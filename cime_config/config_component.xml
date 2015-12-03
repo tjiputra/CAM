@@ -217,7 +217,7 @@
     <values>
       <value compset="%SCAM">TRUE</value>
     </values>
-    <group>run_componnet_cam_defpts</group>
+    <group>run_component_cam_defpts</group>
     <file>env_run.xml</file>
     <desc>Operate on only a single point of the global grid  - DO NOT EDIT (for experts only)</desc>
   </entry>

@@ -939,7 +939,7 @@
              else
                 write( msg, '(2a,3(1x,i12),2x,a)' ) &
                      'subr initaermodes_setspecptrs error setting lptr_', &
-                     ' - m, l, lmassa, cnst_name = ', m, l, lmassa, '??????'
+                     ' - m, l, lmassa, cnst_name = ', m, l, lmassa, 'UNDEF '
                 call endrun( trim(msg) )
              end if
 
