@@ -3,8 +3,6 @@
 
 
 
-
-
       module m_spc_id
 
       implicit none

@@ -3,8 +3,6 @@
 
 
 
-
-
       module mo_lin_matrix
 
       private

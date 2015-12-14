@@ -3,8 +3,6 @@
 
 
 
-
-
       module mo_adjrxt
 
       private

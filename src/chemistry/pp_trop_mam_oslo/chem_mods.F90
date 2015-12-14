@@ -3,8 +3,6 @@
 
 
 
-
-
       module chem_mods
 !--------------------------------------------------------------
 ! ... Basic chemistry parameters and arrays
@@ -35,6 +33,7 @@
                             indexh2o = 4, & ! index of water vapor density
                             clsze = 1, & ! loop length for implicit chemistry
                             rxt_tag_cnt = 3, &
+                            enthalpy_cnt = 0, &
                             nslvd = 0
 
       integer :: clscnt(5) = 0
@@ -52,6 +51,8 @@
 
 
 
+      real(r8), allocatable :: cph_enthalpy(:)
+      integer, allocatable :: cph_rid(:)
 
       integer, allocatable :: rxt_tag_map(:)
       real(r8), allocatable :: pht_alias_mult(:,:)
