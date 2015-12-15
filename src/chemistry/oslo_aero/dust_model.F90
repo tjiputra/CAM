@@ -1,11 +1,12 @@
-module oslo_dust_intr
-!---------------------------------------------------------------------------------
+module dust_model
+  use shr_kind_mod,     only: r8 => shr_kind_r8, cl => shr_kind_cl
+  use spmd_utils,       only: masterproc
+  use cam_abortutils,   only: endrun
 
 use aerosoldef,       only: l_dst_a2, l_dst_a3
 use shr_kind_mod,     only: r8 => shr_kind_r8, cl => shr_kind_cl
 use camsrfexch,       only: cam_in_t
 use ppgrid,           only: pcols
-use abortutils,       only: endrun
 use cam_logfile,      only: iulog
 
 implicit none
@@ -19,24 +20,62 @@ save
    integer, dimension(numberOfDustModes)             :: tracerMap = (/-99, -99/) !index of dust tracers in the modes
 
    !Related to soil erodibility
-   real(r8), allocatable ::  soil_erodibility(:,:)     ! soil erodibility factor
-   real(r8), allocatable ::  soil_erodibility_in(:,:)  ! temporary input array
+   real(r8)          :: dust_emis_fact = -1.e36_r8        ! tuning parameter for dust emissions
+   character(len=cl) :: soil_erod_file = 'soil_erod_file' ! full pathname for soil erodibility dataset
 
-   real(r8)      :: dust_emis_fact = -1.e36_r8   ! tuning parameter for dust emissions
-   character(cl) :: soil_erod = 'soil_erod'   ! full pathname for soil erodibility dataset
-
+   logical, parameter, public :: dust_active = .TRUE.
 public oslo_dust_emis_intr
 public getNumberOfDustModes
 public getDustTracerIndexInMode
 public getEmissionFractionInDustMode
 public isOsloDustTracer
-public oslo_dust_initialize
+public dust_init
 
 
 !===============================================================================
 contains
 !===============================================================================
 
+  subroutine dust_readnl(nlfile)
+
+    use namelist_utils,  only: find_group_name
+    use units,           only: getunit, freeunit
+    use mpishorthand
+
+    character(len=*), intent(in) :: nlfile  ! filepath for file containing namelist input
+
+    ! Local variables
+    integer :: unitn, ierr
+    character(len=*), parameter :: subname = 'dust_readnl'
+
+    namelist /dust_nl/ dust_emis_fact, soil_erod_file
+
+    !-----------------------------------------------------------------------------
+
+    ! Read namelist
+    if (masterproc) then
+       unitn = getunit()
+       open( unitn, file=trim(nlfile), status='old' )
+       call find_group_name(unitn, 'dust_nl', status=ierr)
+       if (ierr == 0) then
+          read(unitn, dust_nl, iostat=ierr)
+          if (ierr /= 0) then
+             call endrun(subname // ':: ERROR reading namelist')
+          end if
+       end if
+       close(unitn)
+       call freeunit(unitn)
+    end if
+
+#ifdef SPMD
+    ! Broadcast namelist variables
+    call mpibcast(dust_emis_fact, 1,                   mpir8,   0, mpicom)
+    call mpibcast(soil_erod_file, len(soil_erod_file), mpichar, 0, mpicom)
+#endif
+
+
+
+  end subroutine dust_readnl
    function getEmissionFractionInDustMode(modeIndex) RESULT(fraction)
       integer, intent(in) :: modeIndex
       real(r8)            :: fraction
@@ -49,20 +88,18 @@ contains
    end function getNumberOfDustModes
 
 
-   subroutine oslo_dust_initialize(dust_emis_fact_in, soil_erod_in)
+   subroutine dust_init()
+
+      use soil_erod_mod, only: soil_erod_init
       implicit none
 
-      character(cl), intent(in) :: soil_erod_in
-      real(r8), intent(in)      :: dust_emis_fact_in
 
-      !Nail the overall tuning factor
-      dust_emis_fact = dust_emis_fact_in
 
-      call read_soil_erodibility_data(soil_erod_in)
+      call  soil_erod_init( dust_emis_fact, soil_erod_file )
 
       call set_oslo_indices()
 
-   end subroutine oslo_dust_initialize
+   end subroutine dust_init
 
    subroutine set_oslo_indices()
       implicit none
@@ -91,100 +128,6 @@ contains
    !For a general discussion of these factors, see: 
    !Zender et al JGR (vol 108, D16, 2003) 
    !http://onlinelibrary.wiley.com/doi/10.1029/2002JD003039/abstract
-
-   subroutine read_soil_erodibility_data(soil_erod_in)
-
-      use cam_history,      only: addfld, add_default, phys_decomp
-      use ioFileMod,        only: getfil
-      use pio
-      use cam_pio_utils,    only : cam_pio_openfile
-      use phys_grid,        only : get_ncols_p, get_rlat_all_p, get_rlon_all_p
-      use interpolate_data, only : lininterp_init, lininterp, lininterp_finish, interp_type
-      use ppgrid,           only : begchunk, endchunk
-      use mo_constants,     only : pi, d2r
-
-      implicit none
-
-      character(cl), intent(in) :: soil_erod_in      !filename of soil erodibility data set
-      character(cl)      :: soil_erod_file
-
-      integer :: did, vid, nlat, nlon
-      type(file_desc_t) :: ncid
-
-      type(interp_type) :: lon_wgts, lat_wgts
-      real(r8) :: to_lats(pcols), to_lons(pcols)
-      real(r8), allocatable :: dst_lons(:)
-      real(r8), allocatable :: dst_lats(:)
-      integer :: c, ncols, ierr
-      real(r8), parameter :: zero=0._r8, twopi=2._r8*pi
-
-      !-----------------------------------------------------------------------
-
-      ! set module data from namelist vars read in aerosol_intr module
-      soil_erod      = soil_erod_in
-
-      ! for soil erodibility in mobilization, apply inside CAM instead of lsm.
-      ! read in soil erodibility factors, similar to Zender's boundary conditions
-
-      ! Get file name.  
-      call getfil(soil_erod, soil_erod_file, 0)
-      call cam_pio_openfile (ncid, trim(soil_erod_file), PIO_NOWRITE)
-
-      ! Get input data resolution.
-      ierr = pio_inq_dimid( ncid, 'lon', did )
-      ierr = pio_inq_dimlen( ncid, did, nlon )
-
-      ierr = pio_inq_dimid( ncid, 'lat', did )
-      ierr = pio_inq_dimlen( ncid, did, nlat )
-
-      allocate(dst_lons(nlon))
-      allocate(dst_lats(nlat))
-      allocate(soil_erodibility_in(nlon,nlat))
-
-      ierr = pio_inq_varid( ncid, 'lon', vid )
-      ierr = pio_get_var( ncid, vid, dst_lons  )
-
-      ierr = pio_inq_varid( ncid, 'lat', vid )
-      ierr = pio_get_var( ncid, vid, dst_lats  )
-
-      ierr = pio_inq_varid( ncid, 'mbl_bsn_fct_geo', vid )
-      ierr = pio_get_var( ncid, vid, soil_erodibility_in )
-
-   !-----------------------------------------------------------------------
-   !     	... convert to radians and setup regridding
-   !-----------------------------------------------------------------------
-       dst_lats(:) = d2r * dst_lats(:)
-       dst_lons(:) = d2r * dst_lons(:)
-
-       allocate( soil_erodibility(pcols,begchunk:endchunk) )
-
-   !-----------------------------------------------------------------------
-   !     	... regrid ..
-   !-----------------------------------------------------------------------
-       do c=begchunk,endchunk
-          ncols = get_ncols_p(c)
-          call get_rlat_all_p(c, pcols, to_lats)
-          call get_rlon_all_p(c, pcols, to_lons)
-          
-          call lininterp_init(dst_lons, nlon, to_lons, ncols, 2, lon_wgts, zero, twopi)
-          call lininterp_init(dst_lats, nlat, to_lats, ncols, 1, lat_wgts)
-
-          call lininterp(soil_erodibility_in(:,:), nlon,nlat , soil_erodibility(:,c), ncols, lon_wgts,lat_wgts)
-
-          call lininterp_finish(lat_wgts)
-          call lininterp_finish(lon_wgts)
-       end do
-       deallocate( soil_erodibility_in, stat=ierr )
-       if( ierr /= 0 ) then
-          write(iulog,*) 'dust_initialize: failed to deallocate soil_erod_in, ierr = ',ierr
-          call endrun
-       end if
-
-      call addfld('MBL_BSN_FCT','frac ',1, 'A','Soil erodibility factor',phys_decomp)
-      call addfld('OSLO_DUST_EMIS','kg/m2/s ',1, 'A','oslo dust emissions',phys_decomp)
-      
-
-   end subroutine read_soil_erodibility_data
 
    function getDustTracerIndexInMode(modeIndex)RESULT(answer)
       integer, intent(in) :: modeIndex
@@ -220,6 +163,10 @@ contains
       !-----------------------------------------------------------------------
       use cam_history,   only: outfld
       use physics_types, only: physics_state
+      use soil_erod_mod, only : soil_erod_fact
+      use soil_erod_mod, only : soil_erodibility
+
+      implicit none
 
       ! Arguments:
 
@@ -269,4 +216,4 @@ contains
       return
    end subroutine oslo_dust_emis_intr
 
-end module oslo_dust_intr
+end module dust_model

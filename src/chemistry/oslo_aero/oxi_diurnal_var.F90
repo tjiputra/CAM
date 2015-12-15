@@ -380,7 +380,7 @@ contains
 	iriseset = 0
 !c check latitude, longitude, dates for proper range before calculating dates.
 	 if (((rlat .lt. -90._r8) .or. (rlat .gt. 90._r8)) .or. &
-     +  ((rlong .lt. -180._r8) .or. (rlong .gt. 180._r8))) then
+       ((rlong .lt. -180._r8) .or. (rlong .gt. 180._r8))) then
 		iriseset = -1
 		return
 	end if

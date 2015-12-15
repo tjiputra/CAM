@@ -19,7 +19,7 @@ module chemistry
   use mo_gas_phase_chemdr, only : map2chm
   use shr_megan_mod,    only : shr_megan_mechcomps, shr_megan_mechcomps_n 
 #ifdef OSLO_AERO
-  use oslo_dust_intr, only : isOsloDustTracer
+  use dust_model, only : isOsloDustTracer
 #endif
 
   use tracer_data,  only : MAXTRCRS

@@ -88,7 +88,7 @@ contains
       !Theory: Poling et al, "The properties of gases and liquids"
       !5th edition, eqn 11-4-4
 
-      use cam_history,     only: addfld, add_default, fieldname_len, phys_decomp
+      use cam_history,     only: addfld, add_default, fieldname_len, horiz_only 
       implicit none
 
       real(r8), parameter :: aunit = 1.6606e-27_r8  ![kg] Atomic mass unit
@@ -212,10 +212,10 @@ contains
             fieldname_donor = trim(solsym(iChem))//"condTend"
             fieldname_receiver = trim(solsym(lifeCycleReceiver(iChem)))//"condTend"
             if(.not. isAlreadyOnList(lifeCycleReceiver(iChem)))then
-               call addfld( fieldname_receiver, unit, 1, 'A', "condensation tendency", phys_decomp )
+               call addfld( fieldname_receiver, horiz_only, "A", unit, "condensation tendency" )
                isAlreadyOnList(lifeCycleReceiver(iChem))=.TRUE.
             end if
-            call addfld( fieldname_donor, unit, 1, 'A', "condensation tendency", phys_decomp )
+            call addfld( fieldname_donor, horiz_only, "A", unit, "condensation tendency" )
             if(history_aerosol)then
                call add_default( fieldname_receiver, 1, ' ' )
                call add_default( fieldname_donor   , 1, ' ')
@@ -224,12 +224,12 @@ contains
       end do
       !Need to add so4_a1 and soa_a1 also (which are not parts of the donor-receiver stuff) 
       fieldname_receiver = trim(solsym(chemistryIndex(l_so4_a1)))//"condTend"
-      call addfld( fieldname_receiver, unit, 1, 'A', "condensation tendency", phys_decomp )
+      call addfld( fieldname_receiver, horiz_only, 'A', unit, "condensation tendency")
       if(history_aerosol)then
          call add_default( fieldname_receiver, 1, ' ' )
       end if
       fieldname_receiver = trim(solsym(chemistryIndex(l_soa_a1)))//"condTend"
-      call addfld( fieldname_receiver, unit, 1, 'A', "condensation tendency", phys_decomp )
+      call addfld( fieldname_receiver, horiz_only, "A", unit, "condensation tendency" )
       if(history_aerosol)then
          call add_default( fieldname_receiver, 1, ' ' )
       end if

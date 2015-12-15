@@ -60,7 +60,7 @@ contains
 subroutine initializeCoagulationOutput()
 
    use ppgrid, only: pver
-   use cam_history,     only: addfld, add_default, fieldname_len, phys_decomp
+   use cam_history,     only: addfld, add_default, fieldname_len, horiz_only
    implicit none
    integer :: imode
    integer :: iChem
@@ -82,10 +82,10 @@ subroutine initializeCoagulationOutput()
          fieldname_donor = trim(solsym(iChem))//"coagTend"
          fieldname_receiver    = trim(solsym(lifeCycleReceiver(iChem)))//"coagTend"
          if(.not. isAlreadyOnList(lifeCycleReceiver(iChem)))then
-            call addfld( fieldname_receiver, unit, 1, 'A', "coagulation tendency", phys_decomp )
+            call addfld( fieldname_receiver, horiz_only ,"A", unit, "coagulation tendency")
             isAlreadyOnList(lifeCycleReceiver(iChem))=.TRUE.
          end if
-         call addfld( fieldname_donor, unit, 1, 'A', "coagulation tendency", phys_decomp )
+         call addfld( fieldname_donor, horiz_only, 'A', unit, "coagulation tendency" )
          if(history_aerosol)then
             call add_default( fieldname_receiver, 1, ' ' )
             call add_default( fieldname_donor   , 1, ' ')
@@ -100,10 +100,10 @@ subroutine initializeCoagulationOutput()
          fieldname_donor = trim(solsym(iChem))//"clcoagTend"
          fieldname_receiver    = trim(solsym(CloudAerReceiver(iChem)))//"_OCWclcoagTend"
          if(.not. isAlreadyOnList(CloudAerReceiver(iChem)))then
-            call addfld( fieldname_receiver, unit, 1, 'A', "coagulation tendency", phys_decomp )
+            call addfld( fieldname_receiver, horiz_only, 'A', unit, "coagulation tendency" )
             isAlreadyOnList(CloudAerReceiver(iChem))=.TRUE.
          end if
-         call addfld( fieldname_donor, unit, 1, 'A', "coagulation tendency", phys_decomp )
+         call addfld( fieldname_donor, horiz_only, "A", unit, "coagulation tendency" )
          if(history_aerosol)then
             call add_default( fieldname_receiver, 1, ' ' )
             call add_default( fieldname_donor   , 1, ' ')

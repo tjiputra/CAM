@@ -718,7 +718,7 @@ CONTAINS
     use mo_chem_utls,  only: get_spc_ndx
 #endif
 #if (defined OSLO_AERO)
-    use oslo_dust_intr
+    use dust_model 
 #endif
     use shr_const_mod, only: shr_const_stebol
     use seq_drydep_mod,only: n_drydep

@@ -1,4 +1,4 @@
-module oslo_salt_intr
+module seasalt_model
 
 use aerosoldef,       only: l_ss_a1, l_ss_a2, l_ss_a3,l_om_ni   &
                            , MODE_IDX_SS_A1, MODE_IDX_SS_A2, MODE_IDX_SS_A3 &
@@ -74,15 +74,16 @@ save
    real(r8), dimension(pcols), save, public  :: spracklenOMOceanSource ![kg/m2/s] spracklen ocean source
    !real(r8), dimension(pcols), save, public  :: spracklenOMOceanSource2 ![kg/m2/s] spracklen ocean source
    real(r8), dimension(pcols)                 :: onOMOceanSource ![kg/m2/s] OM source from Nilsson/O'Dowd
+   logical, parameter, public :: seasalt_active = .TRUE.
 
 public oslo_salt_emis_intr
-public oslo_salt_initialize
+public seasalt_init
 
 !===============================================================================
 contains
 !===============================================================================
 
-   subroutine oslo_salt_initialize()
+   subroutine seasalt_init()
 
       implicit none
       modeMap(1) = MODE_IDX_SS_A1  
@@ -94,7 +95,7 @@ contains
       tracerMap(3) = l_ss_a3
 
       spracklenOMOceanSource(:) = 0.0_r8
-   end subroutine oslo_salt_initialize
+   end subroutine seasalt_init
 
 subroutine oslo_salt_emis_intr(state, cam_in)
 
@@ -202,4 +203,4 @@ subroutine oslo_salt_emis_intr(state, cam_in)
     return
   end subroutine oslo_salt_emis_intr
 
-end module oslo_salt_intr
+end module seasalt_model

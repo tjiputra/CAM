@@ -14,13 +14,14 @@ module modal_aero_deposition
 ! Jul 2011  F Vitt -- made avaliable to be used in a prescribed modal aerosol mode (no prognostic MAM)
 ! Mar 2012  F Vitt -- made changes for to prevent abort when 7-mode aeroslol model is used
 !                     some of the needed consituents do not exist in 7-mode so bin_fluxes will be false
+! May 2014  F Vitt -- included contributions from MAM4 aerosols and added soa_a2 to the ocphiwet fluxes
 !------------------------------------------------------------------------------------------------
 
 use shr_kind_mod,     only: r8 => shr_kind_r8
 use camsrfexch,       only: cam_out_t     
-use constituents,     only: pcnst, cnst_get_ind
-use ppgrid,           only: pcols
-use abortutils,       only: endrun
+use constituents,     only: cnst_get_ind, pcnst
+use cam_abortutils,   only: endrun
+use rad_constituents, only: rad_cnst_get_info
 use aerosoldef,       only: l_bc_n,l_bc_ax,l_bc_ni,l_bc_a,l_bc_ai,l_bc_ac
 use aerosoldef,       only: l_om_ni,l_om_ai,l_om_ac,l_dst_a2,l_dst_a3
 
@@ -34,82 +35,56 @@ public :: &
    set_srf_wetdep
 
 ! Private module data
-integer :: idx_bc1  = -1
-integer :: idx_pom1 = -1
-integer :: idx_soa1 = -1
-integer :: idx_soa2 = -1
-integer :: idx_dst1 = -1
-integer :: idx_dst3 = -1
-integer :: idx_ncl3 = -1
-integer :: idx_so43 = -1
-logical :: bin_fluxes = .false.
 
 logical :: initialized = .false.
+integer :: bcphi_ndx( pcnst ) = -1
+integer :: bcpho_ndx( pcnst ) = -1
+integer :: ocphi_ndx( pcnst ) = -1
+integer :: ocpho_ndx( pcnst ) = -1
+integer :: crse_dust_ndx( pcnst ) = -1
+integer :: fine_dust_ndx( pcnst ) = -1
+integer :: bcphi_cnt = 0
+integer :: ocphi_cnt = 0
+integer :: bcpho_cnt = 0
+integer :: ocpho_cnt = 0
+integer :: crse_dust_cnt = 0
+integer :: fine_dust_cnt = 0
 
 !==============================================================================
 contains
 !==============================================================================
 
-subroutine modal_aero_deposition_init(bc1_ndx,pom1_ndx,soa1_ndx,soa2_ndx,dst1_ndx,dst3_ndx,ncl3_ndx,so43_ndx,num3_ndx)
+subroutine modal_aero_deposition_init( bcphi_indices, bcpho_indices, ocphi_indices, &
+                                ocpho_indices, fine_dust_indices, crse_dust_indices )
 
-! set aerosol indices for re-mapping surface deposition fluxes:
-! *_a1 = accumulation mode
-! *_a2 = aitken mode
-! *_a3 = coarse mode
+  ! set aerosol indices for re-mapping surface deposition fluxes:
+  ! *_a1 = accumulation mode
+  ! *_a2 = aitken mode
+  ! *_a3 = coarse mode
 
    ! can be initialized with user specified indices
    ! if called from aerodep_flx module (for prescribed modal aerosol fluxes) then these indices are specified
+  integer, optional, intent(in) :: bcphi_indices(:)     ! hydrophilic black carbon
+  integer, optional, intent(in) :: bcpho_indices(:)     ! hydrophobic black carbon
+  integer, optional, intent(in) :: ocphi_indices(:)     ! hydrophilic organic carbon
+  integer, optional, intent(in) :: ocpho_indices(:)     ! hydrophobic organic carbon 
+  integer, optional, intent(in) :: fine_dust_indices(:) ! fine dust
+  integer, optional, intent(in) :: crse_dust_indices(:) ! coarse dust
 
-   integer, optional, intent(in) :: bc1_ndx,pom1_ndx,soa1_ndx,soa2_ndx,dst1_ndx,dst3_ndx,ncl3_ndx,so43_ndx,num3_ndx
+  ! local vars
+  integer :: i, pcnt, scnt
+
+  character(len=16), parameter :: fine_dust_modes(2) =  (/ 'accum           ', 'fine_dust       '/)
+  character(len=16), parameter :: crse_dust_modes(2) =  (/ 'coarse          ', 'coarse_dust     '/)
+  character(len=16), parameter :: hydrophilic_carbon_modes(1) = (/'accum           '/)
+  character(len=16), parameter :: hydrophobic_carbon_modes(3) = (/'aitken          ',  'coarse          ', 'primary_carbon  '/)
 
    ! if already initialized abort the run
    if (initialized) then
-     call endrun('modal_aero_deposition_init is already initialized')
+     call endrun('modal_aero_deposition is already initialized')
    endif
 
-   if (present(bc1_ndx)) then
-      idx_bc1  = bc1_ndx
-   else
-      call cnst_get_ind('bc_a1',  idx_bc1)
-   endif
-   if (present(pom1_ndx)) then
-      idx_pom1 = pom1_ndx
-   else
-      call cnst_get_ind('pom_a1', idx_pom1)
-   endif
-   if (present(soa1_ndx)) then
-      idx_soa1 = soa1_ndx
-   else
-      call cnst_get_ind('soa_a1', idx_soa1)
-   endif
-   if (present(soa2_ndx)) then
-      idx_soa2 = soa2_ndx
-   else
-      call cnst_get_ind('soa_a2', idx_soa2)
-   endif
-   if (present(dst1_ndx)) then
-      idx_dst1 = dst1_ndx
-   else
-      call cnst_get_ind('dst_a1', idx_dst1,abort=.false.)
-   endif
-   if (present(dst3_ndx)) then
-      idx_dst3 = dst3_ndx
-   else
-      call cnst_get_ind('dst_a3', idx_dst3,abort=.false.)
-   endif
-   if (present(ncl3_ndx)) then
-      idx_ncl3 = ncl3_ndx
-   else
-      call cnst_get_ind('ncl_a3', idx_ncl3,abort=.false.)
-   endif
-   if (present(so43_ndx)) then
-      idx_so43 = so43_ndx
-   else
-      call cnst_get_ind('so4_a3', idx_so43,abort=.false.)
-   endif
 
-!  for 7 mode bin_fluxes will be false
-   bin_fluxes = idx_dst1>0 .and. idx_dst3>0 .and.idx_ncl3>0 .and. idx_so43>0
    initialized = .true.
 
 end subroutine modal_aero_deposition_init
@@ -125,12 +100,23 @@ subroutine set_srf_wetdep(aerdepwetis, aerdepwetcw, cam_out)
    type(cam_out_t), intent(inout) :: cam_out     ! cam export state
 
    ! Local variables:
-   integer :: i
+   integer :: i, ispec, idx
    integer :: ncol                      ! number of columns
+
+   real(r8) :: bcphiwet_sum, ocphiwet_sum
    !----------------------------------------------------------------------------
+
+  if (.not.initialized) call endrun('set_srf_wetdep: modal_aero_deposition has not been initialized')
 
    ncol = cam_out%ncol
 
+   cam_out%bcphiwet(:) = 0._r8
+   cam_out%ocphiwet(:) = 0._r8
+
+   ! derive cam_out variables from deposition fluxes
+   !  note: wet deposition fluxes are negative into surface, 
+   !        dry deposition fluxes are positive into surface.
+   !        srf models want positive definite fluxes.
    do i = 1, ncol
       ! black carbon fluxes
       cam_out%bcphiwet(i) = -(aerdepwetis(i,l_bc_ni)+aerdepwetcw(i,l_bc_ni)+ &
@@ -166,16 +152,24 @@ subroutine set_srf_drydep(aerdepdryis, aerdepdrycw, cam_out)
    type(cam_out_t), intent(inout) :: cam_out     ! cam export state
 
    ! Local variables:
-   integer :: i
+   integer :: i, ispec, idx
    integer :: ncol                      ! number of columns
+   real(r8):: bcphidry_sum, ocphidry_sum, ocphodry_sum
    !----------------------------------------------------------------------------
 
+   if (.not.initialized) call endrun('set_srf_drydep: modal_aero_deposition has not been initialized')
+
    ncol = cam_out%ncol
+
+   cam_out%bcphidry(:) = 0._r8
+   cam_out%bcphodry(:) = 0._r8
+   cam_out%ocphidry(:) = 0._r8
+   cam_out%ocphodry(:) = 0._r8
 
    ! derive cam_out variables from deposition fluxes
    !  note: wet deposition fluxes are negative into surface, 
    !        dry deposition fluxes are positive into surface.
-   !        CLM wants positive definite fluxes.
+   !        srf models want positive definite fluxes.
    do i = 1, ncol
       ! black carbon fluxes
       cam_out%bcphidry(i) = aerdepdryis(i,l_bc_ni)+aerdepdrycw(i,l_bc_ni)+ &
