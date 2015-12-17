@@ -18,7 +18,9 @@ module mo_chm_diags
 
   integer :: id_n,id_no,id_no2,id_no3,id_n2o5,id_hno3,id_ho2no2,id_clono2,id_brono2
   integer :: id_cl,id_clo,id_hocl,id_cl2,id_cl2o2,id_oclo,id_hcl,id_brcl
-  integer :: id_ccl4,id_cfc11,id_cfc113,id_ch3ccl3,id_cfc12,id_ch3cl,id_hcfc22,id_cf2clbr
+  integer :: id_ccl4,id_cfc11,id_cfc113,id_ch3ccl3,id_cfc12,id_ch3cl,id_hcfc22,id_cf3br,id_cf2clbr
+  integer :: id_cfc114,id_cfc115,id_hcfc141b,id_hcfc142b,id_h1202,id_h2402,id_ch2br2,id_chbr3
+  integer :: id_hf,id_f,id_cof2,id_cofcl,id_ch3br
   integer :: id_br,id_bro,id_hbr,id_hobr,id_ch4,id_h2o,id_h2
   integer :: id_o,id_o2,id_h
 
@@ -28,12 +30,13 @@ module mo_chm_diags
   logical :: has_jeuvs, has_jno_i, has_jno
 
   integer :: nox_species(3),  noy_species(15)
-  integer :: clox_species(6), cloy_species(9), tcly_species(17)
-  integer :: brox_species(2), broy_species(6)
+  integer :: clox_species(6), cloy_species(9), tcly_species(21)
+  integer :: brox_species(4), broy_species(6), tbry_species(13)
+  integer :: foy_species(4),  tfy_species(16)
   integer :: toth_species(3)
   integer :: sox_species(3)
   integer :: nhx_species(3)
-  integer :: aer_species(gas_pcnst), cam_aerosols(8)
+  integer :: aer_species(gas_pcnst)
 
   character(len=fieldname_len) :: dtchem_name(gas_pcnst)
   character(len=fieldname_len) :: depvel_name(gas_pcnst)
@@ -56,13 +59,9 @@ contains
     !	... initialize utility routine
     !--------------------------------------------------------------------
 
-    use cam_history,  only : addfld, phys_decomp, add_default
+    use cam_history,  only : addfld, add_default, horiz_only
     use constituents, only : cnst_get_ind, cnst_longname
-    use dyn_grid,     only : get_dyn_grid_parm, get_horiz_grid_d
     use phys_control, only: phys_getopts
-#if (defined MODAL_AERO)
-    use modal_aero_data, only: cnst_name_cw
-#endif
 #if (defined OSLO_AERO)
 !    use aerosoldef, only: getCloudTracerIndexDirect, getCloudTracerName &
 !                       , N_AEROSOL_TYPES, aerosol_type_name, isAerosol 
@@ -83,8 +82,8 @@ contains
     integer :: id_nh3, id_nh4
     integer :: id_dst01, id_dst02, id_dst03, id_dst04, id_sslt01, id_sslt02, id_sslt03, id_sslt04
     integer :: id_soa,  id_oc1, id_oc2, id_cb1, id_cb2
-    integer :: id_bry, id_cly 
     integer :: id_soam,id_soai,id_soat,id_soab,id_soax
+    integer :: id_bry, id_cly 
 
     logical :: history_aerosol      ! Output the MAM aerosol tendencies
     logical :: history_amwg         ! output the variables used by the AMWG diag package
@@ -120,14 +119,35 @@ contains
     id_oclo    = get_spc_ndx( 'OCLO' )
     id_hcl     = get_spc_ndx( 'HCL' )
     id_brcl    = get_spc_ndx( 'BRCL' )
+
+    id_f       = get_spc_ndx( 'F' )
+    id_hf      = get_spc_ndx( 'HF' )
+    id_cofcl   = get_spc_ndx( 'COFCL' )
+    id_cof2    = get_spc_ndx( 'COF2' )
+
     id_ccl4    = get_spc_ndx( 'CCL4' )
     id_cfc11   = get_spc_ndx( 'CFC11' )
+
     id_cfc113  = get_spc_ndx( 'CFC113' )
+    id_cfc114  = get_spc_ndx( 'CFC114' )
+    id_cfc115  = get_spc_ndx( 'CFC115' )
+
     id_ch3ccl3 = get_spc_ndx( 'CH3CCL3' )
     id_cfc12   = get_spc_ndx( 'CFC12' )
     id_ch3cl   = get_spc_ndx( 'CH3CL' )
+
     id_hcfc22  = get_spc_ndx( 'HCFC22' )
+    id_hcfc141b= get_spc_ndx( 'HCFC141B' )
+    id_hcfc142b= get_spc_ndx( 'HCFC142B' )
+
     id_cf2clbr = get_spc_ndx( 'CF2CLBR' )
+    id_cf3br   = get_spc_ndx( 'CF3BR' )
+    id_ch3br   = get_spc_ndx( 'CH3BR' )
+    id_h1202   = get_spc_ndx( 'H1202' )
+    id_h2402   = get_spc_ndx( 'H2402' )
+    id_ch2br2  = get_spc_ndx( 'CH2BR2' )
+    id_chbr3   = get_spc_ndx( 'CHBR3' )
+
     id_br      = get_spc_ndx( 'BR' )
     id_bro     = get_spc_ndx( 'BRO' )
     id_hbr     = get_spc_ndx( 'HBR' )
@@ -178,16 +198,28 @@ contains
     id_soab = get_spc_ndx( 'SOAB' )
     id_soax = get_spc_ndx( 'SOAX' )
 
+
+!... NOY species
     nox_species = (/ id_n, id_no, id_no2 /)
     noy_species = (/ id_n, id_no, id_no2, id_no3, id_n2o5, id_hno3, id_ho2no2, id_clono2, &
                      id_brono2, id_pan, id_onit, id_mpan, id_isopno3, id_onitr, id_nh4no3 /)
+!... CLOY species
     clox_species = (/ id_cl, id_clo, id_hocl, id_cl2, id_cl2o2, id_oclo /)
     cloy_species = (/ id_cl, id_clo, id_hocl, id_cl2, id_cl2o2, id_oclo, id_hcl, id_clono2, id_brcl /)
     tcly_species = (/ id_cl, id_clo, id_hocl, id_cl2, id_cl2o2, id_oclo, id_hcl, id_clono2, id_brcl, &
-                      id_ccl4, id_cfc11, id_cfc113, id_ch3ccl3, id_cfc12, id_ch3cl, id_hcfc22, id_cf2clbr /)
+                      id_ccl4, id_cfc11, id_cfc113, id_cfc114, id_cfc115, id_ch3ccl3, id_cfc12, id_ch3cl, &
+                      id_hcfc22, id_hcfc141b, id_hcfc142b, id_cf2clbr /)
 
-    brox_species = (/ id_br, id_bro /)
+!... FOY species
+    foy_species = (/ id_F, id_hf, id_cofcl, id_cof2 /)
+    tfy_species = (/ id_f, id_hf, id_cofcl, id_cof2, id_cfc11, id_cfc12, id_cfc113, id_cfc114, id_cfc115, &
+                     id_hcfc22, id_hcfc141b, id_hcfc142b, id_cf2clbr, id_cf3br, id_h1202, id_h2402 /)
+
+!... BROY species
+    brox_species = (/ id_br, id_bro, id_brcl, id_hobr /)
     broy_species = (/ id_br, id_bro, id_hbr, id_brono2, id_brcl, id_hobr /)
+    tbry_species = (/ id_br, id_bro, id_hbr, id_brono2, id_brcl, id_hobr, id_cf2clbr, id_cf3br, id_ch3br, id_h1202, &
+                      id_h2402, id_ch2br2, id_chbr3 /)
 
     sox_species = (/ id_so2, id_so4, id_h2so4 /)
     nhx_species = (/ id_nh3, id_nh4, id_nh4no3 /)
@@ -210,24 +242,29 @@ contains
        endif
     enddo
 
-    cam_aerosols = (/ id_dst01, id_dst02, id_dst03, id_dst04, &
-                      id_sslt01, id_sslt02, id_sslt03, id_sslt04 /)
-
     toth_species = (/ id_ch4, id_h2o, id_h2 /)
 
-    call addfld( 'NOX', 'mol/mol', pver, 'A', 'nox volume mixing ratio',  phys_decomp )
-    call addfld( 'NOY', 'mol/mol', pver, 'A', 'noy volume mixing ratio',  phys_decomp )
-    call addfld( 'BROX','mol/mol', pver, 'A', 'brox volume mixing ratio', phys_decomp )
-    call addfld( 'BROY','mol/mol', pver, 'A', 'total inorganic bromine (Br+BrO+HOBr+BrONO2+HBr+BrCl)', phys_decomp )
-    call addfld( 'CLOX','mol/mol', pver, 'A', 'clox volume mixing ratio', phys_decomp )
-    call addfld( 'CLOY','mol/mol', pver, 'A', 'total inorganic chlorine (Cl+ClO+2Cl2+2Cl2O2+OClO+HOCl+ClONO2+HCl+BrCl)', &
-	phys_decomp )
-    call addfld( 'TCLY','mol/mol', pver, 'A', 'total Cl volume mixing ratio', phys_decomp )
-    call addfld( 'TOTH','mol/mol', pver, 'A', 'total H2 volume mixing ratio', phys_decomp )
+    call addfld( 'NOX',     (/ 'lev' /), 'A', 'mol/mol', 'nox (N+NO+NO2)' )
+    call addfld( 'NOY',     (/ 'lev' /), 'A', 'mol/mol', &
+                 'noy = total inorganic nitrogen (N+NO+NO2+NO3+2N2O5+HNO3+HO2NO2+ORGNOY+NH4NO3' )
+    call addfld( 'NOY_SRF', horiz_only,  'A', 'mol/mol', 'surface noy volume mixing ratio' )
 
-    call addfld( 'NOY_mmr', 'kg/kg', pver, 'A', 'NOy mass mixing ratio', phys_decomp )
-    call addfld( 'SOX_mmr', 'kg/kg', pver, 'A', 'SOx mass mixing ratio', phys_decomp )
-    call addfld( 'NHX_mmr', 'kg/kg', pver, 'A', 'NHx mass mixing ratio', phys_decomp )
+    call addfld( 'BROX',    (/ 'lev' /), 'A', 'mol/mol', 'brox (Br+BrO+BRCl+HOBr)' )
+    call addfld( 'BROY',    (/ 'lev' /), 'A', 'mol/mol', 'total inorganic bromine (Br+BrO+HOBr+BrONO2+HBr+BrCl)' )
+    call addfld( 'TBRY',    (/ 'lev' /), 'A', 'mol/mol', 'total Br (ORG+INORG) volume mixing ratio' )
+
+    call addfld( 'CLOX',    (/ 'lev' /), 'A', 'mol/mol', 'clox (Cl+CLO+HOCl+2Cl2+2Cl2O2+OClO' )
+    call addfld( 'CLOY',    (/ 'lev' /), 'A', 'mol/mol', 'total inorganic chlorine (Cl+ClO+2Cl2+2Cl2O2+OClO+HOCl+ClONO2+HCl+BrCl)' )
+    call addfld( 'TCLY',    (/ 'lev' /), 'A', 'mol/mol', 'total Cl (ORG+INORG) volume mixing ratio' )
+
+    call addfld( 'FOY',     (/ 'lev' /), 'A', 'mol/mol', 'total inorganic fluorine (F+HF+COFCL+2COF2)' )
+    call addfld( 'TFY',     (/ 'lev' /), 'A', 'mol/mol', 'total F (ORG+INORG) volume mixing ratio' )
+
+    call addfld( 'TOTH',    (/ 'lev' /), 'A', 'mol/mol', 'total H2 volume mixing ratio' )
+
+    call addfld( 'NOY_mmr', (/ 'lev' /), 'A', 'kg/kg', 'NOy mass mixing ratio' )
+    call addfld( 'SOX_mmr', (/ 'lev' /), 'A', 'kg/kg', 'SOx mass mixing ratio' )
+    call addfld( 'NHX_mmr', (/ 'lev' /), 'A', 'kg/kg', 'NHx mass mixing ratio' )
 
     do j = 1,NJEUV
        write( jchar, '(I2)' ) j
@@ -240,24 +277,31 @@ contains
     has_jno   = rid_jno>0
 
     if ( has_jeuvs ) then
-       call addfld( 'PION_EUV','/cm^3/s', pver, 'I', 'total euv ionization rate', phys_decomp )
-       call addfld( 'PEUV1',   '/cm^3/s', pver, 'I', '(j1+j2+j3)*o', phys_decomp )
-       call addfld( 'PEUV1e',  '/cm^3/s', pver, 'I', '(j14+j15+j16)*o', phys_decomp )
-       call addfld( 'PEUV2',   '/cm^3/s', pver, 'I', 'j4*n', phys_decomp )
-       call addfld( 'PEUV3',   '/cm^3/s', pver, 'I', '(j5+j7+j8+j9)*o2', phys_decomp )
-       call addfld( 'PEUV3e',  '/cm^3/s', pver, 'I', '(j17+j19+j20+j21)*o2', phys_decomp )
-       call addfld( 'PEUV4',   '/cm^3/s', pver, 'I', '(j10+j11)*n2', phys_decomp )
-       call addfld( 'PEUV4e',  '/cm^3/s', pver, 'I', '(j22+j23)*n2', phys_decomp )
-       call addfld( 'PEUVN2D', '/cm^3/s', pver, 'I', '(j11+j13)*n2', phys_decomp )
-       call addfld( 'PEUVN2De','/cm^3/s', pver, 'I', '(j23+j25)*n2', phys_decomp )
+       call addfld( 'PION_EUV', (/ 'lev' /), 'I', '/cm^3/s', 'total euv ionization rate' )
+       call addfld( 'PEUV1',    (/ 'lev' /), 'I', '/cm^3/s', '(j1+j2+j3)*o' )
+       call addfld( 'PEUV1e',   (/ 'lev' /), 'I', '/cm^3/s', '(j14+j15+j16)*o' )
+       call addfld( 'PEUV2',    (/ 'lev' /), 'I', '/cm^3/s', 'j4*n' )
+       call addfld( 'PEUV3',    (/ 'lev' /), 'I', '/cm^3/s', '(j5+j7+j8+j9)*o2' )
+       call addfld( 'PEUV3e',   (/ 'lev' /), 'I', '/cm^3/s', '(j17+j19+j20+j21)*o2' )
+       call addfld( 'PEUV4',    (/ 'lev' /), 'I', '/cm^3/s', '(j10+j11)*n2' )
+       call addfld( 'PEUV4e',   (/ 'lev' /), 'I', '/cm^3/s', '(j22+j23)*n2' )
+       call addfld( 'PEUVN2D',  (/ 'lev' /), 'I', '/cm^3/s', '(j11+j13)*n2' )
+       call addfld( 'PEUVN2De', (/ 'lev' /), 'I', '/cm^3/s', '(j23+j25)*n2' )
     endif
     if ( has_jno ) then
-       call addfld( 'PJNO', '/cm^3/s', pver, 'I', 'jno*no', phys_decomp )
+       call addfld( 'PJNO', (/ 'lev' /), 'I', '/cm^3/s', 'jno*no' )
     endif
     if ( has_jno_i ) then
-       call addfld( 'PJNO_I', '/cm^3/s', pver, 'I', 'jno_i*no', phys_decomp )
+       call addfld( 'PJNO_I', (/ 'lev' /), 'I', '/cm^3/s', 'jno_i*no' )
     endif
-
+!
+! CCMI
+!
+    call addfld( 'DO3CHM_TRP', horiz_only, 'A', 'kg/s', 'integrated net tendency from chem in troposphere',            &
+         flag_xyfill=.True. )
+    call addfld( 'DO3CHM_LMS', horiz_only, 'A', 'kg/s', 'integrated net tendency from chem in lowermost stratosphere', &
+         flag_xyfill=.True. )
+!
     do m = 1,gas_pcnst
 
        spc_name = trim(solsym(m))
@@ -275,24 +319,16 @@ contains
        depflx_name(m) = 'DF_'//trim(spc_name)
        dtchem_name(m) = 'D'//trim(spc_name)//'CHM'
 
-       call addfld( depvel_name(m), 'cm/s ',   1,    'A', 'deposition velocity ', phys_decomp )
-       call addfld( depflx_name(m), 'kg/m2/s', 1,    'A', 'dry deposition flux ', phys_decomp )
-       call addfld( dtchem_name(m), 'kg/s ',   pver, 'A', 'net tendency from chem', phys_decomp )
-#if defined OSLO_AERO
-       !Needed for budget term of gases! Aerosols have their own budget terms
-       if(.NOT. isAerosol(n))then
-          if(history_aerosol)then
-             call add_default( depflx_name(m), 1, ' ')
-          end if
-       endif
-#endif
-       wetdep_name_area(m)='WD_A_'//trim(spc_name)
+       call addfld( depvel_name(m), horiz_only,  'A', 'cm/s',    'deposition velocity ' )
+       call addfld( depflx_name(m), horiz_only,  'A', 'kg/m2/s', 'dry deposition flux ' )
+       call addfld( dtchem_name(m), (/ 'lev' /), 'A', 'kg/s',    'net tendency from chem' )
+
        wetdep_name(m) = 'WD_'//trim(spc_name)
        wtrate_name(m) = 'WDR_'//trim(spc_name)
 
-       call addfld( wetdep_name_area(m), 'kg/m2/s ',   1,    'A', spc_name//' wet deposition', phys_decomp )
-       call addfld( wetdep_name(m), 'kg/s ',   1,    'A', spc_name//' wet deposition', phys_decomp )
-       call addfld( wtrate_name(m),   '/s ',   pver, 'A', spc_name//' wet deposition rate', phys_decomp )
+       call addfld( wetdep_name_area(m), horiz_only, 'A', 'kg/m2/s ', spc_name//' wet deposition' )
+       call addfld( wetdep_name(m), horiz_only,  'A', 'kg/s', spc_name//' wet deposition' )
+       call addfld( wtrate_name(m), (/ 'lev' /), 'A',   '/s', spc_name//' wet deposition rate' )
        
 #if defined OSLO_AERO
        !Needed for budget term of gases! Aerosols have their own budget terms
@@ -309,14 +345,12 @@ contains
           unit_basename = 'kg'  
        endif
 
-       if ( (any( aer_species == m )).or.(trim(chempkg) == 'trop_mam3') .or. (trim(chempkg) == 'trop_mam_oslo') ) then
-          if ( .not. any ( cam_aerosols == m ) ) then
-             call addfld( spc_name, unit_basename//'/kg ',   pver, 'A', trim(attr)//' concentration', phys_decomp)
-          endif
-          call addfld( trim(spc_name)//'_SRF', unit_basename//'/kg', 1, 'A', trim(attr)//" in bottom layer", phys_decomp)    
+       if ( any( aer_species == m ) ) then
+          call addfld( spc_name,   (/ 'lev' /), 'A', unit_basename//'/kg ', trim(attr)//' concentration')
+          call addfld( trim(spc_name)//'_SRF', horiz_only, 'A', unit_basename//'/kg', trim(attr)//" in bottom layer")
        else
-          call addfld( spc_name, 'mol/mol ', pver, 'A', trim(attr)//' concentration', phys_decomp)
-          call addfld( trim(spc_name)//'_SRF', 'mol/mol ', 1, 'A', trim(attr)//" in bottom layer", phys_decomp)
+          call addfld( spc_name, (/ 'lev' /), 'A', 'mol/mol', trim(attr)//' concentration')
+          call addfld( trim(spc_name)//'_SRF', horiz_only, 'A', 'mol/mol', trim(attr)//" in bottom layer")
        endif
 
        if ((m /= id_cly) .and. (m /= id_bry)) then
@@ -333,52 +367,6 @@ contains
           call add_default( spc_name, 1, ' ' )
        end if
 
-#if (defined MODAL_AERO)
-
-! add cloud borne aerosol
-       if ( n>0 ) then
-          if( .not. (cnst_name_cw(n) == ' ') ) then
-
-             if (cnst_name_cw(n)(1:3) == 'num') then
-                unit_basename = ' 1'
-             else
-                unit_basename = 'kg'  
-             endif
-
-             call addfld( cnst_name_cw(n),                unit_basename//'/kg ', pver, 'A', &
-                  trim(cnst_name_cw(n))//' in cloud water',phys_decomp)
-             call addfld (trim(cnst_name_cw(n))//'SFWET', unit_basename//'/m2/s ',1,  'A', &
-                  trim(cnst_name_cw(n))//' wet deposition flux at surface',phys_decomp)
-             call addfld (trim(cnst_name_cw(n))//'SFSIC', unit_basename//'/m2/s ',1,  'A', &
-                  trim(cnst_name_cw(n))//' wet deposition flux (incloud, convective) at surface',phys_decomp)
-             call addfld (trim(cnst_name_cw(n))//'SFSIS', unit_basename//'/m2/s ',1,  'A', &
-                  trim(cnst_name_cw(n))//' wet deposition flux (incloud, stratiform) at surface',phys_decomp)
-             call addfld (trim(cnst_name_cw(n))//'SFSBC', unit_basename//'/m2/s ',1,  'A', &
-                  trim(cnst_name_cw(n))//' wet deposition flux (belowcloud, convective) at surface',phys_decomp)
-             call addfld (trim(cnst_name_cw(n))//'SFSBS', unit_basename//'/m2/s ',1,  'A', &
-                  trim(cnst_name_cw(n))//' wet deposition flux (belowcloud, stratiform) at surface',phys_decomp)
-             call addfld (trim(cnst_name_cw(n))//'DDF',   unit_basename//'/m2/s ',   1, 'A', &
-                  trim(cnst_name_cw(n))//' dry deposition flux at bottom (grav + turb)',phys_decomp)
-             call addfld (trim(cnst_name_cw(n))//'TBF',   unit_basename//'/m2/s ',   1, 'A', &
-                  trim(cnst_name_cw(n))//' turbulent dry deposition flux',phys_decomp)
-             call addfld (trim(cnst_name_cw(n))//'GVF',   unit_basename//'/m2/s ',   1, 'A', &
-                  trim(cnst_name_cw(n))//' gravitational dry deposition flux',phys_decomp)     
-
-             if ( history_aerosol ) then 
-                call add_default( cnst_name_cw(n), 1, ' ' )
-                call add_default (trim(cnst_name_cw(n))//'GVF', 1, ' ')
-                call add_default (trim(cnst_name_cw(n))//'SFWET', 1, ' ') 
-                call add_default (trim(cnst_name_cw(n))//'TBF', 1, ' ')
-                call add_default (trim(cnst_name_cw(n))//'DDF', 1, ' ')
-                call add_default (trim(cnst_name_cw(n))//'SFSBS', 1, ' ')      
-                call add_default (trim(cnst_name_cw(n))//'SFSIC', 1, ' ')
-                call add_default (trim(cnst_name_cw(n))//'SFSBC', 1, ' ')
-                call add_default (trim(cnst_name_cw(n))//'SFSIS', 1, ' ')
-             endif
-          endif
-       endif
-#endif
-
 #if defined OSLO_AERO
    !output 3d-field of aersol tracer in cloud water
    if(n > 0) then
@@ -386,18 +374,18 @@ contains
       if(cloudTracerIndex > 0)then
          cloudTracerName(1:len(CloudTracerName))=" "
          cloudTracerName = getCloudTracerName(n)
-         call addfld( trim(cloudTracerName),'kg/kg ', pver, 'A', &
-              trim(cloudTracerName)//' in cloud water',phys_decomp)
+         call addfld( trim(cloudTracerName), (/'lev'/), 'A','kg/kg', &
+              trim(cloudTracerName)//' in cloud water')
          call add_default( trim(cloudTracerName), 1, ' ' )
 
          !Add column burden of cloud tracers
-         call addfld('cb_'//trim(cloudTracerName),'kg/m2',1,'A', &
-              'cb_'//trim(cloudTracerName)//' column in cloud water',phys_decomp)
+         call addfld('cb_'//trim(cloudTracerName),horiz_only, 'A', 'kg/m2', &
+              'cb_'//trim(cloudTracerName)//' column in cloud water')
          call add_default('cb_'//trim(cloudTracerName),1,' ')
       endif
       !..and column burden in clean air
-      call addfld('cb_'//trim(spc_name),'kg/m2',1,'A', &
-           'cb_'//trim(spc_name)//' in column',phys_decomp)
+      call addfld('cb_'//trim(spc_name),horiz_only, 'A', 'kg/m2', &
+           'cb_'//trim(spc_name)//' in column')
       call add_default('cb_'//trim(spc_name),1,' ' )
 
       if(history_aerosol)then
@@ -418,32 +406,31 @@ contains
 
     enddo
 
+    call addfld( 'MASS', (/ 'lev' /), 'A', 'kg', 'mass of grid box' )
+    call addfld( 'AREA', horiz_only,  'A', 'm2', 'area of grid box' )
 #ifdef OSLO_AERO
    do n=1,N_AEROSOL_TYPES
-      call addfld('cb_'//trim(aerosol_type_name(n)),'kg/m2',1,'A',&
-         'cb_'//trim(aerosol_type_name(n))//' column of aerosol type', phys_decomp)
+      call addfld('cb_'//trim(aerosol_type_name(n)),horiz_only, 'A', 'kg/m2',&
+         'cb_'//trim(aerosol_type_name(n))//' column of aerosol type')
       call add_default('cb_'//trim(aerosol_type_name(n)), 1, ' ')
-      call addfld('mmr_'//trim(aerosol_type_name(n)),'kg/kg',pver,'A',&
-         'mmr_'//trim(aerosol_type_name(n))//' mmr of aerosol type', phys_decomp)
+      call addfld('mmr_'//trim(aerosol_type_name(n)),(/'lev'/),'A','kg/kg' ,&
+         'mmr_'//trim(aerosol_type_name(n))//' mmr of aerosol type')
       call add_default('mmr_'//trim(aerosol_type_name(n)), 1, ' ')
    end do
 #endif
 
-    call addfld( 'MASS', 'kg', pver, 'A', 'mass of grid box', phys_decomp )
-    call addfld( 'AREA', 'm2', 1,    'A', 'area of grid box', phys_decomp )
+    call addfld( 'WD_NOY', horiz_only, 'A', 'kg/s', 'NOy wet deposition' )
+    call addfld( 'DF_NOY', horiz_only, 'I', 'kg/m2/s', 'NOy dry deposition flux ' )
 
-    call addfld( 'WD_NOY', 'kg/s', 1, 'A', 'NOy wet deposition', phys_decomp )
-    call addfld( 'DF_NOY', 'kg/m2/s', 1, 'I', 'NOy dry deposition flux ', phys_decomp )
+    call addfld( 'WD_SOX', horiz_only, 'A', 'kg/s', 'SOx wet deposition' )
+    call addfld( 'DF_SOX', horiz_only, 'I', 'kg/m2/s', 'SOx dry deposition flux ' )
 
-    call addfld( 'WD_SOX', 'kg/s', 1, 'A', 'SOx wet deposition', phys_decomp )
-    call addfld( 'DF_SOX', 'kg/m2/s', 1, 'I', 'SOx dry deposition flux ', phys_decomp )
-
-    call addfld( 'WD_NHX', 'kg/s', 1, 'A', 'NHx wet deposition', phys_decomp )
-    call addfld( 'DF_NHX', 'kg/m2/s', 1, 'I', 'NHx dry deposition flux ', phys_decomp )
+    call addfld( 'WD_NHX', horiz_only, 'A', 'kg/s', 'NHx wet deposition' )
+    call addfld( 'DF_NHX', horiz_only, 'I', 'kg/m2/s', 'NHx dry deposition flux ' )
 
   end subroutine chm_diags_inti
 
-  subroutine chm_diags( lchnk, ncol, vmr, mmr, rxt_rates, invariants, depvel, depflx, mmr_tend, pdel, pbuf )
+  subroutine chm_diags( lchnk, ncol, vmr, mmr, rxt_rates, invariants, depvel, depflx, mmr_tend, pdel, pmid, ltrop, pbuf )
     !--------------------------------------------------------------------
     !	... utility routine to output chemistry diagnostic variables
     !--------------------------------------------------------------------
@@ -452,9 +439,6 @@ contains
     use constituents, only : pcnst
     use constituents, only : cnst_get_ind
     use phys_grid,    only : get_area_all_p, pcols
-#if (defined MODAL_AERO)
-    use modal_aero_data,       only : cnst_name_cw, qqcw_get_field
-#endif
 #if (defined OSLO_AERO)
 !    use aerosoldef,   only : getCloudTracerIndexDirect, getCloudTracerName &
 !                           , N_AEROSOL_TYPES, aerosolType                  &
@@ -465,6 +449,11 @@ contains
     use physics_buffer,    only : pbuf_get_field
 #endif
     use physics_buffer, only : physics_buffer_desc
+!
+! CCMI
+!
+    use cam_history_support, only : fillvalue
+!
     
     implicit none
 
@@ -481,6 +470,9 @@ contains
     real(r8), intent(in)  :: depflx(ncol, gas_pcnst)
     real(r8), intent(in)  :: mmr_tend(ncol,pver,gas_pcnst)
     real(r8), intent(in)  :: pdel(ncol,pver)
+    real(r8), intent(in)  :: pmid(ncol,pver)
+    integer,  intent(in)  :: ltrop(ncol)
+
     type(physics_buffer_desc), pointer :: pbuf(:)
 #ifdef OSLO_AERO
     real(r8), dimension(:,:), pointer  :: cloudTracerField
@@ -502,8 +494,9 @@ contains
     real(r8)    :: un2(ncol)
     
     real(r8), dimension(ncol,pver) :: vmr_nox, vmr_noy, vmr_clox, vmr_cloy, vmr_tcly, vmr_brox, vmr_broy, vmr_toth
+    real(r8), dimension(ncol,pver) :: vmr_tbry, vmr_foy, vmr_tfy
     real(r8), dimension(ncol,pver) :: mmr_noy, mmr_sox, mmr_nhx, net_chem
-    real(r8), dimension(ncol)      :: df_noy, df_sox, df_nhx
+    real(r8), dimension(ncol)      :: df_noy, df_sox, df_nhx, do3chm_trp, do3chm_lms
 
     real(r8) :: area(ncol), mass(ncol,pver)
     real(r8) :: wgt
@@ -519,6 +512,9 @@ contains
     vmr_tcly(:ncol,:) = 0._r8
     vmr_brox(:ncol,:) = 0._r8
     vmr_broy(:ncol,:) = 0._r8
+    vmr_tbry(:ncol,:) = 0._r8
+    vmr_foy(:ncol,:)  = 0._r8
+    vmr_tfy(:ncol,:)  = 0._r8
     vmr_toth(:ncol,:) = 0._r8
     mmr_noy(:ncol,:) = 0._r8
     mmr_sox(:ncol,:) = 0._r8
@@ -544,23 +540,46 @@ contains
 #endif
     do m = 1,gas_pcnst
 
-       if ( m == id_ch4 .or. m == id_n2o5 .or. m == id_cfc12 .or. m == id_cl2 .or. m == id_cl2o2) then
+ !...FOY (counting Fluorines, not chlorines or bromines)
+       if ( m == id_cfc12 .or. m == id_hcfc22 .or. m == id_cf2clbr .or. m == id_h1202 .or. m == id_hcfc142b &
+            .or. m == id_cof2 ) then
           wgt = 2._r8
-       elseif ( m == id_cfc11 .or. m == id_cfc113 .or. m == id_ch3ccl3 ) then
+       elseif ( m == id_cfc113 .or. m == id_cf3br ) then
+          wgt = 3._r8
+       elseif ( m == id_cfc114 .or. m == id_h2402 ) then
+          wgt = 4._r8
+       elseif ( m == id_cfc115 ) then
+          wgt = 5._r8
+       else
+          wgt = 1._r8
+       endif
+       if ( any( foy_species == m ) ) then
+          vmr_foy(:ncol,:) = vmr_foy(:ncol,:) +  wgt * vmr(:ncol,:,m)
+       endif
+       if ( any( tfy_species == m ) ) then
+          vmr_tfy(:ncol,:) = vmr_tfy(:ncol,:) +  wgt * vmr(:ncol,:,m)
+       endif
+
+!... counting chlorine and bromines, etc... (and total H2 species)
+       if ( m == id_ch4 .or. m == id_n2o5 .or. m == id_cfc12 .or. m == id_cl2 .or. m == id_cl2o2  ) then
+          wgt = 2._r8
+       elseif (m == id_cfc114 .or. m == id_hcfc141b .or. m == id_h1202 .or. m == id_h2402 .or. m == id_ch2br2 ) then
+          wgt = 2._r8
+       elseif ( m == id_cfc11 .or. m == id_cfc113 .or. m == id_ch3ccl3 .or. m == id_chbr3 ) then
           wgt = 3._r8
        elseif ( m == id_ccl4 ) then
           wgt = 4._r8
        else
           wgt = 1._r8
        endif
-
+!...NOY
        if ( any( nox_species == m ) ) then
           vmr_nox(:ncol,:) = vmr_nox(:ncol,:) +  wgt * vmr(:ncol,:,m)
        endif
        if ( any( noy_species == m ) ) then
           vmr_noy(:ncol,:) = vmr_noy(:ncol,:) +  wgt * vmr(:ncol,:,m)
        endif
-
+!...NOY, SOX, NHX
        if ( any( noy_species == m ) ) then
           mmr_noy(:ncol,:) = mmr_noy(:ncol,:) +  wgt * mmr(:ncol,:,m)
        endif
@@ -570,7 +589,7 @@ contains
        if ( any( nhx_species == m ) ) then
           mmr_nhx(:ncol,:) = mmr_nhx(:ncol,:) +  wgt * mmr(:ncol,:,m)
        endif
-
+!...CLOY
        if ( any( clox_species == m ) ) then
           vmr_clox(:ncol,:) = vmr_clox(:ncol,:) +  wgt * vmr(:ncol,:,m)
        endif
@@ -580,38 +599,29 @@ contains
        if ( any( tcly_species == m ) ) then
           vmr_tcly(:ncol,:) = vmr_tcly(:ncol,:) +  wgt * vmr(:ncol,:,m)
        endif
-
+!...BROY
        if ( any( brox_species == m ) ) then
           vmr_brox(:ncol,:) = vmr_brox(:ncol,:) +  wgt * vmr(:ncol,:,m)
        endif
        if ( any( broy_species == m ) ) then
           vmr_broy(:ncol,:) = vmr_broy(:ncol,:) +  wgt * vmr(:ncol,:,m)
        endif
-
+       if ( any( tbry_species == m ) ) then
+          vmr_tbry(:ncol,:) = vmr_tbry(:ncol,:) +  wgt * vmr(:ncol,:,m)
+       endif
+!...HOY
        if ( any ( toth_species == m ) ) then
           vmr_toth(:ncol,:) = vmr_toth(:ncol,:) +  wgt * vmr(:ncol,:,m)
        endif
        
-       if ( (any( aer_species == m )).or.(trim(chempkg) == 'trop_mam3') .or.  (trim(chempkg).eq.'trop_mam_oslo') ) then
-          if ( .not. any ( cam_aerosols == m ) ) then
+       if ( any( aer_species == m ) ) then
              call outfld( solsym(m), mmr(:ncol,:,m), ncol ,lchnk )
-          endif
           call outfld( trim(solsym(m))//'_SRF', mmr(:ncol,pver,m), ncol ,lchnk )
        else
           call outfld( solsym(m), vmr(:ncol,:,m), ncol ,lchnk )
           call outfld( trim(solsym(m))//'_SRF', vmr(:ncol,pver,m), ncol ,lchnk )
        endif
 
-#if (defined MODAL_AERO)
-       ! output cloud borne aerosol
-       spc_name = trim(solsym(m))
-       call cnst_get_ind(spc_name, n, abort=.false. )
-       if ( n>0 ) then
-          if( .not. (cnst_name_cw(n) == ' ') ) then
-             call outfld( cnst_name_cw(n), qqcw_get_field(pbuf, n,lchnk), pcols ,lchnk )   ! output as mmr (kg/kg)
-          end if
-       end if
-#endif
 #if defined OSLO_AERO
        spc_name = trim(solsym(m))
        call cnst_get_ind(spc_name, n, abort=.false.)
@@ -667,22 +677,56 @@ contains
        end do
        call outfld( dtchem_name(m), net_chem(:ncol,:), ncol, lchnk )
 
+
+!
+! CCMI
+!
+       if ( trim(dtchem_name(m)) == 'DO3CHM' ) then
+          do3chm_trp(:) = 0._r8
+          do i=1,ncol
+             do k=ltrop(i),pver
+                do3chm_trp(i) = do3chm_trp(i) + net_chem(i,k)
+             end do
+          end do
+          where ( do3chm_trp == 0._r8 )
+             do3chm_trp = fillvalue
+          end where
+          call outfld('DO3CHM_TRP',do3chm_trp(:ncol), ncol, lchnk )
+          do3chm_lms(:) = 0._r8
+          do i=1,ncol
+             do k=1,pver
+                if ( pmid(i,k) > 100.e2_r8 .and. k < ltrop(i) ) then
+                   do3chm_lms(i) = do3chm_lms(i) + net_chem(i,k)
+                end if
+             end do
+          end do
+          where ( do3chm_lms == 0._r8 )
+             do3chm_lms = fillvalue
+          end where
+          call outfld('DO3CHM_LMS',do3chm_lms(:ncol), ncol, lchnk )
+       end if
+!
     enddo
+
 #ifdef OSLO_AERO
     do n=1,N_AEROSOL_TYPES
        call outfld("mmr_"//trim(aerosol_type_name(n)), mmr_aerosol_type(:ncol,:,n), ncol,lchnk)
        call outfld("cb_"//trim(aerosol_type_name(n)), cb_aerosol_type(:ncol,n), ncol,lchnk)
     enddo 
 #endif
+    call outfld( 'NOX',  vmr_nox  (:ncol,:), ncol, lchnk )
+    call outfld( 'NOY',  vmr_noy  (:ncol,:), ncol, lchnk )
+    call outfld( 'NOY_SRF',  vmr_noy(:ncol,pver),  ncol, lchnk )
+    call outfld( 'CLOX', vmr_clox (:ncol,:), ncol, lchnk )
+    call outfld( 'CLOY', vmr_cloy (:ncol,:), ncol, lchnk )
+    call outfld( 'BROX', vmr_brox (:ncol,:), ncol, lchnk )
+    call outfld( 'BROY', vmr_broy (:ncol,:), ncol, lchnk )
+    call outfld( 'TCLY', vmr_tcly (:ncol,:), ncol, lchnk )
+    call outfld( 'TBRY', vmr_tbry (:ncol,:), ncol, lchnk )
+    call outfld( 'FOY',  vmr_foy  (:ncol,:), ncol, lchnk )
+    call outfld( 'TFY',  vmr_tfy  (:ncol,:), ncol, lchnk )
+    call outfld( 'TOTH', vmr_toth (:ncol,:), ncol, lchnk )
 
-
-    call outfld( 'NOX',  vmr_nox(:ncol,:),  ncol, lchnk )
-    call outfld( 'NOY',  vmr_noy(:ncol,:),  ncol, lchnk )
-    call outfld( 'CLOX', vmr_clox(:ncol,:), ncol, lchnk )
-    call outfld( 'CLOY', vmr_cloy(:ncol,:), ncol, lchnk )
-    call outfld( 'BROX', vmr_brox(:ncol,:), ncol, lchnk )
-    call outfld( 'BROY', vmr_broy(:ncol,:), ncol, lchnk )
-    call outfld( 'TCLY', vmr_tcly(:ncol,:), ncol, lchnk )
     call outfld( 'NOY_mmr', mmr_noy(:ncol,:), ncol ,lchnk )
     call outfld( 'SOX_mmr', mmr_sox(:ncol,:), ncol ,lchnk )
     call outfld( 'NHX_mmr', mmr_nhx(:ncol,:), ncol ,lchnk )

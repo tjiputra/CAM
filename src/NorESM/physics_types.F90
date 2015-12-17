@@ -3,22 +3,22 @@
 !-------------------------------------------------------------------------------
 module physics_types
 
-  use shr_kind_mod, only: r8 => shr_kind_r8
-  use ppgrid,       only: pcols, pver, psubcols
-  use constituents, only: pcnst, qmin, cnst_name
-  use geopotential, only: geopotential_dse, geopotential_t ! tht  (dlw/jgo)
-  use physconst,    only: zvir, gravit, cpair, rair, cpairv, rairv, cpliq ! tht: add cpliq
-  use dycore,       only: dycore_is
-  use phys_grid,    only: get_ncols_p, get_rlon_all_p, get_rlat_all_p, get_gcol_all_p
-  use cam_logfile,  only: iulog
-  use abortutils,   only: endrun
-  use phys_control, only: waccmx_is
-  use shr_const_mod,only: shr_const_rwv
+  use shr_kind_mod,     only: r8 => shr_kind_r8
+  use ppgrid,           only: pcols, pver, psubcols
+  use constituents,     only: pcnst, qmin, cnst_name
+  use geopotential,     only: geopotential_dse, geopotential_t
+  use physconst,        only: zvir, gravit, cpair, rair, cpairv, rairv
+  use dycore,           only: dycore_is
+  use phys_grid,        only: get_ncols_p, get_rlon_all_p, get_rlat_all_p, get_gcol_all_p
+  use cam_logfile,      only: iulog
+  use cam_abortutils,   only: endrun
+  use phys_control,     only: waccmx_is
+  use shr_const_mod,    only: shr_const_rwv
 
   implicit none
   private          ! Make default type private to the module
 
-  logical          :: adjust_te = .TRUE. !tht (dlw/jgo) 
+  logical, parameter :: adjust_te = .FALSE.
 
 ! Public types:
 
@@ -38,6 +38,7 @@ module physics_types
   public physics_state_copy  ! copy a physics_state object
   public physics_ptend_copy  ! copy a physics_ptend object
   public physics_ptend_sum   ! accumulate physics_ptend objects
+  public physics_ptend_scale ! Multiply physics_ptend objects by a constant factor.
   public physics_tend_init   ! initialize a physics_tend object
 
   public set_state_pdry      ! calculate dry air masses in state variable
@@ -46,7 +47,6 @@ module physics_types
   public physics_type_alloc
 
   public physics_state_alloc   ! allocate individual components within state
-  public physics_state_dycore_alloc   ! allocate components set by dycore
   public physics_state_dealloc ! deallocate individual components within state
   public physics_tend_alloc    ! allocate individual components within tend
   public physics_tend_dealloc  ! deallocate individual components within tend
@@ -58,10 +58,8 @@ module physics_types
      integer                                     :: &
           lchnk,                &! chunk index
           ngrdcol,              &! -- Grid        -- number of active columns (on the grid)
-          nsubcol(pcols),       &! -- Sub-columns -- number of active sub-columns in each grid column
           psetcols=0,           &! --             -- max number of columns set - if subcols = pcols*psubcols, else = pcols
-          ncol=0,               &! --             -- sum of nsubcol for all ngrdcols - number of active columns
-          indcol(pcols*psubcols) ! --             -- indices for mapping from subcols to grid cols
+          ncol=0                 ! --             -- sum of nsubcol for all ngrdcols - number of active columns
      real(r8), dimension(:), allocatable         :: &
           lat,     &! latitude (radians)
           lon,     &! longitude (radians)
@@ -109,15 +107,6 @@ module physics_types
           cid        ! unique column id
      integer :: ulatcnt, &! number of unique lats in chunk
                 uloncnt   ! number of unique lons in chunk
-
-     ! Whether allocation from dycore has happened.
-     logical :: dycore_alloc = .false.
-
-     ! WACCM variables set by dycore
-     real(r8), dimension(:,:),allocatable        :: &
-          uzm,     &  ! zonal wind for qbo (m/s)
-          frontgf, &  ! frontogenesis function
-          frontga     ! frontogenesis angle
 
   end type physics_state
 
@@ -215,11 +204,11 @@ contains
 ! Update the state and or tendency structure with the parameterization tendencies
 !-----------------------------------------------------------------------
     use shr_sys_mod,  only: shr_sys_flush
-    use geopotential, only: geopotential_dse, geopotential_t ! tht (dlw/jgo)
     use constituents, only: cnst_get_ind, cnst_mw
     use scamMod,      only: scm_crm_mode, single_column
     use phys_control, only: phys_getopts
     use physconst,    only: physconst_update ! Routine which updates physconst variables (WACCM-X)
+    use ppgrid,       only: begchunk, endchunk
 
 !------------------------------Arguments--------------------------------
     type(physics_ptend), intent(inout)  :: ptend   ! Parameterization tendencies
@@ -235,6 +224,7 @@ contains
     integer :: i,k,m                               ! column,level,constituent indices
     integer :: ixcldice, ixcldliq                  ! indices for CLDICE and CLDLIQ
     integer :: ixnumice, ixnumliq
+    integer :: ixnumsnow, ixnumrain
     integer :: ncol                                ! number of columns
     character*40 :: name    ! param and tracer name for qneg3
 
@@ -242,16 +232,20 @@ contains
 
     real(r8) :: zvirv(state%psetcols,pver)  ! Local zvir array pointer
 
+    real(r8),allocatable :: cpairv_loc(:,:,:)
+    real(r8),allocatable :: rairv_loc(:,:,:)
+
     ! PERGRO limits cldliq/ice for macro/microphysics:
     character(len=24), parameter :: pergro_cldlim_names(4) = &
          (/ "stratiform", "cldwat    ", "micro_mg  ", "macro_park" /)
 
+    ! cldliq/ice limits that are always on.
+    character(len=24), parameter :: cldlim_names(2) = &
+         (/ "convect_deep", "zm_conv_tend" /)
+
     ! Whether to do validation of state on each call.
     logical :: state_debug_checks
 
-    integer :: energy_conservation_type
-
-    call phys_getopts(energy_conservation_type_out=energy_conservation_type)
     !-----------------------------------------------------------------------
 
     ! The column radiation model does not update the state
@@ -280,6 +274,30 @@ contains
        end if
     end if
 
+    !-----------------------------------------------------------------------
+    ! cpairv_loc and rairv_loc need to be allocated to a size which matches state and ptend
+    ! If psetcols == pcols, the cpairv is the correct size and just copy
+    ! If psetcols > pcols and all cpairv match cpair, then assign the constant cpair
+    if (state%psetcols == pcols) then
+       allocate (cpairv_loc(state%psetcols,pver,begchunk:endchunk))
+       cpairv_loc(:,:,:) = cpairv(:,:,:)
+    else if (state%psetcols > pcols .and. all(cpairv(:,:,:) == cpair)) then
+       allocate(cpairv_loc(state%psetcols,pver,begchunk:endchunk))
+       cpairv_loc(:,:,:) = cpair
+    else
+       call endrun('physics_update: cpairv is not allowed to vary when subcolumns are turned on')
+    end if
+    if (state%psetcols == pcols) then
+       allocate (rairv_loc(state%psetcols,pver,begchunk:endchunk))
+       rairv_loc(:,:,:) = rairv(:,:,:)
+    else if (state%psetcols > pcols .and. all(rairv(:,:,:) == rair)) then
+       allocate(rairv_loc(state%psetcols,pver,begchunk:endchunk))
+       rairv_loc(:,:,:) = rair
+    else
+       call endrun('physics_update: rairv_loc is not allowed to vary when subcolumns are turned on')
+    end if
+
+    !-----------------------------------------------------------------------
     call phys_getopts(state_debug_checks_out=state_debug_checks)
 
     ncol = state%ncol
@@ -308,7 +326,9 @@ contains
     ! the indices will be set to -1)
     call cnst_get_ind('NUMICE', ixnumice, abort=.false.)
     call cnst_get_ind('NUMLIQ', ixnumliq, abort=.false.)
-  
+    call cnst_get_ind('NUMRAI', ixnumrain, abort=.false.)
+    call cnst_get_ind('NUMSNO', ixnumsnow, abort=.false.)
+
     do m = 1, pcnst
        if(ptend%lq(m)) then
           do k = ptend%top_level, ptend%bot_level
@@ -317,7 +337,8 @@ contains
 
           ! now test for mixing ratios which are too small
           ! don't call qneg3 for number concentration variables
-          if (m /= ixnumice  .and.  m /= ixnumliq) then
+          if (m /= ixnumice  .and.  m /= ixnumliq .and. &
+              m /= ixnumrain .and.  m /= ixnumsnow ) then
              name = trim(ptend%name) // '/' // trim(cnst_name(m))
              call qneg3(trim(name), state%lchnk, ncol, state%psetcols, pver, m, m, qmin(m), state%q(1,1,m))
           else
@@ -357,7 +378,7 @@ contains
           if ( any(ptend%name == pergro_cldlim_names) ) &
                call state_cnst_min_nz(1.e-12_r8, ixcldliq, ixnumliq)
 #endif
-          if (ptend%name == 'convect_deep') &
+          if ( any(ptend%name == cldlim_names) ) &
                call state_cnst_min_nz(1.e-36_r8, ixcldliq, ixnumliq)
        end if
     end if
@@ -368,7 +389,7 @@ contains
           if ( any(ptend%name == pergro_cldlim_names) ) &
                call state_cnst_min_nz(1.e-12_r8, ixcldice, ixnumice)
 #endif
-          if (ptend%name == 'convect_deep') &
+          if ( any(ptend%name == cldlim_names) ) &
                call state_cnst_min_nz(1.e-36_r8, ixcldice, ixnumice)
        end if
     end if
@@ -382,54 +403,48 @@ contains
       call cnst_get_ind('N', ixn)             
 
       call physconst_update(state%q, state%t, &
-	         cnst_mw(ixo), cnst_mw(ixo2), cnst_mw(ixh), cnst_mw(ixn), &
-	                              ixo, ixo2, ixh, pcnst, state%lchnk, ncol)
-    endif	  
+                            cnst_mw(ixo), cnst_mw(ixo2), cnst_mw(ixh), cnst_mw(ixn), &
+                            ixo, ixo2, ixh, pcnst, state%lchnk, ncol)
+    endif
    
     if ( waccmx_is('ionosphere') .or. waccmx_is('neutral') ) then 
-      zvirv(:,:) = shr_const_rwv / rairv(:,:,state%lchnk) - 1._r8
+      zvirv(:,:) = shr_const_rwv / rairv_loc(:,:,state%lchnk) - 1._r8
     else
       zvirv(:,:) = zvir    
     endif
 
-    !-------------------------------------------------------------------------------------------
-    ! Update dry static energy(moved from above for WACCM-X so updating after cpairv update)
-    !-------------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------------------------
+    ! Update temperature from dry static energy (moved from above for WACCM-X so updating after cpairv_loc update)
+    !-------------------------------------------------------------------------------------------------------------
+
     if(ptend%ls) then
        do k = ptend%top_level, ptend%bot_level
-!+tht (dlw/jgo)
-          state%s(:ncol,k)   = state%s(:ncol,k)   + ptend%s(:ncol,k) * dt 
-          state%t(:ncol,k)   = state%t(:ncol,k)   + ptend%s(:ncol,k) * dt/cpairv(:ncol,k,state%lchnk)
-!-tht
+          state%t(:ncol,k) = state%t(:ncol,k) + ptend%s(:ncol,k)*dt/cpairv_loc(:ncol,k,state%lchnk)
           if (present(tend)) &
-               tend%dtdt(:ncol,k) = tend%dtdt(:ncol,k) + ptend%s(:ncol,k)/cpairv(:ncol,k,state%lchnk)
+               tend%dtdt(:ncol,k) = tend%dtdt(:ncol,k) + ptend%s(:ncol,k)/cpairv_loc(:ncol,k,state%lchnk)
        end do
     end if
 
-    ! Derive new temperature and geopotential fields if heating or water tendency not 0.
+    ! Derive new geopotential fields if heating or water tendency not 0.
+
     if (ptend%ls .or. ptend%lq(1)) then
-      if(energy_conservation_type .eq. 0)then
-         !+tht (dlw/jgo): update geopotential and dry static energy with updated temperature
-         call geopotential_dse(  &
-              state%lnpint, state%lnpmid, state%pint  , state%pmid  , state%pdel  , state%rpdel  , &
-              state%s     , state%q(:,:,1),state%phis , rairv(:,:,state%lchnk), gravit  , cpairv(:,:,state%lchnk), &
-              zvirv    , state%t     , state%zi    , state%zm    , ncol         )
-      else 
-         call geopotential_t  (                                                                    &
+       call geopotential_t  (                                                                    &
             state%lnpint, state%lnpmid, state%pint  , state%pmid  , state%pdel  , state%rpdel  , &
-            state%t     , state%q(:,:,1), rairv(:,:,state%lchnk), gravit  , zvirv              , &
+            state%t     , state%q(:,:,1), rairv_loc(:,:,state%lchnk), gravit  , zvirv              , &
             state%zi    , state%zm      , ncol         )
-         do k = ptend%top_level, ptend%bot_level
-            state%s(:,k) = state%t(:,k  )*cpairv(:,k,state%lchnk) + gravit*state%zm(:,k) + state%phis(:)
-         end do
-!-tht
-      end if !energy conservation type
+       ! update dry static energy for use in next process
+       do k = ptend%top_level, ptend%bot_level
+          state%s(:ncol,k) = state%t(:ncol,k  )*cpairv_loc(:ncol,k,state%lchnk) &
+                           + gravit*state%zm(:ncol,k) + state%phis(:ncol)
+       end do
     end if
 
     ! Good idea to do this regularly.
     call shr_sys_flush(iulog)
 
     if (state_debug_checks) call physics_state_check(state, ptend%name)
+
+    deallocate(cpairv_loc, rairv_loc)
 
     ! Deallocate ptend
     call physics_ptend_dealloc(ptend)
@@ -470,6 +485,7 @@ contains
 
     end subroutine state_cnst_min_nz
 
+
   end subroutine physics_update
 
 !===============================================================================
@@ -508,12 +524,8 @@ contains
     posinf_r8 = shr_infnan_posinf
     neginf_r8 = shr_infnan_neginf
 
-    ! It may be reasonable to check some of the integers components of the
+    ! It may be reasonable to check some of the integer components of the
     ! state as well, but this is not yet implemented.
-
-    call shr_assert(allocated(state%frontgf) .eqv. allocated(state%frontga), &
-         msg="Only one of frontgf/frontga allocated. Either both should be &
-         &allocated, or neither (package "//trim(name)//").")
 
     ! Check for NaN first to avoid any IEEE exceptions.
 
@@ -571,17 +583,6 @@ contains
          varname="state%exner",     msg=msg)
     call shr_assert_in_domain(state%zm(:ncol,:),        is_nan=.false., &
          varname="state%zm",        msg=msg)
-
-    ! Don't check these fields until they are first set.
-    if (allocated(state%uzm)) &
-         call shr_assert_in_domain(state%uzm(:ncol,:),     is_nan=.false., &
-         varname="state%uzm",     msg=msg)
-    if (allocated(state%frontgf)) &
-         call shr_assert_in_domain(state%frontgf(:ncol,:), is_nan=.false., &
-         varname="state%frontgf", msg=msg)
-    if (allocated(state%frontga)) &
-         call shr_assert_in_domain(state%frontga(:ncol,:), is_nan=.false., &
-         varname="state%frontga", msg=msg)
 
     ! 2-D variables (at interfaces)
     call shr_assert_in_domain(state%pint(:ncol,:),      is_nan=.false., &
@@ -654,19 +655,8 @@ contains
          varname="state%lnpmiddry", msg=msg)
     call shr_assert_in_domain(state%exner(:ncol,:),     lt=posinf_r8, gt=0._r8, &
          varname="state%exner",     msg=msg)
-    call shr_assert_in_domain(state%zm(:ncol,:),        lt=posinf_r8, ge=0._r8, &
+    call shr_assert_in_domain(state%zm(:ncol,:),        lt=posinf_r8, gt=neginf_r8, &
          varname="state%zm",        msg=msg)
-
-    ! Don't check these fields until they are first set.
-    if (allocated(state%uzm)) &
-         call shr_assert_in_domain(state%uzm(:ncol,:),     lt=posinf_r8, gt=neginf_r8, &
-         varname="state%uzm",     msg=msg)
-    if (allocated(state%frontgf)) &
-         call shr_assert_in_domain(state%frontgf(:ncol,:), lt=posinf_r8, gt=neginf_r8, &
-         varname="state%frontgf", msg=msg)
-    if (allocated(state%frontga)) &
-         call shr_assert_in_domain(state%frontga(:ncol,:), le=pi,        ge=-pi, &
-         varname="state%frontga", msg=msg)
 
     ! 2-D variables (at interfaces)
     call shr_assert_in_domain(state%pint(:ncol,:),      lt=posinf_r8, gt=0._r8, &
@@ -677,7 +667,7 @@ contains
          varname="state%lnpint",    msg=msg)
     call shr_assert_in_domain(state%lnpintdry(:ncol,:), lt=posinf_r8, gt=neginf_r8, &
          varname="state%lnpintdry", msg=msg)
-    call shr_assert_in_domain(state%zi(:ncol,:),        lt=posinf_r8, ge=0._r8, &
+    call shr_assert_in_domain(state%zi(:ncol,:),        lt=posinf_r8, gt=neginf_r8, &
          varname="state%zi",        msg=msg)
 
     ! 3-D variables
@@ -840,6 +830,69 @@ contains
 
 !===============================================================================
 
+  subroutine physics_ptend_scale(ptend, fac, ncol)
+!-----------------------------------------------------------------------
+! Scale ptend fields for ptend logical flags = .true.
+! Where ptend logical flags = .false, don't change ptend.
+!
+! Assumes that input ptend is valid (e.g. that
+! ptend%lu .eqv. allocated(ptend%u)), and therefore
+! does not check allocation status of individual arrays.
+!-----------------------------------------------------------------------
+
+!------------------------------Arguments--------------------------------
+    type(physics_ptend), intent(inout)  :: ptend   ! Incoming ptend
+    real(r8), intent(in) :: fac                    ! Factor to multiply ptend by.
+    integer, intent(in)                 :: ncol    ! number of columns
+
+!---------------------------Local storage-------------------------------
+    integer :: m                                   ! constituent index
+
+!-----------------------------------------------------------------------
+
+! Update u,v fields
+    if (ptend%lu) &
+         call multiply_tendency(ptend%u, &
+         ptend%taux_srf, ptend%taux_top)
+
+    if (ptend%lv) &
+         call multiply_tendency(ptend%v, &
+         ptend%tauy_srf, ptend%tauy_top)
+
+! Heat
+    if (ptend%ls) &
+         call multiply_tendency(ptend%s, &
+         ptend%hflux_srf, ptend%hflux_top)
+
+! Update constituents
+    do m = 1, pcnst
+       if (ptend%lq(m)) &
+            call multiply_tendency(ptend%q(:,:,m), &
+            ptend%cflx_srf(:,m), ptend%cflx_top(:,m))
+    end do
+
+
+  contains
+
+    subroutine multiply_tendency(tend_arr, flx_srf, flx_top)
+      real(r8), intent(inout) :: tend_arr(:,:) ! Tendency array (pcols, plev)
+      real(r8), intent(inout) :: flx_srf(:)    ! Surface flux (or stress)
+      real(r8), intent(inout) :: flx_top(:)    ! Top-of-model flux (or stress)
+
+      integer :: k
+
+      do k = ptend%top_level, ptend%bot_level
+         tend_arr(:ncol,k) = tend_arr(:ncol,k) * fac
+      end do
+      flx_srf(:ncol) = flx_srf(:ncol) * fac
+      flx_top(:ncol) = flx_top(:ncol) * fac
+
+    end subroutine multiply_tendency
+
+  end subroutine physics_ptend_scale
+
+!===============================================================================
+
 subroutine physics_ptend_copy(ptend, ptend_cp)
 
    !-----------------------------------------------------------------------
@@ -889,7 +942,6 @@ subroutine physics_ptend_copy(ptend, ptend_cp)
 
 end subroutine physics_ptend_copy
 
-
 !===============================================================================
 
   subroutine physics_ptend_reset(ptend)
@@ -937,7 +989,6 @@ end subroutine physics_ptend_copy
 ! Initialize the parameterization tendency structure to "empty"
 !-----------------------------------------------------------------------
 
-    use phys_control, only: phys_getopts
 !------------------------------Arguments--------------------------------
     type(physics_ptend), intent(out)    :: ptend    ! Parameterization tendencies
     integer, intent(in)                 :: psetcols ! maximum number of columns
@@ -946,8 +997,7 @@ end subroutine physics_ptend_copy
     logical, optional                   :: lu       ! if true, then fields to support dudt are allocated
     logical, optional                   :: lv       ! if true, then fields to support dvdt are allocated
     logical, dimension(pcnst),optional  :: lq       ! if true, then fields to support dqdt are allocated
-   
-    integer                             :: energy_conservation_type 
+    
 !-----------------------------------------------------------------------
 
     if (allocated(ptend%s)) then 
@@ -995,13 +1045,6 @@ end subroutine physics_ptend_copy
     call physics_ptend_alloc(ptend, psetcols)
 
     call physics_ptend_reset(ptend)
-
-    call phys_getopts(energy_conservation_type_out=energy_conservation_type)
-    if(energy_conservation_type .eq. 1)then
-      adjust_te = .TRUE.
-    else
-      adjust_te = .FALSE.
-    end if
 
     return
   end subroutine physics_ptend_init
@@ -1097,347 +1140,8 @@ end subroutine physics_ptend_copy
 
   end subroutine init_geo_unique
 
-  !=================================================
-  subroutine physics_dme_adjust(state, tend, qini, dt, te_conserve, eflx, ocnfrac,sst,ts)
-
-      use phys_control, only: phys_getopts
-   
-       type(physics_state), intent(inout) :: state
-       type(physics_tend ), intent(inout) :: tend
-       real(r8),            intent(in   ) :: qini(pcols,pver)    ! initial specific humidity
-       real(r8),            intent(in   ) :: dt   
-       logical, intent(in) , optional  :: te_conserve
-       real(r8), intent(out), optional :: eflx   (pcols)         ! energy flux for use in check_energy
-       real(r8), intent(in) , optional :: ocnfrac(pcols)         ! Ocean fraction (fraction)
-       real(r8), intent(in) , optional :: sst    (pcols)         ! Sea surface temperature
-       real(r8), intent(in) , optional :: ts     (pcols)         ! Surface temperature
-               ! model physics timestep
-      integer :: energy_conservation_type
-
-      call phys_getopts(energy_conservation_type_out=energy_conservation_type)
-
-      if(energy_conservation_type .eq. 0)then
-         call physics_dme_adjust_ORG(state, tend, qini, dt)     
-      else if (energy_conservation_type .eq. 1 .and. (present(te_conserve) .and. present(eflx) .and. present(ocnfrac) .and. present(sst) .and. present(ts)))then
-         call physics_dme_adjust_THT(state, tend, qini, dt, te_conserve , eflx,ocnfrac,sst,ts)
-      else if (energy_conservation_type .eq. 1 .and. present(te_conserve) )then
-         call physics_dme_adjust_THT(state, tend, qini, dt, te_conserve)
-      else 
-         call endrun("option for physics_dme_adjust not programmed yet")
-      end if
-  end subroutine physics_dme_adjust
-!============================================
-!++tht
- !subroutine physics_dme_adjust(state, tend, qini, dt)
-  subroutine physics_dme_adjust_THT(state, tend, qini, dt, te_conserve, eflx, ocnfrac, sst, ts)
-!+tht: many changes below, not comment-tracked
-    !----------------------------------------------------------------------- 
-    ! 
-    ! Purpose: Adjust the dry mass in each layer back to the value of physics input state
-    ! 
-    ! Method: Conserve the integrated mass, momentum and total energy in each layer
-    !         by scaling the specific mass of consituents, specific momentum (velocity)
-    !         and specific total energy by the relative change in layer mass. Solve for
-    !         the new temperature by subtracting the new kinetic energy from total energy
-    !         and inverting the hydrostatic equation
-    !
-    !         The mass in each layer is modified, changing the relationship of the layer 
-    !         interfaces and midpoints to the surface pressure. The result is no longer in 
-    !         the original hybrid coordinate. 
-    !
-    !         This procedure cannot be applied to the "eul" or "sld" dycores because they
-    !         require the hybrid coordinate.
-    ! 
-    ! Author: Byron Boville
-
-    ! !REVISION HISTORY:
-    !   03.03.28  Boville    Created, partly from code by Lin in p_d_adjust
-    !   14.04.09  Toniazzo   Revised adjustment for consistency with new energy update; 
-    !                        this consists in a source of ethalpy e, de = alpha * dp, 
-    !                        where alpha is the specific volume and dp the hydrostatic 
-    !                        pressure adjustment; plus flux divergence terms for the 
-    !                        option (hybrid_coord) where remapping is needed for the 
-    !                        result to remain valid in the hybrid vertical coordinate
-    !                        (so that, in principle, this routine could now be applied 
-    !                        to "eul" and "sld" cores).
-    ! 
-    !-----------------------------------------------------------------------
-
-    use constituents, only : cnst_get_type_byind
-    use hycoef,       only : hyai, hybi, ps0, hyam, hybm
-
-    implicit none
-    !
-    ! Arguments
-    !
-    type(physics_state), intent(inout) :: state
-    type(physics_tend ), intent(inout) :: tend
-    real(r8),            intent(in   ) :: qini(pcols,pver)    ! initial specific humidity
-    real(r8),            intent(in   ) :: dt                  ! model physics timestep
-    !--- additional arguments for adjustment over ocean for coupled cases
-    logical,             intent(in   ) :: te_conserve         ! switch to enforce conservation
-    real(r8), intent(out), optional :: eflx   (pcols)         ! energy flux for use in check_energy
-    real(r8), intent(in) , optional :: ocnfrac(pcols)         ! Ocean fraction (fraction)
-    real(r8), intent(in) , optional :: sst    (pcols)         ! Sea surface temperature
-    real(r8), intent(in) , optional :: ts     (pcols)         ! Surface temperature
-    !
-    !---------------------------Local workspace-----------------------------
-    !
-    integer  :: lchnk         ! chunk identifier
-    integer  :: ncol          ! number of atmospheric columns
-    integer  :: i,k,m         ! Longitude, level indices
-    real(r8) :: fdq(pcols)    ! mass adjustment factor
-    real(r8) :: te(pcols)     ! total energy in a layer
-    real(r8) :: utmp(pcols)   ! temp variable for recalculating the initial u values
-    real(r8) :: vtmp(pcols)   ! temp variable for recalculating the initial v values
-
-    real(r8) :: zvirv(pcols,pver) ! Local zvir array pointer
-
-    real(r8) :: ps_old(pcols)       ! old surface pressure 
-    real(r8) :: pdel_new(pcols)     ! Layer thickness (pint(k+1) - pint(k))
-    real(r8) :: mdq(pcols,pver)     ! mass adjustment
-    real(r8) :: fdq_ke(pcols)       ! mass adjustment factor to conserve momentum or kinetic energy
-    real(r8) :: pdot  (pcols)       ! total (lagrangian) pressure adjustment
-    real(r8) :: edot  (pcols)       ! advective pressure adjustment
-
-    real(r8) :: qf(pcols,pcnst), qtmp(pcols,pcnst), uf(pcols), vf(pcols) ! work arrays
-
-    real(r8), parameter :: condreftemp = 273.15_r8 ! arbitrarily set fixed temperature of condensates
-
-    logical  :: hybrid_coord  ! Flag for hybrid coord system (".true.") or non-hybrid (".false.")
-    logical  :: ke_conserve   ! Flag to conserve KE - otherwise if (adjust_uv) then conserve momentum
-    logical  :: adjust_uv     ! adjust (U,V) ?
-    logical  :: ohf_adjust    ! flag to set temperature of water condensates equal to SST over ocn
-
-!-------- nanny checks from standard code -------------------------------
-    ! verify that the dycore is FV
-    if (.not. dycore_is('LR') ) return
-
-    if (state%psetcols .ne. pcols) then
-       call endrun('physics_dme_adjust: cannot pass in a state which has sub-columns')
-    end if
-
-!-------- options by logical switches, default should be all F ----------
-
-! adjust on hybrid instead of on lagrangian levels
-    hybrid_coord = .false. 
-! wind-adjustment?
-    adjust_uv    = .false.
-! conserve KE? 
-    ke_conserve  = .false. 
-! assign SST,TS, or CondRefTemp to T of condensates?
-    ohf_adjust   = .false.
-
-
-!--------------- initialise adjustment loop -----------------------------
-    lchnk = state%lchnk
-    ncol  = state%ncol
-
-   ! old surface pressure
-    ps_old  (:ncol) = state%ps(:ncol) 
-
-    state%ps(:ncol) = state%pint(:ncol,1)
-    do k = 1, pver
-   ! specific enthalpy before adjustment
-     state%s(:ncol,k)= state%t(:ncol,k)*cpairv(:ncol,k,lchnk)  &
-                     +0.5_r8*(state%u(:ncol,k)**2 + state%v(:ncol,k)**2) 
-   ! Dp'/Dp
-     mdq    (:ncol,k)= state%q(:ncol,k,1) - qini(:ncol,k)    ! only water-vapor mass change considered 
-   ! new surface pressure 
-     state%ps(:ncol) = state%ps(:ncol) + state%pdel(:ncol,k)*(1._r8 + mdq(:ncol,k))
-    end do
-
-    ! lagrangian & advective pressure change at top interface
-    pdot  (:ncol) = 0._r8
-    edot  (:ncol) = 0._r8
-
-    ! energy change due to mass sources
-    if (present(eflx)) eflx(:ncol) = 0._r8
-
-!------------------------------------------------------------------------
-!--------------- start adjustment loop ----------------------------------
-    do k = 1, pver
-
-      ! new Dp (=:Dp") for either lagrangian or hybrid-coordinate adjustment
-       if (hybrid_coord) then ! hybrid-level adjustment (Dp".ne.Dp')
-        pdel_new(:ncol)  = (hyai(k+1)-hyai(k))*ps0 &
-                          +(hybi(k+1)-hybi(k))*state%ps(:ncol) 
-       else                    ! lagrangian adjustment  (Dp".eq.Dp')
-        pdel_new(:ncol)  = state%pdel(:ncol,k)*(1._r8 + mdq(:ncol,k))
-       endif
-
-      ! Dp"/Dp
-       fdq(:ncol)        = pdel_new(:ncol)/state%pdel(:ncol,k)
-
-      ! humidity adjustment: remapping flux from previous interface, /Dp"
-       if (hybrid_coord .and. k.gt.1) then 
-        do m=1,pcnst
-         qf (:ncol,m) =  .5_r8*(state%q(:ncol,k,m)+qtmp(:ncol,m))*edot(:ncol)/pdel_new(:ncol) 
-        enddo
-       else
-        do m=1,pcnst
-         qf (:ncol,m) =  0._r8
-        enddo
-       endif
-
-      ! wind adjustment increments
-       if      (ke_conserve) then
-        fdq_ke(:ncol) = fdq(:ncol)**0.5_r8
-       else if (adjust_uv) then 
-        fdq_ke(:ncol) = fdq(:ncol)
-       else
-        fdq_ke(:ncol) = 1._r8
-       end if
-       if (hybrid_coord .and. k.gt.1) then ! here u,vtmp = u,v(k-1) 
-        uf (:ncol) =  .5_r8*(state%u(:ncol,k)+utmp(:ncol))*edot(:ncol)/pdel_new(:ncol) 
-        vf (:ncol) =  .5_r8*(state%v(:ncol,k)+vtmp(:ncol))*edot(:ncol)/pdel_new(:ncol) 
-       else
-        uf (:ncol) = 0. 
-        vf (:ncol) = 0. 
-       endif
-        ! u,vtmp set to pre-physics u,v from the updated values and the tendencies
-       utmp(:ncol) = state%u(:ncol,k) - dt * tend%dudt(:ncol,k)
-       vtmp(:ncol) = state%v(:ncol,k) - dt * tend%dvdt(:ncol,k)
-
-       if (adjust_te) then
-      ! adjust specific enthalpy
-        if (hybrid_coord .and. k.gt.1) then    ! remapping flux from previous interface, /Dp"
-         te (:ncol) =  .5_r8*(state%s(:ncol,k)+state%s(:ncol,k-1))*edot(:ncol)/pdel_new(:ncol) 
-        else
-         te (:ncol) = 0._r8
-        endif 
-       ! lagrangian adjustment
-        if (te_conserve) then 
-        ! enthalpy change by hydrost. pressure work in conservative adjustment
-         te  (:ncol) = te  (:ncol) + state%s(:ncol,k)/fdq(:ncol)                                 & ! te *(Dp/Dp")
-                                 + gravit*state%zi(:ncol, k )*pdot(:ncol)/pdel_new(:ncol)
-        ! lagrangian pressure change at next interface
-         pdot(:ncol) = pdot(:ncol) + state%pdel(:ncol,k)*mdq(:ncol,k)
-        ! finish adjustment
-         te  (:ncol) = te(:ncol) - gravit*state%zi(:ncol,k+1)*pdot(:ncol)/pdel_new(:ncol)
-        else
-        ! lagrangian pressure change at mid-level
-         pdot(:ncol) = pdot(:ncol) + .5_r8*state%pdel(:ncol,k)*mdq(:ncol,k)
-        ! enthalpy change by hydrost. pressure work in full adjustment
-         te  (:ncol) = te(:ncol) + state%s(:ncol,k)/(fdq(:ncol)/(1._r8+mdq(:ncol,k)))            & ! te *(Dp'/Dp")
-!                    +2._r8/7._r8*cpairv(:ncol,k,lchnk)*state%t(:ncol,k)/state%pmid(:ncol,k)     & ! alpha
-                     +             rairv(:ncol,k,lchnk)*state%t(:ncol,k)/state%pmid(:ncol,k)     & ! alpha
-                      *pdot(:ncol)/fdq(:ncol)                                                    & ! *dp*(Dp/Dp")
-        ! the following is a very small term (probably =0) to ensure the correct vertical integral
-                     -(.5_r8*(state%zi(:ncol,k+1)+state%zi(:ncol,k))-state%zm(:ncol,k))*gravit   & ! probably =0.
-                      *mdq(:ncol,k)/fdq(:ncol)                                                     ! *dq*(Dp/Dp")
-        ! lagrangian pressure change at next interface
-         pdot(:ncol) = pdot(:ncol) + .5_r8*state%pdel(:ncol,k)*mdq(:ncol,k)
-        endif
-
-       !add here any physical or implied heat (internal energy) transfer between moist air
-        if (ohf_adjust) then 
-         if ( present(ocnfrac) .and. present(sst) .and. present(ts) ) then
-          where (ocnfrac(:ncol) > 1e-12) 
-           te  (:ncol) = te(:ncol) - mdq(:ncol,k)/fdq(:ncol) &
-                     *cpliq/cpairv(:ncol,k,lchnk)*(state%t(:ncol,k) - sst(:ncol))
-          elsewhere
-           te  (:ncol) = te(:ncol) - mdq(:ncol,k)/fdq(:ncol) &
-                     *cpliq/cpairv(:ncol,k,lchnk)*(state%t(:ncol,k) -  ts(:ncol))
-          endwhere
-         else
-          if ( present(sst) ) then
-           te  (:ncol) = te(:ncol) - mdq(:ncol,k)/fdq(:ncol) &
-                     *cpliq/cpairv(:ncol,k,lchnk)*(state%t(:ncol,k) - sst(:ncol))
-          else if ( present(ts) ) then 
-           te  (:ncol) = te(:ncol) - mdq(:ncol,k)/fdq(:ncol) &
-                     *cpliq/cpairv(:ncol,k,lchnk)*(state%t(:ncol,k) -  ts(:ncol))
-          else ! fixed temperature of all condensates
-           te  (:ncol) = te(:ncol) - mdq(:ncol,k)/fdq(:ncol) &
-                     *cpliq/cpairv(:ncol,k,lchnk)*(state%t(:ncol,k) -  condreftemp)
-          endif
-         endif
-        else ! compute heat flux diagnostics associated with mass changes for use in check_energy
-         if (present(eflx)) &
-          eflx (:ncol) = eflx(:ncol) + mdq(:ncol,k)/dt*state%pdel(:ncol,k)/gravit &
-                                      *(state%s(:ncol,k)+gravit*state%zm(:ncol,k)+state%phis(:ncol))
-        endif
-
-        if (hybrid_coord .and. k.lt.pver) then ! remapping flux from next interface, /Dp"
-         edot(:ncol) = pdot(:ncol) - hybi(k+1)*(state%ps(:ncol)-ps_old(:ncol))
-         te  (:ncol) = te(:ncol) - .5_r8*(state%s(:ncol,k)+state%s(:ncol,k+1))*edot(:ncol)/pdel_new(:ncol)
-        endif
-       else
-      ! do NO adjustment to specific enthalpy 
-        te  (:ncol) = state%s(:ncol,k)
-        if (hybrid_coord .and. k.lt.pver) then 
-         pdot(:ncol) = pdot(:ncol) + state%pdel(:ncol,k)*mdq(:ncol,k)
-         edot(:ncol) = pdot(:ncol) - hybi(k+1)*(state%ps(:ncol)-ps_old(:ncol))
-        endif
-       endif
-
-       if (hybrid_coord .and. k.lt.pver) then ! remapping flux from next interface, /Dp"
-        do m=1,pcnst
-         qf (:ncol,m) =  qf(:ncol,m) &
-                           - .5_r8*(state%q(:ncol,k,m)+state%q(:ncol,k+1,m))*edot(:ncol)/pdel_new(:ncol) 
-        enddo
-        uf (:ncol) = uf(:ncol) - .5_r8*(state%u(:ncol,k)+state%u(:ncol,k+1))*edot(:ncol)/pdel_new(:ncol) 
-        vf (:ncol) = vf(:ncol) - .5_r8*(state%v(:ncol,k)+state%v(:ncol,k+1))*edot(:ncol)/pdel_new(:ncol) 
-       endif
-
-      ! adjust constituents to conserve mass in each layer
-       do m = 1, pcnst 
-         ! store unadjusted q for use in next k
-          qtmp   (:ncol  ,m) = state%q(:ncol,k,m)
-          state%q(:ncol,k,m) = state%q(:ncol,k,m) / fdq(:ncol) + qf(:ncol,m)
-       end do
-
-      ! compute adjusted u,v (note fdq_ke=1 if both adjust_uv and ke_conserve =F)
-       uf(:ncol) = state%u(:ncol,k  ) / fdq_ke(:ncol) + uf(:ncol)
-       vf(:ncol) = state%v(:ncol,k  ) / fdq_ke(:ncol) + vf(:ncol)
-       ! adjusted u,v tendencies
-       tend%dudt(:ncol,k) = (uf(:ncol) - utmp(:ncol)) / dt
-       tend%dvdt(:ncol,k) = (vf(:ncol) - vtmp(:ncol)) / dt
-       ! store unadjusted u,v for use in next k
-       utmp(:ncol) = state%u(:ncol,k)
-       vtmp(:ncol) = state%v(:ncol,k)
-       ! write adjusted u,v
-       state%u(:ncol,k) = uf(:ncol)
-       state%v(:ncol,k) = vf(:ncol)
-
-      ! compute adjusted temperature
-       state%t(:ncol,k) =(te(:ncol) - 0.5_r8*(state%u(:ncol,k)**2 + state%v(:ncol,k)**2)) &
-                         /cpairv(:ncol,k,lchnk)
-
-      ! compute new total pressure variables
-       state%pint  (:ncol,k+1) = state%pint(:ncol,k  ) + pdel_new(:ncol)
-       state%lnpint(:ncol,k+1) = log(state%pint(:ncol,k+1))
-       state%pdel  (:ncol,k  ) = pdel_new(:ncol)
-       state%rpdel (:ncol,k  ) = 1._r8/ state%pdel(:ncol,k  )
-    end do ! k
-!---------------- end adjustment loop -----------------------------------
-!------------------------------------------------------------------------
-
-    if ( waccmx_is('ionosphere') .or. waccmx_is('neutral') ) then 
-      zvirv(:,:) = shr_const_rwv / rairv(:,:,state%lchnk) - 1._r8
-    else
-      zvirv(:,:) = zvir    
-    endif
-
-    call geopotential_t  (                                                                    &
-         state%lnpint, state%lnpmid, state%pint  , state%pmid  , state%pdel  , state%rpdel  , &
-         state%t     , state%q(1,1,1), rairv(:,:,state%lchnk), gravit  , zvirv              , &
-         state%zi    , state%zm      , ncol         )
-
-! update original dry static energy
-    do k = 1, pver
-      state%s(:ncol,k) = state%t(:ncol,k  )*cpairv(:ncol,k,lchnk) &
-                        + gravit*state%zm(:ncol,k) + state%phis(:ncol)
-    enddo
-
-! update dry pressure too? OK after set_dry_to_wet was called in tphysac.
-    call set_state_pdry(state)
-
-  end subroutine physics_dme_adjust_THT
-
-
-
-  subroutine physics_dme_adjust_ORG(state, tend, qini, dt)
+!===============================================================================
+  subroutine physics_dme_adjust(state, tend, qini, dt)
     !----------------------------------------------------------------------- 
     ! 
     ! Purpose: Adjust the dry mass in each layer back to the value of physics input state
@@ -1463,6 +1167,7 @@ end subroutine physics_ptend_copy
     !-----------------------------------------------------------------------
 
     use constituents, only : cnst_get_type_byind
+    use ppgrid,       only : begchunk, endchunk
 
     implicit none
     !
@@ -1484,6 +1189,8 @@ end subroutine physics_ptend_copy
     real(r8) :: vtmp(pcols)   ! temp variable for recalculating the initial v values
 
     real(r8) :: zvirv(pcols,pver)    ! Local zvir array pointer
+
+    real(r8),allocatable :: cpairv_loc(:,:,:)
     !
     !-----------------------------------------------------------------------
     ! verify that the dycore is FV
@@ -1491,6 +1198,9 @@ end subroutine physics_ptend_copy
 
     if (state%psetcols .ne. pcols) then
        call endrun('physics_dme_adjust: cannot pass in a state which has sub-columns')
+    end if
+    if (adjust_te) then
+       call endrun('physics_dme_adjust: must update code based on the "correct" energy before turning on "adjust_te"')
     end if
 
     lchnk = state%lchnk
@@ -1542,14 +1252,32 @@ end subroutine physics_ptend_copy
 
 ! compute new T,z from new s,q,dp
     if (adjust_te) then
-       call geopotential_dse(state%lnpint, state%lnpmid  , state%pint ,  &
+
+! cpairv_loc needs to be allocated to a size which matches state and ptend
+! If psetcols == pcols, cpairv is the correct size and just copy into cpairv_loc
+! If psetcols > pcols and all cpairv match cpair, then assign the constant cpair
+
+       if (state%psetcols == pcols) then
+          allocate (cpairv_loc(state%psetcols,pver,begchunk:endchunk))
+          cpairv_loc(:,:,:) = cpairv(:,:,:)
+       else if (state%psetcols > pcols .and. all(cpairv(:,:,:) == cpair)) then
+          allocate(cpairv_loc(state%psetcols,pver,begchunk:endchunk))
+          cpairv_loc(:,:,:) = cpair
+       else
+          call endrun('physics_dme_adjust: cpairv is not allowed to vary when subcolumns are turned on')
+       end if
+
+       call geopotential_dse(state%lnpint, state%lnpmid, state%pint,  &
             state%pmid  , state%pdel    , state%rpdel,  &
             state%s     , state%q(:,:,1), state%phis , rairv(:,:,state%lchnk), &
-	    gravit, cpairv(:,:,state%lchnk), zvirv, &
+            gravit, cpairv_loc(:,:,state%lchnk), zvirv, &
             state%t     , state%zi      , state%zm   , ncol)
+
+       deallocate(cpairv_loc)
+
     end if
 
-  end subroutine physics_dme_adjust_ORG
+  end subroutine physics_dme_adjust
 !-----------------------------------------------------------------------
 
 !===============================================================================
@@ -1573,8 +1301,6 @@ end subroutine physics_ptend_copy
 
     ! Allocate state_out with same subcol dimension as state_in
     call physics_state_alloc ( state_out, state_in%lchnk, state_in%psetcols)
-    if (state_in%dycore_alloc) &
-         call physics_state_dycore_alloc(state_out)
 
     ncol = state_in%ncol
     
@@ -1583,9 +1309,6 @@ end subroutine physics_ptend_copy
     state_out%lchnk    = state_in%lchnk
     state_out%ncol     = state_in%ncol  
     state_out%count    = state_in%count 
-    state_out%indcol(:)= state_in%indcol(:)
-
-    state_out%nsubcol(:)= state_in%nsubcol(:)
 
     do i = 1, ncol
        state_out%lat(i)    = state_in%lat(i)
@@ -1648,30 +1371,6 @@ end subroutine physics_ptend_copy
           end do
        end do
     end do
-
-    if (allocated(state_in%uzm)) then
-       do k = 1, pver
-          do i = 1, ncol
-             state_out%uzm(i,k) = state_in%uzm(i,k) 
-          end do
-       end do
-    end if
-
-    if (allocated(state_in%frontgf)) then
-       do k = 1, pver
-          do i = 1, ncol
-             state_out%frontgf(i,k) = state_in%frontgf(i,k) 
-          end do
-       end do
-    end if
-
-    if (allocated(state_in%frontga)) then
-       do k = 1, pver
-          do i = 1, ncol
-             state_out%frontga(i,k) = state_in%frontga(i,k)
-          end do
-       end do
-    end if
 
   end subroutine physics_state_copy
 !===============================================================================
@@ -1810,11 +1509,6 @@ subroutine physics_state_alloc(state,lchnk,psetcols)
 
   !  state%ncol - is initialized in physics_state_set_grid,  if not using sub-columns
 
-  state%nsubcol(:) = 1                   ! Default number of sub-columns is 1
-  do i=1,state%ngrdcol
-    state%indcol(i)  = i                 ! Default is the index for each column (no sub-columns)
-  end do
-  state%indcol(state%ngrdcol+1:psetcols) = 0._r8
   !----------------------------------
 
   allocate(state%lat(psetcols), stat=ierr)
@@ -1961,45 +1655,6 @@ end subroutine physics_state_alloc
 
 !===============================================================================
 
-subroutine physics_state_dycore_alloc(state)
-
-  ! Allocate the components of state that are first set by the dycore.
-  ! Assumes that physics_state_alloc has already been called.
-
-  use dycore, only : dycore_is
-  use infnan, only : inf, assignment(=)
-
-  type(physics_state), intent(inout) :: state
-
-  integer :: psetcols, ierr=0
-
-  psetcols = state%psetcols
-
-  ! Zonal mean only calculated for lat-lon grids.
-  if (dycore_is('LR')) then
-     allocate(state%uzm(psetcols,pver), stat=ierr)
-     if ( ierr /= 0 ) call endrun( &
-          'physics_state_dycore_alloc error: allocation error for state%uzm')
-     state%uzm(:,:) = inf
-  end if
-
-  allocate(state%frontgf(psetcols,pver), stat=ierr)
-  if ( ierr /= 0 ) call endrun( &
-       'physics_state_dycore_alloc error: allocation error for state%frontgf')
-
-  allocate(state%frontga(psetcols,pver), stat=ierr)
-  if ( ierr /= 0 ) call endrun( &
-       'physics_state_dycore_alloc error: allocation error for state%frontga')
-
-  state%frontgf(:,:) = inf
-  state%frontga(:,:) = inf
-
-  state%dycore_alloc = .true.
-
-end subroutine physics_state_dycore_alloc
-
-!===============================================================================
-
 subroutine physics_state_dealloc(state)
 
 ! deallocate the individual state components
@@ -2109,18 +1764,8 @@ subroutine physics_state_dealloc(state)
   deallocate(state%lonmapback, stat=ierr)
   if ( ierr /= 0 ) call endrun('physics_state_dealloc error: deallocation error for state%lonmapback')
 
-  ! The following fields may not always be allocated, so check allocation status.
-
-  if (allocated(state%uzm)) deallocate(state%uzm, stat=ierr)
-  if ( ierr /= 0 ) call endrun('physics_state_dealloc error: deallocation error for state%uzm')
-
-  if (allocated(state%frontgf)) deallocate(state%frontgf, stat=ierr)
-  if ( ierr /= 0 ) call endrun('physics_state_dealloc error: deallocation error for state%frontgf')
-
-  if (allocated(state%frontga)) deallocate(state%frontga, stat=ierr)
-  if ( ierr /= 0 ) call endrun('physics_state_dealloc error: deallocation error for state%frontga')
-
-  state%dycore_alloc = .false.
+  deallocate(state%cid, stat=ierr)
+  if ( ierr /= 0 ) call endrun('physics_state_dealloc error: deallocation error for state%cid')
 
 end subroutine physics_state_dealloc
 

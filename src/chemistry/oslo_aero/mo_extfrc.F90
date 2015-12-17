@@ -4,11 +4,11 @@ module mo_extfrc
   !---------------------------------------------------------------
 
   use shr_kind_mod, only : r8 => shr_kind_r8
-  use ppgrid,       only : pcols, begchunk, endchunk, pver, pverp
-  use chem_mods,    only : gas_pcnst, extcnt
-  use spmd_utils,   only : masterproc,iam
-  use abortutils,   only : endrun
-  use cam_history,  only : addfld, outfld, phys_decomp, add_default
+  use ppgrid,        only : pver, pverp
+  use chem_mods,     only : gas_pcnst, extcnt, extfrc_lst, frc_from_dataset
+  use spmd_utils,    only : masterproc
+  use cam_abortutils,only : endrun
+  use cam_history,   only : addfld, outfld, add_default, horiz_only
   use cam_logfile,  only : iulog
   use tracer_data,  only : trfld,trfile
 
@@ -16,12 +16,9 @@ module mo_extfrc
 
   type :: forcing
      integer           :: frc_ndx
-     real(r8)              :: mw
-     character(len=265) :: filename
-     real(r8), pointer     :: times(:)
-     real(r8), pointer     :: levi(:)
-     character(len=8)  :: species
-     character(len=8)  :: units
+     real(r8)          :: scalefactor
+     character(len=265):: filename
+     character(len=16) :: species
      integer                   :: nsectors
      character(len=32),pointer :: sectors(:)
      type(trfld), pointer      :: fields(:)
@@ -39,26 +36,28 @@ module mo_extfrc
 
   character(len=256) ::   filename
 
-  logical :: has_extfrc(gas_pcnst)
   type(forcing), allocatable  :: forcings(:)
-  integer :: extfrc_cnt = 0
+  integer :: n_frc_files = 0
 
 contains
 
-  subroutine extfrc_inti( extfrc_specifier, extfrc_type, extfrc_cycle_yr, extfrc_fixed_ymd, extfrc_fixed_tod)
+  subroutine extfrc_inti( extfrc_specifier, extfrc_type_in, extfrc_cycle_yr, extfrc_fixed_ymd, extfrc_fixed_tod)
 
     !-----------------------------------------------------------------------
     ! 	... initialize the surface forcings
     !-----------------------------------------------------------------------
-    use cam_pio_utils, only : cam_pio_openfile
-    use pio, only : pio_inq_dimid, pio_inquire, pio_inq_varndims, pio_closefile, &
-         pio_inq_varname, pio_nowrite, file_desc_t
+    use cam_pio_utils, only : cam_pio_openfile, cam_pio_closefile
+    use pio,           only : pio_inquire, pio_inq_varndims
+    use pio,           only : pio_inq_varname, pio_nowrite, file_desc_t
+    use pio,           only : pio_get_att, PIO_NOERR, PIO_GLOBAL
+    use pio,           only : pio_seterrorhandling, PIO_BCAST_ERROR,PIO_INTERNAL_ERROR
     use mo_tracname,   only : solsym
     use mo_chem_utls,  only : get_extfrc_ndx, get_spc_ndx
     use chem_mods,     only : frc_from_dataset
     use tracer_data,   only : trcdata_init
     use phys_control,  only : phys_getopts
-    use physics_buffer, only : physics_buffer_desc
+    use physics_buffer,only : physics_buffer_desc
+    use string_utils,  only : GLC
 
     implicit none
 
@@ -66,7 +65,7 @@ contains
     ! 	... dummy arguments
     !-----------------------------------------------------------------------
     character(len=*), dimension(:), intent(in) :: extfrc_specifier
-    character(len=*), intent(in) :: extfrc_type
+    character(len=*), intent(in) :: extfrc_type_in
     integer  , intent(in)        :: extfrc_cycle_yr
     integer  , intent(in)        :: extfrc_fixed_ymd
     integer  , intent(in)        :: extfrc_fixed_tod
@@ -76,10 +75,12 @@ contains
     !-----------------------------------------------------------------------
     integer :: astat
     integer :: j, l, m, n, i,mm                          ! Indices
-    character(len=16)  :: species
     character(len=16)  :: spc_name
     character(len=256) :: locfn
-    character(len=256) :: spc_fnames(gas_pcnst)
+    character(len=256) :: frc_fnames(gas_pcnst)
+    real(r8)           :: frc_scalefactor(gas_pcnst)
+    character(len=16)  :: frc_species(gas_pcnst)
+    integer            :: frc_indexes(gas_pcnst)
 
     integer ::  vid, ndims, nvars, isec, ierr
     type(file_desc_t) :: ncid
@@ -90,20 +91,22 @@ contains
     logical         , parameter :: rmv_file = .false.
     logical  :: history_aerosol      ! Output the MAM aerosol tendencies
 
+    character(len=32) :: extfrc_type = ' '
+    character(len=80) :: file_interp_type = ' '
+    character(len=256) :: tmp_string = ' '
+    character(len=32) :: xchr = ' '
+    real(r8) :: xdbl
+
     !-----------------------------------------------------------------------
  
     call phys_getopts( history_aerosol_out        = history_aerosol   )
-
-    do i = 1, gas_pcnst
-       has_extfrc(i) = .false.
-       spc_fnames(i) = ''
-    enddo
 
     !-----------------------------------------------------------------------
     ! 	... species has insitu forcing ?
     !-----------------------------------------------------------------------
 
     !write(iulog,*) 'Species with insitu forcings'
+    mm = 0
 
     count_emis: do n=1,gas_pcnst
 
@@ -113,7 +116,18 @@ contains
 
        i = scan(extfrc_specifier(n),'->')
        spc_name = trim(adjustl(extfrc_specifier(n)(:i-1)))
-       filename = trim(adjustl(extfrc_specifier(n)(i+2:)))
+       
+       ! need to parse out scalefactor ...
+       tmp_string = adjustl(extfrc_specifier(n)(i+2:))
+       j = scan( tmp_string, '*' )
+       if (j>0) then
+          xchr = tmp_string(1:j-1) ! get the multipler (left of the '*')
+          read( xchr, * ) xdbl   ! convert the string to a real
+          tmp_string = adjustl(tmp_string(j+1:)) ! get the filepath name (right of the '*')
+       else
+          xdbl = 1._r8
+       endif
+       filename = trim(tmp_string)
 
        m = get_extfrc_ndx( spc_name )
 
@@ -125,17 +139,17 @@ contains
           call endrun('extfrc_inti: '//trim(spc_name)//' cannot have external forcing from additional dataset')
        endif
 
-       mm = get_spc_ndx(spc_name)
-       spc_fnames(mm) = filename
-
-       has_extfrc(mm) = .true.
-       !write(iulog,*) '   ',  spc_name ,' : filename = ',trim(spc_fnames(mm)),' spc ndx = ',mm
+       mm = mm+1
+       frc_species(mm) = spc_name
+       frc_fnames(mm) = filename
+       frc_indexes(mm) = m
+       frc_scalefactor(mm) = xdbl
 
     enddo count_emis
 
-    extfrc_cnt = count( has_extfrc(:) )
+    n_frc_files = mm
 
-    if( extfrc_cnt < 1 ) then
+    if( n_frc_files < 1 ) then
        if (masterproc) write(iulog,*) 'There are no species with insitu forcings'
        return
     end if
@@ -145,7 +159,7 @@ contains
     !-----------------------------------------------------------------------
     ! 	... allocate forcings type array
     !-----------------------------------------------------------------------
-    allocate( forcings(extfrc_cnt), stat=astat )
+    allocate( forcings(n_frc_files), stat=astat )
     if( astat/= 0 ) then
        write(iulog,*) 'extfrc_inti: failed to allocate forcings array; error = ',astat
        call endrun
@@ -154,32 +168,31 @@ contains
     !-----------------------------------------------------------------------
     ! 	... setup the forcing type array
     !-----------------------------------------------------------------------
-    n = 0
-    species_loop : do m = 1,gas_pcnst
-       has_forcing : if( has_extfrc(m) ) then
-          spc_name = trim( solsym(m) )
-          n        = n + 1
-          !-----------------------------------------------------------------------
-          ! 	... default settings
-          !-----------------------------------------------------------------------
-          forcings(n)%frc_ndx          = get_extfrc_ndx( spc_name )
-          forcings(n)%species          = spc_name
-          forcings(n)%filename         = spc_fnames(m)
-          call addfld( trim(spc_name)//'_XFRC',  'molec/cm3/s', pver, 'A', &
-                       'external forcing for '//trim(spc_name),   phys_decomp )
+    do m=1,n_frc_files 
+       forcings(m)%frc_ndx     = frc_indexes(m)
+       forcings(m)%species     = frc_species(m)
+       forcings(m)%filename    = frc_fnames(m)
+       forcings(m)%scalefactor = frc_scalefactor(m)
+    enddo
+    
+    do n= 1,extcnt 
+       if (frc_from_dataset(n)) then
+          spc_name = extfrc_lst(n)
+          call addfld( trim(spc_name)//'_XFRC', (/ 'lev' /), 'A',  'molec/cm3/s', &
+               'external forcing for '//trim(spc_name) )
 #ifndef OSLO_AERO
-          call addfld( trim(spc_name)//'_CLXF',  'molec/cm2/s', 1, 'A', &
-                       'vertically intergrated external forcing for '//trim(spc_name),   phys_decomp )
+          call addfld( trim(spc_name)//'_CLXF', horiz_only,  'A',  'molec/cm2/s', &
+               'vertically intergrated external forcing for '//trim(spc_name) )
 #else
-          call addfld( trim(spc_name)//'_CLXF',  'kg/m2/s', 1, 'A', &
-                      'vertically intergrated external forcing for '//trim(spc_name),   phys_decomp )
+          call addfld( trim(spc_name)//'_CLXF', horiz_only, 'A', 'kg/m2/s', &
+                       'vertically intergrated external forcing for '//trim(spc_name) )
 #endif
            if ( history_aerosol ) then 
              call add_default( trim(spc_name)//'_XFRC', 1, ' ' )
              call add_default( trim(spc_name)//'_CLXF', 1, ' ' )
           endif
-       end if has_forcing
-    end do species_loop
+       endif
+    enddo
 
     if (masterproc) then
        !-----------------------------------------------------------------------
@@ -197,8 +210,8 @@ contains
           write(iulog,*) ' cycle year = ',extfrc_cycle_yr
        end if
        write(iulog,*) ' '
-       write(iulog,*) 'there are ',extfrc_cnt,' species with external forcing files'
-       do m = 1,extfrc_cnt
+       write(iulog,*) 'there are ',n_frc_files,' species with external forcing files'
+       do m = 1,n_frc_files
           write(iulog,*) ' '
           write(iulog,*) 'forcing type ',m
           write(iulog,*) 'species = ',trim(forcings(m)%species)
@@ -211,7 +224,7 @@ contains
     !-----------------------------------------------------------------------
     ! read emis files to determine number of sectors
     !-----------------------------------------------------------------------
-    frcing_loop: do m = 1, extfrc_cnt
+    frcing_loop: do m = 1, n_frc_files
 
        forcings(m)%nsectors = 0
 
@@ -252,7 +265,21 @@ contains
 
        enddo
 
-       call pio_closefile (ncid)
+       ! Global attribute 'input_method' overrides the ext_frc_type namelist setting on
+       ! a file-by-file basis.  If the ext_frc file does not contain the 'input_method' 
+       ! attribute then the ext_frc_type namelist setting is used.
+       call pio_seterrorhandling(ncid, PIO_BCAST_ERROR)
+       ierr = pio_get_att(ncid, PIO_GLOBAL, 'input_method', file_interp_type)
+       call pio_seterrorhandling(ncid, PIO_INTERNAL_ERROR)
+       if ( ierr == PIO_NOERR) then
+          l = GLC(file_interp_type)
+          extfrc_type(1:l) = file_interp_type(1:l)
+          extfrc_type(l+1:) = ' '
+       else
+          extfrc_type = trim(extfrc_type_in)
+       endif
+
+       call cam_pio_closefile (ncid)
 
        allocate(forcings(m)%file%in_pbuf(size(forcings(m)%sectors)))
        forcings(m)%file%in_pbuf(:) = .false.
@@ -260,7 +287,7 @@ contains
                           forcings(m)%filename, filelist, datapath, &
                           forcings(m)%fields,  &
                           forcings(m)%file, &
-                          rmv_file, extfrc_cycle_yr, extfrc_fixed_ymd, extfrc_fixed_tod, extfrc_type)
+                          rmv_file, extfrc_cycle_yr, extfrc_fixed_ymd, extfrc_fixed_tod, trim(extfrc_type) )
 
     enddo frcing_loop
 
@@ -287,18 +314,19 @@ contains
     !-----------------------------------------------------------------------
     integer :: m
 
-    do m = 1,extfrc_cnt
+    do m = 1,n_frc_files
        call advance_trcdata( forcings(m)%fields, forcings(m)%file, state, pbuf2d  )
     end do
 
   end subroutine extfrc_timestep_init
 
   subroutine extfrc_set( lchnk, zint, frcing, ncol )
+
     !--------------------------------------------------------
     !	... form the external forcing
     !--------------------------------------------------------
 #ifdef OSLO_AERO
-    use mo_chem_utls,  only : get_extfrc_ndx, get_spc_ndx
+    use mo_chem_utls,  only : get_spc_ndx
     use chem_mods,     only : adv_mass
 #endif
 
@@ -321,114 +349,45 @@ contains
     integer  :: k, isec
     real(r8),parameter :: km_to_cm = 1.e5_r8
 #ifdef OSLO_AERO
-    character(len=50):: spc_name
-    integer          :: spc_ndx
+    integer             :: spc_ndx
 #endif
 
-#if (defined MODAL_AERO)
-    real(r8) :: fr_to_ait, fr_to_acc, fr_to_pom, fr_to_cor
-    real(r8) :: demis_ait, demis_acc, demis_pom, demis_cor
-           ! emitted mass-mean diameter (m) for aitken, accum, coarse modes
-           ! for log-normal, demis = dgn_emis * exp(1.5*(lnsigmag*2))
-    real(r8) :: x_mton_ait, x_mton_acc, x_mton_pom, x_mton_cor
-           ! [(number emissions)/(mass emissions)] for aitken, accum, coarse modes
-           ! x_mton_xxx = 1/(emitted particle mean mass)  (#/kg)
-    real(r8) :: om_to_oc
-#endif
-#if (defined OSLO_AERO)
-    real(r8), parameter :: om_to_oc = 1.4_r8
-#endif
-
-    if( extfrc_cnt < 1 .or. extcnt < 1 ) then
+    if( n_frc_files < 1 .or. extcnt < 1 ) then
        return
     end if
+
+    frcing(:,:,:) = 0._r8
 
     !--------------------------------------------------------
     !	... set non-zero forcings
     !--------------------------------------------------------
-    src_loop : do m = 1,extfrc_cnt
-
-!!$#ifdef DIAGS
-!!$          write(iulog,*) ' '
-!!$          write(iulog,*) 'src frcing'
-!!$          write(iulog,'(1p5g15.7)') frc_data
-!!$          write(iulog,*) 'model frcing'
-!!$          write(iulog,'(1p5g15.7)') frc_model(:,1)
-!!$          data_dz(:)  = forcings(m)%levi(2:nlev+1) - forcings(m)%levi(1:nlev)
-!!$          model_dz(:) = model_z(2:pverp) - model_z(1:pver)
-!!$          data_sum  = dot_product( frc_data,data_dz )
-!!$          model_sum = dot_product( frc_model(:,1),model_dz )
-!!$          write(iulog,*) 'data_sum, model_sum = ',data_sum, model_sum
-!!$          write(iulog,*) '======================================================'
-!!$          if ( abs( (data_sum-model_sum)/max(1.e-20,(data_sum+model_sum)) ) > 0.3 ) then
-!!$             call endrun('EXTFRC_SET: data_sum and model_sum disagree')
-!!$          endif
-!!$#endif
+    file_loop : do m = 1,n_frc_files
 
        n = forcings(m)%frc_ndx
 
-       frcing(:ncol,:,n) = 0._r8
        do isec = 1,forcings(m)%nsectors
-          if (forcings(m)%file%alt_data) then
-             frcing(:ncol,:,n) = frcing(:ncol,:,n) + forcings(m)%fields(isec)%data(:ncol,pver:1:-1,lchnk)
-          else
              frcing(:ncol,:,n) = frcing(:ncol,:,n) + forcings(m)%fields(isec)%data(:ncol,:,lchnk)
-          endif
        enddo
 
-#if (defined MODAL_AERO)
-   !! this is done here because so4_a1 and so4_a2 have the same emis files
-   !   fr_to_ait = 0.01             ! fraction of SO4 mass emitted to aitken mode
-   !   fr_to_acc = 1.0 - fr_to_ait  ! fraction of SO4 mass emitted to accu. mode
-   !   demis_ait = 0.018e-6    ! m
-   !   demis_acc = 0.11e-6     ! m
-       om_to_oc  = 1.4_r8
+       frcing(:ncol,:,n) = forcings(m)%scalefactor*frcing(:ncol,:,n)
 
-   !   x_mton_ait = 6.0 * specmw_so4_amode /      &     ! kmol -> #
-   !               (pi*specdens_so4_amode*(demis_ait**3))
-   !   x_mton_acc = 6.0 * specmw_so4_amode /      &     ! kmol -> #
-   !               (pi*specdens_so4_amode*(demis_acc**3))
+    enddo file_loop
 
-       select case( forcings(m)%species )
-   !   case( 'so4_a1' )
-   !      frcing(:ncol,:,n) = frcing(:ncol,:,n) * fr_to_acc * 1._r8/2.5_r8 ! 0._r8
-   !   case( 'so4_a2' )
-   !      frcing(:ncol,:,n) = frcing(:ncol,:,n) * fr_to_ait * 1._r8/2.5_r8 ! 0._r8
-   !   case( 'num_a1' )
-   !      frcing(:ncol,:,n) = frcing(:ncol,:,n) * fr_to_acc * x_mton_acc * 1._r8/2.5_r8 ! 0._r8
-   !   case( 'num_a2' )
-   !      frcing(:ncol,:,n) = frcing(:ncol,:,n) * fr_to_ait * x_mton_ait * 1._r8/2.5_r8 ! 0._r8
-#if ( defined MODAL_AERO_7MODE )
-       case( 'pom_a3' )
-          frcing(:ncol,:,n) = frcing(:ncol,:,n) * om_to_oc
-#elif ( defined MODAL_AERO_3MODE )
-       case( 'pom_a1' )
-          frcing(:ncol,:,n) = frcing(:ncol,:,n) * om_to_oc
-#endif
-       end select
-#endif
+    frc_loop : do n = 1,extcnt
+       if (frc_from_dataset(n)) then
 
-!Scale factor to go from OC ==> OM when using OSLO aerosols
-#if (defined OSLO_AERO)
-       select case( forcings(m)%species )
-       case( 'OM_NI' )
-          frcing(:ncol,:,n) = frcing(:ncol,:,n) * om_to_oc
-       end select
-#endif
-
-       xfcname = trim(forcings(m)%species)//'_XFRC'
+          xfcname = trim(extfrc_lst(n))//'_XFRC'
        call outfld( xfcname, frcing(:ncol,:,n), ncol, lchnk )
 
        frcing_col(:ncol) = 0._r8
        do k = 1,pver
           frcing_col(:ncol) = frcing_col(:ncol) + frcing(:ncol,k,n)*(zint(:ncol,k)-zint(:ncol,k+1))*km_to_cm
        enddo
-       xfcname = trim(forcings(m)%species)//'_CLXF'
 
 #ifdef OSLO_AERO
        !redefine to kg/m2/s if oslo aerosols
-       spc_name = trim(forcings(m)%species)
-       spc_ndx = get_spc_ndx(trim(spc_name))
+       xfcname = trim(forcings(m)%species)
+       spc_ndx = get_spc_ndx(trim(xfcname))
        !It makes more sense to output in kg/m2/s to compare with other terms
        frcing_col(:ncol) = frcing_col(:ncol)     &
                            *1.0e4_r8             &   !molec/cm2 ==> molec/m2
@@ -437,9 +396,10 @@ contains
                            *1.e-3_r8                 !==>> kg/m2
 #endif
 
+          xfcname = trim(extfrc_lst(n))//'_CLXF'
        call outfld( xfcname, frcing_col(:ncol), ncol, lchnk )
-
-    end do src_loop
+       endif
+    end do frc_loop
 
   end subroutine extfrc_set
 

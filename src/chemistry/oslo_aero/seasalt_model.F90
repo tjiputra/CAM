@@ -1,5 +1,6 @@
 module seasalt_model
 
+use constituents,     only: cnst_name
 use aerosoldef,       only: l_ss_a1, l_ss_a2, l_ss_a3,l_om_ni   &
                            , MODE_IDX_SS_A1, MODE_IDX_SS_A2, MODE_IDX_SS_A3 &
                            , rhopart
@@ -36,6 +37,8 @@ save
 !cak
 
    integer, parameter :: numberOfSaltModes = 3
+   character(len=6), public, dimension(10)        :: seasalt_names
+   integer, parameter, public :: seasalt_nbin             = numberOfSaltModes              !just because this is needed by mo_photo.F90
 
    !Numbers in table below are from Kirkevåg et al (2013) http://www.geosci-model-dev.net/6/207/2013/gmd-6-207-2013.html
    !Based on Struthers et al 2011 (http://www.atmos-chem-phys.net/11/3459/2011/acp-11-3459-2011.html)
@@ -86,6 +89,9 @@ contains
    subroutine seasalt_init()
 
       implicit none
+
+      integer         :: i
+
       modeMap(1) = MODE_IDX_SS_A1  
       modeMap(2) = MODE_IDX_SS_A2
       modeMap(3) = MODE_IDX_SS_A3
@@ -93,6 +99,11 @@ contains
       tracerMap(1) = l_ss_a1
       tracerMap(2) = l_ss_a2
       tracerMap(3) = l_ss_a3
+
+      seasalt_names(:)="      "
+      do i=1,numberOfSaltModes
+         seasalt_names(i) = cnst_name(tracerMap(i))
+      end do
 
       spracklenOMOceanSource(:) = 0.0_r8
    end subroutine seasalt_init

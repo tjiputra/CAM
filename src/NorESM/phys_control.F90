@@ -12,7 +12,7 @@ module phys_control
 
 use spmd_utils,    only: masterproc
 use cam_logfile,   only: iulog
-use abortutils,    only: endrun
+use cam_abortutils, only: endrun
 use shr_kind_mod,  only: r8 => shr_kind_r8
 
 implicit none
@@ -26,8 +26,7 @@ public :: &
    phys_do_flux_avg,  &! return true to average surface fluxes
    cam_physpkg_is,    &! query for the name of the physics package
    cam_chempkg_is,    &! query for the name of the chemistry package
-   do_waccm_phys,     &! WACCM physics is on
-   waccmx_is           ! query for the WACCM-X option
+   waccmx_is
 
 ! Private module data
 
@@ -37,11 +36,7 @@ integer,           parameter :: unset_int = huge(1)
 ! Namelist variables:
 character(len=16) :: cam_physpkg          = unset_str  ! CAM physics package [cam3 | cam4 | cam5 |
                                                        !   ideal | adiabatic].
-character(len=32) :: cam_chempkg          = unset_str  ! CAM chemistry package [waccm_mozart | 
-                                                       !  waccm_ghg | trop_mozart | trop_ghg | 
-                                                       !  trop_bam | trop_mam3 | trop_mam7 | 
-                                                       !  super_fast_llnl | super_fast_llnl_mam3 | 
-                                                       !  waccm_mozart_mam3 | none
+character(len=32) :: cam_chempkg          = unset_str  ! CAM chemistry package 
 character(len=16) :: waccmx_opt           = unset_str  ! WACCMX run option [ionosphere | neutral | off
 character(len=16) :: deep_scheme          = unset_str  ! deep convection package
 character(len=16) :: shallow_scheme       = unset_str  ! shallow convection package
@@ -50,30 +45,55 @@ character(len=16) :: microp_scheme        = unset_str  ! microphysics package
 character(len=16) :: macrop_scheme        = unset_str  ! macrophysics package
 character(len=16) :: radiation_scheme     = unset_str  ! radiation package
 integer           :: srf_flux_avg         = unset_int  ! 1 => smooth surface fluxes, 0 otherwise
-integer           :: conv_water_in_rad    = unset_int  ! 0==> No; 1==> Yes-Arithmetic average;
-                                                       ! 2==> Yes-Average in emissivity.
 
 logical           :: use_subcol_microp    = .false.    ! if .true. then use sub-columns in microphysics
 
 logical           :: atm_dep_flux         = .true.     ! true => deposition fluxes will be provided
                                                        ! to the coupler
 logical           :: history_amwg         = .true.     ! output the variables used by the AMWG diag package
+logical           :: history_vdiag        = .false.    ! output the variables used by the AMWG variability diag package
 logical           :: history_aerosol      = .false.    ! output the MAM aerosol variables and tendencies
 logical           :: history_aero_optics  = .false.    ! output the aerosol
 logical           :: history_eddy         = .false.    ! output the eddy variables
 logical           :: history_budget       = .false.    ! output tendencies and state variables for CAM4
                                                        ! temperature, water vapor, cloud ice and cloud
                                                        ! liquid budgets.
-integer           :: history_budget_histfile_num = 1   ! output history file number for budget fields
-logical           :: do_clubb_sgs
-logical           :: do_tms
-logical           :: state_debug_checks   = .false.    ! Extra checks for validity of physics_state objects
-                                                       ! in physics_update.
+logical           :: convproc_do_aer      = .false.    ! switch for new convective scavenging treatment for modal aerosols
 
+integer           :: history_budget_histfile_num = 1   ! output history file number for budget fields
+logical           :: history_waccm        = .false.    ! output variables of interest for WACCM runs
+logical           :: history_waccmx       = .false.    ! output variables of interest for WACCM-X runs
+logical           :: history_chemistry    = .true.     ! output default chemistry-related variables
+logical           :: history_carma        = .true.     ! output default CARMA-related variables
+logical           :: history_clubb        = .true.     ! output default CLUBB-related variables
+logical           :: do_clubb_sgs
+logical           :: micro_do_icesupersat
+! Check validity of physics_state objects in physics_update.
+logical           :: state_debug_checks   = .false.
+
+! Macro/micro-physics co-substeps
+integer           :: cld_macmic_num_steps = 1
+
+logical           :: offline_driver       = .false.    ! true => offline driver is being used
 integer           :: energy_conservation_type = 1
 logical           :: lprint_energy_clutter = .false.
 
 logical :: prog_modal_aero ! determines whether prognostic modal aerosols are present in the run.
+
+! Option to use heterogeneous freezing
+logical, public, protected :: use_hetfrz_classnuc = .false.
+
+! Which gravity wave sources are used?
+! Orography.
+logical, public, protected :: use_gw_oro = .true.
+! Frontogenesis.
+logical, public, protected :: use_gw_front = .false.
+! Frontogenesis to inertial spectrum.
+logical, public, protected :: use_gw_front_igw = .false.
+! Deep convection.
+logical, public, protected :: use_gw_convect_dp = .false.
+! Shallow convection.
+logical, public, protected :: use_gw_convect_sh = .false.
 
 !======================================================================= 
 contains
@@ -93,9 +113,12 @@ subroutine phys_ctl_readnl(nlfile)
 
    namelist /phys_ctl_nl/ cam_physpkg, cam_chempkg, waccmx_opt, deep_scheme, shallow_scheme, &
       eddy_scheme, microp_scheme,  macrop_scheme, radiation_scheme, srf_flux_avg, &
-      use_subcol_microp, atm_dep_flux, history_amwg, history_aerosol, history_aero_optics, &
-      history_eddy, history_budget,  history_budget_histfile_num, & 
-      conv_water_in_rad, do_clubb_sgs, do_tms, state_debug_checks, &
+      use_subcol_microp, atm_dep_flux, history_amwg, history_vdiag, history_aerosol, history_aero_optics, &
+      history_eddy, history_budget,  history_budget_histfile_num, history_waccm, &
+      history_waccmx, history_chemistry, history_carma, history_clubb, &
+      do_clubb_sgs, state_debug_checks, use_hetfrz_classnuc, use_gw_oro, use_gw_front, &
+      use_gw_front_igw, use_gw_convect_dp, use_gw_convect_sh, cld_macmic_num_steps, &
+      offline_driver, micro_do_icesupersat, convproc_do_aer,  &
       energy_conservation_type, lprint_energy_clutter
    !-----------------------------------------------------------------------------
 
@@ -128,42 +151,34 @@ subroutine phys_ctl_readnl(nlfile)
    call mpibcast(use_subcol_microp,               1 , mpilog,  0, mpicom)
    call mpibcast(atm_dep_flux,                    1 , mpilog,  0, mpicom)
    call mpibcast(history_amwg,                    1 , mpilog,  0, mpicom)
+   call mpibcast(history_vdiag,                   1 , mpilog,  0, mpicom)
    call mpibcast(history_eddy,                    1 , mpilog,  0, mpicom)
    call mpibcast(history_aerosol,                 1 , mpilog,  0, mpicom)
    call mpibcast(history_aero_optics,             1 , mpilog,  0, mpicom)
    call mpibcast(history_budget,                  1 , mpilog,  0, mpicom)
    call mpibcast(history_budget_histfile_num,     1 , mpiint,  0, mpicom)
+   call mpibcast(history_waccm,                   1 , mpilog,  0, mpicom)
+   call mpibcast(history_waccmx,                  1 , mpilog,  0, mpicom)
+   call mpibcast(history_chemistry,               1 , mpilog,  0, mpicom)
+   call mpibcast(history_carma,                   1 , mpilog,  0, mpicom)
+   call mpibcast(history_clubb,                   1 , mpilog,  0, mpicom)
    call mpibcast(do_clubb_sgs,                    1 , mpilog,  0, mpicom)
-   call mpibcast(conv_water_in_rad,               1 , mpiint,  0, mpicom)
-   call mpibcast(do_tms,                          1 , mpilog,  0, mpicom)
+   call mpibcast(micro_do_icesupersat,            1 , mpilog,  0, mpicom)
    call mpibcast(state_debug_checks,              1 , mpilog,  0, mpicom)
+   call mpibcast(use_hetfrz_classnuc,             1 , mpilog,  0, mpicom)
+   call mpibcast(use_gw_oro,                      1 , mpilog,  0, mpicom)
+   call mpibcast(use_gw_front,                    1 , mpilog,  0, mpicom)
+   call mpibcast(use_gw_front_igw,                1 , mpilog,  0, mpicom)
+   call mpibcast(use_gw_convect_dp,               1 , mpilog,  0, mpicom)
+   call mpibcast(use_gw_convect_sh,               1 , mpilog,  0, mpicom)
+   call mpibcast(cld_macmic_num_steps,            1 , mpiint,  0, mpicom)
+   call mpibcast(offline_driver,                  1 , mpilog,  0, mpicom)
+   call mpibcast(convproc_do_aer,                 1 , mpilog,  0, mpicom)
    call mpibcast(energy_conservation_type,        1 , mpiint,  0, mpicom)
    call mpibcast(lprint_energy_clutter,           1 , mpilog,  0, mpicom)
 #endif
 
    ! Error checking:
-
-   ! Defaults for PBL and microphysics are set in build-namelist.  Check here that
-   ! values have been set to guard against problems with hand edited namelists.
-
-   ! WACCM-X run option set in build-namelist. Check for valid values
-   if (.not. (waccmx_opt == 'ionosphere' .or. waccmx_opt == 'neutral' .or. waccmx_opt == 'off')) then
-      write(iulog,*)'waccm: illegal value of waccmx_opt:', waccmx_opt
-      call endrun('waccm: illegal value of waccmx_opt')
-   endif
-   if (.not. (shallow_scheme .eq. 'Hack' .or. shallow_scheme .eq. 'UW' .or. shallow_scheme .eq. 'CLUBB_SGS')) then
-      write(iulog,*)'phys_setopts: illegal value of shallow_scheme:', shallow_scheme
-      call endrun('phys_setopts: illegal value of shallow_scheme')
-   endif
-   if (.not. (eddy_scheme .eq. 'HB' .or. eddy_scheme .eq. 'HBR' .or. eddy_scheme .eq. 'diag_TKE' .or. &
-              eddy_scheme .eq. 'CLUBB_SGS') ) then
-      write(iulog,*)'phys_setopts: illegal value of eddy_scheme:', eddy_scheme
-      call endrun('phys_setopts: illegal value of eddy_scheme')
-   endif
-   if ((microp_scheme /= 'MG' .and. microp_scheme /= 'RK')) then
-      write(iulog,*)'phys_setopts: illegal value of microp_scheme:', microp_scheme
-      call endrun('phys_setopts: illegal value of microp_scheme')
-   endif
 
    ! Check compatibility of eddy & shallow schemes
    if (( shallow_scheme .eq. 'UW' ) .and. ( eddy_scheme .ne. 'diag_TKE' )) then
@@ -196,17 +211,19 @@ subroutine phys_ctl_readnl(nlfile)
       endif
    endif
       
-
+   ! Macro/micro co-substepping support.
+   if (cld_macmic_num_steps > 1) then
+      if (microp_scheme /= "MG" .or. (macrop_scheme /= "park" .and. macrop_scheme /= "CLUBB_SGS")) then
+         call endrun ("Setting cld_macmic_num_steps > 1 is only &
+              &supported with Park or CLUBB macrophysics and MG microphysics.")
+      end if
+   end if
 
    ! prog_modal_aero determines whether prognostic modal aerosols are present in the run.
-   prog_modal_aero = (     cam_chempkg_is('trop_mam3') &
-                      .or. cam_chempkg_is('trop_mam_oslo') &
-                      .or. cam_chempkg_is('trop_mam7') &
-                      .or. cam_chempkg_is('super_fast_llnl_mam3') &
-                      .or. cam_chempkg_is('trop_mozart_mam3') &
-                      .or. cam_chempkg_is('trop_strat_mam3') &
-                      .or. cam_chempkg_is('trop_strat_mam7') &
-                      .or. cam_chempkg_is('waccm_mozart_mam3'))
+   prog_modal_aero = index(cam_chempkg,'_mam')>0
+#ifdef OSLO_AERO
+   prog_modal_aero = .FALSE.
+#endif 
 end subroutine phys_ctl_readnl
 
 !===============================================================================
@@ -233,16 +250,6 @@ end function cam_chempkg_is
 
 !===============================================================================
 
-logical function do_waccm_phys()
-#ifdef WACCM_PHYS
-  do_waccm_phys = .true.
-#else
-  do_waccm_phys = .false.
-#endif
-end function do_waccm_phys
-
-!===============================================================================
-
 logical function waccmx_is(name)
 
    ! query for the name of the waccmx run option
@@ -256,10 +263,13 @@ end function waccmx_is
 
 subroutine phys_getopts(deep_scheme_out, shallow_scheme_out, eddy_scheme_out, microp_scheme_out, &
                         radiation_scheme_out, use_subcol_microp_out, atm_dep_flux_out, &
-                        history_amwg_out, history_aerosol_out, history_aero_optics_out, history_eddy_out, &
-                        history_budget_out, history_budget_histfile_num_out, conv_water_in_rad_out, &
-                        cam_chempkg_out, prog_modal_aero_out, macrop_scheme_out, do_clubb_sgs_out, &
-                        do_tms_out, state_debug_checks_out, &
+                         history_amwg_out, history_vdiag_out, history_aerosol_out, history_aero_optics_out, history_eddy_out, &
+                        history_budget_out, history_budget_histfile_num_out, &
+                        history_waccm_out, history_waccmx_out, history_chemistry_out, &
+                        history_carma_out, history_clubb_out, &
+                        cam_chempkg_out, prog_modal_aero_out, macrop_scheme_out, &
+                        do_clubb_sgs_out, state_debug_checks_out, cld_macmic_num_steps_out, &
+                        offline_driver_out, micro_do_icesupersat_out, convproc_do_aer_out, &
                         lprint_energy_clutter_out, energy_conservation_type_out )
 !-----------------------------------------------------------------------
 ! Purpose: Return runtime settings
@@ -279,17 +289,25 @@ subroutine phys_getopts(deep_scheme_out, shallow_scheme_out, eddy_scheme_out, mi
    logical,           intent(out), optional :: use_subcol_microp_out
    logical,           intent(out), optional :: atm_dep_flux_out
    logical,           intent(out), optional :: history_amwg_out
+   logical,           intent(out), optional :: history_vdiag_out
    logical,           intent(out), optional :: history_eddy_out
    logical,           intent(out), optional :: history_aerosol_out
    logical,           intent(out), optional :: history_aero_optics_out
    logical,           intent(out), optional :: history_budget_out
    integer,           intent(out), optional :: history_budget_histfile_num_out
+   logical,           intent(out), optional :: history_waccm_out
+   logical,           intent(out), optional :: history_waccmx_out
+   logical,           intent(out), optional :: history_chemistry_out
+   logical,           intent(out), optional :: history_carma_out
+   logical,           intent(out), optional :: history_clubb_out
    logical,           intent(out), optional :: do_clubb_sgs_out
-   integer,           intent(out), optional :: conv_water_in_rad_out
+   logical,           intent(out), optional :: micro_do_icesupersat_out        
    character(len=32), intent(out), optional :: cam_chempkg_out
    logical,           intent(out), optional :: prog_modal_aero_out
-   logical,           intent(out), optional :: do_tms_out
    logical,           intent(out), optional :: state_debug_checks_out
+   integer,           intent(out), optional :: cld_macmic_num_steps_out
+   logical,           intent(out), optional :: offline_driver_out
+   logical,           intent(out), optional :: convproc_do_aer_out
    integer,           intent(out), optional :: energy_conservation_type_out
    logical,           intent(out), optional :: lprint_energy_clutter_out
 
@@ -306,14 +324,22 @@ subroutine phys_getopts(deep_scheme_out, shallow_scheme_out, eddy_scheme_out, mi
    if ( present(history_aero_optics_out ) ) history_aero_optics_out  = history_aero_optics
    if ( present(history_budget_out      ) ) history_budget_out       = history_budget
    if ( present(history_amwg_out        ) ) history_amwg_out         = history_amwg
+   if ( present(history_vdiag_out       ) ) history_vdiag_out        = history_vdiag
    if ( present(history_eddy_out        ) ) history_eddy_out         = history_eddy
    if ( present(history_budget_histfile_num_out ) ) history_budget_histfile_num_out = history_budget_histfile_num
+   if ( present(history_waccm_out       ) ) history_waccm_out        = history_waccm
+   if ( present(history_waccmx_out      ) ) history_waccmx_out       = history_waccmx
+   if ( present(history_chemistry_out   ) ) history_chemistry_out    = history_chemistry
+   if ( present(history_carma_out       ) ) history_carma_out        = history_carma
+   if ( present(history_clubb_out       ) ) history_clubb_out        = history_clubb
    if ( present(do_clubb_sgs_out        ) ) do_clubb_sgs_out         = do_clubb_sgs
-   if ( present(conv_water_in_rad_out   ) ) conv_water_in_rad_out    = conv_water_in_rad
+   if ( present(micro_do_icesupersat_out )) micro_do_icesupersat_out = micro_do_icesupersat
    if ( present(cam_chempkg_out         ) ) cam_chempkg_out          = cam_chempkg
    if ( present(prog_modal_aero_out     ) ) prog_modal_aero_out      = prog_modal_aero
-   if ( present(do_tms_out              ) ) do_tms_out               = do_tms
    if ( present(state_debug_checks_out  ) ) state_debug_checks_out   = state_debug_checks
+   if ( present(cld_macmic_num_steps_out) ) cld_macmic_num_steps_out = cld_macmic_num_steps
+   if ( present(offline_driver_out      ) ) offline_driver_out       = offline_driver
+   if ( present(convproc_do_aer_out     ) ) convproc_do_aer_out      = convproc_do_aer
 
    if ( present(lprint_energy_clutter_out    ) ) lprint_energy_clutter_out       = lprint_energy_clutter
    if ( present(energy_conservation_type_out  ) ) energy_conservation_type_out   = energy_conservation_type

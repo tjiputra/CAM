@@ -3,6 +3,7 @@ module dust_model
   use spmd_utils,       only: masterproc
   use cam_abortutils,   only: endrun
 
+use constituents,     only: cnst_name
 use aerosoldef,       only: l_dst_a2, l_dst_a3
 use shr_kind_mod,     only: r8 => shr_kind_r8, cl => shr_kind_cl
 use camsrfexch,       only: cam_in_t
@@ -18,6 +19,8 @@ save
    !This can be refined, but the fractions in coarse/fine mode are approx ok
    real(r8), parameter, dimension(numberOfDustModes) :: emis_fraction_in_mode = (/0.13_r8, 0.87_r8 /)
    integer, dimension(numberOfDustModes)             :: tracerMap = (/-99, -99/) !index of dust tracers in the modes
+   character(len=6), public, dimension(10)        :: dust_names
+   integer, parameter, public                     :: dust_nbin = numberOfDustModes
 
    !Related to soil erodibility
    real(r8)          :: dust_emis_fact = -1.e36_r8        ! tuning parameter for dust emissions
@@ -30,6 +33,7 @@ public getDustTracerIndexInMode
 public getEmissionFractionInDustMode
 public isOsloDustTracer
 public dust_init
+public dust_readnl
 
 
 !===============================================================================
@@ -92,12 +96,17 @@ contains
 
       use soil_erod_mod, only: soil_erod_init
       implicit none
-
+      integer             :: i
 
 
       call  soil_erod_init( dust_emis_fact, soil_erod_file )
 
       call set_oslo_indices()
+
+      dust_names(:)="      "
+      do i=1,numberOfDustModes
+         dust_names(i) = cnst_name(tracerMap(i))
+      end do
 
    end subroutine dust_init
 

@@ -1,42 +1,62 @@
 module vertical_diffusion
 
-  !----------------------------------------------------------------------------------------------------- !
-  ! Module to compute vertical diffusion of momentum,  moisture, trace constituents                      !
-  ! and static energy. Separate modules compute                                                          !
-  !   1. stresses associated with turbulent flow over orography                                          !
-  !      ( turbulent mountain stress )                                                                   !
-  !   2. eddy diffusivities, including nonlocal tranport terms                                           !
-  !   3. molecular diffusivities                                                                         !
-  !   4. coming soon... gravity wave drag                                                                !
-  ! Lastly, a implicit diffusion solver is called, and tendencies retrieved by                           !
-  ! differencing the diffused and initial states.                                                        !
-  !                                                                                                      !
-  ! Calling sequence:                                                                                    !
-  !                                                                                                      !
-  !  vertical_diffusion_init      Initializes vertical diffustion constants and modules                  !
-  !        init_molec_diff        Initializes molecular diffusivity module                               !
-  !        init_eddy_diff         Initializes eddy diffusivity module (includes PBL)                     !
-  !        init_tms               Initializes turbulent mountain stress module                           !
-  !        init_vdiff             Initializes diffusion solver module                                    !
-  !  vertical_diffusion_ts_init   Time step initialization (only used for upper boundary condition)      !
-  !  vertical_diffusion_tend      Computes vertical diffusion tendencies                                 !
-  !        compute_tms            Computes turbulent mountain stresses                                   !
-  !        compute_eddy_diff      Computes eddy diffusivities and countergradient terms                  !
-  !        compute_vdiff          Solves vertical diffusion equations, including molecular diffusivities !
-  !                                                                                                      !
-  !---------------------------Code history-------------------------------------------------------------- !
-  ! J. Rosinski : Jun. 1992                                                                              !
-  ! J. McCaa    : Sep. 2004                                                                              !
-  ! S. Park     : Aug. 2006, Dec. 2008. Jan. 2010                                                        ! 
-  !----------------------------------------------------------------------------------------------------- !
+!----------------------------------------------------------------------------------------------------- !
+! Module to compute vertical diffusion of momentum,  moisture, trace constituents                      !
+! and static energy. Separate modules compute                                                          !
+!   1. stresses associated with turbulent flow over orography                                          !
+!      ( turbulent mountain stress )                                                                   !
+!   2. eddy diffusivities, including nonlocal tranport terms                                           !
+!   3. molecular diffusivities                                                                         !
+! Lastly, a implicit diffusion solver is called, and tendencies retrieved by                           !
+! differencing the diffused and initial states.                                                        !
+!                                                                                                      !
+! Calling sequence:                                                                                    !
+!                                                                                                      !
+!  vertical_diffusion_init      Initializes vertical diffustion constants and modules                  !
+!        init_molec_diff        Initializes molecular diffusivity module                               !
+!        init_eddy_diff         Initializes eddy diffusivity module (includes PBL)                     !
+!        init_tms               Initializes turbulent mountain stress module                           !
+!        init_vdiff             Initializes diffusion solver module                                    !
+!  vertical_diffusion_ts_init   Time step initialization (only used for upper boundary condition)      !
+!  vertical_diffusion_tend      Computes vertical diffusion tendencies                                 !
+!        compute_tms            Computes turbulent mountain stresses                                   !
+!        compute_eddy_diff      Computes eddy diffusivities and countergradient terms                  !
+!        compute_vdiff          Solves vertical diffusion equations, including molecular diffusivities !
+!                                                                                                      !
+!----------------------------------------------------------------------------------------------------- !
+! Some notes on refactoring changes made in 2015, which were not quite finished.                       !
+!                                                                                                      !
+!      - eddy_diff_tend should really only have state, pbuf, and cam_in as inputs. The process of      !
+!        removing these arguments, and referring to pbuf fields instead, is not complete.              !
+!                                                                                                      !
+!      - compute_vdiff was intended to be split up into three components:                              !
+!                                                                                                      !
+!         1. Diffusion of winds and heat ("U", "V", and "S" in the fieldlist object).                  !
+!                                                                                                      !
+!         2. Turbulent diffusion of a single constituent                                               !
+!                                                                                                      !
+!         3. Molecular diffusion of a single constituent                                               !
+!                                                                                                      !
+!        This reorganization would allow the three resulting functions to each use a simpler interface !
+!        than the current combined version, and possibly also remove the need to use the fieldlist     !
+!        object at all.                                                                                !
+!                                                                                                      !
+!      - The conditionals controlled by "do_pbl_diags" are somewhat scattered. It might be better to   !
+!        pull out these diagnostic calculations and outfld calls into separate functions.              !
+!                                                                                                      !
+!---------------------------Code history-------------------------------------------------------------- !
+! J. Rosinski : Jun. 1992                                                                              !
+! J. McCaa    : Sep. 2004                                                                              !
+! S. Park     : Aug. 2006, Dec. 2008. Jan. 2010                                                        !
+!----------------------------------------------------------------------------------------------------- !
 
-  use shr_kind_mod,     only : r8 => shr_kind_r8, i4=> shr_kind_i4
-  use ppgrid,           only : pcols, pver, pverp
-  use constituents,     only : pcnst, qmin, cnst_get_ind
-  use diffusion_solver, only : vdiff_selector
-  use abortutils,       only : endrun
-  use error_messages,   only : handle_errmsg
-  use physconst,        only :          &
+use shr_kind_mod,     only : r8 => shr_kind_r8, i4=> shr_kind_i4
+use ppgrid,           only : pcols, pver, pverp
+use constituents,     only : pcnst
+use diffusion_solver, only : vdiff_selector
+use cam_abortutils,   only : endrun
+use error_messages,   only : handle_errmsg
+use physconst,        only :          &
                                cpair  , &     ! Specific heat of dry air
                                gravit , &     ! Acceleration due to gravity
                                rair   , &     ! Gas constant for dry air
@@ -45,102 +65,91 @@ module vertical_diffusion
                                latice , &     ! Latent heat of fusion
                                karman , &     ! von Karman constant
                                mwdry  , &     ! Molecular weight of dry air
-                               avogad , &     ! Avogadro's number
-                               boltz  , &     ! Boltzman's constant
-                               tms_orocnst,&  ! turbulent mountain stress parameter
-                               tms_z0fac      ! Factor determining z_0 from orographic standard deviation [no unit]
-  use cam_history,      only : fieldname_len
-  use perf_mod
-  use cam_logfile,      only : iulog
-  use phys_control,     only : phys_getopts, waccmx_is
-  use time_manager,     only : is_first_step
+     avogad         ! Avogadro's number
+use cam_history,      only : fieldname_len
+use perf_mod
+use cam_logfile,      only : iulog
+use ref_pres,         only : do_molec_diff, nbot_molec
+use phys_control,     only : phys_getopts
+use time_manager,     only : is_first_step
+
 #ifdef OSLO_AERO
   use aerosoldef, only: getNumberOfAerosolTracers, fillAerosolTracerList
 #endif
-  implicit none
-  private      
-  save
-  
-  ! ----------------- !
-  ! Public interfaces !
-  ! ----------------- !
 
-  public vd_readnl
-  public vd_register                                   ! Register multi-time-level variables with physics buffer
-  public vertical_diffusion_init                       ! Initialization
-  public vertical_diffusion_ts_init                    ! Time step initialization (only used for upper boundary condition)
-  public vertical_diffusion_tend                       ! Full vertical diffusion routine
+implicit none
+private
+save
 
-  ! ------------ !
-  ! Private data !
-  ! ------------ !
+! ----------------- !
+! Public interfaces !
+! ----------------- !
 
-  character(len=16)    :: eddy_scheme                  ! Default set in phys_control.F90, use namelist to change
-                                                       !     'HB'       = Holtslag and Boville (default)
-                                                       !     'HBR'      = Holtslag and Boville and Rash 
-                                                       !     'diag_TKE' = Bretherton and Park ( UW Moist Turbulence Scheme )
-  integer, parameter   :: nturb = 5                    ! Number of iterations for solution ( when 'diag_TKE' scheme is selected )
-  logical, parameter   :: wstarent = .true.            ! Use wstar (.true.) or TKE (.false.) entrainment closure
-                                                       ! ( when 'diag_TKE' scheme is selected )
-  logical              :: do_pseudocon_diff = .false.  ! If .true., do pseudo-conservative variables diffusion
+public vd_readnl
+public vd_register                                   ! Register multi-time-level variables with physics buffer
+public vertical_diffusion_init                       ! Initialization
+public vertical_diffusion_ts_init                    ! Time step initialization (only used for upper boundary condition)
+public vertical_diffusion_tend                       ! Full vertical diffusion routine
 
-  character(len=16)    :: shallow_scheme               ! For checking compatibility between eddy diffusion
-                                                       ! and shallow convection schemes
-                                                       !     'Hack'     = Hack Shallow Convection Scheme
-                                                       !     'UW'       = Park and Bretherton ( UW Shallow Convection Scheme )
-  character(len=16)    :: microp_scheme                ! Microphysics scheme
+! ------------ !
+! Private data !
+! ------------ !
 
-  logical              :: do_molec_diff                ! Switch for molecular diffusion
+character(len=16)    :: eddy_scheme                  ! Default set in phys_control.F90, use namelist to change
+!     'HB'       = Holtslag and Boville (default)
+!     'HBR'      = Holtslag and Boville and Rash
+!     'diag_TKE' = Bretherton and Park ( UW Moist Turbulence Scheme )
+logical, parameter   :: wstarent = .true.            ! Use wstar (.true.) or TKE (.false.) entrainment closure
+! ( when 'diag_TKE' scheme is selected )
+logical              :: do_pseudocon_diff = .false.  ! If .true., do pseudo-conservative variables diffusion
 
-  type(vdiff_selector) :: fieldlist_wet                ! Logical switches for moist mixing ratio diffusion
-  type(vdiff_selector) :: fieldlist_dry                ! Logical switches for dry mixing ratio diffusion
-  type(vdiff_selector) :: fieldlist_molec              ! Logical switches for molecular diffusion
-  integer              :: ntop                         ! Top interface level to which vertical diffusion is applied ( = 1 ).
-  integer              :: nbot                         ! Bottom interface level to which vertical diffusion is applied ( = pver ).
-  integer              :: tke_idx, kvh_idx, kvm_idx    ! TKE and eddy diffusivity indices for fields in the physics buffer
-  integer              :: kvt_idx                      ! Index for kinematic molecular conductivity
-  integer              :: turbtype_idx, smaw_idx       ! Turbulence type and instability functions
-  integer              :: tauresx_idx, tauresy_idx     ! Redisual stress for implicit surface stress
+character(len=16)    :: shallow_scheme               ! Shallow convection scheme
 
-  character(len=fieldname_len) :: vdiffnam(pcnst)      ! Names of vertical diffusion tendencies
-  integer              :: ixcldice, ixcldliq           ! Constituent indices for cloud liquid and ice water
-  integer              :: ixnumice, ixnumliq
+type(vdiff_selector) :: fieldlist_wet                ! Logical switches for moist mixing ratio diffusion
+type(vdiff_selector) :: fieldlist_dry                ! Logical switches for dry mixing ratio diffusion
+type(vdiff_selector) :: fieldlist_molec              ! Logical switches for molecular diffusion
+integer              :: tke_idx, kvh_idx, kvm_idx    ! TKE and eddy diffusivity indices for fields in the physics buffer
+integer              :: kvt_idx                      ! Index for kinematic molecular conductivity
+integer              :: turbtype_idx, smaw_idx       ! Turbulence type and instability functions
+integer              :: tauresx_idx, tauresy_idx     ! Redisual stress for implicit surface stress
 
+character(len=fieldname_len) :: vdiffnam(pcnst)      ! Names of vertical diffusion tendencies
+integer              :: ixcldice, ixcldliq           ! Constituent indices for cloud liquid and ice water
+integer              :: ixnumice, ixnumliq
 
-  logical              :: history_amwg                  ! output the variables used by the AMWG diag package
-  logical              :: history_eddy                  ! output the eddy variables
-  logical              :: history_budget               ! Output tendencies and state variables for CAM4 T, qv, ql, qi
-  integer              :: history_budget_histfile_num  ! output history file number for budget fields
+integer              :: pblh_idx, tpert_idx, qpert_idx
 
-  integer              :: qrl_idx    = 0               ! pbuf index 
-  integer              :: wsedl_idx  = 0               ! pbuf index
+! pbuf fields for unicon
+integer              :: qtl_flx_idx  = -1            ! for use in cloud macrophysics when UNICON is on
+integer              :: qti_flx_idx  = -1            ! for use in cloud macrophysics when UNICON is on
 
-  integer              :: pblh_idx, tpert_idx, qpert_idx
+! pbuf fields for tms
+integer              :: ksrftms_idx  = -1
+integer              :: tautmsx_idx  = -1
+integer              :: tautmsy_idx  = -1
 
-  real(r8)             :: kv_top_pressure              ! Pressure defining the bottom of the upper atmosphere for kvh scaling (Pa)
-  real(r8)             :: kv_top_scale                 ! Eddy diffusivity scale factor for upper atmosphere
-  real(r8)             :: kv_freetrop_scale            ! Eddy diffusivity scale factor for the free troposphere
-  real(r8)             :: eddy_lbulk_max               ! Maximum master length for diag_TKE
-  real(r8)             :: eddy_leng_max                ! Maximum dissipation length for diag_TKE
-  real(r8)             :: eddy_max_bot_pressure        ! Bottom pressure level (hPa) for eddy_leng_max
-  logical              :: diff_cnsrv_mass_check        ! do mass conservation check
-  logical              :: do_tms                       ! switch for turbulent mountain stress
-  logical              :: do_iss                       ! switch for implicit turbulent surface stress
-  logical              :: prog_modal_aero = .false.    ! set true if prognostic modal aerosols are present
-  integer              :: pmam_ncnst = 0               ! number of prognostic modal aerosol constituents
-  integer, allocatable :: pmam_cnst_idx(:)             ! constituent indices of prognostic modal aerosols
+logical              :: diff_cnsrv_mass_check        ! do mass conservation check
+logical              :: do_iss                       ! switch for implicit turbulent surface stress
+logical              :: prog_modal_aero = .false.    ! set true if prognostic modal aerosols are present
+integer              :: pmam_ncnst = 0               ! number of prognostic modal aerosol constituents
+integer, allocatable :: pmam_cnst_idx(:)             ! constituent indices of prognostic modal aerosols
+
+logical              :: do_pbl_diags = .false.
+logical              :: waccmx_mode = .false.
 
 contains
 
   ! =============================================================================== !
   !                                                                                 !
   ! =============================================================================== !
-  subroutine vd_readnl(nlfile)
+subroutine vd_readnl(nlfile)
 
     use namelist_utils,  only: find_group_name
     use units,           only: getunit, freeunit
-    use mpishorthand
-    use spmd_utils,      only: masterproc
+  use spmd_utils,      only: masterproc, masterprocid, mpi_logical, mpicom
+  use shr_log_mod,     only: errMsg => shr_log_errMsg
+  use trb_mtn_stress_cam, only: trb_mtn_stress_readnl
+  use eddy_diff_cam,   only: eddy_diff_readnl
   
     character(len=*), intent(in) :: nlfile  ! filepath for file containing namelist input
   
@@ -148,8 +157,7 @@ contains
     integer :: unitn, ierr
     character(len=*), parameter :: subname = 'vd_readnl'
   
-    namelist /vert_diff_nl/ kv_top_pressure, kv_top_scale, kv_freetrop_scale, eddy_lbulk_max, eddy_leng_max, &
-         eddy_max_bot_pressure, diff_cnsrv_mass_check, do_iss
+  namelist /vert_diff_nl/ diff_cnsrv_mass_check, do_iss
     !-----------------------------------------------------------------------------
   
     if (masterproc) then
@@ -166,38 +174,35 @@ contains
       call freeunit(unitn)
     end if
   
-#ifdef SPMD
-    ! Broadcast namelist variables
-    call mpibcast(kv_top_pressure,                 1 , mpir8,   0, mpicom)
-    call mpibcast(kv_top_scale,                    1 , mpir8,   0, mpicom)
-    call mpibcast(kv_freetrop_scale,               1 , mpir8,   0, mpicom)
-    call mpibcast(eddy_lbulk_max,                  1 , mpir8,   0, mpicom)
-    call mpibcast(eddy_leng_max,                   1 , mpir8,   0, mpicom)
-    call mpibcast(eddy_max_bot_pressure,           1 , mpir8,   0, mpicom)
-    call mpibcast(diff_cnsrv_mass_check,           1 , mpilog,  0, mpicom)
-    call mpibcast(do_iss,                          1 , mpilog,  0, mpicom)
-#endif
+  call mpi_bcast(diff_cnsrv_mass_check, 1, mpi_logical, masterprocid, mpicom, ierr)
+  if (ierr /= 0) call endrun(errMsg(__FILE__, __LINE__)//" mpi_bcast error")
+  call mpi_bcast(do_iss,                1, mpi_logical, masterprocid, mpicom, ierr)
+  if (ierr /= 0) call endrun(errMsg(__FILE__, __LINE__)//" mpi_bcast error")
 
-  end subroutine vd_readnl
+  ! Get eddy_scheme setting from phys_control.
+  call phys_getopts( eddy_scheme_out          =          eddy_scheme, &
+       shallow_scheme_out       =       shallow_scheme )
 
-  ! =============================================================================== !
-  !                                                                                 !
-  ! =============================================================================== !
+  ! TMS reads its own namelist.
+  call trb_mtn_stress_readnl(nlfile)
 
-  subroutine vd_register()
+  if (eddy_scheme == 'diag_TKE') call eddy_diff_readnl(nlfile)
+
+end subroutine vd_readnl
+
+! =============================================================================== !
+!                                                                                 !
+! =============================================================================== !
+
+subroutine vd_register()
 
     !------------------------------------------------ !
     ! Register physics buffer fields and constituents !
     !------------------------------------------------ !
 
     use physics_buffer,      only : pbuf_add_field, dtype_r8, dtype_i4
-
-    ! Get eddy_scheme setting from phys_control.F90
-
-    call phys_getopts( eddy_scheme_out          =          eddy_scheme, & 
-                       shallow_scheme_out       =       shallow_scheme, &
-                       microp_scheme_out        =        microp_scheme, &
-                       do_tms_out               =               do_tms)
+  use trb_mtn_stress_cam,  only : trb_mtn_stress_register
+  use eddy_diff_cam,       only : eddy_diff_register
 
     ! Add fields to physics buffer
 
@@ -218,46 +223,63 @@ contains
     call pbuf_add_field('tpert', 'global', dtype_r8, (/pcols/),                       tpert_idx)
     call pbuf_add_field('qpert', 'global', dtype_r8, (/pcols,pcnst/),                 qpert_idx)
 
-  end subroutine vd_register
+  if (trim(shallow_scheme) == 'UNICON') then
+     call pbuf_add_field('qtl_flx',  'global', dtype_r8, (/pcols, pverp/), qtl_flx_idx)
+     call pbuf_add_field('qti_flx',  'global', dtype_r8, (/pcols, pverp/), qti_flx_idx)
+  end if
 
-  ! =============================================================================== !
-  !                                                                                 !
-  ! =============================================================================== !
+  ! diag_TKE fields
+  if (eddy_scheme == 'diag_TKE') then
+     call eddy_diff_register()
+  end if
 
-  subroutine vertical_diffusion_init(pbuf2d)
+  ! TMS fields
+  call trb_mtn_stress_register()
+
+end subroutine vd_register
+
+! =============================================================================== !
+!                                                                                 !
+! =============================================================================== !
+
+subroutine vertical_diffusion_init(pbuf2d)
 
     !------------------------------------------------------------------!
     ! Initialization of time independent fields for vertical diffusion !
     ! Calls initialization routines for subsidiary modules             !
     !----------------------------------------------------------------- !
 
-    use cam_history,       only : addfld, add_default, phys_decomp
-    use eddy_diff,         only : init_eddy_diff
+  use cam_history,       only : addfld, add_default, horiz_only
+  use cam_history,       only : register_vector_field
+  use eddy_diff_cam,     only : eddy_diff_init
     use hb_diff,           only : init_hb_diff
     use molec_diff,        only : init_molec_diff
-    use trb_mtn_stress,    only : init_tms
     use diffusion_solver,  only : init_vdiff, new_fieldlist_vdiff, vdiff_select
     use constituents,      only : cnst_get_ind, cnst_get_type_byind, cnst_name, cnst_get_molec_byind
     use spmd_utils,        only : masterproc
-    use ref_pres,          only : pref_mid
+  use ref_pres,          only : press_lim_idx, pref_mid
     use physics_buffer,    only : pbuf_set_field, pbuf_get_index, physics_buffer_desc
     use rad_constituents,  only : rad_cnst_get_info, rad_cnst_get_mode_num_idx, &
                                   rad_cnst_get_mam_mmr_idx
-    use phys_control,      only : do_waccm_phys
+  use trb_mtn_stress_cam,only : trb_mtn_stress_init
+  use upper_bc,          only : ubc_init
+  use phys_control,      only : waccmx_is
 
     type(physics_buffer_desc), pointer :: pbuf2d(:,:)
     character(128) :: errstring   ! Error status for init_vdiff
     integer        :: ntop_eddy   ! Top    interface level to which eddy vertical diffusion is applied ( = 1 )
     integer        :: nbot_eddy   ! Bottom interface level to which eddy vertical diffusion is applied ( = pver )
-    integer        :: ntop_molec  ! Top    interface level to which molecular vertical diffusion is applied ( = 1 )
-    integer        :: nbot_molec  ! Bottom interface level to which molecular vertical diffusion is applied
     integer        :: k           ! Vertical loop index
 
-    real(r8), parameter  :: do_molec_pres = 0.1_r8    ! If top of model is above this pressure,
-                                                     ! turn on molecular diffusion. (Pa)
     real(r8), parameter :: ntop_eddy_pres = 1.e-5_r8 ! Pressure below which eddy diffusion is not done in WACCM-X. (Pa)
 
     integer :: im, l, m, nmodes, nspec
+
+  logical :: history_amwg                 ! output the variables used by the AMWG diag package
+  logical :: history_eddy                 ! output the eddy variables
+  logical :: history_budget               ! Output tendencies and state variables for CAM4 T, qv, ql, qi
+  integer :: history_budget_histfile_num  ! output history file number for budget fields
+  logical :: history_waccm                ! output variables of interest for WACCM runs
 
     ! ----------------------------------------------------------------- !
 
@@ -265,16 +287,21 @@ contains
        write(iulog,*)'Initializing vertical diffusion (vertical_diffusion_init)'
     end if
 
+  ! Check to see if WACCM-X is on (currently we don't care whether the
+  ! ionosphere is on or not, since this neutral diffusion code is the
+  ! same either way).
+  waccmx_mode = waccmx_is('ionosphere') .or. waccmx_is('neutral')
+
     ! ----------------------------------------------------------------- !
     ! Get indices of cloud liquid and ice within the constituents array !
     ! ----------------------------------------------------------------- !
 
     call cnst_get_ind( 'CLDLIQ', ixcldliq )
     call cnst_get_ind( 'CLDICE', ixcldice )
-    if( microp_scheme == 'MG' ) then
-        call cnst_get_ind( 'NUMLIQ', ixnumliq )
-        call cnst_get_ind( 'NUMICE', ixnumice )
-    endif
+  ! These are optional; with the CAM4 microphysics, there are no number
+  ! constituents.
+  call cnst_get_ind( 'NUMLIQ', ixnumliq, abort=.false. )
+  call cnst_get_ind( 'NUMICE', ixnumice, abort=.false. )
 
     ! prog_modal_aero determines whether prognostic modal aerosols are present in the run.
     call phys_getopts(prog_modal_aero_out=prog_modal_aero)
@@ -316,10 +343,14 @@ contains
 #endif
     end if
 
+  ! Initialize upper boundary condition module
+
+  call ubc_init()
+
     ! ---------------------------------------------------------------------------------------- !
     ! Initialize molecular diffusivity module                                                  !
     ! Note that computing molecular diffusivities is a trivial expense, but constituent        !
-    ! diffusivities depend on their molecular weights. Decomposing the diffusion matric        !
+  ! diffusivities depend on their molecular weights. Decomposing the diffusion matrix        !
     ! for each constituent is a needless expense unless the diffusivity is significant.        !
     ! ---------------------------------------------------------------------------------------- !
 
@@ -327,42 +358,28 @@ contains
     ! Initialize molecular diffusion and get top and bottom molecular diffusion limits
     !----------------------------------------------------------------------------------------
 
-    do_molec_diff = (pref_mid(1) < do_molec_pres)
- 
     if( do_molec_diff ) then
-       call init_molec_diff( r8, pcnst, rair, mwdry, avogad, gravit, &
-            cpair, boltz, pref_mid, ntop_molec, nbot_molec, errstring)
+     call init_molec_diff( r8, pcnst, mwdry, avogad, &
+          errstring)
 
        call handle_errmsg(errstring, subname="init_molec_diff")
 
-       call addfld( 'TTPXMLC', 'K/S', 1, 'A', 'Top interf. temp. flux: molec. viscosity', phys_decomp )
-       call add_default ( 'TTPXMLC', 1, ' ' )
-       if( masterproc ) write(iulog,fmt='(a,i3,5x,a,i3)') 'NTOP_MOLEC =', ntop_molec, 'NBOT_MOLEC =', nbot_molec
-    else
-       ntop_molec = 1
-       nbot_molec = 0
+     call addfld( 'TTPXMLC', horiz_only, 'A', 'K/S', 'Top interf. temp. flux: molec. viscosity' )
+     if( masterproc ) write(iulog,fmt='(a,i3,5x,a,i3)') 'NBOT_MOLEC =', nbot_molec
     end if
 
     ! ---------------------------------- !    
     ! Initialize eddy diffusivity module !
     ! ---------------------------------- !
  
-    ntop_eddy  = 1      ! if >1, must be <= nbot_molec
-    nbot_eddy  = pver   ! currently always pver
-
-    !----------------------------------------------------------------------------------------
-    ! Different top used for WACCM-X extended model. Set eddy diffusion upper bound to level 
-    ! just above where pressure=1E-05 Pa
-    !----------------------------------------------------------------------------------------
-
-    if ( waccmx_is('ionosphere') .or. waccmx_is('neutral') ) then
-       eddy_top_loop: do k = 2, pver
-          if (pref_mid(k) .gt. ntop_eddy_pres) then
-             ntop_eddy  = k-1
-             exit eddy_top_loop
-          endif
-       end do eddy_top_loop
+  ! ntop_eddy must be 1 or <= nbot_molec
+  ! Currently, it is always 1 except for WACCM-X.
+  if ( waccmx_mode ) then
+     ntop_eddy  = press_lim_idx(ntop_eddy_pres, top=.true.)
+  else
+     ntop_eddy = 1
     end if
+  nbot_eddy  = pver
 
    if (masterproc) write(iulog, fmt='(a,i3,5x,a,i3)') 'NTOP_EDDY  =', ntop_eddy, 'NBOT_EDDY  =', nbot_eddy
 
@@ -370,51 +387,27 @@ contains
     case ( 'diag_TKE' ) 
         if( masterproc ) write(iulog,*) &
              'vertical_diffusion_init: eddy_diffusivity scheme: UW Moist Turbulence Scheme by Bretherton and Park'
-        ! Check compatibility of eddy and shallow scheme
-        if( shallow_scheme .ne. 'UW' ) then
-            write(iulog,*) 'ERROR: shallow convection scheme ', shallow_scheme,' is incompatible with eddy scheme ', eddy_scheme
-            call endrun( 'convect_shallow_init: shallow_scheme and eddy_scheme are incompatible' )
-        endif
-        call init_eddy_diff( r8, pver, gravit, cpair, rair, zvir, latvap, latice, &
-                             ntop_eddy, nbot_eddy, karman, eddy_lbulk_max, eddy_leng_max, &
-                             eddy_max_bot_pressure )
-        if( masterproc ) write(iulog,*) 'vertical_diffusion: nturb, ntop_eddy, nbot_eddy ', nturb, ntop_eddy, nbot_eddy
+     call eddy_diff_init(pbuf2d, ntop_eddy, nbot_eddy)
     case ( 'HB', 'HBR')
         if( masterproc ) write(iulog,*) 'vertical_diffusion_init: eddy_diffusivity scheme:  Holtslag and Boville'
         call init_hb_diff(gravit, cpair, ntop_eddy, nbot_eddy, pref_mid, &
                           karman, eddy_scheme)
-        call addfld('HB_ri', 'no',      pver,  'A',  'Richardson Number (HB Scheme), I',  phys_decomp )
+     call addfld('HB_ri',      (/ 'lev' /),  'A', 'no',  'Richardson Number (HB Scheme), I' )
+  case ( 'CLUBB_SGS' )
+     do_pbl_diags = .true.
     end select
-    
-    ! The vertical diffusion solver must operate 
-    ! over the full range of molecular and eddy diffusion
-
-    ntop = min(ntop_molec,ntop_eddy)
-    nbot = max(nbot_molec,nbot_eddy)
     
     ! ------------------------------------------- !
     ! Initialize turbulent mountain stress module !
     ! ------------------------------------------- !
 
-    if( do_tms ) then
-       call init_tms( r8, tms_orocnst, tms_z0fac, karman, gravit, rair, errstring )
-
-       call handle_errmsg(errstring, subname="init_tms")
-
-       call addfld( 'TAUTMSX' ,'N/m2  ',  1,  'A',  'Zonal      turbulent mountain surface stress',  phys_decomp )
-       call addfld( 'TAUTMSY' ,'N/m2  ',  1,  'A',  'Meridional turbulent mountain surface stress',  phys_decomp )
-       if (masterproc) then
-          write(iulog,*)'Using turbulent mountain stress module'
-          write(iulog,*)'  tms_orocnst = ',tms_orocnst
-          write(iulog,*)'  tms_z0fac = ',tms_z0fac
-       end if
-    endif
+  call trb_mtn_stress_init()
     
     ! ---------------------------------- !
     ! Initialize diffusion solver module !
     ! ---------------------------------- !
 
-    call init_vdiff( r8, rair, gravit, do_iss, errstring )
+  call init_vdiff( r8, iulog, rair, cpair, gravit, do_iss, errstring )
     call handle_errmsg(errstring, subname="init_vdiff")
 
     ! Use fieldlist_wet to select the fields which will be diffused using moist mixing ratios ( all by default )
@@ -461,82 +454,87 @@ contains
     do k = 1, pcnst
        vdiffnam(k) = 'VD'//cnst_name(k)
        if( k == 1 ) vdiffnam(k) = 'VD01'    !**** compatibility with old code ****
-       call addfld( vdiffnam(k), 'kg/kg/s ', pver, 'A', 'Vertical diffusion of '//cnst_name(k), phys_decomp )
+     call addfld( vdiffnam(k), (/ 'lev' /), 'A', 'kg/kg/s', 'Vertical diffusion of '//cnst_name(k) )
     end do
 
-    call addfld( 'TKE'         , 'm2/s2'  , pverp  , 'A', 'Turbulent Kinetic Energy'                          , phys_decomp )
-    call addfld( 'PBLH'        , 'm'      , 1      , 'A', 'PBL height'                                        , phys_decomp )
-    call addfld( 'TPERT'       , 'K'      , 1      , 'A', 'Perturbation temperature (eddies in PBL)'          , phys_decomp )
-    call addfld( 'QPERT'       , 'kg/kg'  , 1      , 'A', 'Perturbation specific humidity (eddies in PBL)'    , phys_decomp )
-    call addfld( 'USTAR'       , 'm/s'    , 1      , 'A', 'Surface friction velocity'                         , phys_decomp )
-    call addfld( 'KVH'         , 'm2/s'   , pverp  , 'A', 'Vertical diffusion diffusivities (heat/moisture)'  , phys_decomp )
-    call addfld( 'KVM'         , 'm2/s'   , pverp  , 'A', 'Vertical diffusion diffusivities (momentum)'       , phys_decomp )
-    call addfld( 'KVT'         , 'm2/s'   , pverp  , 'A', 'Vertical diffusion kinematic molecular conductivity', phys_decomp )
-    call addfld( 'CGS'         , 's/m2'   , pverp  , 'A', 'Counter-gradient coeff on surface kinematic fluxes', phys_decomp )
-    call addfld( 'DTVKE'       , 'K/s'    , pver   , 'A', 'dT/dt vertical diffusion KE dissipation'           , phys_decomp )
-    call addfld( 'DTV'         , 'K/s'    , pver   , 'A', 'T vertical diffusion'                              , phys_decomp )
-    call addfld( 'DUV'         , 'm/s2'   , pver   , 'A', 'U vertical diffusion'                              , phys_decomp )
-    call addfld( 'DVV'         , 'm/s2'   , pver   , 'A', 'V vertical diffusion'                              , phys_decomp )
-    call addfld( 'QT'          , 'kg/kg'  , pver   , 'A', 'Total water mixing ratio'                          , phys_decomp )
-    call addfld( 'SL'          , 'J/kg'   , pver   , 'A', 'Liquid water static energy'                        , phys_decomp )
-    call addfld( 'SLV'         , 'J/kg'   , pver   , 'A', 'Liq wat virtual static energy'                     , phys_decomp )
-    call addfld( 'SLFLX'       , 'W/m2'   , pverp  , 'A', 'Liquid static energy flux'                         , phys_decomp ) 
-    call addfld( 'QTFLX'       , 'W/m2'   , pverp  , 'A', 'Total water flux'                                  , phys_decomp ) 
-    call addfld( 'UFLX'        , 'W/m2'   , pverp  , 'A', 'Zonal momentum flux'                               , phys_decomp ) 
-    call addfld( 'VFLX'        , 'W/m2'   , pverp  , 'A', 'Meridional momentm flux'                           , phys_decomp ) 
-    call addfld( 'WGUSTD'      , 'm/s'    , 1      , 'A', 'wind gusts from turbulence'                        , phys_decomp )
+  if (.not. do_pbl_diags) then
+     call addfld( 'PBLH'        , horiz_only    , 'A', 'm'      , 'PBL height'                                         )
+     call addfld( 'QT'          , (/ 'lev' /)   , 'A', 'kg/kg'  , 'Total water mixing ratio'                           )
+     call addfld( 'SL'          , (/ 'lev' /)   , 'A', 'J/kg'   , 'Liquid water static energy'                         )
+     call addfld( 'SLV'         , (/ 'lev' /)   , 'A', 'J/kg'   , 'Liq wat virtual static energy'                      )
+     call addfld( 'SLFLX'       , (/ 'ilev' /)  , 'A', 'W/m2'   , 'Liquid static energy flux'                          )
+     call addfld( 'QTFLX'       , (/ 'ilev' /)  , 'A', 'W/m2'   , 'Total water flux'                                   )
+     call addfld( 'TKE'         , (/ 'ilev' /)  , 'A', 'm2/s2'  , 'Turbulent Kinetic Energy'                           )
+     call addfld( 'TPERT'       , horiz_only    , 'A', 'K'      , 'Perturbation temperature (eddies in PBL)'           )
+     call addfld( 'QPERT'       , horiz_only    , 'A', 'kg/kg'  , 'Perturbation specific humidity (eddies in PBL)'     )
+
+     call addfld( 'UFLX'        , (/ 'ilev' /)  , 'A', 'W/m2'   , 'Zonal momentum flux'                                )
+     call addfld( 'VFLX'        , (/ 'ilev' /)  , 'A', 'W/m2'   , 'Meridional momentm flux'                            )
+     call register_vector_field('UFLX', 'VFLX')
+  end if
+
+  call addfld( 'USTAR'       , horiz_only    , 'A', 'm/s'    , 'Surface friction velocity'                          )
+  call addfld( 'KVH'         , (/ 'ilev' /)  , 'A', 'm2/s'   , 'Vertical diffusion diffusivities (heat/moisture)'   )
+  call addfld( 'KVM'         , (/ 'ilev' /)  , 'A', 'm2/s'   , 'Vertical diffusion diffusivities (momentum)'        )
+  call addfld( 'KVT'         , (/ 'ilev' /)  , 'A', 'm2/s'   , 'Vertical diffusion kinematic molecular conductivity')
+  call addfld( 'CGS'         , (/ 'ilev' /)  , 'A', 's/m2'   , 'Counter-gradient coeff on surface kinematic fluxes' )
+  call addfld( 'DTVKE'       , (/ 'lev' /)   , 'A', 'K/s'    , 'dT/dt vertical diffusion KE dissipation'            )
+  call addfld( 'DTV'         , (/ 'lev' /)   , 'A', 'K/s'    , 'T vertical diffusion'                               )
+  call addfld( 'DUV'         , (/ 'lev' /)   , 'A', 'm/s2'   , 'U vertical diffusion'                               )
+  call addfld( 'DVV'         , (/ 'lev' /)   , 'A', 'm/s2'   , 'V vertical diffusion'                               )
 
     ! ---------------------------------------------------------------------------- !
     ! Below ( with '_PBL') are for detailed analysis of UW Moist Turbulence Scheme !
     ! ---------------------------------------------------------------------------- !
 
-    call addfld( 'qt_pre_PBL  ', 'kg/kg'  , pver   , 'A', 'qt_prePBL'                                         , phys_decomp )
-    call addfld( 'sl_pre_PBL  ', 'J/kg'   , pver   , 'A', 'sl_prePBL'                                         , phys_decomp )
-    call addfld( 'slv_pre_PBL ', 'J/kg'   , pver   , 'A', 'slv_prePBL'                                        , phys_decomp )
-    call addfld( 'u_pre_PBL   ', 'm/s'    , pver   , 'A', 'u_prePBL'                                          , phys_decomp )
-    call addfld( 'v_pre_PBL   ', 'm/s'    , pver   , 'A', 'v_prePBL'                                          , phys_decomp )
-    call addfld( 'qv_pre_PBL  ', 'kg/kg'  , pver   , 'A', 'qv_prePBL'                                         , phys_decomp )
-    call addfld( 'ql_pre_PBL  ', 'kg/kg'  , pver   , 'A', 'ql_prePBL'                                         , phys_decomp )
-    call addfld( 'qi_pre_PBL  ', 'kg/kg'  , pver   , 'A', 'qi_prePBL'                                         , phys_decomp )
-    call addfld( 't_pre_PBL   ', 'K'      , pver   , 'A', 't_prePBL'                                          , phys_decomp )
-    call addfld( 'rh_pre_PBL  ', '%'      , pver   , 'A', 'rh_prePBL'                                         , phys_decomp )
+  if (.not. do_pbl_diags) then
 
-    call addfld( 'qt_aft_PBL  ', 'kg/kg'  , pver   , 'A', 'qt_afterPBL'                                       , phys_decomp )
-    call addfld( 'sl_aft_PBL  ', 'J/kg'   , pver   , 'A', 'sl_afterPBL'                                       , phys_decomp )
-    call addfld( 'slv_aft_PBL ', 'J/kg'   , pver   , 'A', 'slv_afterPBL'                                      , phys_decomp )
-    call addfld( 'u_aft_PBL   ', 'm/s'    , pver   , 'A', 'u_afterPBL'                                        , phys_decomp )
-    call addfld( 'v_aft_PBL   ', 'm/s'    , pver   , 'A', 'v_afterPBL'                                        , phys_decomp )
-    call addfld( 'qv_aft_PBL  ', 'kg/kg'  , pver   , 'A', 'qv_afterPBL'                                       , phys_decomp )
-    call addfld( 'ql_aft_PBL  ', 'kg/kg'  , pver   , 'A', 'ql_afterPBL'                                       , phys_decomp )
-    call addfld( 'qi_aft_PBL  ', 'kg/kg'  , pver   , 'A', 'qi_afterPBL'                                       , phys_decomp )
-    call addfld( 't_aft_PBL   ', 'K'      , pver   , 'A', 't_afterPBL'                                        , phys_decomp )
-    call addfld( 'rh_aft_PBL  ', '%'      , pver   , 'A', 'rh_afterPBL'                                       , phys_decomp )
+     call addfld( 'qt_pre_PBL',   (/ 'lev' /)   , 'A', 'kg/kg'  , 'qt_prePBL'          )
+     call addfld( 'sl_pre_PBL',   (/ 'lev' /)   , 'A', 'J/kg'   , 'sl_prePBL'          )
+     call addfld( 'slv_pre_PBL',  (/ 'lev' /)   , 'A', 'J/kg'   , 'slv_prePBL'         )
+     call addfld( 'u_pre_PBL',    (/ 'lev' /)   , 'A', 'm/s'    , 'u_prePBL'           )
+     call addfld( 'v_pre_PBL',    (/ 'lev' /)   , 'A', 'm/s'    , 'v_prePBL'           )
+     call addfld( 'qv_pre_PBL',   (/ 'lev' /)   , 'A', 'kg/kg'  , 'qv_prePBL'          )
+     call addfld( 'ql_pre_PBL',   (/ 'lev' /)   , 'A', 'kg/kg'  , 'ql_prePBL'          )
+     call addfld( 'qi_pre_PBL',   (/ 'lev' /)   , 'A', 'kg/kg'  , 'qi_prePBL'          )
+     call addfld( 't_pre_PBL',    (/ 'lev' /)   , 'A', 'K'      , 't_prePBL'           )
+     call addfld( 'rh_pre_PBL',   (/ 'lev' /)   , 'A', '%'      , 'rh_prePBL'          )
 
-    call addfld( 'slflx_PBL   ', 'J/m2/s' , pverp  , 'A', 'sl flux by PBL'                                    , phys_decomp ) 
-    call addfld( 'qtflx_PBL   ', 'kg/m2/s', pverp  , 'A', 'qt flux by PBL'                                    , phys_decomp ) 
-    call addfld( 'uflx_PBL    ', 'kg/m/s2', pverp  , 'A', 'u flux by PBL'                                     , phys_decomp ) 
-    call addfld( 'vflx_PBL    ', 'kg/m/s2', pverp  , 'A', 'v flux by PBL'                                     , phys_decomp ) 
+     call addfld( 'qt_aft_PBL',   (/ 'lev' /)   , 'A', 'kg/kg'  , 'qt_afterPBL'        )
+     call addfld( 'sl_aft_PBL',   (/ 'lev' /)   , 'A', 'J/kg'   , 'sl_afterPBL'        )
+     call addfld( 'slv_aft_PBL',  (/ 'lev' /)   , 'A', 'J/kg'   , 'slv_afterPBL'       )
+     call addfld( 'u_aft_PBL',    (/ 'lev' /)   , 'A', 'm/s'    , 'u_afterPBL'         )
+     call addfld( 'v_aft_PBL',    (/ 'lev' /)   , 'A', 'm/s'    , 'v_afterPBL'         )
+     call addfld( 'qv_aft_PBL',   (/ 'lev' /)   , 'A', 'kg/kg'  , 'qv_afterPBL'        )
+     call addfld( 'ql_aft_PBL',   (/ 'lev' /)   , 'A', 'kg/kg'  , 'ql_afterPBL'        )
+     call addfld( 'qi_aft_PBL',   (/ 'lev' /)   , 'A', 'kg/kg'  , 'qi_afterPBL'        )
+     call addfld( 't_aft_PBL',    (/ 'lev' /)   , 'A', 'K'      , 't_afterPBL'         )
+     call addfld( 'rh_aft_PBL',   (/ 'lev' /)   , 'A', '%'      , 'rh_afterPBL'        )
 
-    call addfld( 'slflx_cg_PBL', 'J/m2/s' , pverp  , 'A', 'sl_cg flux by PBL'                                 , phys_decomp ) 
-    call addfld( 'qtflx_cg_PBL', 'kg/m2/s', pverp  , 'A', 'qt_cg flux by PBL'                                 , phys_decomp ) 
-    call addfld( 'uflx_cg_PBL ', 'kg/m/s2', pverp  , 'A', 'u_cg flux by PBL'                                  , phys_decomp ) 
-    call addfld( 'vflx_cg_PBL ', 'kg/m/s2', pverp  , 'A', 'v_cg flux by PBL'                                  , phys_decomp ) 
+     call addfld( 'slflx_PBL',    (/ 'ilev' /)  , 'A', 'J/m2/s' , 'sl flux by PBL'     )
+     call addfld( 'qtflx_PBL',    (/ 'ilev' /)  , 'A', 'kg/m2/s', 'qt flux by PBL'     )
+     call addfld( 'uflx_PBL',     (/ 'ilev' /)  , 'A', 'kg/m/s2', 'u flux by PBL'      )
+     call addfld( 'vflx_PBL',     (/ 'ilev' /)  , 'A', 'kg/m/s2', 'v flux by PBL'      )
 
-    call addfld( 'qtten_PBL   ', 'kg/kg/s', pver   , 'A', 'qt tendency by PBL'                                , phys_decomp )
-    call addfld( 'slten_PBL   ', 'J/kg/s' , pver   , 'A', 'sl tendency by PBL'                                , phys_decomp )
-    call addfld( 'uten_PBL    ', 'm/s2'   , pver   , 'A', 'u tendency by PBL'                                 , phys_decomp )
-    call addfld( 'vten_PBL    ', 'm/s2'   , pver   , 'A', 'v tendency by PBL'                                 , phys_decomp )
-    call addfld( 'qvten_PBL   ', 'kg/kg/s', pver   , 'A', 'qv tendency by PBL'                                , phys_decomp )
-    call addfld( 'qlten_PBL   ', 'kg/kg/s', pver   , 'A', 'ql tendency by PBL'                                , phys_decomp )
-    call addfld( 'qiten_PBL   ', 'kg/kg/s', pver   , 'A', 'qi tendency by PBL'                                , phys_decomp )
-    call addfld( 'tten_PBL    ', 'K/s'    , pver   , 'A', 'T tendency by PBL'                                 , phys_decomp )
-    call addfld( 'rhten_PBL   ', '%/s'    , pver   , 'A', 'RH tendency by PBL'                                , phys_decomp )
+     call addfld( 'slflx_cg_PBL', (/ 'ilev' /)  , 'A', 'J/m2/s' , 'sl_cg flux by PBL'  )
+     call addfld( 'qtflx_cg_PBL', (/ 'ilev' /)  , 'A', 'kg/m2/s', 'qt_cg flux by PBL'  )
+     call addfld( 'uflx_cg_PBL',  (/ 'ilev' /)  , 'A', 'kg/m/s2', 'u_cg flux by PBL'   )
+     call addfld( 'vflx_cg_PBL',  (/ 'ilev' /)  , 'A', 'kg/m/s2', 'v_cg flux by PBL'   )
 
-    if( eddy_scheme .eq. 'diag_TKE' ) then    
-       call addfld( 'BPROD   ',  'M2/S3   ',pverp,   'A', 'Buoyancy Production'                               ,phys_decomp)
-       call addfld( 'SFI     ',  'FRACTION',pverp,   'A', 'Interface-layer sat frac'                          ,phys_decomp)    
-       call addfld( 'SPROD   ',  'M2/S3   ',pverp,   'A', 'Shear Production'                                  ,phys_decomp)   
-    endif
+     call addfld( 'qtten_PBL',    (/ 'lev' /)   , 'A', 'kg/kg/s', 'qt tendency by PBL' )
+     call addfld( 'slten_PBL',    (/ 'lev' /)   , 'A', 'J/kg/s' , 'sl tendency by PBL' )
+     call addfld( 'uten_PBL',     (/ 'lev' /)   , 'A', 'm/s2'   , 'u tendency by PBL'  )
+     call addfld( 'vten_PBL',     (/ 'lev' /)   , 'A', 'm/s2'   , 'v tendency by PBL'  )
+     call addfld( 'qvten_PBL',    (/ 'lev' /)   , 'A', 'kg/kg/s', 'qv tendency by PBL' )
+     call addfld( 'qlten_PBL',    (/ 'lev' /)   , 'A', 'kg/kg/s', 'ql tendency by PBL' )
+     call addfld( 'qiten_PBL',    (/ 'lev' /)   , 'A', 'kg/kg/s', 'qi tendency by PBL' )
+     call addfld( 'tten_PBL',     (/ 'lev' /)   , 'A', 'K/s'    , 'T tendency by PBL'  )
+     call addfld( 'rhten_PBL',    (/ 'lev' /)   , 'A', '%/s'    , 'RH tendency by PBL' )
+
+  end if
+
+  call addfld ('ustar',horiz_only, 'A',     ' ',' ')
+  call addfld ('obklen',horiz_only, 'A',    ' ',' ')
  
     ! ----------------------------
     ! determine default variables
@@ -545,23 +543,21 @@ contains
     call phys_getopts( history_amwg_out = history_amwg, &
                        history_eddy_out = history_eddy, &
                        history_budget_out = history_budget, &
-                       history_budget_histfile_num_out = history_budget_histfile_num)
+       history_budget_histfile_num_out = history_budget_histfile_num, &
+       history_waccm_out = history_waccm)
 
     if (history_amwg) then
        call add_default(  vdiffnam(1), 1, ' ' )
        call add_default( 'DTV'       , 1, ' ' )  
+     if (.not. do_pbl_diags) then
        call add_default( 'PBLH'      , 1, ' ' )
-       if( eddy_scheme .eq. 'diag_TKE' ) then    
-          call add_default( 'WGUSTD  ', 1, ' ' )
-       endif
+     end if
     endif
  
     if (history_eddy) then
-       if( eddy_scheme .eq. 'diag_TKE' ) then    
           call add_default( 'UFLX    ', 1, ' ' )
           call add_default( 'VFLX    ', 1, ' ' )
        endif
-    endif
 
     if( history_budget ) then
         call add_default( vdiffnam(ixcldliq), history_budget_histfile_num, ' ' )
@@ -572,39 +568,46 @@ contains
         end if
     end if
 
-    if (do_waccm_phys()) then
+  if ( history_waccm ) then
+     if (do_molec_diff) then
+        call add_default ( 'TTPXMLC', 1, ' ' )
+     end if
        call add_default( 'DUV'     , 1, ' ' )
        call add_default( 'DVV'     , 1, ' ' )
     end if
      ! ----------------------------
    
 
-     qrl_idx   = pbuf_get_index('QRL')
-     wsedl_idx = pbuf_get_index('WSEDL')
-
+  ksrftms_idx = pbuf_get_index('ksrftms')
+  tautmsx_idx = pbuf_get_index('tautmsx')
+  tautmsy_idx = pbuf_get_index('tautmsy')
 
      ! Initialization of some pbuf fields
      if (is_first_step()) then
         ! Initialization of pbuf fields tke, kvh, kvm are done in phys_inidat
         call pbuf_set_field(pbuf2d, turbtype_idx, 0    )
-        call pbuf_set_field(pbuf2d, smaw_idx,     0._r8)
-        call pbuf_set_field(pbuf2d, tauresx_idx,  0._r8)
-        call pbuf_set_field(pbuf2d, tauresy_idx,  0._r8)
+     call pbuf_set_field(pbuf2d, smaw_idx,     0.0_r8)
+     call pbuf_set_field(pbuf2d, tauresx_idx,  0.0_r8)
+     call pbuf_set_field(pbuf2d, tauresy_idx,  0.0_r8)
+     if (trim(shallow_scheme) == 'UNICON') then
+        call pbuf_set_field(pbuf2d, qtl_flx_idx,  0.0_r8)
+        call pbuf_set_field(pbuf2d, qti_flx_idx,  0.0_r8)
+     end if
      end if
 
-  end subroutine vertical_diffusion_init
+end subroutine vertical_diffusion_init
 
-  ! =============================================================================== !
-  !                                                                                 !
-  ! =============================================================================== !
+! =============================================================================== !
+!                                                                                 !
+! =============================================================================== !
 
-  subroutine vertical_diffusion_ts_init( pbuf2d, state )
+subroutine vertical_diffusion_ts_init( pbuf2d, state )
 
     !-------------------------------------------------------------- !
     ! Timestep dependent setting,                                   !
-    ! At present only invokes upper bc code for molecular diffusion !
+  ! At present only invokes upper bc code                         !
     !-------------------------------------------------------------- !
-    use molec_diff    , only : init_timestep_molec_diff
+  use upper_bc,       only : ubc_timestep_init
     use physics_types , only : physics_state
     use ppgrid        , only : begchunk, endchunk
     
@@ -613,29 +616,28 @@ contains
     type(physics_state), intent(in) :: state(begchunk:endchunk)                 
     type(physics_buffer_desc), pointer :: pbuf2d(:,:)
 
+  call ubc_timestep_init( pbuf2d, state)
  
-    if (do_molec_diff) call init_timestep_molec_diff(pbuf2d, state )
+end subroutine vertical_diffusion_ts_init
 
-  end subroutine vertical_diffusion_ts_init
+! =============================================================================== !
+!                                                                                 !
+! =============================================================================== !
 
-  ! =============================================================================== !
-  !                                                                                 !
-  ! =============================================================================== !
-
-  subroutine vertical_diffusion_tend( &
-                                      ztodt    , state    ,                  &
-                                      taux     , tauy     , shflx    , cflx, &
-                                      ustar    , obklen   , ptend    , &
-                                      cldn     , ocnfrac  , landfrac , sgh      , pbuf) 
+subroutine vertical_diffusion_tend( &
+     ztodt    , state    , cam_in,          &
+     ustar    , obklen   , ptend    , &
+     cldn     , pbuf)
     !---------------------------------------------------- !
     ! This is an interface routine for vertical diffusion !
     !---------------------------------------------------- !
     use physics_buffer,     only : physics_buffer_desc, pbuf_get_field, pbuf_set_field
     use physics_types,      only : physics_state, physics_ptend, physics_ptend_init
+  use camsrfexch,         only : cam_in_t
     use cam_history,        only : outfld
     
-    use trb_mtn_stress,     only : compute_tms
-    use eddy_diff,          only : compute_eddy_diff
+  use trb_mtn_stress_cam, only : trb_mtn_stress_tend
+  use eddy_diff_cam,      only : eddy_diff_tend
     use hb_diff,            only : compute_hb_diff
     use wv_saturation,      only : qsat
     use molec_diff,         only : compute_molec_diff, vd_lu_qdecomp
@@ -643,25 +645,22 @@ contains
     use diffusion_solver,   only : compute_vdiff, any, operator(.not.)
     use physconst,          only : cpairv, rairv !Needed for calculation of upward H flux
     use time_manager,       only : get_nstep
-    use constituents,       only : cnst_get_type_byind, cnst_name, cnst_fixed_ubc, cnst_fixed_ubflx
+  use constituents,       only : cnst_get_type_byind, cnst_name, &
+       cnst_mw, cnst_fixed_ubc, cnst_fixed_ubflx
     use physconst,          only : pi
-    use pbl_utils,          only : virtem, calc_obklen
+  use pbl_utils,          only : virtem, calc_obklen, calc_ustar
+  use upper_bc,           only : ubc_get_vals
+  use coords_1d,          only : Coords1D
 
     ! --------------- !
     ! Input Arguments !
     ! --------------- !
 
     type(physics_state), intent(in)    :: state                     ! Physics state variables
+  type(cam_in_t),      intent(in)    :: cam_in                    ! Surface inputs
 
-    real(r8),            intent(in)    :: taux(pcols)               ! x surface stress  [ N/m2 ]
-    real(r8),            intent(in)    :: tauy(pcols)               ! y surface stress  [ N/m2 ]
-    real(r8),            intent(in)    :: shflx(pcols)              ! Surface sensible heat flux  [ w/m2 ]
-    real(r8),            intent(in)    :: cflx(pcols,pcnst)         ! Surface constituent flux [ kg/m2/s ]
     real(r8),            intent(in)    :: ztodt                     ! 2 delta-t [ s ]
     real(r8),            intent(in)    :: cldn(pcols,pver)          ! New stratus fraction [ fraction ]
-    real(r8),            intent(in)    :: ocnfrac(pcols)            ! Ocean fraction
-    real(r8),            intent(in)    :: landfrac(pcols)           ! Land fraction
-    real(r8),            intent(in)    :: sgh(pcols)                ! Standard deviation of orography [ unit ? ]
 
     ! ---------------------- !
     ! Input-Output Arguments !
@@ -681,29 +680,27 @@ contains
     ! Local Variables !
     ! --------------- !
 
-    logical  :: kvinit                                              ! Tell compute_eddy_diff/ caleddy
-                                                                    ! to initialize kvh, kvm (uses kvf)
     character(128) :: errstring                                     ! Error status for compute_vdiff
-    real(r8), pointer, dimension(:,:) :: qrl                        ! LW radiative cooling rate
-    real(r8), pointer, dimension(:,:) :: wsedl                      ! Sedimentation velocity
-                                                                    ! of stratiform liquid cloud droplet [ m/s ]
 
     integer  :: lchnk                                               ! Chunk identifier
     integer  :: ncol                                                ! Number of atmospheric columns
     integer  :: i, k, l, m                                          ! column, level, constituent indices
-    integer  :: ierr                                                ! status for allocate/deallocate
 
     real(r8) :: dtk(pcols,pver)                                     ! T tendency from KE dissipation
     real(r8), pointer   :: tke(:,:)                                 ! Turbulent kinetic energy [ m2/s2 ]
     integer(i4),pointer :: turbtype(:,:)                            ! Turbulent interface types [ no unit ]
     real(r8), pointer   :: smaw(:,:)                                ! Normalized Galperin instability function
                                                                     ! ( 0<= <=4.964 and 1 at neutral )
+
+  real(r8), pointer   :: qtl_flx(:,:)                             ! overbar(w'qtl') where qtl = qv + ql
+  real(r8), pointer   :: qti_flx(:,:)                             ! overbar(w'qti') where qti = qv + qi
+
     real(r8) :: cgs(pcols,pverp)                                    ! Counter-gradient star  [ cg/flux ]
     real(r8) :: cgh(pcols,pverp)                                    ! Counter-gradient term for heat
     real(r8) :: rztodt                                              ! 1./ztodt [ 1/s ]
-    real(r8) :: ksrftms(pcols)                                      ! Turbulent mountain stress surface drag coefficient [ kg/s/m2 ]
-    real(r8) :: tautmsx(pcols)                                      ! U component of turbulent mountain stress [ N/m2 ]
-    real(r8) :: tautmsy(pcols)                                      ! V component of turbulent mountain stress [ N/m2 ]
+  real(r8), pointer :: ksrftms(:)                                 ! Turbulent mountain stress surface drag coefficient [ kg/s/m2 ]
+  real(r8), pointer :: tautmsx(:)                                 ! U component of turbulent mountain stress [ N/m2 ]
+  real(r8), pointer :: tautmsy(:)                                 ! V component of turbulent mountain stress [ N/m2 ]
     real(r8) :: tautotx(pcols)                                      ! U component of total surface stress [ N/m2 ]
     real(r8) :: tautoty(pcols)                                      ! V component of total surface stress [ N/m2 ]
 
@@ -713,7 +710,11 @@ contains
     real(r8) :: kvq(pcols,pverp)                                    ! Eddy diffusivity for constituents [ m2/s ]
     real(r8) :: kvh(pcols,pverp)                                    ! Eddy diffusivity for heat [ m2/s ]
     real(r8) :: kvm(pcols,pverp)                                    ! Eddy diffusivity for momentum [ m2/s ]
-    real(r8) :: bprod(pcols,pverp)                                  ! Buoyancy production of tke [ m2/s3 ]
+  real(r8) :: kvm_temp(pcols,pverp)                               ! Dummy eddy diffusivity for momentum (unused) [ m2/s ]
+  real(r8) :: dtk_temp(pcols,pverp)                               ! Unused output from second compute_vdiff call
+  real(r8) :: tautmsx_temp(pcols)                                 ! Unused output from second compute_vdiff call
+  real(r8) :: tautmsy_temp(pcols)                                 ! Unused output from second compute_vdiff call
+  real(r8) :: topflx_temp(pcols)                                  ! Unused output from second compute_vdiff call
     real(r8) :: sprod(pcols,pverp)                                  ! Shear production of tke [ m2/s3 ]
     real(r8) :: sfi(pcols,pverp)                                    ! Saturation fraction at interfaces [ fraction ]
     real(r8) :: sl(pcols,pver)
@@ -724,7 +725,6 @@ contains
     real(r8) :: slv_prePBL(pcols,pver)
     real(r8) :: slten(pcols,pver)
     real(r8) :: qtten(pcols,pver)
-    real(r8) :: slvten(pcols,pver)
     real(r8) :: slflx(pcols,pverp)
     real(r8) :: qtflx(pcols,pverp)
     real(r8) :: uflx(pcols,pverp)
@@ -735,7 +735,6 @@ contains
     real(r8) :: vflx_cg(pcols,pverp)
     real(r8) :: th(pcols,pver)                                      ! Potential temperature
     real(r8) :: topflx(pcols)                                       ! Molecular heat flux at top interface
-    real(r8) :: wpert(pcols)                                        ! Turbulent wind gusts
     real(r8) :: rhoair
 
     real(r8) :: ri(pcols,pver)                                      ! richardson number (HB output)
@@ -767,12 +766,21 @@ contains
     real(r8) :: t_pro(pcols,pver)
     real(r8), pointer :: tauresx(:)                                      ! Residual stress to be added in vdiff to correct
     real(r8), pointer :: tauresy(:)                                      ! for turb stress mismatch between sfc and atm accumulated.
-    real(r8) :: ipbl(pcols)
-    real(r8) :: kpblh(pcols)
-    real(r8) :: wstarPBL(pcols)
-    real(r8) :: tpertPBL(pcols)
-    real(r8) :: qpertPBL(pcols)
-    real(r8) :: rairi(pcols,pver+1)                                 ! interface gas constant needed for compute_vdiff
+
+  ! Interpolated interface values.
+  real(r8) :: tint(pcols,pver+1)      ! Temperature [ K ]
+  real(r8) :: rairi(pcols,pver+1)     ! Gas constant [ J/K/kg ]
+  real(r8) :: rhoi(pcols,pver+1)      ! Density of air [ kg/m^3 ]
+  real(r8) :: rhoi_dry(pcols,pver+1)  ! Density of air based on dry air pressure [ kg/m^3 ]
+
+  ! Upper boundary conditions
+  real(r8) :: ubc_t(pcols)            ! Temperature [ K ]
+  real(r8) :: ubc_mmr(pcols,pcnst)    ! Mixing ratios [ kg/kg ]
+  real(r8) :: ubc_flux(pcnst)         ! Constituent flux [ kg/s/m^2 ]
+
+  ! Pressure coordinates used by the solver.
+  type(Coords1D) :: p
+  type(Coords1D) :: p_dry
 
     real(r8), pointer :: tpert(:)
     real(r8), pointer :: qpert(:)
@@ -791,6 +799,21 @@ contains
     real(r8) :: v_tmp(pcols,pver)
     real(r8) :: q_tmp(pcols,pver,pcnst)
 
+  ! kq_fac*sqrt(T)*m_d/rho for molecular diffusivity
+  real(r8) :: kq_scal(pcols,pver+1)
+  ! composition dependent mw_fac on interface level
+  real(r8) :: mw_fac(pcols,pver+1,pcnst)
+
+  ! Dry static energy top boundary condition.
+  real(r8) :: dse_top(pcols)
+
+  ! Copies of flux arrays used to zero out any parts that are applied
+  ! elsewhere (e.g. by CLUBB).
+  real(r8) :: taux(pcols)
+  real(r8) :: tauy(pcols)
+  real(r8) :: shflux(pcols)
+  real(r8) :: cflux(pcols,pcnst)
+
     logical  :: lq(pcnst)
 
     ! ----------------------- !
@@ -808,6 +831,63 @@ contains
     call pbuf_get_field(pbuf, pblh_idx,     pblh)
     call pbuf_get_field(pbuf, turbtype_idx, turbtype)
 
+  ! Interpolate temperature to interfaces.
+  do k = 2, pver
+     do i = 1, ncol
+        tint(i,k)  = 0.5_r8 * ( state%t(i,k) + state%t(i,k-1) )
+     end do
+  end do
+  tint(:ncol,pver+1) = state%t(:ncol,pver)
+
+  ! Get upper boundary values
+  call ubc_get_vals( state%lchnk, ncol, state%pint, state%zi, &
+       ubc_t, ubc_mmr, ubc_flux )
+
+  ! Always have a fixed upper boundary T if molecular diffusion is active. Why ?
+  ! For WACCM-X, set ubc temperature to extrapolate from next two lower interface level temperatures
+  if (do_molec_diff) then
+     if (waccmx_mode) then
+        tint(:ncol,1) = 1.5_r8*tint(:ncol,2)-.5_r8*tint(:ncol,3)
+     else
+        tint (:ncol,1) = ubc_t(:ncol)
+     endif
+  else
+     tint(:ncol,1) = state%t(:ncol,1)
+  end if
+
+  ! Set up pressure coordinates for solver calls.
+  p = Coords1D(state%pint(:ncol,:))
+  p_dry = Coords1D(state%pintdry(:ncol,:))
+
+  !------------------------------------------------------------------------
+  !  Check to see if constituent dependent gas constant needed (WACCM-X)
+  !------------------------------------------------------------------------
+  if (waccmx_mode) then
+     rairi(:ncol,1) = rairv(:ncol,1,lchnk)
+     do k = 2, pver
+        do i = 1, ncol
+           rairi(i,k) = 0.5_r8 * (rairv(i,k,lchnk)+rairv(i,k-1,lchnk))
+        end do
+     end do
+     rairi(:ncol,pver+1) = rairv(:ncol,pver,lchnk)
+  else
+     rairi(:ncol,:pver+1) = rair
+  endif
+
+  ! Compute rho at interfaces.
+  do k = 1, pver+1
+     do i = 1, ncol
+        rhoi(i,k)  = p%ifc(i,k) / (rairi(i,k)*tint(i,k))
+     end do
+  end do
+
+  ! Compute rho_dry at interfaces.
+  do k = 1, pver+1
+     do i = 1, ncol
+        rhoi_dry(i,k)  = p_dry%ifc(i,k) / (rairi(i,k)*tint(i,k))
+     end do
+  end do
+
     ! ---------------------------------------- !
     ! Computation of turbulent mountain stress !
     ! ---------------------------------------- !
@@ -816,24 +896,14 @@ contains
     ! the raw input (u,v) to compute 'ksrftms', not the provisionally-marched 'u,v' 
     ! within the iteration loop of the PBL scheme. 
 
-    if( do_tms ) then
-        call compute_tms( pcols      , pver     , ncol    ,              &
-                          state%u    , state%v  , state%t , state%pmid , & 
-                          state%exner, state%zm , sgh     , ksrftms    , & 
-                          tautmsx    , tautmsy  , landfrac )
-      ! Here, both 'taux, tautmsx' are explicit surface stresses.        
-      ! Note that this 'tautotx, tautoty' are different from the total stress
-      ! that has been actually added into the atmosphere. This is because both
-      ! taux and tautmsx are fully implicitly treated within compute_vdiff.
-      ! However, 'tautotx, tautoty' are not used in the actual numerical
-      ! computation in this module.   
-        tautotx(:ncol) = taux(:ncol) + tautmsx(:ncol)
-        tautoty(:ncol) = tauy(:ncol) + tautmsy(:ncol)
-    else
-        ksrftms(:ncol) = 0._r8
-        tautotx(:ncol) = taux(:ncol)
-        tautoty(:ncol) = tauy(:ncol)
-    endif
+  call trb_mtn_stress_tend(state, pbuf, cam_in)
+
+  call pbuf_get_field(pbuf, ksrftms_idx, ksrftms)
+  call pbuf_get_field(pbuf, tautmsx_idx, tautmsx)
+  call pbuf_get_field(pbuf, tautmsy_idx, tautmsy)
+
+  tautotx(:ncol) = cam_in%wsx(:ncol) + tautmsx(:ncol)
+  tautoty(:ncol) = cam_in%wsy(:ncol) + tautmsy(:ncol)
 
     !----------------------------------------------------------------------- !
     !   Computation of eddy diffusivities - Select appropriate PBL scheme    !
@@ -843,118 +913,70 @@ contains
     call pbuf_get_field(pbuf, smaw_idx, smaw)
     call pbuf_get_field(pbuf, tke_idx,  tke)
 
+  ! Get potential temperature.
+  th(:ncol,:pver) = state%t(:ncol,:pver) * state%exner(:ncol,:pver)
 
     select case (eddy_scheme)
     case ( 'diag_TKE' ) 
 
-       ! ---------------------------------------------------------------- !
-       ! At first time step, have eddy_diff.F90:caleddy() use kvh=kvm=kvf !
-       ! This has to be done in compute_eddy_diff after kvf is calculated !
-       ! ---------------------------------------------------------------- !
-
-       if( is_first_step() ) then
-           kvinit = .true.
-       else
-           kvinit = .false.
-       endif
-
-       ! ---------------------------------------------- !
-       ! Get LW radiative heating out of physics buffer !
-       ! ---------------------------------------------- !
-       call pbuf_get_field(pbuf, qrl_idx,   qrl   )
-
-       call pbuf_get_field(pbuf, wsedl_idx, wsedl )
-
-       ! Retrieve eddy diffusivities for heat and momentum from physics buffer
-       ! from last timestep ( if first timestep, has been initialized by inidat.F90 )
-
-       call compute_eddy_diff( lchnk    ,                                                                    &
-                               pcols    , pver        , ncol       , state%t    , state%q(:,:,1) , ztodt   , &
-                               state%q(:,:,ixcldliq)  , state%q(:,:,ixcldice)   ,                            &
-                               state%s  , state%rpdel , cldn       , qrl        , wsedl          ,           &
-                               state%zm , state%zi    , state%pmid , state%pint , state%u        , state%v , &
-                               taux     , tauy        , shflx      , cflx(:,1)  , wstarent       , nturb   , &
-                               rrho     , ustar       , pblh       , kvm_in     , kvh_in         , kvm     , &
-                               kvh      , kvq         , cgh        ,                                         &
-                               cgs      , tpert       , qpert      , wpert      , tke            , bprod   , &
-                               sprod    , sfi         , kvinit     ,                                         &
-                               tauresx  , tauresy     , ksrftms    ,                                         &
-                               ipbl(:)  , kpblh(:)    , wstarPBL(:), turbtype   , smaw )
+     call eddy_diff_tend(state, pbuf, cam_in, &
+          ztodt, p, tint, rhoi, cldn, wstarent, &
+          kvm_in, kvh_in, ksrftms, tauresx, tauresy, &
+          rrho, ustar, pblh, kvm, kvh, kvq, cgh, cgs, tpert, qpert, &
+          tke, sprod, sfi, turbtype, smaw)
 
        ! The diag_TKE scheme does not calculate the Monin-Obukhov length, which is used in dry deposition calculations.
        ! Use the routines from pbl_utils to accomplish this. Assumes ustar and rrho have been set.
-       th(:ncol,pver) = state%t(:ncol,pver) * state%exner(:ncol,pver)
        thvs(:ncol) = virtem(th(:ncol,pver),state%q(:ncol,pver,1))
-       call calc_obklen(th(:ncol,pver), thvs(:ncol), cflx(:ncol,1), shflx(:ncol), rrho(:ncol), ustar(:ncol), &
+     call calc_obklen(th(:ncol,pver), thvs(:ncol), cam_in%cflx(:ncol,1), &
+          cam_in%shf(:ncol), rrho(:ncol), ustar(:ncol), &
                         khfs(:ncol),    kqfs(:ncol), kbfs(:ncol),   obklen(:ncol))
 
-       ! ----------------------------------------------- !       
-       ! Store TKE in pbuf for use by shallow convection !
-       ! ----------------------------------------------- !   
-
-       tpertPBL(:ncol) = tpert(:ncol)
-       qpertPBL(:ncol) = qpert(:ncol)
-
-
-       ! The diffusivities from diag_TKE can be much larger than from HB in the free
-       ! troposphere and upper atmosphere. These seem to be larger than observations,
-       ! and in WACCM the gw_drag code is already applying an eddy diffusivity in the
-       ! upper atmosphere. Optionally, adjust the diffusivities in the free troposphere
-       ! or the upper atmosphere.
-       !
-       ! NOTE: Further investigation should be done as to why the diffusivities are
-       ! larger in diag_TKE.
-       if ((kv_freetrop_scale /= 1._r8) .or. ((kv_top_scale /= 1._r8) .and. (kv_top_pressure > 0._r8))) then
-         do i = 1, ncol
-           do k = 1, pverp
-           
-             ! Outside of the boundary layer?
-             if (state%zi(i,k) > pblh(i)) then
-
-               ! In the upper atmosphere?
-               if (state%pint(i,k) <= kv_top_pressure) then
-                 kvh(i,k) = kvh(i,k) * kv_top_scale
-                 kvm(i,k) = kvm(i,k) * kv_top_scale
-                 kvq(i,k) = kvq(i,k) * kv_top_scale
-               else
-                 kvh(i,k) = kvh(i,k) * kv_freetrop_scale
-                 kvm(i,k) = kvm(i,k) * kv_freetrop_scale
-                 kvq(i,k) = kvq(i,k) * kv_freetrop_scale
-               end if
-             else
-               exit
-             end if
-           end do
-         end do
-       end if
-
-       ! Write out fields that are only used by this scheme
-
-       call outfld( 'BPROD   ', bprod(1,1), pcols, lchnk )
-       call outfld( 'SPROD   ', sprod(1,1), pcols, lchnk )
-       call outfld( 'SFI     ', sfi,        pcols, lchnk )
 
     case ( 'HB', 'HBR' )
 
        ! Modification : We may need to use 'taux' instead of 'tautotx' here, for
        !                consistency with the previous HB scheme.
 
-       th(:ncol,:pver) = state%t(:ncol,:pver) * state%exner(:ncol,:pver)
-
        call compute_hb_diff( lchnk     , ncol     ,                                &
                              th        , state%t  , state%q , state%zm , state%zi, &
                              state%pmid, state%u  , state%v , tautotx  , tautoty , &
-                             shflx     , cflx(:,1), obklen  , ustar    , pblh    , &
+          cam_in%shf, cam_in%cflx(:,1), obklen  , ustar    , pblh    , &
                              kvm       , kvh      , kvq     , cgh      , cgs     , &
-                             tpert     , qpert    , cldn    , ocnfrac  , tke     , &
+          tpert     , qpert    , cldn    , cam_in%ocnfrac  , tke     , &
                              ri        , &
                              eddy_scheme )
     
        call outfld( 'HB_ri',          ri,         pcols,   lchnk )
 
-       wpert = 0._r8  
+  case ( 'CLUBB_SGS' )
+
+     ! CLUBB has only a bare-bones placeholder here. If using CLUBB, the
+     ! PBL diffusion will happen before coupling, so vertical_diffusion
+     ! is only handling other things, e.g. some boundary conditions, tms,
+     ! and molecular diffusion.
+
+     thvs(:ncol) = virtem(th(:ncol,pver),state%q(:ncol,pver,1))
+
+     call calc_ustar( state%t(:ncol,pver), state%pmid(:ncol,pver), &
+          cam_in%wsx(:ncol), cam_in%wsy(:ncol), rrho(:ncol), ustar(:ncol) )
+     call calc_obklen( th(:ncol,pver), thvs(:ncol), cam_in%lhf(:ncol)/latvap, &
+          cam_in%shf(:ncol), rrho(:ncol), ustar(:ncol), &
+          khfs(:ncol), kqfs(:ncol), kbfs(:ncol), obklen(:ncol) )
+
+     ! These tendencies all applied elsewhere.
+     kvm = 0._r8
+     kvh = 0._r8
+     kvq = 0._r8
+
+     ! Not defined since PBL is not actually running here.
+     cgh = 0._r8
+     cgs = 0._r8
 
     end select
+
+  call outfld( 'ustar',   ustar(:), pcols, lchnk )
+  call outfld( 'obklen', obklen(:), pcols, lchnk )
 
     ! kvh (in pbuf) is used by other physics parameterizations, and as an initial guess in compute_eddy_diff
     ! on the next timestep.  It is not updated by the compute_vdiff call below.
@@ -964,8 +986,6 @@ contains
     ! The contributions for molecular diffusion made to kvm by the call to compute_vdiff below 
     ! are not included in the pbuf as these are not needed in the initial guess by compute_eddy_diff.
     call pbuf_set_field(pbuf, kvm_idx, kvm)
-
-    call outfld( 'WGUSTD' , wpert, pcols, lchnk )
 
     !------------------------------------ ! 
     !    Application of diffusivities     !
@@ -981,6 +1001,7 @@ contains
     ! Write profile output before applying diffusion scheme !
     !------------------------------------------------------ !
 
+  if (.not. do_pbl_diags) then
     sl_prePBL(:ncol,:pver)  = s_tmp(:ncol,:) -   latvap * q_tmp(:ncol,:,ixcldliq) &
                                              - ( latvap + latice) * q_tmp(:ncol,:,ixcldice)
     qt_prePBL(:ncol,:pver)  = q_tmp(:ncol,:,1) + q_tmp(:ncol,:,ixcldliq) &
@@ -1002,25 +1023,13 @@ contains
     call outfld( 't_pre_PBL    ', state%t,                   pcols, lchnk )
     call outfld( 'rh_pre_PBL   ', ftem_prePBL,               pcols, lchnk )
 
+  end if
+
     ! --------------------------------------------------------------------------------- !
     ! Call the diffusivity solver and solve diffusion equation                          !
     ! The final two arguments are optional function references to                       !
     ! constituent-independent and constituent-dependent moleculuar diffusivity routines !
     ! --------------------------------------------------------------------------------- !
-
-    !------------------------------------------------------------------------ 
-    !  Check to see if constituent dependent gas constant needed (WACCM-X) 
-    !------------------------------------------------------------------------
-    if ( waccmx_is('ionosphere') .or. waccmx_is('neutral') ) then 
-      rairi(:ncol,1) = rairv(:ncol,1,lchnk)
-      do k = 2, pver
-        do i = 1, ncol
-          rairi(i,k) = 0.5_r8 * (rairv(i,k,lchnk)+rairv(i,k-1,lchnk))
-        end do
-      end do
-    else
-      rairi(:ncol,:pver+1) = rair 
-    endif
 
     ! Modification : We may need to output 'tautotx_im,tautoty_im' from below 'compute_vdiff' and
     !                separately print out as diagnostic output, because these are different from
@@ -1029,18 +1038,52 @@ contains
 
     call pbuf_get_field(pbuf, kvt_idx, kvt)
 
+  if (do_molec_diff .and. .not. waccmx_mode) then
+     ! Top boundary condition for dry static energy
+     dse_top(:ncol) = cpairv(:ncol,1,lchnk) * tint(:ncol,1) + &
+          gravit * state%zi(:ncol,1)
+  else
+     dse_top(:ncol) = 0._r8
+  end if
+
+  select case (eddy_scheme)
+  case ('CLUBB_SGS')
+     ! CLUBB applies some fluxes itself, but we still want constituent
+     ! fluxes applied here (except water vapor).
+     taux = 0._r8
+     tauy = 0._r8
+     shflux = 0._r8
+     cflux(:,1) = 0._r8
+     cflux(:,2:) = cam_in%cflx(:,2:)
+  case default
+     taux = cam_in%wsx
+     tauy = cam_in%wsy
+     shflux = cam_in%shf
+     cflux = cam_in%cflx
+  end select
+
     if( any(fieldlist_wet) ) then
 
+     if (do_molec_diff) then
+        call compute_molec_diff(state%lchnk, pcols, pver, pcnst, ncol, &
+             kvm, kvt, tint, rhoi, kq_scal, cnst_mw, &
+             mw_fac, nbot_molec)
+     end if
+
         call compute_vdiff( state%lchnk   ,                                                                     &
-                            pcols         , pver               , pcnst        , ncol          , state%pmid    , &
-                            state%pint    , state%rpdel        , state%t      , ztodt         , taux          , &
-                            tauy          , shflx              , cflx         , ntop          , nbot          , &
+          pcols         , pver               , pcnst        , ncol          , tint          , &
+          p    , state%t      , rhoi, ztodt         , taux          , &
+          tauy          , shflux             , cflux        , &
                             kvh           , kvm                , kvq          , cgs           , cgh           , &
                             state%zi      , ksrftms            , qmincg       , fieldlist_wet , fieldlist_molec,&
                             u_tmp         , v_tmp              , q_tmp        , s_tmp         ,                 &
                             tautmsx       , tautmsy            , dtk          , topflx        , errstring     , &
-                            tauresx       , tauresy            , 1            , cpairv(:,:,state%lchnk), rairi, &
-                            do_molec_diff , compute_molec_diff , vd_lu_qdecomp, kvt )
+          tauresx       , tauresy            , 1            , cpairv(:,:,state%lchnk), dse_top, &
+          do_molec_diff, waccmx_mode, &
+          vd_lu_qdecomp, &
+          ubc_mmr, ubc_flux, kvt, state%pmid, &
+          cnst_mw, cnst_fixed_ubc, cnst_fixed_ubflx, nbot_molec, &
+          kq_scal, mw_fac)
 
         call handle_errmsg(errstring, subname="compute_vdiff", &
              extra_msg="Error in fieldlist_wet call from vertical_diffusion.")
@@ -1050,20 +1093,29 @@ contains
     if( any( fieldlist_dry ) ) then
 
         if( do_molec_diff ) then
-            errstring = "Design flaw: dry vdiff not currently supported with molecular diffusion"
-            call endrun(errstring)
+        ! kvm is unused in the output here (since it was assigned
+        ! above), so we use a temp kvm for the inout argument, and
+        ! ignore the value output by compute_molec_diff.
+        kvm_temp = kvm
+        call compute_molec_diff(state%lchnk, pcols, pver, pcnst, ncol, &
+             kvm_temp, kvt, tint, rhoi_dry, kq_scal, cnst_mw, &
+             mw_fac, nbot_molec)
         end if
 
         call compute_vdiff( state%lchnk   ,                                                                     &
-                            pcols         , pver               , pcnst        , ncol          , state%pmiddry , &
-                            state%pintdry , state%rpdeldry     , state%t      , ztodt         , taux          , &       
-                            tauy          , shflx              , cflx         , ntop          , nbot          , &       
+          pcols         , pver               , pcnst        , ncol          , tint          , &
+          p_dry , state%t      , rhoi_dry,  ztodt         , taux          , &
+          tauy          , shflux             , cflux        , &
                             kvh           , kvm                , kvq          , cgs           , cgh           , &   
                             state%zi      , ksrftms            , qmincg       , fieldlist_dry , fieldlist_molec,&
                             u_tmp         , v_tmp              , q_tmp        , s_tmp         ,                 &
-                            tautmsx       , tautmsy            , dtk          , topflx        , errstring     , &
-                            tauresx       , tauresy            , 1            , cpairv(:,:,state%lchnk), rairi, &
-                            do_molec_diff , compute_molec_diff , vd_lu_qdecomp )
+          tautmsx_temp  , tautmsy_temp       , dtk_temp     , topflx_temp   , errstring     , &
+          tauresx       , tauresy            , 1            , cpairv(:,:,state%lchnk), dse_top, &
+          do_molec_diff , waccmx_mode, &
+          vd_lu_qdecomp, &
+          ubc_mmr, ubc_flux, kvt, state%pmiddry, &
+          cnst_mw, cnst_fixed_ubc, cnst_fixed_ubflx, nbot_molec, &
+          kq_scal, mw_fac)
 
         call handle_errmsg(errstring, subname="compute_vdiff", &
              extra_msg="Error in fieldlist_dry call from vertical_diffusion.")
@@ -1080,7 +1132,7 @@ contains
     tmp1(:ncol) = ztodt * gravit * state%rpdel(:ncol,pver)
        do m = 1, pmam_ncnst
           l = pmam_cnst_idx(m)
-          q_tmp(:ncol,pver,l) = q_tmp(:ncol,pver,l) + tmp1(:ncol) * cflx(:ncol,l)
+          q_tmp(:ncol,pver,l) = q_tmp(:ncol,pver,l) + tmp1(:ncol) * cam_in%cflx(:ncol,l)
        enddo
 #endif
     end if
@@ -1088,6 +1140,8 @@ contains
     ! -------------------------------------------------------- !
     ! Diagnostics and output writing after applying PBL scheme !
     ! -------------------------------------------------------- !
+
+  if (.not. do_pbl_diags) then
 
     sl(:ncol,:pver)  = s_tmp(:ncol,:) -   latvap           * q_tmp(:ncol,:,ixcldliq) &
                                       - ( latvap + latice) * q_tmp(:ncol,:,ixcldice)
@@ -1113,13 +1167,14 @@ contains
                             + cgh(i,k) ) 
           qtflx(i,k) = kvh(i,k) * &
                           ( - rhoair*(qt(i,k-1)-qt(i,k))/(state%zm(i,k-1)-state%zm(i,k)) &
-                            + rhoair*(cflx(i,1)+cflx(i,ixcldliq)+cflx(i,ixcldice))*cgs(i,k) )
+                + rhoair*(cam_in%cflx(i,1)+cam_in%cflx(i,ixcldliq)+cam_in%cflx(i,ixcldice))*cgs(i,k) )
           uflx(i,k)  = kvm(i,k) * &
                           ( - rhoair*(u_tmp(i,k-1)-u_tmp(i,k))/(state%zm(i,k-1)-state%zm(i,k)))
           vflx(i,k)  = kvm(i,k) * &
                           ( - rhoair*(v_tmp(i,k-1)-v_tmp(i,k))/(state%zm(i,k-1)-state%zm(i,k)))
           slflx_cg(i,k) = kvh(i,k) * cgh(i,k)
-          qtflx_cg(i,k) = kvh(i,k) * rhoair * ( cflx(i,1) + cflx(i,ixcldliq) + cflx(i,ixcldice) ) * cgs(i,k)
+           qtflx_cg(i,k) = kvh(i,k) * rhoair * ( cam_in%cflx(i,1) + &
+                cam_in%cflx(i,ixcldliq) + cam_in%cflx(i,ixcldice) ) * cgs(i,k)
           uflx_cg(i,k)  = 0._r8
           vflx_cg(i,k)  = 0._r8
        end do
@@ -1129,8 +1184,8 @@ contains
   !                Note also that 'tautotx' is explicit total stress, different from
   !                the ones that have been actually added into the atmosphere.
 
-    slflx(:ncol,pverp) = shflx(:ncol)
-    qtflx(:ncol,pverp) = cflx(:ncol,1)
+     slflx(:ncol,pverp) = cam_in%shf(:ncol)
+     qtflx(:ncol,pverp) = cam_in%cflx(:ncol,1)
     uflx(:ncol,pverp)  = tautotx(:ncol)
     vflx(:ncol,pverp)  = tautoty(:ncol)
 
@@ -1138,6 +1193,30 @@ contains
     qtflx_cg(:ncol,pverp) = 0._r8
     uflx_cg(:ncol,pverp)  = 0._r8
     vflx_cg(:ncol,pverp)  = 0._r8
+
+     if (trim(shallow_scheme) == 'UNICON') then
+        call pbuf_get_field(pbuf, qtl_flx_idx,  qtl_flx)
+        call pbuf_get_field(pbuf, qti_flx_idx,  qti_flx)
+        qtl_flx(:ncol,1) = 0._r8
+        qti_flx(:ncol,1) = 0._r8
+        do k = 2, pver
+           do i = 1, ncol
+              ! For use in the cloud macrophysics
+              ! Note that density is not added here. Also, only consider local transport term.
+              qtl_flx(i,k) = - kvh(i,k)*(q_tmp(i,k-1,1)-q_tmp(i,k,1)+q_tmp(i,k-1,ixcldliq)-q_tmp(i,k,ixcldliq))/&
+                   (state%zm(i,k-1)-state%zm(i,k))
+              qti_flx(i,k) = - kvh(i,k)*(q_tmp(i,k-1,1)-q_tmp(i,k,1)+q_tmp(i,k-1,ixcldice)-q_tmp(i,k,ixcldice))/&
+                   (state%zm(i,k-1)-state%zm(i,k))
+           end do
+        end do
+        do i = 1, ncol
+           rhoair = state%pint(i,pverp)/(rair*((slv(i,pver)-gravit*state%zi(i,pverp))/cpair))
+           qtl_flx(i,pverp) = cam_in%cflx(i,1)/rhoair
+           qti_flx(i,pverp) = cam_in%cflx(i,1)/rhoair
+        end do
+     end if
+
+  end if
 
     ! --------------------------------------------------------------- !
     ! Convert the new profiles into vertical diffusion tendencies.    !
@@ -1154,11 +1233,13 @@ contains
     ptend%u(:ncol,:)       = ( u_tmp(:ncol,:) - state%u(:ncol,:) ) * rztodt
     ptend%v(:ncol,:)       = ( v_tmp(:ncol,:) - state%v(:ncol,:) ) * rztodt
     ptend%q(:ncol,:pver,:) = ( q_tmp(:ncol,:pver,:) - state%q(:ncol,:pver,:) ) * rztodt
+  if (.not. do_pbl_diags) then
     slten(:ncol,:)         = ( sl(:ncol,:) - sl_prePBL(:ncol,:) ) * rztodt
     qtten(:ncol,:)         = ( qt(:ncol,:) - qt_prePBL(:ncol,:) ) * rztodt
+  end if
 
-    ! ----------------------------------------------------------- !
-    ! In order to perform 'pseudo-conservative varible diffusion' !
+  ! ------------------------------------------------------------ !
+  ! In order to perform 'pseudo-conservative variable diffusion' !
     ! perform the following two stages:                           !
     !                                                             !
     ! I.  Re-set (1) 'qvten' by 'qtten', and 'qlten = qiten = 0'  !
@@ -1167,7 +1248,7 @@ contains
     !                                                             !
     ! II. Apply 'positive_moisture'                               !
     !                                                             !
-    ! ----------------------------------------------------------- !
+  ! ------------------------------------------------------------ !
 
     if( eddy_scheme .eq. 'diag_TKE' .and. do_pseudocon_diff ) then
 
@@ -1175,8 +1256,8 @@ contains
          ptend%s(:ncol,:pver)   = slten(:ncol,:pver)
          ptend%q(:ncol,:pver,ixcldliq) = 0._r8         
          ptend%q(:ncol,:pver,ixcldice) = 0._r8         
-         ptend%q(:ncol,:pver,ixnumliq) = 0._r8         
-         ptend%q(:ncol,:pver,ixnumice) = 0._r8         
+     if (ixnumliq > 0) ptend%q(:ncol,:pver,ixnumliq) = 0._r8
+     if (ixnumice > 0) ptend%q(:ncol,:pver,ixnumice) = 0._r8
 
          do i = 1, ncol
             do k = 1, pver
@@ -1200,6 +1281,8 @@ contains
     ! Re-calculate diagnostic output variables after vertical diffusion !
     ! ----------------------------------------------------------------- !
  
+  if (.not. do_pbl_diags) then
+
     qv_aft_PBL(:ncol,:pver)  =   state%q(:ncol,:pver,1)         + ptend%q(:ncol,:pver,1)        * ztodt
     ql_aft_PBL(:ncol,:pver)  =   state%q(:ncol,:pver,ixcldliq)  + ptend%q(:ncol,:pver,ixcldliq) * ztodt
     qi_aft_PBL(:ncol,:pver)  =   state%q(:ncol,:pver,ixcldice)  + ptend%q(:ncol,:pver,ixcldice) * ztodt
@@ -1216,14 +1299,14 @@ contains
     tten(:ncol,:pver)        = ( t_aftPBL(:ncol,:pver)    - state%t(:ncol,:pver) )              * rztodt     
     rhten(:ncol,:pver)       = ( ftem_aftPBL(:ncol,:pver) - ftem_prePBL(:ncol,:pver) )          * rztodt 
 
+  end if
+
     ! -------------------------------------------------------------- !
     ! mass conservation check.........
     ! -------------------------------------------------------------- !
     if (diff_cnsrv_mass_check) then
 
        ! Conservation check
-       nstep = get_nstep()
-       
        do m = 1, pcnst
           fixed_ubc: if ((.not.cnst_fixed_ubc(m)).and.(.not.cnst_fixed_ubflx(m))) then
              col_loop: do i = 1, ncol
@@ -1240,10 +1323,11 @@ contains
                    sum2 = sum2 +(state%q(i,k,m)+ptend%q(i,k,m)*ztodt)*pdelx/ gravit   ! total column after tendancy is applied
                    sum3 = sum3 +(               ptend%q(i,k,m)*ztodt)*pdelx/ gravit   ! rate of change in column
                 enddo
-                sum1 = sum1 + (cflx(i,m) * ztodt) ! add in surface flux (kg/m2)
-                sflx = (cflx(i,m) * ztodt) 
+              sum1 = sum1 + (cam_in%cflx(i,m) * ztodt) ! add in surface flux (kg/m2)
+              sflx = (cam_in%cflx(i,m) * ztodt)
                 if (sum1>1.e-36_r8) then
                    if( abs((sum2-sum1)/sum1) .gt. 1.e-12_r8  ) then
+                    nstep = get_nstep()
                       write(iulog,'(a,a8,a,I4,2f8.3,5e25.16)') &
                            'MASSCHECK vert diff : nstep,lon,lat,mass1,mass2,sum3,sflx,rel-diff : ', &
                            trim(cnst_name(m)), ' : ', nstep, state%lon(i)*180._r8/pi, state%lat(i)*180._r8/pi, &
@@ -1259,6 +1343,8 @@ contains
     ! -------------------------------------------------------------- !
     ! Writing state variables after PBL scheme for detailed analysis !
     ! -------------------------------------------------------------- !
+
+  if (.not. do_pbl_diags) then
 
     call outfld( 'sl_aft_PBL'   , sl,                        pcols, lchnk )
     call outfld( 'qt_aft_PBL'   , qt,                        pcols, lchnk )
@@ -1288,10 +1374,13 @@ contains
     call outfld( 'tten_PBL'     , tten,                      pcols, lchnk )
     call outfld( 'rhten_PBL'    , rhten,                     pcols, lchnk )
 
+  end if
+
     ! ------------------------------------------- !
     ! Writing the other standard output variables !
     ! ------------------------------------------- !
 
+  if (.not. do_pbl_diags) then
     call outfld( 'QT'           , qt,                        pcols, lchnk )
     call outfld( 'SL'           , sl,                        pcols, lchnk )
     call outfld( 'SLV'          , slv,                       pcols, lchnk )
@@ -1304,6 +1393,7 @@ contains
     call outfld( 'PBLH'         , pblh,                      pcols, lchnk )
     call outfld( 'TPERT'        , tpert,                     pcols, lchnk )
     call outfld( 'QPERT'        , qpert,                     pcols, lchnk )
+  end if
     call outfld( 'USTAR'        , ustar,                     pcols, lchnk )
     call outfld( 'KVH'          , kvh,                       pcols, lchnk )
     call outfld( 'KVT'          , kvt,                       pcols, lchnk )
@@ -1318,24 +1408,20 @@ contains
     do m = 1, pcnst
        call outfld( vdiffnam(m) , ptend%q(1,1,m),            pcols, lchnk )
     end do
-    if( do_tms ) then
-      ! Here, 'tautmsx,tautmsy' are implicit 'tms' that have been actually
-      ! added into the atmosphere.
-        call outfld( 'TAUTMSX'  , tautmsx,                   pcols, lchnk )
-        call outfld( 'TAUTMSY'  , tautmsy,                   pcols, lchnk )
-    end if
     if( do_molec_diff ) then
         call outfld( 'TTPXMLC'  , topflx,                    pcols, lchnk )
     end if
 
-    return
-  end subroutine vertical_diffusion_tend
+  call p%finalize()
+  call p_dry%finalize()
 
-  ! =============================================================================== !
-  !                                                                                 !
-  ! =============================================================================== !
+end subroutine vertical_diffusion_tend
 
-  subroutine positive_moisture( cp, xlv, xls, ncol, mkx, dt, qvmin, qlmin, qimin, & 
+! =============================================================================== !
+!                                                                                 !
+! =============================================================================== !
+
+subroutine positive_moisture( cp, xlv, xls, ncol, mkx, dt, qvmin, qlmin, qimin, &
                                 dp, qv, ql, qi, t, s, qvten, qlten, qiten, sten )
   ! ------------------------------------------------------------------------------- !
   ! If any 'ql < qlmin, qi < qimin, qv < qvmin' are developed in any layer,         !
@@ -1409,6 +1495,6 @@ contains
     end do
     return
 
-  end subroutine positive_moisture
+end subroutine positive_moisture
 
 end module vertical_diffusion

@@ -12,22 +12,21 @@ use shr_kind_mod,  only: r8 => shr_kind_r8
 use camsrfexch,    only: cam_in_t, cam_out_t
 use physics_types, only: physics_state, physics_tend
 use ppgrid,        only: pcols, pver, pverp, begchunk, endchunk
-use physics_buffer, only: physics_buffer_desc, pbuf_add_field, dtype_r8, pbuf_times, &
+use physics_buffer, only: physics_buffer_desc, pbuf_add_field, dtype_r8, dyn_time_lvls, &
                           pbuf_get_field, pbuf_get_index, pbuf_old_tim_idx
 
 
 
-use cam_history,   only: outfld, write_inithist, hist_fld_active
+use cam_history,    only: outfld, write_inithist, hist_fld_active, inithist_all
 use constituents,  only: pcnst, cnst_name, cnst_longname, cnst_cam_outfld, ptendnam, dmetendnam, apcnst, bpcnst, &
                          cnst_get_ind
-use chemistry,     only: chem_is
 use dycore,        only: dycore_is
 use phys_control,  only: phys_getopts
 use wv_saturation, only: qsat, qsat_water, svp_ice
 use time_manager,  only: is_first_step
 
 use scamMod,       only: single_column, wfld
-use abortutils,    only: endrun
+use cam_abortutils, only: endrun
 
 implicit none
 private
@@ -50,10 +49,6 @@ public :: &
    diag_physvar_ic,    &
    diag_readnl          ! read namelist options
 
-logical, public :: inithist_all = .false. ! Flag to indicate set of fields to be 
-                                          ! included on IC file
-                                          !  .false.  include only required fields
-                                          !  .true.   include required *and* optional fields
 
 ! Private data
 
@@ -70,11 +65,13 @@ character(len=8) :: diag_cnst_conv_tend = 'q_only' ! output constituent tendenci
                                                    ! 'none', 'q_only' or 'all'
 
 logical          :: history_amwg                   ! output the variables used by the AMWG diag package
+logical          :: history_vdiag                  ! output the variables used by the AMWG variability diag package
 logical          :: history_eddy                   ! output the eddy variables
 logical          :: history_budget                 ! output tendencies and state variables for CAM4
                                                    ! temperature, water vapor, cloud ice and cloud
                                                    ! liquid budgets.
 integer          :: history_budget_histfile_num    ! output history file number for budget fields
+logical          :: history_waccm                  ! outputs typically used for WACCM
 
 !Physics buffer indices
 integer  ::      qcwat_idx  = 0 
@@ -100,6 +97,8 @@ integer  ::      snow_pcw_idx = 0
 
 integer :: tpert_idx=-1, qpert_idx=-1, pblh_idx=-1
 
+integer :: trefmxav_idx = -1, trefmnav_idx = -1
+
 contains
 
 ! ===============================================================================
@@ -107,7 +106,9 @@ contains
 subroutine diag_register
     
    ! Request physics buffer space for fields that persist across timesteps.
-   call pbuf_add_field('T_TTEND', 'global', dtype_r8, (/pcols,pver,pbuf_times/), t_ttend_idx)
+   call pbuf_add_field('T_TTEND', 'global', dtype_r8, (/pcols,pver,dyn_time_lvls/), t_ttend_idx)
+   call pbuf_add_field('TREFMXAV', 'global', dtype_r8, (/pcols/), trefmxav_idx)
+   call pbuf_add_field('TREFMNAV', 'global', dtype_r8, (/pcols/), trefmnav_idx)
 
 end subroutine diag_register
 
@@ -151,412 +152,307 @@ end subroutine diag_readnl
 
 !================================================================================================
 
-subroutine diag_init()
+subroutine diag_init(pbuf2d)
 
   ! Declare the history fields for which this module contains outfld calls.
 
-   use cam_history,        only: addfld, add_default, phys_decomp
+   use cam_history,        only: addfld, add_default, horiz_only
+   use cam_history,        only: register_vector_field
    use constituent_burden, only: constituent_burden_init
    use cam_control_mod,    only: moist_physics, ideal_phys
+   use physics_buffer,     only: pbuf_set_field
    use tidal_diag,         only: tidal_diag_init 
 
+   type(physics_buffer_desc), pointer, intent(in) :: pbuf2d(:,:)
+
    integer :: k, m
-   ! Note - this is a duplication of information in ice_constants 
-   ! Cannot put in a use statement if want to swap ice models to cice4
-   integer, parameter :: plevmx = 4       ! number of subsurface levels
-   character(len=8), parameter :: tsnam(plevmx) = (/ 'TS1', 'TS2', 'TS3', 'TS4' /)
    integer :: ixcldice, ixcldliq ! constituent indices for cloud liquid and ice water.
    integer :: ierr
 
    ! outfld calls in diag_phys_writeout
 
-   call addfld ('NSTEP   ','timestep',1,    'A','Model timestep',phys_decomp)
-   call addfld ('PHIS    ','m2/s2   ',1,    'I','Surface geopotential',phys_decomp)
+   call addfld ('NSTEP',horiz_only,    'A','timestep','Model timestep')
+   call addfld ('PHIS', horiz_only,    'I','m2/s2','Surface geopotential')
 
-   call addfld ('PS      ','Pa      ',1,    'A','Surface pressure',phys_decomp)
-   call addfld ('T       ','K       ',pver, 'A','Temperature',phys_decomp)
-   call addfld ('U       ','m/s     ',pver, 'A','Zonal wind',phys_decomp)
-   call addfld ('V       ','m/s     ',pver, 'A','Meridional wind',phys_decomp)
-   call addfld (cnst_name(1),'kg/kg ',pver, 'A',cnst_longname(1),phys_decomp)
+   call addfld ('PS',         horiz_only,  'A','Pa',   'Surface pressure')
+   call addfld ('T',          (/ 'lev' /), 'A','K',    'Temperature')
+   call addfld ('U',          (/ 'lev' /), 'A','m/s',  'Zonal wind')
+   call addfld ('V',          (/ 'lev' /), 'A','m/s',  'Meridional wind')
+   call addfld (cnst_name(1), (/ 'lev' /), 'A','kg/kg',cnst_longname(1))
 
    ! State before physics
-   call addfld ('TBP     ','K       ',pver, 'A','Temperature (before physics)'       ,phys_decomp)
-   call addfld (bpcnst(1) ,'kg/kg   ',pver, 'A',cnst_longname(1)//' (before physics)',phys_decomp)
+   call addfld ('TBP',     (/ 'lev' /), 'A','K',    'Temperature (before physics)')
+   call addfld (bpcnst(1) ,(/ 'lev' /), 'A','kg/kg',trim(cnst_longname(1))//' (before physics)')
    ! State after physics
-   call addfld ('TAP     ','K       ',pver, 'A','Temperature (after physics)'       ,phys_decomp)
-   call addfld ('UAP     ','m/s     ',pver, 'A','Zonal wind (after physics)'        ,phys_decomp)
-   call addfld ('VAP     ','m/s     ',pver, 'A','Meridional wind (after physics)'   ,phys_decomp)
-   call addfld (apcnst(1) ,'kg/kg   ',pver, 'A',cnst_longname(1)//' (after physics)',phys_decomp)
+   call addfld ('TAP',      (/ 'lev' /), 'A','K',    'Temperature (after physics)'       )
+   call addfld ('UAP',      (/ 'lev' /), 'A','m/s',  'Zonal wind (after physics)'        )
+   call addfld ('VAP',      (/ 'lev' /), 'A','m/s',  'Meridional wind (after physics)'   )
+   call addfld (apcnst(1) , (/ 'lev' /), 'A','kg/kg',trim(cnst_longname(1))//' (after physics)')
    if ( dycore_is('LR') ) then
-      call addfld ('TFIX    ','K/s     ',1,    'A'     ,'T fixer (T equivalent of Energy correction)',phys_decomp)
-      call addfld ('PTTEND_RESID','K/s ',pver, 'A'     ,&
-                   'T-tendency due to BAB kluge at end of tphysac (diagnostic not part of T-budget)' ,phys_decomp)
-      call addfld ('EFLX    ','W/m2 ',1, 'A'     ,&
-                   'Equivalent heat flux due to mass adjustment at end of tphysac' ,phys_decomp)
+      call addfld ('TFIX',        horiz_only,  'A'     ,'K/s','T fixer (T equivalent of Energy correction)')
+      call addfld ('PTTEND_RESID','K/s ',(/'lev'/), 'A'    'K/s' ,&
+                   'T-tendency due to BAB kluge at end of tphysac (diagnostic not part of T-budget)')
+      call addfld ('EFLX    ',horiz_only, 'A'     ,'W/m2'&
+                   'Equivalent heat flux due to mass adjustment at end of tphysac')
    end if
-   call addfld ('TTEND_TOT   ','K/s' ,pver, 'A','Total temperature tendency'   ,phys_decomp)
+   call addfld ('TTEND_TOT',      (/ 'lev' /), 'A','K/s' ,'Total temperature tendency'   )
   
    ! column burdens for all constituents except water vapor
    call constituent_burden_init
 
-   call addfld ('Z3      ','m       ',pver, 'A','Geopotential Height (above sea level)',phys_decomp)
-   call addfld ('Z1000   ','m       ',1,    'A','Geopotential Z at 700 mbar pressure surface',phys_decomp)
-   call addfld ('Z700    ','m       ',1,    'A','Geopotential Z at 700 mbar pressure surface',phys_decomp)
-   call addfld ('Z500    ','m       ',1,    'A','Geopotential Z at 500 mbar pressure surface',phys_decomp)
-   call addfld ('Z300    ','m       ',1,    'A','Geopotential Z at 300 mbar pressure surface',phys_decomp)
-   call addfld ('Z200    ','m       ',1,    'A','Geopotential Z at 200 mbar pressure surface',phys_decomp)
-   call addfld ('Z100    ','m       ',1,    'A','Geopotential Z at 100 mbar pressure surface',phys_decomp)
-   call addfld ('Z050    ','m       ',1,    'A','Geopotential Z at 50 mbar pressure surface',phys_decomp)
+   call addfld ('Z3',         (/ 'lev' /), 'A', 'm','Geopotential Height (above sea level)')
+   call addfld ('Z1000',      horiz_only,  'A', 'm','Geopotential Z at 700 mbar pressure surface')
+   call addfld ('Z700',       horiz_only,  'A', 'm','Geopotential Z at 700 mbar pressure surface')
+   call addfld ('Z500',       horiz_only,  'A', 'm','Geopotential Z at 500 mbar pressure surface')
+   call addfld ('Z300',       horiz_only,  'A', 'm','Geopotential Z at 300 mbar pressure surface')
+   call addfld ('Z200',       horiz_only,  'A', 'm','Geopotential Z at 200 mbar pressure surface')
+   call addfld ('Z100',       horiz_only,  'A', 'm','Geopotential Z at 100 mbar pressure surface')
+   call addfld ('Z050',       horiz_only,  'A', 'm','Geopotential Z at 50 mbar pressure surface')
 
-   call addfld ('ZZ      ','m2      ',pver, 'A','Eddy height variance' ,phys_decomp)
-   call addfld ('VZ      ','m2/s    ',pver, 'A','Meridional transport of geopotential energy',phys_decomp)
-   call addfld ('VT      ','K m/s   ',pver, 'A','Meridional heat transport',phys_decomp)
-   call addfld ('VU      ','m2/s2   ',pver, 'A','Meridional flux of zonal momentum' ,phys_decomp)
-   call addfld ('VV      ','m2/s2   ',pver, 'A','Meridional velocity squared' ,phys_decomp)
-   call addfld ('VQ      ','m/skg/kg',pver, 'A','Meridional water transport',phys_decomp)
-   call addfld ('QQ      ','kg2/kg2 ',pver, 'A','Eddy moisture variance',phys_decomp)
-   call addfld ('OMEGAV  ','m Pa/s2 ',pver ,'A','Vertical flux of meridional momentum' ,phys_decomp)
-   call addfld ('OMGAOMGA','Pa2/s2  ',pver ,'A','Vertical flux of vertical momentum' ,phys_decomp)
-   call addfld ('OMEGAQ  ','kgPa/kgs',pver ,'A','Vertical water transport' ,phys_decomp)
+   call addfld ('ZZ',         (/ 'lev' /), 'A', 'm2','Eddy height variance' )
+   call addfld ('VZ',         (/ 'lev' /), 'A', 'm2/s','Meridional transport of geopotential energy')
+   call addfld ('VT',         (/ 'lev' /), 'A', 'K m/s   ','Meridional heat transport')
+   call addfld ('VU',         (/ 'lev' /), 'A', 'm2/s2','Meridional flux of zonal momentum' )
+   call addfld ('VV',         (/ 'lev' /), 'A', 'm2/s2','Meridional velocity squared' )
+   call addfld ('VQ',         (/ 'lev' /), 'A', 'm/skg/kg','Meridional water transport')
+   call addfld ('QQ',         (/ 'lev' /), 'A', 'kg2/kg2','Eddy moisture variance')
+   call addfld ('OMEGAV',     (/ 'lev' /), 'A', 'm Pa/s2 ','Vertical flux of meridional momentum' )
+   call addfld ('OMGAOMGA',   (/ 'lev' /), 'A', 'Pa2/s2','Vertical flux of vertical momentum' )
+   call addfld ('OMEGAQ',     (/ 'lev' /), 'A', 'kgPa/kgs','Vertical water transport' )
 
-   call addfld ('UU      ','m2/s2   ',pver, 'A','Zonal velocity squared' ,phys_decomp)
-   call addfld ('WSPEED  ','m/s     ',pver, 'X','Horizontal total wind speed maximum' ,phys_decomp)
-   call addfld ('WSPDSRFMX','m/s    ',1,    'X','Horizontal total wind speed maximum at the surface' ,phys_decomp)
-   call addfld ('WSPDSRFAV','m/s    ',1,    'A','Horizontal total wind speed average at the surface' ,phys_decomp)
+   call addfld ('UU',         (/ 'lev' /), 'A', 'm2/s2','Zonal velocity squared' )
+   call addfld ('WSPEED',     (/ 'lev' /), 'X','m/s','Horizontal total wind speed maximum' )
+   call addfld ('WSPDSRFMX',  horiz_only,  'X','m/s','Horizontal total wind speed maximum at the surface' )
+   call addfld ('WSPDSRFAV',  horiz_only,  'A', 'm/s','Horizontal total wind speed average at the surface' )
 
-   call addfld ('OMEGA   ','Pa/s    ',pver, 'A','Vertical velocity (pressure)',phys_decomp)
-   call addfld ('OMEGAT  ','K Pa/s  ',pver, 'A','Vertical heat flux' ,phys_decomp)
-   call addfld ('OMEGAU  ','m Pa/s2 ',pver, 'A','Vertical flux of zonal momentum' ,phys_decomp)
-   call addfld ('OMEGA850','Pa/s    ',1,    'A','Vertical velocity at 850 mbar pressure surface',phys_decomp)
-   call addfld ('OMEGA500','Pa/s    ',1,    'A','Vertical velocity at 500 mbar pressure surface',phys_decomp)
+   call addfld ('OMEGA',      (/ 'lev' /), 'A', 'Pa/s','Vertical velocity (pressure)')
+   call addfld ('OMEGAT',     (/ 'lev' /), 'A', 'K Pa/s  ','Vertical heat flux' )
+   call addfld ('OMEGAU',     (/ 'lev' /), 'A', 'm Pa/s2 ','Vertical flux of zonal momentum' )
+   call addfld ('OMEGA850',   horiz_only,  'A', 'Pa/s','Vertical velocity at 850 mbar pressure surface')
+   call addfld ('OMEGA500',   horiz_only,  'A', 'Pa/s','Vertical velocity at 500 mbar pressure surface')
 
-   call addfld ('MQ      ','kg/m2   ',pver, 'A','Water vapor mass in layer',phys_decomp)
-   call addfld ('TMQ     ','kg/m2   ',1,    'A','Total (vertically integrated) precipitable water',phys_decomp)
-   call addfld ('RELHUM  ','percent ',pver, 'A','Relative humidity',phys_decomp)
-   call addfld ('RHW  ','percent '   ,pver, 'A','Relative humidity with respect to liquid',phys_decomp)
-   call addfld ('RHI  ','percent '   ,pver, 'A','Relative humidity with respect to ice',phys_decomp)
-   call addfld ('RHCFMIP','percent ' ,pver, 'A','Relative humidity with respect to water above 273 K, ice below 273 K',phys_decomp)
-   call addfld ('PSL     ','Pa      ',1,    'A','Sea level pressure',phys_decomp)
+   call addfld ('MQ',         (/ 'lev' /), 'A', 'kg/m2','Water vapor mass in layer')
+   call addfld ('TMQ',        horiz_only,  'A', 'kg/m2','Total (vertically integrated) precipitable water')
+   call addfld ('RELHUM',     (/ 'lev' /), 'A', 'percent','Relative humidity')
+   call addfld ('RHW',        (/ 'lev' /), 'A', 'percent','Relative humidity with respect to liquid')
+   call addfld ('RHI',        (/ 'lev' /), 'A', 'percent','Relative humidity with respect to ice')
+   call addfld ('RHCFMIP',    (/ 'lev' /), 'A', 'percent','Relative humidity with respect to water above 273 K, ice below 273 K')
+   call addfld ('PSL',        horiz_only,  'A', 'Pa','Sea level pressure')
 
-   call addfld ('T850    ','K       ',1,    'A','Temperature at 850 mbar pressure surface',phys_decomp)
-   call addfld ('T500    ','K       ',1,    'A','Temperature at 500 mbar pressure surface',phys_decomp)
-   call addfld ('T300    ','K       ',1,    'A','Temperature at 300 mbar pressure surface',phys_decomp)
-   call addfld ('T200    ','K       ',1,    'A','Temperature at 200 mbar pressure surface',phys_decomp)
-   call addfld ('Q850    ','kg/kg   ',1,    'A','Specific Humidity at 850 mbar pressure surface',phys_decomp)
-   call addfld ('Q200    ','kg/kg   ',1,    'A','Specific Humidity at 700 mbar pressure surface',phys_decomp)
-   call addfld ('U850    ','m/s     ',1,    'A','Zonal wind at 850 mbar pressure surface',phys_decomp)
-   call addfld ('U250    ','m/s     ',1,    'A','Zonal wind at 250 mbar pressure surface',phys_decomp)
-   call addfld ('U200    ','m/s     ',1,    'A','Zonal wind at 200 mbar pressure surface',phys_decomp)
-   call addfld ('U010    ','m/s     ',1,    'A','Zonal wind at  10 mbar pressure surface',phys_decomp)
-   call addfld ('V850    ','m/s     ',1,    'A','Meridional wind at 850 mbar pressure surface',phys_decomp)
-   call addfld ('V200    ','m/s     ',1,    'A','Meridional wind at 200 mbar pressure surface',phys_decomp)
-   call addfld ('V250    ','m/s     ',1,    'A','Meridional wind at 250 mbar pressure surface',phys_decomp)
+   call addfld ('T850',       horiz_only,  'A', 'K','Temperature at 850 mbar pressure surface')
+   call addfld ('T500',       horiz_only,  'A', 'K','Temperature at 500 mbar pressure surface')
+   call addfld ('T400',       horiz_only,  'A', 'K','Temperature at 400 mbar pressure surface')
+   call addfld ('T300',       horiz_only,  'A', 'K','Temperature at 300 mbar pressure surface')
+   call addfld ('T200',       horiz_only,  'A', 'K','Temperature at 200 mbar pressure surface')
+   call addfld ('Q850',       horiz_only,  'A', 'kg/kg','Specific Humidity at 850 mbar pressure surface')
+   call addfld ('Q200',       horiz_only,  'A', 'kg/kg','Specific Humidity at 700 mbar pressure surface')
+   call addfld ('U850',       horiz_only,  'A', 'm/s','Zonal wind at 850 mbar pressure surface')
+   call addfld ('U500',       horiz_only,  'A', 'm/s','Zonal wind at 500 mbar pressure surface')
+   call addfld ('U250',       horiz_only,  'A', 'm/s','Zonal wind at 250 mbar pressure surface')
+   call addfld ('U200',       horiz_only,  'A', 'm/s','Zonal wind at 200 mbar pressure surface')
+   call addfld ('U010',       horiz_only,  'A', 'm/s','Zonal wind at  10 mbar pressure surface')
+   call addfld ('V850',       horiz_only,  'A', 'm/s','Meridional wind at 850 mbar pressure surface')
+   call addfld ('V500',       horiz_only,  'A', 'm/s','Meridional wind at 500 mbar pressure surface')
+   call addfld ('V250',       horiz_only,  'A', 'm/s','Meridional wind at 250 mbar pressure surface')
+   call addfld ('V200',       horiz_only,  'A', 'm/s','Meridional wind at 200 mbar pressure surface')
 
-   call addfld ('TT      ','K2      ',pver, 'A','Eddy temperature variance' ,phys_decomp)
+   call register_vector_field('U850', 'V850')
+   call register_vector_field('U500', 'V500')
+   call register_vector_field('U250', 'V250')
+   call register_vector_field('U200', 'V200')
 
-   call addfld ('UBOT    ','m/s     ',1,    'A','Lowest model level zonal wind',phys_decomp)
-   call addfld ('VBOT    ','m/s     ',1,    'A','Lowest model level meridional wind',phys_decomp)
-   call addfld ('QBOT    ','kg/kg   ',1,    'A','Lowest model level water vapor mixing ratio',phys_decomp)
-   call addfld ('ZBOT    ','m       ',1,    'A','Lowest model level height', phys_decomp)
+   call addfld ('TT',         (/ 'lev' /), 'A', 'K2','Eddy temperature variance' )
 
-   call addfld ('ATMEINT  ','J/m2    ',1, 'A','Vertically integrated total atmospheric energy ',phys_decomp)
+   call addfld ('UBOT',       horiz_only,  'A', 'm/s','Lowest model level zonal wind')
+   call addfld ('VBOT',       horiz_only,  'A', 'm/s','Lowest model level meridional wind')
+   call register_vector_field('UBOT', 'VBOT')
+   call addfld ('QBOT',       horiz_only,  'A', 'kg/kg','Lowest model level water vapor mixing ratio')
+   call addfld ('ZBOT',       horiz_only,  'A', 'm','Lowest model level height')
 
-   call addfld ('T1000      ','K     ',1,   'A','Temperature at 1000 mbar pressure surface',phys_decomp)
-   call addfld ('T925       ','K     ',1,   'A','Temperature at 925 mbar pressure surface',phys_decomp)   
-   call addfld ('T700       ','K     ',1,   'A','Temperature at 700 mbar pressure surface',phys_decomp)
-   call addfld ('T010       ','K     ',1,   'A','Temperature at 10 mbar pressure surface',phys_decomp)
-   call addfld ('Q1000      ','kg/kg ',1,   'A','Specific Humidity at 1000 mbar pressure surface',phys_decomp)   
-   call addfld ('Q925       ','kg/kg ',1,   'A','Specific Humidity at 925 mbar pressure surface',phys_decomp)
+   call addfld ('ATMEINT',    horiz_only,  'A', 'J/m2','Vertically integrated total atmospheric energy ')
 
-   call addfld ('T7001000   ','K     ',1,   'A','Temperature difference 700 mb - 1000 mb',phys_decomp)
-   call addfld ('TH7001000  ','K     ',1,   'A','Theta difference 700 mb - 1000 mb',phys_decomp)
-   call addfld ('THE7001000 ','K     ',1,   'A','ThetaE difference 700 mb - 1000 mb',phys_decomp)
+   call addfld ('T1000',      horiz_only,  'A', 'K','Temperature at 1000 mbar pressure surface')
+   call addfld ('T925',       horiz_only,  'A', 'K','Temperature at 925 mbar pressure surface')   
+   call addfld ('T700',       horiz_only,  'A', 'K','Temperature at 700 mbar pressure surface')
+   call addfld ('T010',       horiz_only,  'A', 'K','Temperature at 10 mbar pressure surface')
+   call addfld ('Q1000',      horiz_only,  'A', 'kg/kg','Specific Humidity at 1000 mbar pressure surface')   
+   call addfld ('Q925',       horiz_only,  'A', 'kg/kg','Specific Humidity at 925 mbar pressure surface')
 
-   call addfld ('T8501000   ','K     ',1,   'A','Temperature difference 850 mb - 1000 mb',phys_decomp)
-   call addfld ('TH8501000  ','K     ',1,   'A','Theta difference 850 mb - 1000 mb',phys_decomp)   
-   call addfld ('THE8501000 ','K     ',1,   'A','ThetaE difference 850 mb - 1000 mb',phys_decomp)
-   call addfld ('T9251000   ','K     ',1,   'A','Temperature difference 925 mb - 1000 mb',phys_decomp) 
-   call addfld ('TH9251000  ','K     ',1,   'A','Theta difference 925 mb - 1000 mb',phys_decomp)   
-   call addfld ('THE9251000 ','K     ',1,   'A','ThetaE difference 925 mb - 1000 mb',phys_decomp) 
+   call addfld ('T7001000',   horiz_only,  'A', 'K','Temperature difference 700 mb - 1000 mb')
+   call addfld ('TH7001000',  horiz_only,  'A', 'K','Theta difference 700 mb - 1000 mb')
+   call addfld ('THE7001000', horiz_only,  'A', 'K','ThetaE difference 700 mb - 1000 mb')
+
+   call addfld ('T8501000',   horiz_only,  'A', 'K','Temperature difference 850 mb - 1000 mb')
+   call addfld ('TH8501000',  horiz_only,  'A', 'K','Theta difference 850 mb - 1000 mb')   
+   call addfld ('THE8501000', horiz_only,  'A', 'K','ThetaE difference 850 mb - 1000 mb')
+   call addfld ('T9251000',   horiz_only,  'A', 'K','Temperature difference 925 mb - 1000 mb') 
+   call addfld ('TH9251000',  horiz_only,  'A', 'K','Theta difference 925 mb - 1000 mb')   
+   call addfld ('THE9251000', horiz_only,  'A', 'K','ThetaE difference 925 mb - 1000 mb') 
 
    ! This field is added by radiation when full physics is used
    if ( ideal_phys )then
-      call addfld('QRS     ', 'K/s     ', pver, 'A', 'Solar heating rate', phys_decomp)
+      call addfld('QRS', (/ 'lev' /), 'A', 'K/s', 'Solar heating rate')
    end if
 
 
 #ifdef OSLO_AERO
 
-   call addfld ('C_DMS    ','kg m-2   ',1,    'A','Column burden',phys_decomp)
-   call addfld ('C_SO2    ','kg m-2   ',1,    'A','Column burden',phys_decomp)
-   call addfld ('C_SO4    ','kg m-2   ',1,    'A','Column burden',phys_decomp)
-   call addfld ('C_BC     ','kg m-2   ',1,    'A','Column burden',phys_decomp)
-   call addfld ('C_POM    ','kg m-2   ',1,    'A','Column burden',phys_decomp)
-   call addfld ('C_SS     ','kg m-2   ',1,    'A','Column burden',phys_decomp)
-   call addfld ('C_DUST   ','kg m-2   ',1,    'A','Column burden',phys_decomp)
-
-   call addfld ('DMSCO    ','mol/mol  ',pver,    'A','Concentration',phys_decomp)
-   call addfld ('SO2CO    ','mol/mol  ',pver,    'A','Concentration',phys_decomp)
-   call addfld ('SO4    ','kg m-3   ',pver,    'A','Concentration',phys_decomp)
-   call addfld ('BC     ','kg m-3   ',pver,    'A','Concentration',phys_decomp)
-   call addfld ('POM    ','kg m-3   ',pver,    'A','Concentration',phys_decomp)
-   call addfld ('SS     ','kg m-3   ',pver,    'A','Concentration',phys_decomp)
-   call addfld ('DUST   ','kg m-3   ',pver,    'A','Concentration',phys_decomp)
-
-   call addfld ('EMI_DMS    ','kg m-2 s-1  ',1,    'A','Emissions',phys_decomp)
-   call addfld ('EMI_SO2    ','kg m-2 s-1  ',1,    'A','Emissions',phys_decomp)
-   call addfld ('EMI_SO4    ','kg m-2 s-1  ',1,    'A','Emissions',phys_decomp)
-   call addfld ('EMI_BC     ','kg m-2 s-1  ',1,    'A','Emissions',phys_decomp)
-   call addfld ('EMI_POM    ','kg m-2 s-1  ',1,    'A','Emissions',phys_decomp)
-   call addfld ('EMI_SS     ','kg m-2 s-1  ',1,    'A','Emissions',phys_decomp)
-   call addfld ('EMI_DUST   ','kg m-2 s-1  ',1,    'A','Emissions',phys_decomp)
-
-!   call addfld ('WET_MSA    ','kg m-2 s-1   ',1,    'A','Wet deposition',phys_decomp)
-   call addfld ('WET_SO2    ','kg m-2 s-1   ',1,    'A','Wet deposition',phys_decomp)
-   call addfld ('WET_SO4    ','kg m-2 s-1   ',1,    'A','Wet deposition',phys_decomp)
-   call addfld ('WET_BC     ','kg m-2 s-1   ',1,    'A','Wet deposition',phys_decomp)
-   call addfld ('WET_POM    ','kg m-2 s-1   ',1,    'A','Wet deposition',phys_decomp)
-   call addfld ('WET_SS     ','kg m-2 s-1   ',1,    'A','Wet deposition',phys_decomp)
-   call addfld ('WET_DUST   ','kg m-2 s-1   ',1,    'A','Wet deposition',phys_decomp)
-
-!   call addfld ('DRY_MSA    ','kg m-2 s-1   ',1,    'A','Dry deposition',phys_decomp)
-   call addfld ('DRY_SO2    ','kg m-2 s-1   ',1,    'A','Dry deposition',phys_decomp)
-   call addfld ('DRY_SO4    ','kg m-2 s-1   ',1,    'A','Dry deposition',phys_decomp)
-   call addfld ('DRY_BC     ','kg m-2 s-1   ',1,    'A','Dry deposition',phys_decomp)
-   call addfld ('DRY_POM    ','kg m-2 s-1   ',1,    'A','Dry deposition',phys_decomp)
-   call addfld ('DRY_SS     ','kg m-2 s-1   ',1,    'A','Dry deposition',phys_decomp)
-   call addfld ('DRY_DUST   ','kg m-2 s-1   ',1,    'A','Dry deposition',phys_decomp)
-   
-   call addfld ('KHET    ','s-1     ',pver,    'A','Aqueous-phase reaction rate',phys_decomp)
-   call addfld ('CH2O2   ','kg/kg   ',pver,    'A','H2O2 MMR from file ',phys_decomp)
-   call addfld ('NUSO4N  ','kg/kg s-1',pver,    'A','SO4 nucleation rate' ,phys_decomp)
-
 #ifdef DIRIND
-   call addfld ('AOD_VIS ','unitless',1,    'A','Aerosol optical depth at 0.442-0.625um',phys_decomp) ! CAM4-Oslo: 0.35-0.64um
-   call addfld ('ABSVIS  ','unitless',1,    'A','Aerosol absorptive optical depth at 0.442-0.625um',phys_decomp) ! CAM4-Oslo: 0.35-0.64um
-   call addfld ('CAODVIS ','unitless',1,    'A','Clear air aerosol optical depth',phys_decomp)  
-   call addfld ('CABSVIS ','unitless',1,    'A','Clear air aerosol absorptive optical depth',phys_decomp)
-   call addfld ('CLDFREE ','unitless',1,    'A','Cloud free fraction wrt CAODVIS and CABSVIS',phys_decomp)
-   call addfld ('DAYFOC  ','unitless',1,    'A','Daylight fraction',phys_decomp)
-   call addfld ('N_AER   ','unitless',pver, 'A','Aerosol number concentration',phys_decomp)
-   call addfld ('N_AERORG','unitless',pver, 'A','Aerosol number concentration',phys_decomp)
-   call addfld ('SSAVIS  ','unitless',pver, 'A','Aerosol single scattering albedo in visible wavelength band',phys_decomp)    
-   call addfld ('ASYMMVIS','unitless',pver, 'A','Aerosol assymetry factor in visible wavelength band',phys_decomp)    
-   call addfld ('EXTVIS  ','1/km    ',pver, 'A','Aerosol extinction',phys_decomp)     
-   call addfld ('AKCXS   ','mg/m2   ',1,    'A','Scheme excess aerosol mass burden',phys_decomp)     
-   call addfld ('CDNC    ','1/CM3   ',pver, 'A','Cloud Droplet Number Concentration',phys_decomp)
-   call addfld ('CLDFOC  ','FRACTION',pver, 'A','Frequency of Warm Cloud Occurence',phys_decomp)
-   call addfld ('REFFL   ','uM      ',pver, 'A','Effective Radius of Cloud Droplets',phys_decomp)
-   call addfld ('REHANA  ','uM      ',1,    'A','Effective radius as seen from satellite',phys_decomp)
-   call addfld ('FOCHANA ','FRACTION',1,    'A','Frequency of Occurrence of Clouds with REHANA /= 0',phys_decomp)
-   call addfld ('RELH    ','unitless',pver, 'A','Fictive relative humidity',phys_decomp)
-!#ifdef AEROCOM
-!   call addfld ('LOGSIG1 ','unitless',pver, 'A','Log10 of standard deviation for lognormal mode 1',phys_decomp)
-!   call addfld ('RNEW1   ','uM      ',pver, 'A','New modal radius from look-up tables, mode 1',phys_decomp)
-!   call addfld ('LOGSIG2 ','unitless',pver, 'A','Log10 of standard deviation for lognormal mode 2',phys_decomp)
-!   call addfld ('RNEW2   ','uM      ',pver, 'A','New modal radius from look-up tables, mode 2',phys_decomp)
-!   call addfld ('LOGSIG4 ','unitless',pver, 'A','Log10 of standard deviation for lognormal mode 4',phys_decomp)
-!   call addfld ('RNEW4   ','uM      ',pver, 'A','New modal radius from look-up tables, mode 4',phys_decomp)
-!   call addfld ('LOGSIG5 ','unitless',pver, 'A','Log10 of standard deviation for lognormal mode 5',phys_decomp)
-!   call addfld ('RNEW5   ','uM      ',pver, 'A','New modal radius from look-up tables, mode 5',phys_decomp)
-!   call addfld ('LOGSIG6 ','unitless',pver, 'A','Log10 of standard deviation for lognormal mode 6',phys_decomp)
-!   call addfld ('RNEW6   ','uM      ',pver, 'A','New modal radius from look-up tables, mode 6',phys_decomp)
-!   call addfld ('LOGSIG7 ','unitless',pver, 'A','Log10 of standard deviation for lognormal mode 7',phys_decomp)
-!   call addfld ('RNEW7   ','uM      ',pver, 'A','New modal radius from look-up tables, mode 7',phys_decomp)
-!   call addfld ('LOGSIG8 ','unitless',pver, 'A','Log10 of standard deviation for lognormal mode 8',phys_decomp)
-!   call addfld ('RNEW8   ','uM      ',pver, 'A','New modal radius from look-up tables, mode 8',phys_decomp)
-!   call addfld ('LOGSIG9 ','unitless',pver, 'A','Log10 of standard deviation for lognormal mode 9',phys_decomp)
-!   call addfld ('RNEW9   ','uM      ',pver, 'A','New modal radius from look-up tables, mode 9',phys_decomp)
-!   call addfld ('LOGSIG10','unitless',pver, 'A','Log10 of standard deviation for lognormal mode 10',phys_decomp)
-!   call addfld ('RNEW10  ','uM      ',pver, 'A','New modal radius from look-up tables, mode 10',phys_decomp)
-!   call addfld ('RNEW11  ','uM      ',pver, 'A','New modal radius from look-up tables, mode 11',phys_decomp)
-!   call addfld ('RNEW13  ','uM      ',pver, 'A','New modal radius from look-up tables, mode 13',phys_decomp)
-!   call addfld ('RNEW14  ','uM      ',pver, 'A','New modal radius from look-up tables, mode 14',phys_decomp)
-!   call addfld ('RNEWD1  ','uM      ',pver, 'A','New modal dry radius from look-up tables, mode 1',phys_decomp)
-!   call addfld ('RNEWD2  ','uM      ',pver, 'A','New modal dry radius from look-up tables, mode 2',phys_decomp)
-!   call addfld ('RNEWD4  ','uM      ',pver, 'A','New modal dry radius from look-up tables, mode 4',phys_decomp)
-!   call addfld ('RNEWD5  ','uM      ',pver, 'A','New modal dry radius from look-up tables, mode 5',phys_decomp)
-!   call addfld ('RNEWD6  ','uM      ',pver, 'A','New modal dry radius from look-up tables, mode 6',phys_decomp)
-!   call addfld ('RNEWD7  ','uM      ',pver, 'A','New modal dry radius from look-up tables, mode 7',phys_decomp)
-!   call addfld ('RNEWD8  ','uM      ',pver, 'A','New modal dry radius from look-up tables, mode 8',phys_decomp)
-!   call addfld ('RNEWD9  ','uM      ',pver, 'A','New modal dry radius from look-up tables, mode 9',phys_decomp)
-!   call addfld ('RNEWD10 ','uM      ',pver, 'A','New modal dry radius from look-up tables, mode 10',phys_decomp)
-!#endif
+   call addfld ('AOD_VIS ',horiz_only, 'A','unitless','Aerosol optical depth at 0.442-0.625um') ! CAM4-Oslo: 0.35-0.64um
+   call addfld ('ABSVIS  ',horiz_only, 'A','unitless','Aerosol absorptive optical depth at 0.442-0.625um') ! CAM4-Oslo: 0.35-0.64um
+   call addfld ('CAODVIS ',horiz_only, 'A','unitless','Clear air aerosol optical depth')  
+   call addfld ('CABSVIS ',horiz_only, 'A','unitless','Clear air aerosol absorptive optical depth')
+   call addfld ('CLDFREE ',horiz_only, 'A','unitless','Cloud free fraction wrt CAODVIS and CABSVIS')
+   call addfld ('DAYFOC  ',horiz_only, 'A','unitless','Daylight fraction')
+   call addfld ('N_AER   ',(/'lev'/),'A', 'unitless','Aerosol number concentration')
+   call addfld ('N_AERORG',(/'lev'/),'A','unitless','Aerosol number concentration')
+   call addfld ('SSAVIS  ',(/'lev'/),'A','unitless','Aerosol single scattering albedo in visible wavelength band')    
+   call addfld ('ASYMMVIS',(/'lev'/),'A','unitless','Aerosol assymetry factor in visible wavelength band')    
+   call addfld ('EXTVIS  ',(/'lev'/),'A','1/km    ','Aerosol extinction')     
+   call addfld ('AKCXS   ',horiz_only,'A','mg/m2   ','Scheme excess aerosol mass burden')     
+   call addfld ('CDNC    ',(/'lev'/),'A','1/CM3   ','A','Cloud Droplet Number Concentration')
+   call addfld ('CLDFOC  ',(/'lev'/),'A','FRACTION','Frequency of Warm Cloud Occurence')
+   call addfld ('REFFL   ',(/'lev'/),'A','uM      ''Effective Radius of Cloud Droplets')
+   call addfld ('REHANA  ',horiz_only,'A','uM      ','Effective radius as seen from satellite')
+   call addfld ('FOCHANA ',horiz_only,'A','FRACTION','Frequency of Occurrence of Clouds with REHANA /= 0')
+   call addfld ('RELH    ',(/'lev'/),'A', 'unitless','Fictive relative humidity')
 #ifdef AEROFFL
-   call addfld ('FSNT_DRF','W/m^2   ',1,    'A','Total column absorbed solar flux (DIRind)' ,phys_decomp)
-   call addfld ('FSNTCDRF','W/m^2   ',1,    'A','Clear sky total column absorbed solar flux (DIRind)' ,phys_decomp)
-   call addfld ('FSNS_DRF','W/m^2   ',1,    'A','Surface absorbed solar flux (DIRind)' ,phys_decomp)
-   call addfld ('FSNSCDRF','W/m^2   ',1,    'A','Clear sky surface absorbed solar flux (DIRind)' ,phys_decomp)
-   call addfld ('QRS_DRF ','K/s     ',pver, 'A','Solar heating rate (DIRind)' ,phys_decomp)
-   call addfld ('QRSC_DRF','K/s     ',pver, 'A','Clearsky solar heating rate (DIRind)' ,phys_decomp)
-!   call addfld ('FSNT_AIE','W/m^2   ',1,    'A','Total column absorbed solar flux (dirIND)' ,phys_decomp)
-!   call addfld ('FLNT_AIE','W/m^2   ',1,    'A','Total column longwave flux (dirIND)' ,phys_decomp)
-!   call addfld ('FSNTCAIE','W/m^2   ',1,    'A','Clear sky total column absorbed solar flux (dirIND)' ,phys_decomp)
-!   call addfld ('FSNS_AIE','W/m^2   ',1,    'A','Surface absorbed solar flux (dirIND)' ,phys_decomp)
-!   call addfld ('FSNSCAIE','W/m^2   ',1,    'A','Clear sky surface absorbed solar flux (dirIND)' ,phys_decomp)
-!   call addfld ('QRS_AIE ','K/s     ',pver, 'A','Solar heating rate (dirIND)' ,phys_decomp)
-!   call addfld ('QRSC_AIE','K/s     ',pver, 'A','Clearsky solar heating rate (dirIND)' ,phys_decomp)
-   call addfld ('FLNT_DRF','W/m^2   ',1,    'A','Total column longwave flux (DIRind)' ,phys_decomp)
-   call addfld ('FLNTCDRF','W/m^2   ',1,    'A','Clear sky total column longwave flux (DIRind)' ,phys_decomp)
+   call addfld ('FSNT_DRF','W/m^2   ',1,    'A','Total column absorbed solar flux (DIRind)' )
+   call addfld ('FSNTCDRF','W/m^2   ',1,    'A','Clear sky total column absorbed solar flux (DIRind)' )
+   call addfld ('FSNS_DRF','W/m^2   ',1,    'A','Surface absorbed solar flux (DIRind)' )
+   call addfld ('FSNSCDRF','W/m^2   ',1,    'A','Clear sky surface absorbed solar flux (DIRind)' )
+   call addfld ('QRS_DRF ','K/s     ',pver, 'A','Solar heating rate (DIRind)' )
+   call addfld ('QRSC_DRF','K/s     ',pver, 'A','Clearsky solar heating rate (DIRind)' )
+   call addfld ('FLNT_DRF','W/m^2   ',1,    'A','Total column longwave flux (DIRind)' )
+   call addfld ('FLNTCDRF','W/m^2   ',1,    'A','Clear sky total column longwave flux (DIRind)' )
 #ifdef AEROCOM 
-   call addfld ('FSUTADRF','W/m^2   ',1,    'A','SW upwelling flux at TOA',phys_decomp)
-   call addfld ('FSDS_DRF','W/m^2   ',1,    'A','SW downelling flux at surface',phys_decomp)
-   call addfld ('FSUS_DRF','W/m^2   ',1,    'A','SW upwelling flux at surface',phys_decomp)
-   call addfld ('FSDSCDRF','W/m^2   ',1,    'A','SW downwelling clear sky flux at surface',phys_decomp)
-   call addfld ('FLUS    ','W/m^2   ',1,    'A','LW surface upwelling flux',phys_decomp)
-   call addfld ('FLNT_ORG','W/m^2   ',1,    'A','Total column longwave flux (CAM5)' ,phys_decomp)
+   call addfld ('FSUTADRF','W/m^2   ',1,    'A','SW upwelling flux at TOA')
+   call addfld ('FSDS_DRF','W/m^2   ',1,    'A','SW downelling flux at surface')
+   call addfld ('FSUS_DRF','W/m^2   ',1,    'A','SW upwelling flux at surface')
+   call addfld ('FSDSCDRF','W/m^2   ',1,    'A','SW downwelling clear sky flux at surface')
+   call addfld ('FLUS    ','W/m^2   ',1,    'A','LW surface upwelling flux')
+   call addfld ('FLNT_ORG','W/m^2   ',1,    'A','Total column longwave flux (CAM5)' )
 #endif  ! aerocom
 #endif  ! aeroffl
 #ifdef AEROCOM 
-      call addfld ('PMTOT   ','ug/m3   ',1,    'A','Aerosol PM, all sizes',phys_decomp)
-      call addfld ('PM25    ','ug/m3   ',1,    'A','Aerosol PM2.5',phys_decomp)
-      call addfld ('GRIDAREA','m2      ',1,    'A','Grid area for 1.9x2.5 horizontal resolution',phys_decomp)
-      call addfld ('DAERH2O ','mg/m2   ',1,    'A','Aerosol water load',phys_decomp)
-      call addfld ('MMR_AH2O','kg/kg   ',pver, 'A','Aerosol water mmr',phys_decomp)
-      call addfld ('ECDRYAER','m-1     ',pver, 'A','Dry aerosol extinction at 550nm',phys_decomp)  
-      call addfld ('ABSDRYAE','m-1     ',pver, 'A','Dry aerosol absorption at 550nm',phys_decomp)  
-      call addfld ('ECDRY440','m-1     ',pver, 'A','Dry aerosol extinction at 440nm',phys_decomp)  
-      call addfld ('ABSDR440','m-1     ',pver, 'A','Dry aerosol absorption at 440nm',phys_decomp)  
-      call addfld ('ECDRY870','m-1     ',pver, 'A','Dry aerosol extinction at 870nm',phys_decomp)  
-      call addfld ('ABSDR870','m-1     ',pver, 'A','Dry aerosol absorption at 870nm',phys_decomp)  
-      call addfld ('ASYMMDRY','unitless',pver, 'A','Dry asymmetry factor in visible wavelength band',phys_decomp)  
-      call addfld ('ECDRYLT1','m-1     ',pver, 'A','Dry aerosol extinction at 550nm lt05',phys_decomp)
-      call addfld ('ABSDRYBC','m-1     ',pver, 'A','Dry BC absorption at 550nm',phys_decomp)
-      call addfld ('ABSDRYOC','m-1     ',pver, 'A','Dry OC absorption at 550nm',phys_decomp)
-      call addfld ('ABSDRYSU','m-1     ',pver, 'A','Dry sulfate absorption at 550nm',phys_decomp)
-      call addfld ('ABSDRYSS','m-1     ',pver, 'A','Dry sea-salt absorption at 550nm',phys_decomp)
-      call addfld ('ABSDRYDU','m-1     ',pver, 'A','Dry dust absorption at 550nm',phys_decomp)
-      call addfld ('OD550DRY','unitless',1,    'A','Dry aerosol optical depth at 550nm',phys_decomp)  
-      call addfld ('AB550DRY','unitless',1,    'A','Dry aerosol absorptive optical depth at 550nm',phys_decomp)   
-      call addfld ('DERLT05 ','um      ',1,    'A','Effective aerosol dry radius<0.5um',phys_decomp)
-      call addfld ('DERGT05 ','um      ',1,    'A','Effective aerosol dry radius>0.5um',phys_decomp) 
-      call addfld ('DER     ','um      ',1,    'A','Effective aerosol dry radius',phys_decomp) 
-      call addfld ('DOD440  ','unitless',1,    'A','Aerosol optical depth at 440nm',phys_decomp)  
-      call addfld ('ABS440  ','unitless',1,    'A','Aerosol absorptive optical depth at 440nm',phys_decomp)   
-      call addfld ('DOD500  ','unitless',1,    'A','Aerosol optical depth at 500nm',phys_decomp)  
-      call addfld ('ABS500  ','unitless',1,    'A','Aerosol absorptive optical depth at 500nm',phys_decomp)   
-      call addfld ('DOD550  ','unitless',1,    'A','Aerosol optical depth at 550nm',phys_decomp)  
-      call addfld ('ABS550  ','unitless',1,    'A','Aerosol absorptive optical depth at 550nm',phys_decomp)   
-      call addfld ('ABS550AL','unitless',1,    'A','Alt. aerosol absorptive optical depth at 550nm',phys_decomp)   
-      call addfld ('DOD670  ','unitless',1,    'A','Aerosol optical depth at 670nm',phys_decomp)  
-      call addfld ('ABS670  ','unitless',1,    'A','Aerosol absorptive optical depth at 670nm',phys_decomp)   
-      call addfld ('DOD870  ','unitless',1,    'A','Aerosol optical depth at 870nm',phys_decomp)  
-      call addfld ('ABS870  ','unitless',1,    'A','Aerosol absorptive optical depth at 870nm',phys_decomp)   
-      call addfld ('DLOAD_MI','mg/m2   ',1,    'A','mineral aerosol load',phys_decomp)     
-      call addfld ('DLOAD_SS','mg/m2   ',1,    'A','sea-salt aerosol load',phys_decomp)     
-      call addfld ('DLOAD_S4','mg/m2   ',1,    'A','sulfate aerosol load',phys_decomp)     
-      call addfld ('DLOAD_OC','mg/m2   ',1,    'A','OC aerosol load',phys_decomp)     
-      call addfld ('DLOAD_BC','mg/m2   ',1,    'A','BC aerosol load',phys_decomp)     
-!soa
-!      call addfld ('C_BCPM  ','ug m-3  ',pver, 'A','BC concentration',phys_decomp)
-!      call addfld ('C_BC05  ','ug m-3  ',pver, 'A','BC concentration < 0.5um',phys_decomp)
-!      call addfld ('C_BC125 ','ug m-3  ',pver, 'A','BC concentration > 1.25um',phys_decomp)
-!      call addfld ('C_OCPM  ','ug m-3  ',pver, 'A','OC concentration',phys_decomp)
-!      call addfld ('C_OC05  ','ug m-3  ',pver, 'A','OC concentration < 0.5um',phys_decomp)
-!      call addfld ('C_OC125 ','ug m-3  ',pver, 'A','OC concentration > 1.25um',phys_decomp)
-!      call addfld ('C_S4PM  ','ug m-3  ',pver, 'A','SO4 concentration',phys_decomp)
-!      call addfld ('C_S405  ','ug m-3  ',pver, 'A','SO4 concentration < 0.5um',phys_decomp)
-!      call addfld ('C_S4125 ','ug m-3  ',pver, 'A','SO4 concentration > 1.25um',phys_decomp)
-!      call addfld ('C_MIPM  ','ug m-3  ',pver, 'A','dust concentration',phys_decomp)
-!      call addfld ('C_MI05  ','ug m-3  ',pver, 'A','dust concentration < 0.5um',phys_decomp)
-!      call addfld ('C_MI125 ','ug m-3  ',pver, 'A','dust concentration > 1.25um',phys_decomp)
-!      call addfld ('C_SSPM  ','ug m-3  ',pver, 'A','sea-salt concentration',phys_decomp)
-!      call addfld ('C_SS05  ','ug m-3  ',pver, 'A','sea-salt concentration < 0.5um',phys_decomp)
-!      call addfld ('C_SS125 ','ug m-3  ',pver, 'A','sea-salt concentration > 1.25um',phys_decomp) 
-!soa
+      call addfld ('PMTOT   ','ug/m3   ',1,    'A','Aerosol PM, all sizes')
+      call addfld ('PM25    ','ug/m3   ',1,    'A','Aerosol PM2.5')
+      call addfld ('GRIDAREA','m2      ',1,    'A','Grid area for 1.9x2.5 horizontal resolution')
+      call addfld ('DAERH2O ','mg/m2   ',1,    'A','Aerosol water load')
+      call addfld ('MMR_AH2O','kg/kg   ',pver, 'A','Aerosol water mmr')
+      call addfld ('ECDRYAER','m-1     ',pver, 'A','Dry aerosol extinction at 550nm')  
+      call addfld ('ABSDRYAE','m-1     ',pver, 'A','Dry aerosol absorption at 550nm')  
+      call addfld ('ECDRY440','m-1     ',pver, 'A','Dry aerosol extinction at 440nm')  
+      call addfld ('ABSDR440','m-1     ',pver, 'A','Dry aerosol absorption at 440nm')  
+      call addfld ('ECDRY870','m-1     ',pver, 'A','Dry aerosol extinction at 870nm')  
+      call addfld ('ABSDR870','m-1     ',pver, 'A','Dry aerosol absorption at 870nm')  
+      call addfld ('ASYMMDRY','unitless',pver, 'A','Dry asymmetry factor in visible wavelength band')  
+      call addfld ('ECDRYLT1','m-1     ',pver, 'A','Dry aerosol extinction at 550nm lt05')
+      call addfld ('ABSDRYBC','m-1     ',pver, 'A','Dry BC absorption at 550nm')
+      call addfld ('ABSDRYOC','m-1     ',pver, 'A','Dry OC absorption at 550nm')
+      call addfld ('ABSDRYSU','m-1     ',pver, 'A','Dry sulfate absorption at 550nm')
+      call addfld ('ABSDRYSS','m-1     ',pver, 'A','Dry sea-salt absorption at 550nm')
+      call addfld ('ABSDRYDU','m-1     ',pver, 'A','Dry dust absorption at 550nm')
+      call addfld ('OD550DRY','unitless',1,    'A','Dry aerosol optical depth at 550nm')  
+      call addfld ('AB550DRY','unitless',1,    'A','Dry aerosol absorptive optical depth at 550nm')   
+      call addfld ('DERLT05 ','um      ',1,    'A','Effective aerosol dry radius<0.5um')
+      call addfld ('DERGT05 ','um      ',1,    'A','Effective aerosol dry radius>0.5um') 
+      call addfld ('DER     ','um      ',1,    'A','Effective aerosol dry radius') 
+      call addfld ('DOD440  ','unitless',1,    'A','Aerosol optical depth at 440nm')  
+      call addfld ('ABS440  ','unitless',1,    'A','Aerosol absorptive optical depth at 440nm')   
+      call addfld ('DOD500  ','unitless',1,    'A','Aerosol optical depth at 500nm')  
+      call addfld ('ABS500  ','unitless',1,    'A','Aerosol absorptive optical depth at 500nm')   
+      call addfld ('DOD550  ','unitless',1,    'A','Aerosol optical depth at 550nm')  
+      call addfld ('ABS550  ','unitless',1,    'A','Aerosol absorptive optical depth at 550nm')   
+      call addfld ('ABS550AL','unitless',1,    'A','Alt. aerosol absorptive optical depth at 550nm')   
+      call addfld ('DOD670  ','unitless',1,    'A','Aerosol optical depth at 670nm')  
+      call addfld ('ABS670  ','unitless',1,    'A','Aerosol absorptive optical depth at 670nm')   
+      call addfld ('DOD870  ','unitless',1,    'A','Aerosol optical depth at 870nm')  
+      call addfld ('ABS870  ','unitless',1,    'A','Aerosol absorptive optical depth at 870nm')   
+      call addfld ('DLOAD_MI','mg/m2   ',1,    'A','mineral aerosol load')     
+      call addfld ('DLOAD_SS','mg/m2   ',1,    'A','sea-salt aerosol load')     
+      call addfld ('DLOAD_S4','mg/m2   ',1,    'A','sulfate aerosol load')     
+      call addfld ('DLOAD_OC','mg/m2   ',1,    'A','OC aerosol load')     
+      call addfld ('DLOAD_BC','mg/m2   ',1,    'A','BC aerosol load')     
+
+      call addfld ('LOADBCAC','mg/m2   ',1,    'A','BC aerosol coag load')     
+      call addfld ('LOADBC0 ','mg/m2   ',1,    'A','BC aerosol mode 0 load')     
+      call addfld ('LOADBC2 ','mg/m2   ',1,    'A','BC aerosol mode 2 load')     
+      call addfld ('LOADBC4 ','mg/m2   ',1,    'A','BC aerosol mode 4 load')     
+      call addfld ('LOADBC12','mg/m2   ',1,    'A','BC aerosol mode 12 load')     
+      call addfld ('LOADBC14','mg/m2   ',1,    'A','BC aerosol mode 14 load')     
+      call addfld ('LOADOCAC','mg/m2   ',1,    'A','OC aerosol coag load')     
+      call addfld ('LOADOC3 ','mg/m2   ',1,    'A','OC aerosol mode 3 load')     
+      call addfld ('LOADOC4 ','mg/m2   ',1,    'A','OC aerosol mode 4 load')     
+      call addfld ('LOADOC13','mg/m2   ',1,    'A','OC aerosol mode 13 load')     
+      call addfld ('LOADOC14','mg/m2   ',1,    'A','OC aerosol mode 14 load')     
 !
-      call addfld ('LOADBCAC','mg/m2   ',1,    'A','BC aerosol coag load',phys_decomp)     
-      call addfld ('LOADBC0 ','mg/m2   ',1,    'A','BC aerosol mode 0 load',phys_decomp)     
-      call addfld ('LOADBC2 ','mg/m2   ',1,    'A','BC aerosol mode 2 load',phys_decomp)     
-      call addfld ('LOADBC4 ','mg/m2   ',1,    'A','BC aerosol mode 4 load',phys_decomp)     
-      call addfld ('LOADBC12','mg/m2   ',1,    'A','BC aerosol mode 12 load',phys_decomp)     
-      call addfld ('LOADBC14','mg/m2   ',1,    'A','BC aerosol mode 14 load',phys_decomp)     
-      call addfld ('LOADOCAC','mg/m2   ',1,    'A','OC aerosol coag load',phys_decomp)     
-      call addfld ('LOADOC3 ','mg/m2   ',1,    'A','OC aerosol mode 3 load',phys_decomp)     
-      call addfld ('LOADOC4 ','mg/m2   ',1,    'A','OC aerosol mode 4 load',phys_decomp)     
-      call addfld ('LOADOC13','mg/m2   ',1,    'A','OC aerosol mode 13 load',phys_decomp)     
-      call addfld ('LOADOC14','mg/m2   ',1,    'A','OC aerosol mode 14 load',phys_decomp)     
+      call addfld ('EC550AER','m-1     ',pver, 'A','aerosol extinction coefficient')     
+      call addfld ('ABS550_A','m-1     ',pver, 'A','aerosol absorption coefficient')     
+      call addfld ('BS550AER','m-1 sr-1',pver, 'A','aerosol backscatter coefficient')     
 !
-      call addfld ('EC550AER','m-1     ',pver, 'A','aerosol extinction coefficient',phys_decomp)     
-      call addfld ('ABS550_A','m-1     ',pver, 'A','aerosol absorption coefficient',phys_decomp)     
-      call addfld ('BS550AER','m-1 sr-1',pver, 'A','aerosol backscatter coefficient',phys_decomp)     
+      call addfld ('EC550SO4','m-1     ',pver, 'A','SO4 aerosol extinction coefficient')     
+      call addfld ('EC550BC ','m-1     ',pver, 'A','BC aerosol extinction coefficient')     
+      call addfld ('EC550POM','m-1     ',pver, 'A','POM aerosol extinction coefficient')     
+      call addfld ('EC550SS ','m-1     ',pver, 'A','SS aerosol extinction coefficient')     
+      call addfld ('EC550DU ','m-1     ',pver, 'A','DU aerosol extinction coefficient')     
 !
-      call addfld ('EC550SO4','m-1     ',pver, 'A','SO4 aerosol extinction coefficient',phys_decomp)     
-      call addfld ('EC550BC ','m-1     ',pver, 'A','BC aerosol extinction coefficient',phys_decomp)     
-      call addfld ('EC550POM','m-1     ',pver, 'A','POM aerosol extinction coefficient',phys_decomp)     
-      call addfld ('EC550SS ','m-1     ',pver, 'A','SS aerosol extinction coefficient',phys_decomp)     
-      call addfld ('EC550DU ','m-1     ',pver, 'A','DU aerosol extinction coefficient',phys_decomp)     
-!
-      call addfld ('CDOD550  ','unitless',1,    'A','Clear air Aerosol optical depth at 550nm',phys_decomp)  
-      call addfld ('CABS550  ','unitless',1,    'A','Clear air Aerosol abs optical depth at 550nm',phys_decomp)  
-      call addfld ('CABS550A ','unitless',1,    'A','Clear air Aerosol abs optical depth at 550nm',phys_decomp)  
-      call addfld ('CDOD870 ','unitless',1,    'A','Clear air Aerosol optical depth at 870nm',phys_decomp)  
-      call addfld ('A550_DU ','unitless',1,    'A','mineral abs. aerosol optical depth 550nm',phys_decomp)     
-      call addfld ('A550_SS ','unitless',1,    'A','sea-salt abs aerosol optical depth 550nm',phys_decomp)     
-      call addfld ('A550_SO4','unitless',1,    'A','SO4 aerosol abs. optical depth 550nm',phys_decomp)     
-      call addfld ('A550_POM','unitless',1,    'A','OC abs. aerosol optical depth 550nm',phys_decomp)     
-      call addfld ('A550_BC ','unitless',1,    'A','BC abs. aerosol optical depth 550nm',phys_decomp)
-      call addfld ('ABS5503D','unitless',pver,    'A','aerosol 3d abs. optical depth 550nm',phys_decomp)
-      call addfld ('D553_DU ','unitless',pver,    'A','mineral aerosol 3d optical depth 550nm',phys_decomp)     
-      call addfld ('D553_SS ','unitless',pver,    'A','sea-salt aerosol 3d optical depth 550nm',phys_decomp)     
-      call addfld ('D553_SO4','unitless',pver,    'A','SO4 aerosol 3d optical depth 550nm',phys_decomp)     
-      call addfld ('D553_POM','unitless',pver,    'A','OC aerosol 3d optical depth 550nm',phys_decomp)     
-      call addfld ('D553_BC ','unitless',pver,    'A','BC aerosol 3d optical depth 550nm',phys_decomp)
-      call addfld ('D440_DU ','unitless',1,    'A','mineral aerosol optical depth 440nm',phys_decomp)     
-      call addfld ('D440_SS ','unitless',1,    'A','sea-salt aerosol optical depth 440nm',phys_decomp)     
-      call addfld ('D440_SO4','unitless',1,    'A','SO4 aerosol optical depth 440nm',phys_decomp)     
-      call addfld ('D440_POM','unitless',1,    'A','OC aerosol optical depth 440nm',phys_decomp)     
-      call addfld ('D440_BC ','unitless',1,    'A','BC aerosol optical depth 440nm',phys_decomp)     
-      call addfld ('D500_DU ','unitless',1,    'A','mineral aerosol optical depth 500nm',phys_decomp)     
-      call addfld ('D500_SS ','unitless',1,    'A','sea-salt aerosol optical depth 500nm',phys_decomp)     
-      call addfld ('D500_SO4','unitless',1,    'A','SO4 aerosol optical depth 500nm',phys_decomp)     
-      call addfld ('D500_POM','unitless',1,    'A','OC aerosol optical depth 500nm',phys_decomp)     
-      call addfld ('D500_BC ','unitless',1,    'A','BC aerosol optical depth 500nm',phys_decomp)     
-      call addfld ('D550_DU ','unitless',1,    'A','mineral aerosol optical depth 550nm',phys_decomp)     
-      call addfld ('D550_SS ','unitless',1,    'A','sea-salt aerosol optical depth 550nm',phys_decomp)     
-      call addfld ('D550_SO4','unitless',1,    'A','SO4 aerosol optical depth 550nm',phys_decomp)     
-      call addfld ('D550_POM','unitless',1,    'A','OC aerosol optical depth 550nm',phys_decomp)     
-      call addfld ('D550_BC ','unitless',1,    'A','BC aerosol optical depth 550nm',phys_decomp)     
-      call addfld ('D670_DU ','unitless',1,    'A','mineral aerosol optical depth 670nm',phys_decomp)     
-      call addfld ('D670_SS ','unitless',1,    'A','sea-salt aerosol optical depth 670nm',phys_decomp)     
-      call addfld ('D670_SO4','unitless',1,    'A','SO4 aerosol optical depth 670nm',phys_decomp)     
-      call addfld ('D670_POM','unitless',1,    'A','OC aerosol optical depth 670nm',phys_decomp)     
-      call addfld ('D670_BC ','unitless',1,    'A','BC aerosol optical depth 670nm',phys_decomp)     
-      call addfld ('D870_DU ','unitless',1,    'A','mineral aerosol optical depth 870nm',phys_decomp)     
-      call addfld ('D870_SS ','unitless',1,    'A','sea-salt aerosol optical depth 870nm',phys_decomp)     
-      call addfld ('D870_SO4','unitless',1,    'A','SO4 aerosol optical depth 870nm',phys_decomp)     
-      call addfld ('D870_POM','unitless',1,    'A','OC aerosol optical depth 870nm',phys_decomp)     
-      call addfld ('D870_BC ','unitless',1,    'A','BC aerosol optical depth 870nm',phys_decomp)     
-      call addfld ('DLT_DUST','unitless',1,    'A','mineral aerosol optical depth 550nm lt05',phys_decomp)     
-      call addfld ('DLT_SS  ','unitless',1,    'A','sea-salt aerosol optical depth 550nm lt05',phys_decomp)     
-      call addfld ('DLT_SO4 ','unitless',1,    'A','SO4 aerosol optical depth 550nm lt05',phys_decomp)     
-      call addfld ('DLT_POM ','unitless',1,    'A','OC aerosol optical depth 550nm lt05',phys_decomp)     
-      call addfld ('DLT_BC  ','unitless',1,    'A','BC aerosol optical depth 550nm lt05',phys_decomp)     
-      call addfld ('DGT_DUST','unitless',1,    'A','mineral aerosol optical depth 550nm gt05',phys_decomp)     
-      call addfld ('DGT_SS  ','unitless',1,    'A','sea-salt aerosol optical depth 550nm gt05',phys_decomp)     
-      call addfld ('DGT_SO4 ','unitless',1,    'A','SO4 aerosol optical depth 550nm gt05',phys_decomp)     
-      call addfld ('DGT_POM ','unitless',1,    'A','OC aerosol optical depth 550nm gt05',phys_decomp)     
-      call addfld ('DGT_BC  ','unitless',1,    'A','BC aerosol optical depth 550nm gt05',phys_decomp)     
-      call addfld ('NNAT_0  ','1/cm3   ',pver, 'A','Aerosol mode 0 number concentration',phys_decomp)     
-      call addfld ('NNAT_1  ','1/cm3   ',pver, 'A','Aerosol mode 1 number concentration',phys_decomp)     
-      call addfld ('NNAT_2  ','1/cm3   ',pver, 'A','Aerosol mode 2 number concentration',phys_decomp)     
-      call addfld ('NNAT_4  ','1/cm3   ',pver, 'A','Aerosol mode 4 number concentration',phys_decomp)     
-      call addfld ('NNAT_5  ','1/cm3   ',pver, 'A','Aerosol mode 5 number concentration',phys_decomp)     
-      call addfld ('NNAT_6  ','1/cm3   ',pver, 'A','Aerosol mode 6 number concentration',phys_decomp)     
-      call addfld ('NNAT_7  ','1/cm3   ',pver, 'A','Aerosol mode 7 number concentration',phys_decomp)     
-      call addfld ('NNAT_8  ','1/cm3   ',pver, 'A','Aerosol mode 8 number concentration',phys_decomp)     
-      call addfld ('NNAT_9  ','1/cm3   ',pver, 'A','Aerosol mode 9 number concentration',phys_decomp)     
-      call addfld ('NNAT_10 ','1/cm3   ',pver, 'A','Aerosol mode 10 number concentration',phys_decomp)     
-      call addfld ('NNAT_11 ','1/cm3   ',pver, 'A','Aerosol mode 11 number concentration',phys_decomp)     
-      call addfld ('NNAT_12 ','1/cm3   ',pver, 'A','Aerosol mode 12 number concentration',phys_decomp)     
-      call addfld ('NNAT_13 ','1/cm3   ',pver, 'A','Aerosol mode 13 number concentration',phys_decomp)     
-      call addfld ('NNAT_14 ','1/cm3   ',pver, 'A','Aerosol mode 14 number concentration',phys_decomp)     
-      call addfld ('AIRMASS ','kg/m3   ',pver, 'A','Layer airmass',phys_decomp)     
-      call addfld ('BETOTVIS','unitless',pver, 'A','Aerosol 3d optical depth at 0.442-0.625',phys_decomp)  ! CAM4-Oslo: 0.35-0.64um
-      call addfld ('BATOTVIS','unitless',pver, 'A','Aerosol 3d absorptive optical depth at 0.442-0.625',phys_decomp) ! CAM4-Oslo: 0.35-0.64um
-      call addfld ('BATSW13 ','unitless',pver, 'A','Aerosol 3d SW absorptive optical depth at 3.077-3.846um',phys_decomp)
-      call addfld ('BATLW01 ','unitless',pver, 'A','Aerosol 3d LW absorptive optical depth at 3.077-3.846um',phys_decomp)
-      call addfld ('AERLWA01','unitless',pver, 'A','CAM5 3d LW absorptive optical depth at 3.077-3.846um',phys_decomp)
+      call addfld ('CDOD550  ','unitless',1,    'A','Clear air Aerosol optical depth at 550nm')  
+      call addfld ('CABS550  ','unitless',1,    'A','Clear air Aerosol abs optical depth at 550nm')  
+      call addfld ('CABS550A ','unitless',1,    'A','Clear air Aerosol abs optical depth at 550nm')  
+      call addfld ('CDOD870 ','unitless',1,    'A','Clear air Aerosol optical depth at 870nm')  
+      call addfld ('A550_DU ','unitless',1,    'A','mineral abs. aerosol optical depth 550nm')     
+      call addfld ('A550_SS ','unitless',1,    'A','sea-salt abs aerosol optical depth 550nm')     
+      call addfld ('A550_SO4','unitless',1,    'A','SO4 aerosol abs. optical depth 550nm')     
+      call addfld ('A550_POM','unitless',1,    'A','OC abs. aerosol optical depth 550nm')     
+      call addfld ('A550_BC ','unitless',1,    'A','BC abs. aerosol optical depth 550nm')
+      call addfld ('ABS5503D','unitless',pver,    'A','aerosol 3d abs. optical depth 550nm')
+      call addfld ('D553_DU ','unitless',pver,    'A','mineral aerosol 3d optical depth 550nm')     
+      call addfld ('D553_SS ','unitless',pver,    'A','sea-salt aerosol 3d optical depth 550nm')     
+      call addfld ('D553_SO4','unitless',pver,    'A','SO4 aerosol 3d optical depth 550nm')     
+      call addfld ('D553_POM','unitless',pver,    'A','OC aerosol 3d optical depth 550nm')     
+      call addfld ('D553_BC ','unitless',pver,    'A','BC aerosol 3d optical depth 550nm')
+      call addfld ('D440_DU ','unitless',1,    'A','mineral aerosol optical depth 440nm')     
+      call addfld ('D440_SS ','unitless',1,    'A','sea-salt aerosol optical depth 440nm')     
+      call addfld ('D440_SO4','unitless',1,    'A','SO4 aerosol optical depth 440nm')     
+      call addfld ('D440_POM','unitless',1,    'A','OC aerosol optical depth 440nm')     
+      call addfld ('D440_BC ','unitless',1,    'A','BC aerosol optical depth 440nm')     
+      call addfld ('D500_DU ','unitless',1,    'A','mineral aerosol optical depth 500nm')     
+      call addfld ('D500_SS ','unitless',1,    'A','sea-salt aerosol optical depth 500nm')     
+      call addfld ('D500_SO4','unitless',1,    'A','SO4 aerosol optical depth 500nm')     
+      call addfld ('D500_POM','unitless',1,    'A','OC aerosol optical depth 500nm')     
+      call addfld ('D500_BC ','unitless',1,    'A','BC aerosol optical depth 500nm')     
+      call addfld ('D550_DU ','unitless',1,    'A','mineral aerosol optical depth 550nm')     
+      call addfld ('D550_SS ','unitless',1,    'A','sea-salt aerosol optical depth 550nm')     
+      call addfld ('D550_SO4','unitless',1,    'A','SO4 aerosol optical depth 550nm')     
+      call addfld ('D550_POM','unitless',1,    'A','OC aerosol optical depth 550nm')     
+      call addfld ('D550_BC ','unitless',1,    'A','BC aerosol optical depth 550nm')     
+      call addfld ('D670_DU ','unitless',1,    'A','mineral aerosol optical depth 670nm')     
+      call addfld ('D670_SS ','unitless',1,    'A','sea-salt aerosol optical depth 670nm')     
+      call addfld ('D670_SO4','unitless',1,    'A','SO4 aerosol optical depth 670nm')     
+      call addfld ('D670_POM','unitless',1,    'A','OC aerosol optical depth 670nm')     
+      call addfld ('D670_BC ','unitless',1,    'A','BC aerosol optical depth 670nm')     
+      call addfld ('D870_DU ','unitless',1,    'A','mineral aerosol optical depth 870nm')     
+      call addfld ('D870_SS ','unitless',1,    'A','sea-salt aerosol optical depth 870nm')     
+      call addfld ('D870_SO4','unitless',1,    'A','SO4 aerosol optical depth 870nm')     
+      call addfld ('D870_POM','unitless',1,    'A','OC aerosol optical depth 870nm')     
+      call addfld ('D870_BC ','unitless',1,    'A','BC aerosol optical depth 870nm')     
+      call addfld ('DLT_DUST','unitless',1,    'A','mineral aerosol optical depth 550nm lt05')     
+      call addfld ('DLT_SS  ','unitless',1,    'A','sea-salt aerosol optical depth 550nm lt05')     
+      call addfld ('DLT_SO4 ','unitless',1,    'A','SO4 aerosol optical depth 550nm lt05')     
+      call addfld ('DLT_POM ','unitless',1,    'A','OC aerosol optical depth 550nm lt05')     
+      call addfld ('DLT_BC  ','unitless',1,    'A','BC aerosol optical depth 550nm lt05')     
+      call addfld ('DGT_DUST','unitless',1,    'A','mineral aerosol optical depth 550nm gt05')     
+      call addfld ('DGT_SS  ','unitless',1,    'A','sea-salt aerosol optical depth 550nm gt05')     
+      call addfld ('DGT_SO4 ','unitless',1,    'A','SO4 aerosol optical depth 550nm gt05')     
+      call addfld ('DGT_POM ','unitless',1,    'A','OC aerosol optical depth 550nm gt05')     
+      call addfld ('DGT_BC  ','unitless',1,    'A','BC aerosol optical depth 550nm gt05')     
+      call addfld ('AIRMASS ','kg/m3   ',pver, 'A','Layer airmass')     
+      call addfld ('BETOTVIS','unitless',pver, 'A','Aerosol 3d optical depth at 0.442-0.625')  ! CAM4-Oslo: 0.35-0.64um
+      call addfld ('BATOTVIS','unitless',pver, 'A','Aerosol 3d absorptive optical depth at 0.442-0.625') ! CAM4-Oslo: 0.35-0.64um
+      call addfld ('BATSW13 ','unitless',pver, 'A','Aerosol 3d SW absorptive optical depth at 3.077-3.846um')
+      call addfld ('BATLW01 ','unitless',pver, 'A','Aerosol 3d LW absorptive optical depth at 3.077-3.846um')
+      call addfld ('AERLWA01','unitless',pver, 'A','CAM5 3d LW absorptive optical depth at 3.077-3.846um')
 #endif  ! aerocom
 #endif  ! dirind
 
@@ -567,9 +463,11 @@ subroutine diag_init()
    ! determine default variables
    ! ----------------------------
    call phys_getopts(history_amwg_out   = history_amwg    , &
+                     history_vdiag_out  = history_vdiag   , &
                      history_eddy_out   = history_eddy    , &
                      history_budget_out = history_budget  , &
-                     history_budget_histfile_num_out = history_budget_histfile_num)
+                     history_budget_histfile_num_out = history_budget_histfile_num, &
+                     history_waccm_out  = history_waccm)
 
    if (history_amwg) then
       call add_default ('PHIS    '  , 1, ' ')
@@ -591,6 +489,19 @@ subroutine diag_init()
       if (moist_physics) then
          call add_default ('RELHUM  ', 1, ' ')
       end if
+      ! This field is added by radiation when full physics is used
+      if ( ideal_phys )then
+         call add_default('QRS     ', 1, ' ')
+      end if
+   end if
+   
+   if (history_vdiag) then
+     call add_default ('U200', 2, ' ')
+     call add_default ('V200', 2, ' ')
+     call add_default ('U850', 2, ' ')
+     call add_default ('U200', 3, ' ')
+     call add_default ('U850', 3, ' ')
+     call add_default ('OMEGA500', 3, ' ')
    end if
    
    if (history_eddy) then
@@ -612,6 +523,8 @@ subroutine diag_init()
       call add_default ('U       '  , history_budget_histfile_num, ' ')
       call add_default ('V       '  , history_budget_histfile_num, ' ')
       call add_default (cnst_name(1), history_budget_histfile_num, ' ')
+      call add_default ('TTEND_TOT' , history_budget_histfile_num, ' ')
+
       ! State before physics (FV)
       call add_default ('TBP     '  , history_budget_histfile_num, ' ')
       call add_default (bpcnst(1)   , history_budget_histfile_num, ' ')
@@ -620,21 +533,19 @@ subroutine diag_init()
       call add_default ('UAP     '  , history_budget_histfile_num, ' ')
       call add_default ('VAP     '  , history_budget_histfile_num, ' ')
       call add_default (apcnst(1)   , history_budget_histfile_num, ' ')
-      if ( dycore_is('LR') ) then
+      if ( dycore_is('LR') .or. dycore_is('SE') ) then
          call add_default ('TFIX    '    , history_budget_histfile_num, ' ')
          call add_default ('PTTEND_RESID', history_budget_histfile_num, ' ')
          call add_default ('EFLX    '    , history_budget_histfile_num, ' ')
       end if
    end if
 
-   ! This field is added by radiation when full physics is used
-   if ( ideal_phys )then
-      call add_default('QRS     ', 1, ' ')
-   end if
+   ! create history variables for fourier coefficients of the diurnal 
+   ! and semidiurnal tide in T, U, V, and Z3
+   call tidal_diag_init() 
 
 
 #ifdef DIRIND
-!dupl   call add_default ('AODVIS ', 1, ' ')
    call add_default ('AOD_VIS ', 1, ' ')
    call add_default ('ABSVIS  ', 1, ' ')
    call add_default ('DAYFOC  ', 1, ' ')
@@ -653,44 +564,6 @@ subroutine diag_init()
    call add_default ('REHANA  ', 1, ' ')
    call add_default ('FOCHANA ', 1, ' ')
    call add_default ('RELH    ', 1, ' ')
-!#ifdef AEROCOM
-!   call add_default ('LOGSIG1 ', 1, ' ')
-!   call add_default ('RNEW1   ', 1, ' ')
-!   call add_default ('LOGSIG2 ', 1, ' ')
-!   call add_default ('RNEW2   ', 1, ' ')
-!   call add_default ('LOGSIG4 ', 1, ' ')
-!   call add_default ('RNEW4   ', 1, ' ')
-!   call add_default ('LOGSIG5 ', 1, ' ')
-!   call add_default ('RNEW5   ', 1, ' ')
-!   call add_default ('LOGSIG6 ', 1, ' ')
-!   call add_default ('RNEW6   ', 1, ' ')
-!   call add_default ('LOGSIG7 ', 1, ' ')
-!   call add_default ('RNEW7   ', 1, ' ')
-!   call add_default ('LOGSIG8 ', 1, ' ')
-!   call add_default ('RNEW8   ', 1, ' ')
-!   call add_default ('LOGSIG9 ', 1, ' ')
-!   call add_default ('RNEW9   ', 1, ' ')
-!   call add_default ('LOGSIG10', 1, ' ')
-!   call add_default ('RNEW10  ', 1, ' ')
-!!   call add_default ('LOGSIG11', 1, ' ')
-!   call add_default ('RNEW11  ', 1, ' ')
-!!   call add_default ('LOGSIG13', 1, ' ')
-!   call add_default ('RNEW13  ', 1, ' ')
-!!   call add_default ('LOGSIG14', 1, ' ')
-!   call add_default ('RNEW14  ', 1, ' ')
-!   call add_default ('RNEWD1  ', 1, ' ')
-!   call add_default ('RNEWD2  ', 1, ' ')
-!   call add_default ('RNEWD4  ', 1, ' ')
-!   call add_default ('RNEWD5  ', 1, ' ')
-!   call add_default ('RNEWD6  ', 1, ' ')
-!   call add_default ('RNEWD7  ', 1, ' ')
-!   call add_default ('RNEWD8  ', 1, ' ')
-!   call add_default ('RNEWD9  ', 1, ' ')
-!   call add_default ('RNEWD10 ', 1, ' ')
-!!   call add_default ('RNEWD11 ', 1, ' ')
-!!   call add_default ('RNEWD13 ', 1, ' ')
-!!   call add_default ('RNEWD14 ', 1, ' ')
-!#endif
 #ifdef AEROFFL
      call add_default ('FSNT_DRF', 1, ' ')
      call add_default ('FSNTCDRF', 1, ' ')
@@ -698,13 +571,6 @@ subroutine diag_init()
      call add_default ('FSNSCDRF', 1, ' ')
      call add_default ('QRS_DRF ', 1, ' ')
      call add_default ('QRSC_DRF', 1, ' ')
-!     call add_default ('FSNT_AIE', 1, ' ')
-!     call add_default ('FLNT_AIE', 1, ' ')
-!     call add_default ('FSNTCAIE', 1, ' ')
-!     call add_default ('FSNS_AIE', 1, ' ')
-!     call add_default ('FSNSCAIE', 1, ' ')
-!     call add_default ('QRS_AIE ', 1, ' ')
-!     call add_default ('QRSC_AIE', 1, ' ')
      call add_default ('FLNT_DRF', 1, ' ')
      call add_default ('FLNTCDRF', 1, ' ')
 #ifdef AEROCOM 
@@ -757,23 +623,6 @@ subroutine diag_init()
       call add_default ('DLOAD_S4', 1, ' ')
       call add_default ('DLOAD_OC', 1, ' ')
       call add_default ('DLOAD_BC', 1, ' ')
-!soa
-!      call add_default ('C_BCPM  ', 1, ' ')
-!      call add_default ('C_BC05  ', 1, ' ')
-!      call add_default ('C_BC125 ', 1, ' ')
-!      call add_default ('C_OCPM  ', 1, ' ')
-!      call add_default ('C_OC05  ', 1, ' ')
-!      call add_default ('C_OC125 ', 1, ' ')
-!      call add_default ('C_S4PM  ', 1, ' ')
-!      call add_default ('C_S405  ', 1, ' ')
-!      call add_default ('C_S4125 ', 1, ' ')
-!      call add_default ('C_MIPM  ', 1, ' ')
-!      call add_default ('C_MI05  ', 1, ' ')
-!      call add_default ('C_MI125 ', 1, ' ')
-!      call add_default ('C_SSPM  ', 1, ' ')
-!      call add_default ('C_SS05  ', 1, ' ')
-!      call add_default ('C_SS125 ', 1, ' ')
-!soa
       call add_default ('LOADBCAC', 1, ' ')
       call add_default ('LOADBC0 ', 1, ' ')
       call add_default ('LOADBC2 ', 1, ' ')
@@ -846,20 +695,6 @@ subroutine diag_init()
       call add_default ('DGT_SO4 ', 1, ' ')
       call add_default ('DGT_POM ', 1, ' ')
       call add_default ('DGT_BC  ', 1, ' ')
-      call add_default ('NNAT_0  ', 1, ' ')
-      call add_default ('NNAT_1  ', 1, ' ')
-      call add_default ('NNAT_2  ', 1, ' ')
-      call add_default ('NNAT_4  ', 1, ' ')
-      call add_default ('NNAT_5  ', 1, ' ')
-      call add_default ('NNAT_6  ', 1, ' ')
-      call add_default ('NNAT_7  ', 1, ' ')
-      call add_default ('NNAT_8  ', 1, ' ')
-      call add_default ('NNAT_9  ', 1, ' ')
-      call add_default ('NNAT_10 ', 1, ' ')
-      call add_default ('NNAT_11 ', 1, ' ')
-      call add_default ('NNAT_12 ', 1, ' ')
-      call add_default ('NNAT_13 ', 1, ' ')
-      call add_default ('NNAT_14 ', 1, ' ')
       call add_default ('AIRMASS ', 1, ' ')
       call add_default ('BETOTVIS', 1, ' ')
       call add_default ('BATOTVIS', 1, ' ')
@@ -877,10 +712,10 @@ subroutine diag_init()
    if (.not. moist_physics) return
 
 
-   call addfld ('PDELDRY ','Pa      ',pver, 'A','Dry pressure difference between levels',phys_decomp)
-   call addfld ('PSDRY   ','Pa      ',1,    'A','Surface pressure',phys_decomp)
+   call addfld ('PDELDRY',(/ 'lev' /), 'A','Pa','Dry pressure difference between levels')
+   call addfld ('PSDRY',  horiz_only,  'A','Pa','Surface pressure')
 
-   if (chem_is('waccm_ghg') .or. chem_is('waccm_mozart') .or. chem_is('waccm_mozart_mam3')) then
+   if (history_waccm) then
       call add_default ('PS      ', 2, ' ')
       call add_default ('T       ', 2, ' ')
    end if
@@ -889,11 +724,11 @@ subroutine diag_init()
 
    call cnst_get_ind('CLDLIQ', ixcldliq)
    call cnst_get_ind('CLDICE', ixcldice)
-   call addfld ('DTCOND  ','K/s     ',pver, 'A','T tendency - moist processes',phys_decomp)
-   call addfld ('DTCOND_24_COS','K/s',pver, 'A','T tendency - moist processes 24hr. cos coeff.',phys_decomp)
-   call addfld ('DTCOND_24_SIN','K/s',pver, 'A','T tendency - moist processes 24hr. sin coeff.',phys_decomp)
-   call addfld ('DTCOND_12_COS','K/s',pver, 'A','T tendency - moist processes 12hr. cos coeff.',phys_decomp)
-   call addfld ('DTCOND_12_SIN','K/s',pver, 'A','T tendency - moist processes 12hr. sin coeff.',phys_decomp)
+   call addfld ('DTCOND',       (/ 'lev' /), 'A','K/s','T tendency - moist processes')
+   call addfld ('DTCOND_24_COS',(/ 'lev' /), 'A','K/s','T tendency - moist processes 24hr. cos coeff.')
+   call addfld ('DTCOND_24_SIN',(/ 'lev' /), 'A','K/s','T tendency - moist processes 24hr. sin coeff.')
+   call addfld ('DTCOND_12_COS',(/ 'lev' /), 'A','K/s','T tendency - moist processes 12hr. cos coeff.')
+   call addfld ('DTCOND_12_SIN',(/ 'lev' /), 'A','K/s','T tendency - moist processes 12hr. sin coeff.')
 
    ! determine number of constituents for which convective tendencies must be computed
    if (history_budget) then
@@ -909,7 +744,7 @@ subroutine diag_init()
    end do
 
    if (diag_cnst_conv_tend == 'q_only' .or. diag_cnst_conv_tend == 'all' .or. history_budget) then
-      call addfld (dcconnam(1), 'kg/kg/s',pver,'A',trim(cnst_name(1))//' tendency due to moist processes',phys_decomp)
+      call addfld (dcconnam(1),(/ 'lev' /),'A', 'kg/kg/s',trim(cnst_name(1))//' tendency due to moist processes')
       if ( diag_cnst_conv_tend == 'q_only' .or. diag_cnst_conv_tend == 'all' ) then
          call add_default (dcconnam(1),                           1, ' ')
       end if
@@ -918,7 +753,7 @@ subroutine diag_init()
       end if
       if (diag_cnst_conv_tend == 'all' .or. history_budget) then
          do m = 2, pcnst
-            call addfld (dcconnam(m), 'kg/kg/s',pver,'A',trim(cnst_name(m))//' tendency due to moist processes',phys_decomp)
+            call addfld (dcconnam(m),(/ 'lev' /),'A', 'kg/kg/s',trim(cnst_name(m))//' tendency due to moist processes')
             if( diag_cnst_conv_tend == 'all' ) then
                call add_default (dcconnam(m),                           1, ' ')
             end if
@@ -929,51 +764,51 @@ subroutine diag_init()
       end if
    end if
 
-   call addfld ('PRECL   ','m/s     ',1,    'A','Large-scale (stable) precipitation rate (liq + ice)'                ,phys_decomp)
-   call addfld ('PRECC   ','m/s     ',1,    'A','Convective precipitation rate (liq + ice)'                          ,phys_decomp)
-   call addfld ('PRECT   ','m/s     ',1,    'A','Total (convective and large-scale) precipitation rate (liq + ice)'  ,phys_decomp)
-   call addfld ('PREC_PCW','m/s     ',1,    'A','LS_pcw precipitation rate',phys_decomp)
-   call addfld ('PREC_zmc','m/s     ',1,    'A','CV_zmc precipitation rate',phys_decomp)
-   call addfld ('PRECTMX ','m/s     ',1,    'X','Maximum (convective and large-scale) precipitation rate (liq+ice)'  ,phys_decomp)
-   call addfld ('PRECSL  ','m/s     ',1,    'A','Large-scale (stable) snow rate (water equivalent)'                  ,phys_decomp)
-   call addfld ('PRECSC  ','m/s     ',1,    'A','Convective snow rate (water equivalent)'                            ,phys_decomp)
-   call addfld ('PRECCav ','m/s     ',1,    'A','Average large-scale precipitation (liq + ice)'                      ,phys_decomp)
-   call addfld ('PRECLav ','m/s     ',1,    'A','Average convective precipitation  (liq + ice)'                      ,phys_decomp)
+   call addfld ('PRECL',    horiz_only, 'A', 'm/s','Large-scale (stable) precipitation rate (liq + ice)'                )
+   call addfld ('PRECC',    horiz_only, 'A', 'm/s','Convective precipitation rate (liq + ice)'                          )
+   call addfld ('PRECT',    horiz_only, 'A', 'm/s','Total (convective and large-scale) precipitation rate (liq + ice)'  )
+   call addfld ('PREC_PCW', horiz_only, 'A', 'm/s','LS_pcw precipitation rate')
+   call addfld ('PREC_zmc', horiz_only, 'A', 'm/s','CV_zmc precipitation rate')
+   call addfld ('PRECTMX',  horiz_only, 'X','m/s','Maximum (convective and large-scale) precipitation rate (liq+ice)'   )
+   call addfld ('PRECSL',   horiz_only, 'A', 'm/s','Large-scale (stable) snow rate (water equivalent)'                  )
+   call addfld ('PRECSC',   horiz_only, 'A', 'm/s','Convective snow rate (water equivalent)'                            )
+   call addfld ('PRECCav',  horiz_only, 'A', 'm/s','Average large-scale precipitation (liq + ice)'                      )
+   call addfld ('PRECLav',  horiz_only, 'A', 'm/s','Average convective precipitation  (liq + ice)'                      )
 
    ! outfld calls in diag_surf
 
-   call addfld ('SHFLX   ','W/m2    ',1,    'A','Surface sensible heat flux',phys_decomp)
-   call addfld ('LHFLX   ','W/m2    ',1,    'A','Surface latent heat flux',phys_decomp)
-   call addfld ('QFLX    ','kg/m2/s ',1,    'A','Surface water flux',phys_decomp)
+   call addfld ('SHFLX',    horiz_only, 'A', 'W/m2','Surface sensible heat flux')
+   call addfld ('LHFLX',    horiz_only, 'A', 'W/m2','Surface latent heat flux')
+   call addfld ('QFLX',     horiz_only, 'A', 'kg/m2/s','Surface water flux')
 
-   call addfld ('TAUX    ','N/m2    ',1,    'A','Zonal surface stress',phys_decomp)
-   call addfld ('TAUY    ','N/m2    ',1,    'A','Meridional surface stress',phys_decomp)
-   call addfld ('TREFHT  ','K       ',1,    'A','Reference height temperature',phys_decomp)
-   call addfld ('TREFHTMN','K       ',1,    'M','Minimum reference height temperature over output period',phys_decomp)
-   call addfld ('TREFHTMX','K       ',1,    'X','Maximum reference height temperature over output period',phys_decomp)
-   call addfld ('QREFHT  ','kg/kg   ',1,    'A','Reference height humidity',phys_decomp)
-   call addfld ('U10     ','m/s     ',1,    'A','10m wind speed',phys_decomp)
-   call addfld ('RHREFHT ','fraction',1,    'A','Reference height relative humidity',phys_decomp)
+   call addfld ('TAUX',     horiz_only, 'A', 'N/m2','Zonal surface stress')
+   call addfld ('TAUY',     horiz_only, 'A', 'N/m2','Meridional surface stress')
+   call addfld ('TREFHT',   horiz_only, 'A', 'K','Reference height temperature')
+   call addfld ('TREFHTMN', horiz_only, 'M','K','Minimum reference height temperature over output period')
+   call addfld ('TREFHTMX', horiz_only, 'X','K','Maximum reference height temperature over output period')
+   call addfld ('QREFHT',   horiz_only, 'A', 'kg/kg','Reference height humidity')
+   call addfld ('U10',      horiz_only, 'A', 'm/s','10m wind speed')
+   call addfld ('RHREFHT',  horiz_only, 'A', 'fraction','Reference height relative humidity')
 
-   call addfld ('LANDFRAC','fraction',1,    'A','Fraction of sfc area covered by land',phys_decomp)
-   call addfld ('ICEFRAC ','fraction',1,    'A','Fraction of sfc area covered by sea-ice',phys_decomp)
-   call addfld ('OCNFRAC ','fraction',1,    'A','Fraction of sfc area covered by ocean',phys_decomp)
+   call addfld ('LANDFRAC', horiz_only, 'A', 'fraction','Fraction of sfc area covered by land')
+   call addfld ('ICEFRAC',  horiz_only, 'A', 'fraction','Fraction of sfc area covered by sea-ice')
+   call addfld ('OCNFRAC',  horiz_only, 'A', 'fraction','Fraction of sfc area covered by ocean')
 
-   call addfld ('TREFMNAV','K       ',1,    'A','Average of TREFHT daily minimum',phys_decomp)
-   call addfld ('TREFMXAV','K       ',1,    'A','Average of TREFHT daily maximum',phys_decomp)
+   call addfld ('TREFMNAV', horiz_only, 'A', 'K','Average of TREFHT daily minimum')
+   call addfld ('TREFMXAV', horiz_only, 'A', 'K','Average of TREFHT daily maximum')
 
-   call addfld ('TS      ','K       ',1,    'A','Surface temperature (radiative)',phys_decomp)
-   call addfld ('TSMN    ','K       ',1,    'M','Minimum surface temperature over output period',phys_decomp)
-   call addfld ('TSMX    ','K       ',1,    'X','Maximum surface temperature over output period',phys_decomp)
-   call addfld ('SNOWHLND','m       ',1,    'A','Water equivalent snow depth',phys_decomp)
-   call addfld ('SNOWHICE','m       ',1,    'A','Snow depth over ice',phys_decomp, fill_value = 1.e30_r8)
-   call addfld ('TBOT    ','K       ',1,    'A','Lowest model level temperature', phys_decomp)
+   call addfld ('TS',       horiz_only, 'A', 'K','Surface temperature (radiative)')
+   call addfld ('TSMN',     horiz_only, 'M','K','Minimum surface temperature over output period')
+   call addfld ('TSMX',     horiz_only, 'X','K','Maximum surface temperature over output period')
+   call addfld ('SNOWHLND', horiz_only, 'A', 'm','Water equivalent snow depth')
+   call addfld ('SNOWHICE', horiz_only, 'A', 'm','Snow depth over ice', fill_value = 1.e30_r8)
+   call addfld ('TBOT',     horiz_only, 'A', 'K','Lowest model level temperature')
 
-   call addfld ('ASDIR',   '1',       1,    'A','albedo: shortwave, direct', phys_decomp)
-   call addfld ('ASDIF',   '1',       1,    'A','albedo: shortwave, diffuse', phys_decomp)
-   call addfld ('ALDIR',   '1',       1,    'A','albedo: longwave, direct', phys_decomp)
-   call addfld ('ALDIF',   '1',       1,    'A','albedo: longwave, diffuse', phys_decomp)
-   call addfld ('SST',     'K',       1,    'A','sea surface temperature', phys_decomp)
+   call addfld ('ASDIR',    horiz_only, 'A', '1','albedo: shortwave, direct')
+   call addfld ('ASDIF',    horiz_only, 'A', '1','albedo: shortwave, diffuse')
+   call addfld ('ALDIR',    horiz_only, 'A', '1','albedo: longwave, direct')
+   call addfld ('ALDIF',    horiz_only, 'A', '1','albedo: longwave, diffuse')
+   call addfld ('SST',      horiz_only, 'A', 'K','sea surface temperature')
 
    ! defaults
    if (history_amwg) then
@@ -1000,19 +835,25 @@ subroutine diag_init()
        call add_default ('SNOWHICE', 1, ' ')
     endif
 
+    if (history_vdiag) then
+        call add_default ('PRECT   ', 2, ' ')
+        call add_default ('PRECT   ', 3, ' ')
+        call add_default ('PRECT   ', 4, ' ')
+    end if
+
    ! outfld calls in diag_phys_tend_writeout
 
-   call addfld ('PTTEND  '   ,'K/s     ',pver, 'A','T total physics tendency'                             ,phys_decomp)
-   call addfld (ptendnam(       1),  'kg/kg/s ',pver, 'A',trim(cnst_name(       1))//' total physics tendency '      ,phys_decomp)
-   call addfld (ptendnam(ixcldliq),  'kg/kg/s ',pver, 'A',trim(cnst_name(ixcldliq))//' total physics tendency '      ,phys_decomp)
-   call addfld (ptendnam(ixcldice),  'kg/kg/s ',pver, 'A',trim(cnst_name(ixcldice))//' total physics tendency '      ,phys_decomp)
+   call addfld ('PTTEND',          (/ 'lev' /), 'A', 'K/s','T total physics tendency'                             )
+   call addfld (ptendnam(       1),(/ 'lev' /), 'A', 'kg/kg/s',trim(cnst_name(       1))//' total physics tendency '      )
+   call addfld (ptendnam(ixcldliq),(/ 'lev' /), 'A', 'kg/kg/s',trim(cnst_name(ixcldliq))//' total physics tendency '      )
+   call addfld (ptendnam(ixcldice),(/ 'lev' /), 'A', 'kg/kg/s',trim(cnst_name(ixcldice))//' total physics tendency '      )
    if ( dycore_is('LR') )then
-      call addfld (dmetendnam(       1),'kg/kg/s ',pver, 'A', &
-           trim(cnst_name(       1))//' dme adjustment tendency (FV) ',phys_decomp)
-      call addfld (dmetendnam(ixcldliq),'kg/kg/s ',pver, 'A', &
-           trim(cnst_name(ixcldliq))//' dme adjustment tendency (FV) ',phys_decomp)
-      call addfld (dmetendnam(ixcldice),'kg/kg/s ',pver, 'A', &
-           trim(cnst_name(ixcldice))//' dme adjustment tendency (FV) ',phys_decomp)
+      call addfld (dmetendnam(       1),(/ 'lev' /), 'A','kg/kg/s', &
+           trim(cnst_name(       1))//' dme adjustment tendency (FV) ')
+      call addfld (dmetendnam(ixcldliq),(/ 'lev' /), 'A','kg/kg/s', &
+           trim(cnst_name(ixcldliq))//' dme adjustment tendency (FV) ')
+      call addfld (dmetendnam(ixcldice),(/ 'lev' /), 'A','kg/kg/s', &
+           trim(cnst_name(ixcldice))//' dme adjustment tendency (FV) ')
    end if
 
    if ( history_budget ) then
@@ -1032,19 +873,18 @@ subroutine diag_init()
 
    ! outfld calls in diag_physvar_ic
 
-   call addfld ('QCWAT&IC   ','kg/kg   ',pver, 'I','q associated with cloud water'                   ,phys_decomp)
-   call addfld ('TCWAT&IC   ','kg/kg   ',pver, 'I','T associated with cloud water'                   ,phys_decomp)
-   call addfld ('LCWAT&IC   ','kg/kg   ',pver, 'I','Cloud water (ice + liq'                          ,phys_decomp)
-   call addfld ('CLOUD&IC   ','fraction',pver, 'I','Cloud fraction'                                  ,phys_decomp)
-   call addfld ('CONCLD&IC   ','fraction',pver, 'I','Convective cloud fraction'                      ,phys_decomp)
-   call addfld ('TKE&IC     ','m2/s2   ',pverp,'I','Turbulent Kinetic Energy'                        ,phys_decomp)
-   call addfld ('CUSH&IC    ','m       ',1,    'I','Convective Scale Height'                         ,phys_decomp)
-   call addfld ('KVH&IC     ','m2/s    ',pverp,'I','Vertical diffusion diffusivities (heat/moisture)',phys_decomp)
-   call addfld ('KVM&IC     ','m2/s    ',pverp,'I','Vertical diffusion diffusivities (momentum)'     ,phys_decomp)
-   call addfld ('PBLH&IC    ','m       ',1,    'I','PBL height'                                      ,phys_decomp)
-   call addfld ('TPERT&IC   ','K       ',1,    'I','Perturbation temperature (eddies in PBL)'        ,phys_decomp)
-   call addfld ('QPERT&IC   ','kg/kg   ',1,    'I','Perturbation specific humidity (eddies in PBL)'  ,phys_decomp)
-   call addfld ('TBOT&IC    ','K       ',1,    'I','Lowest model level temperature'                  ,phys_decomp)
+   call addfld ('QCWAT&IC',  (/ 'lev' /),  'I','kg/kg','q associated with cloud water'                   )
+   call addfld ('TCWAT&IC',  (/ 'lev' /),  'I','kg/kg','T associated with cloud water'                   )
+   call addfld ('LCWAT&IC',  (/ 'lev' /),  'I','kg/kg','Cloud water (ice + liq'                          )
+   call addfld ('CLOUD&IC',  (/ 'lev' /),  'I','fraction','Cloud fraction'                               )
+   call addfld ('CONCLD&IC', (/ 'lev' /),  'I','fraction','Convective cloud fraction'                    )
+   call addfld ('TKE&IC',    (/ 'ilev' /), 'I','m2/s2','Turbulent Kinetic Energy'                        )
+   call addfld ('CUSH&IC',   horiz_only,   'I','m','Convective Scale Height'                             )
+   call addfld ('KVH&IC',    (/ 'ilev' /), 'I','m2/s','Vertical diffusion diffusivities (heat/moisture)' )
+   call addfld ('KVM&IC',    (/ 'ilev' /), 'I','m2/s','Vertical diffusion diffusivities (momentum)'      )
+   call addfld ('PBLH&IC',   horiz_only,   'I','m','PBL height'                                          )
+   call addfld ('TPERT&IC',  horiz_only,   'I','K','Perturbation temperature (eddies in PBL)'            )
+   call addfld ('QPERT&IC',  horiz_only,   'I','kg/kg','Perturbation specific humidity (eddies in PBL)'  )
 
 
    ! Initial file - Optional fields
@@ -1062,88 +902,38 @@ subroutine diag_init()
       call add_default ('CUSH&IC    ',0, 'I')
       call add_default ('KVH&IC     ',0, 'I')
       call add_default ('KVM&IC     ',0, 'I')
-      call add_default ('TBOT&IC    ',0, 'I')
    end if
 
    ! CAM export state 
-   call addfld('a2x_BCPHIWET', 'kg/m2/s', 1, 'A', 'wetdep of hydrophilic black carbon',   phys_decomp)
-   call addfld('a2x_BCPHIDRY', 'kg/m2/s', 1, 'A', 'drydep of hydrophilic black carbon',   phys_decomp)
-   call addfld('a2x_BCPHODRY', 'kg/m2/s', 1, 'A', 'drydep of hydrophobic black carbon',   phys_decomp)
-   call addfld('a2x_OCPHIWET', 'kg/m2/s', 1, 'A', 'wetdep of hydrophilic organic carbon', phys_decomp)
-   call addfld('a2x_OCPHIDRY', 'kg/m2/s', 1, 'A', 'drydep of hydrophilic organic carbon', phys_decomp)
-   call addfld('a2x_OCPHODRY', 'kg/m2/s', 1, 'A', 'drydep of hydrophobic organic carbon', phys_decomp)
-   call addfld('a2x_DSTWET1',  'kg/m2/s', 1, 'A', 'wetdep of dust (bin1)',                phys_decomp)
-   call addfld('a2x_DSTDRY1',  'kg/m2/s', 1, 'A', 'drydep of dust (bin1)',                phys_decomp)
-   call addfld('a2x_DSTWET2',  'kg/m2/s', 1, 'A', 'wetdep of dust (bin2)',                phys_decomp)
-   call addfld('a2x_DSTDRY2',  'kg/m2/s', 1, 'A', 'drydep of dust (bin2)',                phys_decomp)
-   call addfld('a2x_DSTWET3',  'kg/m2/s', 1, 'A', 'wetdep of dust (bin3)',                phys_decomp)
-   call addfld('a2x_DSTDRY3',  'kg/m2/s', 1, 'A', 'drydep of dust (bin3)',                phys_decomp)
-   call addfld('a2x_DSTWET4',  'kg/m2/s', 1, 'A', 'wetdep of dust (bin4)',                phys_decomp)
-   call addfld('a2x_DSTDRY4',  'kg/m2/s', 1, 'A', 'drydep of dust (bin4)',                phys_decomp)
+   call addfld('a2x_BCPHIWET', horiz_only, 'A', 'kg/m2/s', 'wetdep of hydrophilic black carbon')
+   call addfld('a2x_BCPHIDRY', horiz_only, 'A', 'kg/m2/s', 'drydep of hydrophilic black carbon')
+   call addfld('a2x_BCPHODRY', horiz_only, 'A', 'kg/m2/s', 'drydep of hydrophobic black carbon')
+   call addfld('a2x_OCPHIWET', horiz_only, 'A', 'kg/m2/s', 'wetdep of hydrophilic organic carbon')
+   call addfld('a2x_OCPHIDRY', horiz_only, 'A', 'kg/m2/s', 'drydep of hydrophilic organic carbon')
+   call addfld('a2x_OCPHODRY', horiz_only, 'A', 'kg/m2/s', 'drydep of hydrophobic organic carbon')
+   call addfld('a2x_DSTWET1',  horiz_only, 'A',  'kg/m2/s', 'wetdep of dust (bin1)')
+   call addfld('a2x_DSTDRY1',  horiz_only, 'A',  'kg/m2/s', 'drydep of dust (bin1)')
+   call addfld('a2x_DSTWET2',  horiz_only, 'A',  'kg/m2/s', 'wetdep of dust (bin2)')
+   call addfld('a2x_DSTDRY2',  horiz_only, 'A',  'kg/m2/s', 'drydep of dust (bin2)')
+   call addfld('a2x_DSTWET3',  horiz_only, 'A',  'kg/m2/s', 'wetdep of dust (bin3)')
+   call addfld('a2x_DSTDRY3',  horiz_only, 'A',  'kg/m2/s', 'drydep of dust (bin3)')
+   call addfld('a2x_DSTWET4',  horiz_only, 'A',  'kg/m2/s', 'wetdep of dust (bin4)')
+   call addfld('a2x_DSTDRY4',  horiz_only, 'A',  'kg/m2/s', 'drydep of dust (bin4)')
 
-   !---------------------------------------------------------
-   ! CAM history fields for CAM-DOM/CAM-CSIM 
-   !---------------------------------------------------------
-
-   ! CAM-DOM history fields
-#ifdef COUP_DOM
-   call addfld ('TSOCN&IC   ','m       ',1,    'I','Ocean tempertare',phys_decomp)
-   call add_default ('TSOCN&IC   ',0, 'I')
-#endif
-
-  ! CAM-CSIM history fields
-
-  do k=1,plevmx
-     call addfld (tsnam(k),'K       ',1,'A',tsnam(k)//' subsoil temperature',phys_decomp)
-  end do
-  call addfld ('SICTHK  '   ,'m       ',1,'A','Sea ice thickness',phys_decomp)
-  call addfld ('TSICE   '   ,'K       ',1,'A','Ice temperature',phys_decomp)
-  do k = 1,plevmx
-     call addfld (trim(tsnam(k))//'&IC','K       ',1,'I',tsnam(k)//' subsoil temperature',phys_decomp)
-  end do
-  call addfld ('SICTHK&IC  ','m       ',1,'I','Sea ice thickness'                      ,phys_decomp)
-  call addfld ('TSICE&IC   ','K       ',1,'I','Ice temperature'                        ,phys_decomp)
-  call addfld ('SNOWHICE&IC','m       ',1,'I','Water equivalent snow depth'            ,phys_decomp)
-  call addfld ('ICEFRAC&IC ','fraction',1,'I','Fraction of sfc area covered by sea-ice',phys_decomp)
-  call addfld ('TSICERAD&IC','K       ',1,'I','Radiatively equivalent ice temperature' ,phys_decomp)
-  do k = 1,plevmx
-     call add_default(trim(tsnam(k))//'&IC',0, 'I')
-  end do
-  call add_default ('SICTHK&IC  ',0, 'I')
-  call add_default ('TSICE&IC   ',0, 'I')
-  call add_default ('SNOWHICE&IC',0, 'I')
-  call add_default ('ICEFRAC&IC ',0, 'I')
-  if (inithist_all) then
-     call add_default ('TSICERAD&IC',0, 'I')
-  end if
-
-  !---------------------------------------------------------
-  ! WACCM diagnostic history fields 
-  !---------------------------------------------------------
-
-  if (chem_is('waccm_ghg') .or. chem_is('waccm_mozart') .or. chem_is('waccm_mozart_mam3')) then
-
-    ! create history variables for fourier coefficients of the diurnal 
-    ! and semidiurnal tide in T, U, V, and Z3
-
-    call tidal_diag_init() 
-
-  endif
-
-  qcwat_idx  = pbuf_get_index('QCWAT',ierr)
-  tcwat_idx  = pbuf_get_index('TCWAT',ierr)
-  lcwat_idx  = pbuf_get_index('LCWAT',ierr)
+  qcwat_idx  = pbuf_get_index('QCWAT',errcode=ierr)
+  tcwat_idx  = pbuf_get_index('TCWAT',errcode=ierr)
+  lcwat_idx  = pbuf_get_index('LCWAT',errcode=ierr)
   cld_idx    = pbuf_get_index('CLD')
-  concld_idx = pbuf_get_index('CONCLD')
+  concld_idx = pbuf_get_index('CONCLD',errcode=ierr)
   
   tke_idx  = pbuf_get_index('tke')
   kvm_idx  = pbuf_get_index('kvm')
   kvh_idx  = pbuf_get_index('kvh')
-  cush_idx = pbuf_get_index('cush')
+  cush_idx = pbuf_get_index('cush', errcode=ierr)
   
   pblh_idx  = pbuf_get_index('pblh')
   tpert_idx = pbuf_get_index('tpert')
-  qpert_idx = pbuf_get_index('qpert',ierr)
+  qpert_idx = pbuf_get_index('qpert',errcode=ierr)
 
   prec_dp_idx  = pbuf_get_index('PREC_DP') 
   snow_dp_idx  = pbuf_get_index('SNOW_DP') 
@@ -1153,6 +943,9 @@ subroutine diag_init()
   snow_sed_idx = pbuf_get_index('SNOW_SED')
   prec_pcw_idx = pbuf_get_index('PREC_PCW')
   snow_pcw_idx = pbuf_get_index('SNOW_PCW')
+
+  call pbuf_set_field(pbuf2d, trefmxav_idx, -1.0e36_r8)
+  call pbuf_set_field(pbuf2d, trefmnav_idx,  1.0e36_r8)
 
 end subroutine diag_init
 
@@ -1232,7 +1025,7 @@ subroutine diag_conv_tend_ini(state,pbuf)
 
    do k = 1, pver
       do i = 1, ncol
-         dtcond(i,k,lchnk) = state%s(i,k)
+         dtcond(i,k,lchnk) = state%t(i,k)
       end do
    end do
 
@@ -1246,7 +1039,7 @@ subroutine diag_conv_tend_ini(state,pbuf)
 
    !! initialize to pbuf T_TTEND to temperature at first timestep
    if (is_first_step()) then
-      do m = 1, pbuf_times
+      do m = 1, dyn_time_lvls
          call pbuf_get_field(pbuf, t_ttend_idx, t_ttend, start=(/1,1,m/), kount=(/pcols,pver,1/))
          t_ttend(:ncol,:) = state%t(:ncol,:)
       end do
@@ -1538,6 +1331,10 @@ end subroutine diag_conv_tend_ini
        call vertinterp(ncol, pcols, pver, state%pmid, 50000._r8, state%t, p_surf)
        call outfld('T500    ', p_surf, pcols, lchnk )
     end if
+    if (hist_fld_active('T400')) then
+       call vertinterp(ncol, pcols, pver, state%pmid, 40000._r8, state%t, p_surf)
+       call outfld('T400    ', p_surf, pcols, lchnk )
+    end if
     if (hist_fld_active('T300')) then
        call vertinterp(ncol, pcols, pver, state%pmid, 30000._r8, state%t, p_surf)
        call outfld('T300    ', p_surf, pcols, lchnk )
@@ -1558,6 +1355,10 @@ end subroutine diag_conv_tend_ini
        call vertinterp(ncol, pcols, pver, state%pmid, 85000._r8, state%u, p_surf)
        call outfld('U850    ', p_surf, pcols, lchnk )
     end if
+    if (hist_fld_active('U500')) then
+       call vertinterp(ncol, pcols, pver, state%pmid, 50000._r8, state%u, p_surf)
+       call outfld('U500    ', p_surf, pcols, lchnk )
+    end if
     if (hist_fld_active('U250')) then
        call vertinterp(ncol, pcols, pver, state%pmid, 25000._r8, state%u, p_surf)
        call outfld('U250    ', p_surf, pcols, lchnk )
@@ -1573,6 +1374,10 @@ end subroutine diag_conv_tend_ini
     if (hist_fld_active('V850')) then
        call vertinterp(ncol, pcols, pver, state%pmid, 85000._r8, state%v, p_surf)
        call outfld('V850    ', p_surf, pcols, lchnk )
+    end if
+    if (hist_fld_active('V500')) then
+       call vertinterp(ncol, pcols, pver, state%pmid, 50000._r8, state%v, p_surf)
+       call outfld('V500    ', p_surf, pcols, lchnk )
     end if
     if (hist_fld_active('V250')) then
        call vertinterp(ncol, pcols, pver, state%pmid, 25000._r8, state%v, p_surf)
@@ -1738,14 +1543,9 @@ end subroutine diag_conv_tend_ini
 
 
   !---------------------------------------------------------
-  ! WACCM tidal diagnostics 
+    ! tidal diagnostics 
   !---------------------------------------------------------
-
-  if (chem_is('waccm_ghg') .or. chem_is('waccm_mozart') .or. chem_is('waccm_mozart_mam3')) then
-
     call tidal_diag_write(state) 
-
-  endif
 
     return
   end subroutine diag_phys_writeout
@@ -1831,7 +1631,7 @@ subroutine diag_conv(state, ztodt, pbuf)
 
    do k = 1, pver
       do i = 1, ncol
-         dtcond(i,k,lchnk) = (state%s(i,k) - dtcond(i,k,lchnk))*rtdt / cpair
+         dtcond(i,k,lchnk) = (state%t(i,k) - dtcond(i,k,lchnk))*rtdt
       end do
    end do
    call outfld('DTCOND  ', dtcond(:,:,lchnk), pcols, lchnk)
@@ -1858,7 +1658,7 @@ end subroutine diag_conv
 
 !===============================================================================
 
-subroutine diag_surf (cam_in, cam_out, ps, trefmxav, trefmnav )
+subroutine diag_surf (cam_in, cam_out, state, pbuf)
 
 !----------------------------------------------------------------------- 
 ! 
@@ -1876,11 +1676,8 @@ subroutine diag_surf (cam_in, cam_out, ps, trefmxav, trefmnav )
 !
     type(cam_in_t),  intent(in) :: cam_in
     type(cam_out_t), intent(in) :: cam_out
-
-    real(r8), intent(inout) :: trefmnav(pcols) ! daily minimum tref  
-    real(r8), intent(inout) :: trefmxav(pcols) ! daily maximum tref
-
-    real(r8), intent(in)    :: ps(pcols)       ! Surface pressure.
+    type(physics_state), intent(in)    :: state
+    type(physics_buffer_desc), pointer :: pbuf(:)
 !
 !---------------------------Local workspace-----------------------------
 !
@@ -1889,6 +1686,10 @@ subroutine diag_surf (cam_in, cam_out, ps, trefmxav, trefmnav )
     integer :: ncol         ! longitude dimension
     real(r8) tem2(pcols)    ! temporary workspace
     real(r8) ftem(pcols)    ! temporary workspace
+
+    real(r8), pointer :: trefmnav(:) ! daily minimum tref  
+    real(r8), pointer :: trefmxav(:) ! daily maximum tref
+
 !
 !-----------------------------------------------------------------------
 !
@@ -1909,7 +1710,7 @@ subroutine diag_surf (cam_in, cam_out, ps, trefmxav, trefmnav )
 ! 
 ! Calculate and output reference height RH (RHREFHT)
 
-   call qsat(cam_in%tref(:ncol), ps(:ncol), tem2(:ncol), ftem(:ncol))
+   call qsat(cam_in%tref(:ncol), state%ps(:ncol), tem2(:ncol), ftem(:ncol))
        ftem(:ncol) = cam_in%qref(:ncol)/ftem(:ncol)*100._r8
 
       
@@ -1930,6 +1731,8 @@ subroutine diag_surf (cam_in, cam_out, ps, trefmxav, trefmnav )
 !
 ! Compute daily minimum and maximum of TREF
 !
+    call pbuf_get_field(pbuf, trefmxav_idx, trefmxav)
+    call pbuf_get_field(pbuf, trefmnav_idx, trefmnav)
     do i = 1,ncol
        trefmxav(i) = max(cam_in%tref(i),trefmxav(i))
        trefmnav(i) = min(cam_in%tref(i),trefmnav(i))
@@ -2043,7 +1846,7 @@ end subroutine diag_export
 !---------------------------Local workspace-----------------------------
 !
    integer  :: k                 ! indices
-   integer  :: itim              ! indices
+   integer  :: itim_old          ! indices
 
    real(r8), pointer, dimension(:,:) :: cwat_var
    real(r8), pointer, dimension(:,:) :: conv_var_3d
@@ -2057,28 +1860,36 @@ end subroutine diag_export
       !
       ! Associate pointers with physics buffer fields
       !
-      itim = pbuf_old_tim_idx()
+      itim_old = pbuf_old_tim_idx()
 
       if (qcwat_idx > 0) then
-         call pbuf_get_field(pbuf, qcwat_idx, cwat_var, start=(/1,1,itim/), kount=(/pcols,pver,1/) )
+         call pbuf_get_field(pbuf, qcwat_idx, cwat_var, start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
          call outfld('QCWAT&IC   ',cwat_var, pcols,lchnk)
       end if
 
       if (tcwat_idx > 0) then
-         call pbuf_get_field(pbuf, tcwat_idx,  cwat_var, start=(/1,1,itim/), kount=(/pcols,pver,1/) )
+         call pbuf_get_field(pbuf, tcwat_idx,  cwat_var, start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
          call outfld('TCWAT&IC   ',cwat_var, pcols,lchnk)
       end if
 
       if (lcwat_idx > 0) then
-         call pbuf_get_field(pbuf, lcwat_idx,  cwat_var, start=(/1,1,itim/), kount=(/pcols,pver,1/) )
+         call pbuf_get_field(pbuf, lcwat_idx,  cwat_var, start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
          call outfld('LCWAT&IC   ',cwat_var, pcols,lchnk)
       end if
 
-      call pbuf_get_field(pbuf, cld_idx,    cwat_var, start=(/1,1,itim/), kount=(/pcols,pver,1/) )
+      call pbuf_get_field(pbuf, cld_idx,    cwat_var, start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
       call outfld('CLOUD&IC   ',cwat_var, pcols,lchnk)
 
-      call pbuf_get_field(pbuf, concld_idx, cwat_var, start=(/1,1,itim/), kount=(/pcols,pver,1/) )
+      if (concld_idx > 0) then
+         call pbuf_get_field(pbuf, concld_idx, cwat_var, start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
       call outfld('CONCLD&IC   ',cwat_var, pcols,lchnk)
+      end if
+
+      if (cush_idx > 0) then
+         call pbuf_get_field(pbuf, cush_idx, conv_var_2d ,(/1,itim_old/),  (/pcols,1/))
+         call outfld('CUSH&IC   ',conv_var_2d, pcols,lchnk)
+
+      end if
 
       call pbuf_get_field(pbuf, tke_idx, conv_var_3d)
       call outfld('TKE&IC    ',conv_var_3d, pcols,lchnk)
@@ -2089,9 +1900,6 @@ end subroutine diag_export
       call pbuf_get_field(pbuf, kvh_idx,  conv_var_3d)
       call outfld('KVH&IC    ',conv_var_3d, pcols,lchnk)
  
-      call pbuf_get_field(pbuf, cush_idx, conv_var_2d ,(/1,itim/),  (/pcols,1/))
-      call outfld('CUSH&IC   ',conv_var_2d, pcols,lchnk)
-
       if (qpert_idx > 0) then 
          call pbuf_get_field(pbuf, qpert_idx, qpert)
          call outfld('QPERT&IC   ', qpert, pcols, lchnk)
@@ -2103,8 +1911,6 @@ end subroutine diag_export
       call pbuf_get_field(pbuf, tpert_idx, tpert)
       call outfld('TPERT&IC   ', tpert, pcols, lchnk)
 
-      ! The following is only needed for cam-csim
-      call outfld('TBOT&IC    ', cam_out%tbot, pcols, lchnk)
    end if
 
    end subroutine diag_physvar_ic
@@ -2113,7 +1919,7 @@ end subroutine diag_export
 !#######################################################################
 
 subroutine diag_phys_tend_writeout(state, pbuf,  tend, ztodt, tmp_q, tmp_cldliq, tmp_cldice, &
-                                   tmp_t, qini, cldliqini, cldiceini, eflx)
+                                   qini, cldliqini, cldiceini, eflx)
 
    !---------------------------------------------------------------
    !
@@ -2134,7 +1940,6 @@ subroutine diag_phys_tend_writeout(state, pbuf,  tend, ztodt, tmp_q, tmp_cldliq,
    real(r8)           , intent(inout) :: tmp_q     (pcols,pver) ! As input, holds pre-adjusted tracers (FV)
    real(r8)           , intent(inout) :: tmp_cldliq(pcols,pver) ! As input, holds pre-adjusted tracers (FV)
    real(r8)           , intent(inout) :: tmp_cldice(pcols,pver) ! As input, holds pre-adjusted tracers (FV)
-   real(r8)           , intent(inout) :: tmp_t     (pcols,pver) ! holds last physics_updated T (FV)
    real(r8)           , intent(in   ) :: qini      (pcols,pver) ! tracer fields at beginning of physics
    real(r8)           , intent(in   ) :: cldliqini (pcols,pver) ! tracer fields at beginning of physics
    real(r8)           , intent(in   ) :: cldiceini (pcols,pver) ! tracer fields at beginning of physics
@@ -2151,7 +1956,7 @@ subroutine diag_phys_tend_writeout(state, pbuf,  tend, ztodt, tmp_q, tmp_cldliq,
    integer  :: ixcldice, ixcldliq! constituent indices for cloud liquid and ice water.
    ! CAM pointers to get variables from the physics buffer
    real(r8), pointer, dimension(:,:) :: t_ttend  
-   integer  :: itim
+   integer  :: itim_old
 
    !-----------------------------------------------------------------------
 
@@ -2164,8 +1969,6 @@ subroutine diag_phys_tend_writeout(state, pbuf,  tend, ztodt, tmp_q, tmp_cldliq,
    ! Dump out post-physics state (FV only)
 
    if (dycore_is('LR')) then
-      tmp_t(:ncol,:pver) = (tmp_t(:ncol,:pver) - state%t(:ncol,:pver))/ztodt
-      call outfld('PTTEND_RESID', tmp_t, pcols, lchnk   )
       if(present(eflx))call outfld('EFLX',eflx, pcols, lchnk)
    end if
    call outfld('TAP', state%t, pcols, lchnk   )
@@ -2176,9 +1979,10 @@ subroutine diag_phys_tend_writeout(state, pbuf,  tend, ztodt, tmp_q, tmp_cldliq,
    if ( cnst_cam_outfld(ixcldliq) ) call outfld (apcnst(ixcldliq), state%q(1,1,ixcldliq), pcols, lchnk)
    if ( cnst_cam_outfld(ixcldice) ) call outfld (apcnst(ixcldice), state%q(1,1,ixcldice), pcols, lchnk)
 
-   ! T-tendency due to FV Energy fixer (remove from total physics tendency diagnostic)
+   ! Total physics tendency for Temperature
+   ! (remove global fixer tendency from total for FV and SE dycores)
 
-   if (dycore_is('LR')) then
+   if (dycore_is('LR') .or. dycore_is('SE')) then
       call check_energy_get_integrals( heat_glob_out=heat_glob )
       ftem2(:ncol)  = heat_glob/cpair
       call outfld('TFIX', ftem2, pcols, lchnk   )
@@ -2186,12 +1990,9 @@ subroutine diag_phys_tend_writeout(state, pbuf,  tend, ztodt, tmp_q, tmp_cldliq,
    else
       ftem3(:ncol,:pver)  = tend%dtdt(:ncol,:pver)
    end if
-
-   ! Total physics tendency for Temperature
-
    call outfld('PTTEND',ftem3, pcols, lchnk )
 
-   ! Tendency for dry mass adjustment of q (valid for FV only)
+   ! Tendency for dry mass adjustment of q (FV only)
 
    if (dycore_is('LR')) then
       tmp_q     (:ncol,:pver) = (state%q(:ncol,:pver,       1) - tmp_q     (:ncol,:pver))*rtdt
@@ -2220,8 +2021,8 @@ subroutine diag_phys_tend_writeout(state, pbuf,  tend, ztodt, tmp_q, tmp_cldliq,
    ! Total (physics+dynamics, everything!) tendency for Temperature
 
    !! get temperature stored in physics buffer
-   itim = pbuf_old_tim_idx()
-   call pbuf_get_field(pbuf, t_ttend_idx, t_ttend, start=(/1,1,itim/), kount=(/pcols,pver,1/))
+   itim_old = pbuf_old_tim_idx()
+   call pbuf_get_field(pbuf, t_ttend_idx, t_ttend, start=(/1,1,itim_old/), kount=(/pcols,pver,1/))
 
    !! calculate and outfld the total temperature tendency
    ftem3(:ncol,:) = (state%t(:ncol,:) - t_ttend(:ncol,:))/ztodt
