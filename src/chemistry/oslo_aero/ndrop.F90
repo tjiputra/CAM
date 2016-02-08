@@ -29,7 +29,7 @@ use cam_history,      only: addfld, add_default, horiz_only, fieldname_len, outf
 use cam_abortutils,   only: endrun
 use cam_logfile,      only: iulog
 !++ MH_2015/09/09
-use classnuc, only : classnuc_in
+use phys_control,   only: use_hetfrz_classnuc
 !-- MH_2015/09/09
 
 #ifdef OSLO_AERO
@@ -380,67 +380,6 @@ subroutine ndrop_init
    endif
 
 #endif
-
-!++ MH_2015/04/15
-if(classnuc_in) then
-    call addfld('bc_num',(/ 'lev' /),'A', '#/cm3', 'total bc number')
-    call addfld('dst1_num',(/ 'lev' /),'A', '#/cm3','total dst1 number')
-    call addfld('dst3_num',(/ 'lev' /),'A', '#/cm3', 'total dst3 number')
-    call addfld('bcc_num',(/ 'lev' /),'A', '#/cm3',  'coated bc number')
-    call addfld('dst1c_num',(/ 'lev' /),'A', '#/cm3', 'coated dst1 number')
-    call addfld('dst3c_num',(/ 'lev' /),'A', '#/cm3', 'coated dst3 number')
-    call addfld('bcuc_num',(/ 'lev' /),'A', '#/cm3', 'uncoated bc number')
-    call addfld('dst1uc_num',(/ 'lev' /),'A', '#/cm3','uncoated dst1 number')
-    call addfld('dst3uc_num',(/ 'lev' /),'A', '#/cm3', 'uncoated dst3 number')
-
-    call addfld('bc_a1_num',(/ 'lev' /), 'A', '#/cm3', 'interstitial bc number')
-    call addfld('dst_a1_num',(/ 'lev' /),'A', '#/cm3', 'interstitial dst1 number')
-    call addfld('dst_a3_num',(/ 'lev' /), 'A', '#/cm3','interstitial dst3 number')
-    call addfld('bc_c1_num', (/ 'lev' /),  'A',  '#/cm3', 'cloud borne bc number')
-    call addfld('dst_c1_num', (/ 'lev' /), 'A',  '#/cm3', 'cloud borne dst1 number')
-    call addfld('dst_c3_num', (/ 'lev' /), 'A',  '#/cm3', 'cloud borne dst3 number')
-    
-    !++diag_aer
-    call addfld('fn_bc_c1_num',(/ 'lev' /),'A', '#/cm3', 'cloud borne bc number derived from fn')
-    call addfld('fn_dst_c1_num',(/ 'lev' /),'A', '#/cm3', 'cloud borne dst1 number derived from fn')
-    call addfld('fn_dst_c3_num',(/ 'lev' /),'A', '#/cm3', 'cloud borne dst3 number derived from fn')
-    !--diag_aer
-
-    !++ wy4.0
-    call addfld('na500',(/ 'lev' /),'A', '#/cm3', 'interstitial aerosol number with D>500 nm')
-    call addfld('totna500',(/ 'lev' /),'A', '#/cm3', 'total aerosol number with D>500 nm')
-    !-- wy4.0
-
-    call add_default('bc_num', 1, ' ')
-    call add_default('dst1_num', 1, ' ')
-    call add_default('dst3_num', 1, ' ')
-    call add_default('bcc_num', 1, ' ')
-    call add_default('dst1c_num', 1, ' ')
-    call add_default('dst3c_num', 1, ' ')
-    call add_default('bcuc_num', 1, ' ')
-    call add_default('dst1uc_num', 1, ' ')
-    call add_default('dst3uc_num', 1, ' ')
-
-    call add_default('bc_a1_num', 1, ' ')
-    call add_default('dst_a1_num', 1, ' ')
-    call add_default('dst_a3_num', 1, ' ')
-    call add_default('bc_c1_num', 1, ' ')
-    call add_default('dst_c1_num', 1, ' ')
-    call add_default('dst_c3_num', 1, ' ')
-    
-    !++diag_aer
-    call add_default('fn_bc_c1_num', 1, ' ')
-    call add_default('fn_dst_c1_num', 1, ' ')
-    call add_default('fn_dst_c3_num', 1, ' ')
-    !--diag_aer
-
-    !++ wy4.0
-    call add_default('na500', 1, ' ')
-    call add_default('totna500', 1, ' ')
-    !-- wy4.0
-
-end if
-!-- MH_2015/04/15
 
 end subroutine ndrop_init
 
@@ -1120,7 +1059,7 @@ subroutine dropmixnuc( &
          !++ MH_2015/04/10
          !Call the activation procedure
          if(numberOfModes .gt. 0)then
-		    if (classnuc_in) then
+		    if (use_hetfrz_classnuc) then
                call activate_modal( &
                wbar, wmix, wdiab, wmin, wmax,                       &
                temp(i,k), cs(i,k), naermod, numberOfModes,          &
@@ -1146,7 +1085,7 @@ subroutine dropmixnuc( &
 
             dumc = (cldn_tmp - cldo_tmp)
 #ifdef OSLO_AERO
-      if (classnuc_in) then
+      if (use_hetfrz_classnuc) then
 	     fn_tmp(:) = fn_in(i,k,1:nmodes)
       else
          fn_tmp(:) = fn(:)
@@ -1161,7 +1100,7 @@ subroutine dropmixnuc( &
       fluxm(:)= 0.0_r8
       do m = 1, numberOfModes   !Number of coexisting modes to be used for activation
          kcomp = speciesMap(m)       !This is the CAM-oslo mode (modes 1-14 may be activated, mode 0 not)
-         if (classnuc_in) then
+         if (use_hetfrz_classnuc) then
 		    fn_in(i,k,kcomp) = fn_tmp(m)
          else
             fn(kcomp) = fn_tmp(m)
@@ -1174,13 +1113,13 @@ subroutine dropmixnuc( &
             do m = 1, ntot_amode
                mm = mam_idx(m,0)
 #ifdef OSLO_AERO
-               if (classnuc_in) then
+               if (use_hetfrz_classnuc) then
                   dact   = dumc*fn_in(i,k,m)*numberConcentration(i,k,m)/cs(i,k) !#/kg_{air}
                else
                   dact   = dumc*fn(m)*numberConcentration(i,k,m)/cs(i,k) !#/kg_{air}
                end if
 #else
-               if (classnuc_in) then
+               if (use_hetfrz_classnuc) then
                   dact   = dumc*fn_in(i,k,m)*raer(mm)%fld(i,k) ! interstitial only
                else
                   dact   = dumc*fn(m)*raer(mm)%fld(i,k) ! interstitial only
@@ -1299,7 +1238,7 @@ subroutine dropmixnuc( &
 #endif
          !++ MH_2015/04/10
          if(numberOfModes .gt. 0)then
-		    if (classnuc_in) then
+		    if (use_hetfrz_classnuc) then
                call activate_modal( &
                   wbar, wmix, wdiab, wmin, wmax,                       &
                   temp(i,k), cs(i,k), naermod, numberOfModes , &
@@ -1333,7 +1272,7 @@ subroutine dropmixnuc( &
                endif
 
 #ifdef OSLO_AERO
-            if (classnuc_in) then
+            if (use_hetfrz_classnuc) then
                fn_tmp(:) = fn_in(i,k,1:nmodes)
             else
                fn_tmp(:) = fn(:)
@@ -1348,7 +1287,7 @@ subroutine dropmixnuc( &
             fluxm(:)= 0.0_r8
             do m = 1, numberOfModes   !Number of coexisting modes to be used for activation
                kcomp = speciesMap(m)       !This is the CAM-oslo mode (modes 1-14 may be activated, mode 0 not)
-               if (classnuc_in) then
+               if (use_hetfrz_classnuc) then
                   fn_in(i,k,kcomp) = fn_tmp(m)
                else
                   fn(kcomp) = fn_tmp(m)
