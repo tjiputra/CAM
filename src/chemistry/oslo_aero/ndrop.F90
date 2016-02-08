@@ -21,12 +21,12 @@ use physics_buffer,   only: physics_buffer_desc, pbuf_get_index, pbuf_get_field
 use wv_saturation,    only: qsat
 use phys_control,     only: phys_getopts
 use ref_pres,         only: top_lev => trop_cloud_top_lev
-use shr_spfn_mod,     only: erf => shr_spfn_erf_nonintrinsic
+use shr_spfn_mod,     only: erf => shr_spfn_erf
 use rad_constituents, only: rad_cnst_get_info, rad_cnst_get_mode_num, rad_cnst_get_aer_mmr, &
                             rad_cnst_get_aer_props, rad_cnst_get_mode_props,                &
                             rad_cnst_get_mam_mmr_idx, rad_cnst_get_mode_num_idx
-use cam_history,      only: addfld, add_default, phys_decomp, fieldname_len, outfld
-use abortutils,       only: endrun
+use cam_history,      only: addfld, add_default, horiz_only, fieldname_len, outfld
+use cam_abortutils,   only: endrun
 use cam_logfile,      only: iulog
 !++ MH_2015/09/09
 use classnuc, only : classnuc_in
@@ -257,10 +257,10 @@ subroutine ndrop_init
             fieldname_cw(mm)=trim(getCloudTracerName(lptr))//"_mixnuc1"
 
             long_name = trim(fieldname(mm)) // ' dropmixnuc column tendency'
-            call addfld(trim(fieldname(mm)), "kg/m2/s", 1, 'A', long_name, phys_decomp)
+            call addfld(trim(fieldname(mm)), horiz_only ,'A', "kg/m2/s",long_name)
 
             long_name = trim(fieldname_cw(mm)) // ' dropmixnuc column tendency'
-            call addfld(trim(fieldname_cw(mm)), "kg/m2/s", 1, 'A', long_name, phys_decomp)
+            call addfld(trim(fieldname_cw(mm)), horiz_only, 'A', "kg/m2/s",long_name)
 
             if (history_aerosol) then
                call add_default(trim(fieldname(mm)), 1, ' ')
@@ -277,19 +277,19 @@ subroutine ndrop_init
       write(modeString,"(I2)"),m
       if(m .lt. 10) modeString="0"//adjustl(modeString)
       varName = "NMR"//trim(modeString)
-      call addfld(varName, 'm  ', pver, 'A', 'number median radius mode '//modeString,    phys_decomp)
+      call addfld(varName, (/ 'lev' /),'A', 'm  ', 'number median radius mode '//modeString)
       if(history_aerosol)call add_default(varName, 1, ' ')
       varName = "NCONC"//trim(modeString)
-      call addfld(varName, '#/m3  ', pver, 'A', 'number concentration mode '//modeString,    phys_decomp)
+      call addfld(varName, (/ 'lev' /),'A', '#/m3  ', 'number concentration mode '//modeString)
       if(history_aerosol)call add_default(varName, 1, ' ')
       varName = "VCONC"//trim(modeString)
-      call addfld(varName, 'm3/m3  ', pver, 'A', 'volume concentration mode '//modeString,    phys_decomp)
+      call addfld(varName, (/ 'lev' /),'A',  'm3/m3  ','volume concentration mode '//modeString)
       if(history_aerosol)call add_default(varName, 1, ' ')
       varName = "SIGMA"//trim(modeString)
-      call addfld(varName, '-', pver, 'A', 'Std. dev. mode '//modeString,    phys_decomp)
+      call addfld(varName, (/ 'lev' /),'A', '-','Std. dev. mode '//modeString)
       if(history_aerosol)call add_default(varName, 1, ' ')
       varName = "HYGRO"//trim(modeString)
-      call addfld(varName, '-', pver, 'A', 'Hygroscopicity '//modeString,    phys_decomp)
+      call addfld(varName, (/ 'lev' /),'A','-','Hygroscopicity '//modeString)
       if(history_aerosol)call add_default(varName, 1, ' ')
    end do
 #else
@@ -326,10 +326,10 @@ subroutine ndrop_init
 
             ! Add tendency fields to the history only when prognostic MAM is enabled.
             long_name = trim(tmpname) // ' dropmixnuc mixnuc column tendency'
-            call addfld(fieldname(mm), unit, 1, 'A', long_name, phys_decomp)
+            call addfld(fieldname(mm),    horiz_only, 'A', unit, long_name)
 
             long_name = trim(tmpname_cw) // ' dropmixnuc mixnuc column tendency'
-            call addfld(fieldname_cw(mm), unit, 1, 'A', long_name, phys_decomp)
+            call addfld(fieldname_cw(mm), horiz_only, 'A', unit, long_name)
 
             if (history_aerosol) then
                call add_default(fieldname(mm), 1, ' ')
@@ -343,19 +343,19 @@ subroutine ndrop_init
 
 #endif
 
-   call addfld('CCN1    ','#/cm3   ',pver, 'A','CCN concentration at S=0.02%',phys_decomp)
-   call addfld('CCN2    ','#/cm3   ',pver, 'A','CCN concentration at S=0.05%',phys_decomp)
-   call addfld('CCN3    ','#/cm3   ',pver, 'A','CCN concentration at S=0.1%',phys_decomp)
-   call addfld('CCN4    ','#/cm3   ',pver, 'A','CCN concentration at S=0.2%',phys_decomp)
-   call addfld('CCN5    ','#/cm3   ',pver, 'A','CCN concentration at S=0.5%',phys_decomp)
-   call addfld('CCN6    ','#/cm3   ',pver, 'A','CCN concentration at S=1.0%',phys_decomp)
+   call addfld('CCN1',(/ 'lev' /), 'A','#/cm3','CCN concentration at S=0.02%')
+   call addfld('CCN2',(/ 'lev' /), 'A','#/cm3','CCN concentration at S=0.05%')
+   call addfld('CCN3',(/ 'lev' /), 'A','#/cm3','CCN concentration at S=0.1%')
+   call addfld('CCN4',(/ 'lev' /), 'A','#/cm3','CCN concentration at S=0.2%')
+   call addfld('CCN5',(/ 'lev' /), 'A','#/cm3','CCN concentration at S=0.5%')
+   call addfld('CCN6',(/ 'lev' /), 'A','#/cm3','CCN concentration at S=1.0%')
 
 
-   call addfld('WTKE     ', 'm/s     ', pver, 'A', 'Standard deviation of updraft velocity', phys_decomp)
-   call addfld('NDROPMIX ', '#/kg/s  ', pver, 'A', 'Droplet number mixing',                  phys_decomp)
-   call addfld('NDROPSRC ', '#/kg/s  ', pver, 'A', 'Droplet number source',                  phys_decomp)
-   call addfld('NDROPSNK ', '#/kg/s  ', pver, 'A', 'Droplet number loss by microphysics',    phys_decomp)
-   call addfld('NDROPCOL ', '#/m2    ', 1,    'A', 'Column droplet number',                  phys_decomp)
+   call addfld('WTKE',     (/ 'lev' /), 'A', 'm/s', 'Standard deviation of updraft velocity')
+   call addfld('NDROPMIX', (/ 'lev' /), 'A', '#/kg/s', 'Droplet number mixing')
+   call addfld('NDROPSRC', (/ 'lev' /), 'A', '#/kg/s', 'Droplet number source')
+   call addfld('NDROPSNK', (/ 'lev' /), 'A', '#/kg/s', 'Droplet number loss by microphysics')
+   call addfld('NDROPCOL', horiz_only,  'A', '#/m2', 'Column droplet number')
 
 #ifndef OSLO_AERO
 
@@ -383,32 +383,32 @@ subroutine ndrop_init
 
 !++ MH_2015/04/15
 if(classnuc_in) then
-    call addfld('bc_num', '#/cm3', pver, 'A', 'total bc number', phys_decomp)
-    call addfld('dst1_num', '#/cm3', pver, 'A', 'total dst1 number', phys_decomp)
-    call addfld('dst3_num', '#/cm3', pver, 'A', 'total dst3 number', phys_decomp)
-    call addfld('bcc_num', '#/cm3', pver, 'A', 'coated bc number', phys_decomp)
-    call addfld('dst1c_num', '#/cm3', pver, 'A', 'coated dst1 number', phys_decomp)
-    call addfld('dst3c_num', '#/cm3', pver, 'A', 'coated dst3 number', phys_decomp)
-    call addfld('bcuc_num', '#/cm3', pver, 'A', 'uncoated bc number', phys_decomp)
-    call addfld('dst1uc_num', '#/cm3', pver, 'A', 'uncoated dst1 number', phys_decomp)
-    call addfld('dst3uc_num', '#/cm3', pver, 'A', 'uncoated dst3 number', phys_decomp)
+    call addfld('bc_num',(/ 'lev' /),'A', '#/cm3', 'total bc number')
+    call addfld('dst1_num',(/ 'lev' /),'A', '#/cm3','total dst1 number')
+    call addfld('dst3_num',(/ 'lev' /),'A', '#/cm3', 'total dst3 number')
+    call addfld('bcc_num',(/ 'lev' /),'A', '#/cm3',  'coated bc number')
+    call addfld('dst1c_num',(/ 'lev' /),'A', '#/cm3', 'coated dst1 number')
+    call addfld('dst3c_num',(/ 'lev' /),'A', '#/cm3', 'coated dst3 number')
+    call addfld('bcuc_num',(/ 'lev' /),'A', '#/cm3', 'uncoated bc number')
+    call addfld('dst1uc_num',(/ 'lev' /),'A', '#/cm3','uncoated dst1 number')
+    call addfld('dst3uc_num',(/ 'lev' /),'A', '#/cm3', 'uncoated dst3 number')
 
-    call addfld('bc_a1_num', '#/cm3', pver, 'A', 'interstitial bc number', phys_decomp)
-    call addfld('dst_a1_num', '#/cm3', pver, 'A', 'interstitial dst1 number', phys_decomp)
-    call addfld('dst_a3_num', '#/cm3', pver, 'A', 'interstitial dst3 number', phys_decomp)
-    call addfld('bc_c1_num', '#/cm3', pver, 'A', 'cloud borne bc number', phys_decomp)
-    call addfld('dst_c1_num', '#/cm3', pver, 'A', 'cloud borne dst1 number', phys_decomp)
-    call addfld('dst_c3_num', '#/cm3', pver, 'A', 'cloud borne dst3 number', phys_decomp)
+    call addfld('bc_a1_num',(/ 'lev' /), 'A', '#/cm3', 'interstitial bc number')
+    call addfld('dst_a1_num',(/ 'lev' /),'A', '#/cm3', 'interstitial dst1 number')
+    call addfld('dst_a3_num',(/ 'lev' /), 'A', '#/cm3','interstitial dst3 number')
+    call addfld('bc_c1_num', (/ 'lev' /),  'A',  '#/cm3', 'cloud borne bc number')
+    call addfld('dst_c1_num', (/ 'lev' /), 'A',  '#/cm3', 'cloud borne dst1 number')
+    call addfld('dst_c3_num', (/ 'lev' /), 'A',  '#/cm3', 'cloud borne dst3 number')
     
     !++diag_aer
-    call addfld('fn_bc_c1_num', '#/cm3', pver, 'A', 'cloud borne bc number derived from fn', phys_decomp)
-    call addfld('fn_dst_c1_num', '#/cm3', pver, 'A', 'cloud borne dst1 number derived from fn', phys_decomp)
-    call addfld('fn_dst_c3_num', '#/cm3', pver, 'A', 'cloud borne dst3 number derived from fn', phys_decomp)
+    call addfld('fn_bc_c1_num',(/ 'lev' /),'A', '#/cm3', 'cloud borne bc number derived from fn')
+    call addfld('fn_dst_c1_num',(/ 'lev' /),'A', '#/cm3', 'cloud borne dst1 number derived from fn')
+    call addfld('fn_dst_c3_num',(/ 'lev' /),'A', '#/cm3', 'cloud borne dst3 number derived from fn')
     !--diag_aer
 
     !++ wy4.0
-    call addfld('na500', '#/cm3', pver, 'A', 'interstitial aerosol number with D>500 nm', phys_decomp)
-    call addfld('totna500', '#/cm3', pver, 'A', 'total aerosol number with D>500 nm', phys_decomp)
+    call addfld('na500',(/ 'lev' /),'A', '#/cm3', 'interstitial aerosol number with D>500 nm')
+    call addfld('totna500',(/ 'lev' /),'A', '#/cm3', 'total aerosol number with D>500 nm')
     !-- wy4.0
 
     call add_default('bc_num', 1, ' ')
@@ -1124,7 +1124,7 @@ subroutine dropmixnuc( &
                call activate_modal( &
                wbar, wmix, wdiab, wmin, wmax,                       &
                temp(i,k), cs(i,k), naermod, numberOfModes,          &
-               vaerosol, hygro, fn_in(i,k,:), fm, fluxn,            &
+               vaerosol, hygro, fn_in(i,k,1:nmodes), fm, fluxn,            &
                fluxm,flux_fullact(k)                                &
 #ifdef OSLO_AERO
                ,lnsigman                                            &
@@ -1147,7 +1147,7 @@ subroutine dropmixnuc( &
             dumc = (cldn_tmp - cldo_tmp)
 #ifdef OSLO_AERO
       if (classnuc_in) then
-	     fn_tmp(:) = fn_in(i,k,:)
+	     fn_tmp(:) = fn_in(i,k,1:nmodes)
       else
          fn_tmp(:) = fn(:)
       end if
@@ -1334,7 +1334,7 @@ subroutine dropmixnuc( &
 
 #ifdef OSLO_AERO
             if (classnuc_in) then
-               fn_tmp(:) = fn_in(i,k,:)
+               fn_tmp(:) = fn_in(i,k,1:nmodes)
             else
                fn_tmp(:) = fn(:)
             end if
@@ -2659,7 +2659,6 @@ subroutine maxsat(zeta,eta,nmode,smc,smax, f1_in, f2_in)
       if(eta(m).gt.1.e-20_r8)then
          g1=zeta(m)/eta(m)
          g1sqrt=sqrt(g1)
-         g1=g1sqrt*g1
          g1=g1sqrt*g1
          g2=smc(m)/sqrt(eta(m)+3._r8*zeta(m))
          g2sqrt=sqrt(g2)

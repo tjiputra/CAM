@@ -190,9 +190,9 @@ subroutine diag_init(pbuf2d)
    call addfld (apcnst(1) , (/ 'lev' /), 'A','kg/kg',trim(cnst_longname(1))//' (after physics)')
    if ( dycore_is('LR') ) then
       call addfld ('TFIX',        horiz_only,  'A'     ,'K/s','T fixer (T equivalent of Energy correction)')
-      call addfld ('PTTEND_RESID','K/s ',(/'lev'/), 'A'    'K/s' ,&
+      call addfld ('PTTEND_RESID',(/'lev'/), 'A',  'K/s' ,&
                    'T-tendency due to BAB kluge at end of tphysac (diagnostic not part of T-budget)')
-      call addfld ('EFLX    ',horiz_only, 'A'     ,'W/m2'&
+      call addfld ('EFLX    ',horiz_only, 'A'  ,'W/m2',&
                    'Equivalent heat flux due to mass adjustment at end of tphysac')
    end if
    call addfld ('TTEND_TOT',      (/ 'lev' /), 'A','K/s' ,'Total temperature tendency'   )
@@ -312,7 +312,7 @@ subroutine diag_init(pbuf2d)
    call addfld ('AKCXS   ',horiz_only,'A','mg/m2   ','Scheme excess aerosol mass burden')     
    call addfld ('CDNC    ',(/'lev'/),'A','1/CM3   ','A','Cloud Droplet Number Concentration')
    call addfld ('CLDFOC  ',(/'lev'/),'A','FRACTION','Frequency of Warm Cloud Occurence')
-   call addfld ('REFFL   ',(/'lev'/),'A','uM      ''Effective Radius of Cloud Droplets')
+   call addfld ('REFFL   ',(/'lev'/),'A','uM      ','Effective Radius of Cloud Droplets')
    call addfld ('REHANA  ',horiz_only,'A','uM      ','Effective radius as seen from satellite')
    call addfld ('FOCHANA ',horiz_only,'A','FRACTION','Frequency of Occurrence of Clouds with REHANA /= 0')
    call addfld ('RELH    ',(/'lev'/),'A', 'unitless','Fictive relative humidity')
