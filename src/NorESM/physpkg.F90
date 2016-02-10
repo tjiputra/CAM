@@ -277,11 +277,6 @@ subroutine phys_register
        call prescribed_ghg_register()
        call sslt_rebin_register
 
-#ifdef OSLO_AERO
-      call aero_register
-      call registerCondensation()
-#endif
-
        ! CAM3 prescribed aerosols
        if (cam3_aero_data_on) then
           call cam3_aero_data_register()
