@@ -3,7 +3,7 @@ BEGSIM
 
       Solution
  SO2, H2SO4
- DMS -> CH3SCH3, H2O2, SO4_N-> H2SO4
+ DMS -> CH3SCH3, H2O2
  SO4_NA->H2SO4, SO4_A1->H2SO4, SO4_A2->NH4HSO4
  SO4_AC->H2SO4, SO4_PR->H2SO4, BC_N->C
  BC_AX->C, BC_NI->C, BC_A->C, BC_AI->C 
@@ -12,7 +12,7 @@ BEGSIM
  SS_A1->NaCl, SS_A2->NaCl, SS_A3->NaCl
 * Approximate soa species with those of monoterpene oxidation products
 * based on Paasonen et al. (2010); Taipale et al. (2008). 
- SOA_N->C10H16O2, SOA_NA->C10H16O2, SOA_A1->C10H16O2
+ SOA_NA->C10H16O2, SOA_A1->C10H16O2
  SOA_LV ->C10H16O2, SOA_SV->C10H16O2
  monoterp -> C10H16, isoprene -> C5H8
    End Solution
@@ -32,15 +32,15 @@ BEGSIM
       Explicit
       End Explicit
       Implicit
-        DMS, SO2, H2O2, SO4_N
+        DMS, SO2, H2O2
         SO4_NA, SO4_A1, SO4_A2
         SO4_AC, SO4_PR, BC_N
         BC_AX, BC_NI, BC_A, BC_AI 
         BC_AC, OM_NI, OM_AI, OM_AC
         DST_A2, DST_A3
         SS_A1, SS_A2, SS_A3 , H2SO4
-	SOA_N, SOA_NA, SOA_A1
-	SOA_LV,SOA_SV, monoterp, isoprene
+        SOA_NA, SOA_A1
+	     SOA_LV,SOA_SV, monoterp, isoprene
       End Implicit
    End Solution Classes
 
@@ -55,7 +55,13 @@ BEGSIM
                DMS + OH -> SO2                                                  ; 9.6e-12, -234.
                DMS + NO3 -> SO2 + HNO3                                          ; 1.9e-13,  520.
                SO2 + OH + M -> H2SO4 + M                                      ; 3.0e-31, 3.3, 1.5e-12, 0.0, 0.6
- [usr_DMS_OH]  DMS + OH -> .5 * SO2 + .5 * HO2 + 4.0 * OM_NI
+* SOA has MW=168, and MSA=96, so to get correct MSA mass ==> factor of 96/168 = 0.57
+* Then account for 0.25 which is 0.25 MSA molec per DMS molec (the other 0.75 goes to SO2)
+* Then 0.2 assumed yield for SOA_LV and 0.8 assumed  yield for SOA_SV gives the coefficients below
+* reaction rate from Chin et al 1996, JGR, vol 101, no D13
+* 
+ [usr_DMS_OH]  DMS + OH -> .75 * SO2 + .5 * HO2 + 0.029*SOA_LV + 0.114*SOA_SV
+*
 *cka: added organic vapor oxidation with constants from IUPAC below
 *     Assume a  yield of 15% for SOA LV production from these reactions
 *     Assume a  yield of 15 % for monoterpene and 5% for isoprene SOA SV production reactions

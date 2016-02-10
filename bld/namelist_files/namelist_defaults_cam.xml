@@ -1584,4 +1584,19 @@
 <focndomain hgrid="ne120np4"  >share/domains/domain.ocn.ne120np4_gx1v6.111226.nc</focndomain>
 <focndomain hgrid="ne240np4"  >share/domains/domain.ocn.ne240np4_gx1v6.111226.nc</focndomain>
 
+<!-- CAM-Oslo variables -->
+<volc_fraction_coarse   >0.0</volc_fraction_coarse>
+<aerotab_table_dir>noresm-only/atm/cam/camoslo/AeroTab_27jan16</aerotab_table_dir>
+<dms_source>lana</dms_source>
+<dms_source_type>CYCLICAL</dms_source_type>
+<dms_cycle_year>2000</dms_cycle_year>
+<opom_source>odowd</opom_source>
+<opom_source_type>CYCLICAL</opom_source_type>
+<opom_cycle_year>2000</opom_cycle_year>
+<ocean_filename>Lana_ocean_1849_2006.nc</ocean_filename>
+<ocean_filepath>noresm-only/atm/cam/camoslo</ocean_filepath>
+
+<energy_conservation_type > 1 </energy_conservation_type>
+<lprint_energy_global   > .false. </lprint_energy_global>
+<lprint_energy_clutter  > .false. </lprint_energy_clutter>
 </namelist_defaults>

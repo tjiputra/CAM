@@ -30,71 +30,68 @@
 
          mat(1) = -( rxt(4) + rxt(5) + rxt(7) + het_rates(3) )
 
-         mat(4) = -( rxt(6) + het_rates(1) )
-         mat(2) = rxt(4) + rxt(5) + .500_r8*rxt(7)
+         mat(5) = -( rxt(6) + het_rates(1) )
+         mat(2) = rxt(4) + rxt(5) + .750_r8*rxt(7)
 
-         mat(6) = -( rxt(1) + rxt(3) + het_rates(4) )
+         mat(7) = -( rxt(1) + rxt(3) + het_rates(4) )
 
-         mat(7) = -( het_rates(5) )
+         mat(8) = -( het_rates(5) )
 
-         mat(8) = -( het_rates(6) )
+         mat(9) = -( het_rates(6) )
 
-         mat(9) = -( het_rates(7) )
+         mat(10) = -( het_rates(7) )
 
-         mat(10) = -( het_rates(8) )
+         mat(11) = -( het_rates(8) )
 
-         mat(11) = -( het_rates(9) )
+         mat(12) = -( het_rates(9) )
 
-         mat(12) = -( het_rates(10) )
+         mat(13) = -( het_rates(10) )
 
-         mat(13) = -( het_rates(11) )
+         mat(14) = -( het_rates(11) )
 
-         mat(14) = -( het_rates(12) )
+         mat(15) = -( het_rates(12) )
 
-         mat(15) = -( het_rates(13) )
+         mat(16) = -( het_rates(13) )
 
-         mat(16) = -( het_rates(14) )
+         mat(17) = -( het_rates(14) )
 
-         mat(17) = -( het_rates(15) )
+         mat(18) = -( het_rates(15) )
 
-         mat(18) = -( het_rates(16) )
+         mat(19) = -( het_rates(16) )
 
-         mat(19) = -( het_rates(17) )
-         mat(3) = 4.000_r8*rxt(7)
+         mat(20) = -( het_rates(17) )
 
-         mat(20) = -( het_rates(18) )
+         mat(21) = -( het_rates(18) )
 
-         mat(21) = -( het_rates(19) )
+         mat(22) = -( het_rates(19) )
 
-         mat(22) = -( het_rates(20) )
+         mat(23) = -( het_rates(20) )
 
-         mat(23) = -( het_rates(21) )
+         mat(24) = -( het_rates(21) )
 
-         mat(24) = -( het_rates(22) )
+         mat(25) = -( het_rates(22) )
 
-         mat(25) = -( het_rates(23) )
-
-         mat(26) = -( het_rates(24) )
+         mat(26) = -( het_rates(23) )
 
          mat(27) = -( het_rates(2) )
-         mat(5) = rxt(6)
+         mat(6) = rxt(6)
 
-         mat(28) = -( het_rates(25) )
+         mat(28) = -( het_rates(24) )
 
-         mat(29) = -( het_rates(26) )
+         mat(29) = -( het_rates(25) )
 
-         mat(30) = -( het_rates(27) )
+         mat(30) = -( het_rates(26) )
+         mat(3) = .029_r8*rxt(7)
+         mat(32) = .150_r8*rxt(8)
 
-         mat(31) = -( het_rates(28) )
-         mat(33) = .150_r8*rxt(8)
+         mat(31) = -( het_rates(27) )
+         mat(4) = .114_r8*rxt(7)
+         mat(33) = .150_r8*rxt(9) + .150_r8*rxt(10)
+         mat(35) = .050_r8*rxt(11) + .050_r8*rxt(12) + .050_r8*rxt(13)
 
-         mat(32) = -( het_rates(29) )
-         mat(34) = .150_r8*rxt(9) + .150_r8*rxt(10)
-         mat(36) = .050_r8*rxt(11) + .050_r8*rxt(12) + .050_r8*rxt(13)
+         mat(34) = -( rxt(8) + rxt(9) + rxt(10) + het_rates(28) )
 
-         mat(35) = -( rxt(8) + rxt(9) + rxt(10) + het_rates(30) )
-
-         mat(37) = -( rxt(11) + rxt(12) + rxt(13) + het_rates(31) )
+         mat(36) = -( rxt(11) + rxt(12) + rxt(13) + het_rates(29) )
 
 
       end subroutine linmat01

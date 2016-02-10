@@ -14,7 +14,7 @@ subroutine aeronucl(lchnk, ncol, t, pmid, h2ommr, h2so4pc, oxidorg, coagnuc, nuc
     use wv_saturation,  only: qsat_water
     use physconst,      only: avogad, rair 
     use ppgrid,         only: pcols, pver, pverp
-    use aerosoldef, only : MODE_IDX_SO4SOA_AIT, rhopart, l_so4_a1, l_soa_lv, l_so4_n, l_soa_n
+    use aerosoldef, only : MODE_IDX_SO4SOA_AIT, rhopart, l_so4_a1, l_soa_lv, l_so4_na, l_soa_na
     use commondefinitions, only: originalNumberMedianRadius
     use cam_history,    only: outfld
     use phys_control,   only: phys_getopts
@@ -355,8 +355,8 @@ subroutine aeronucl(lchnk, ncol, t, pmid, h2ommr, h2so4pc, oxidorg, coagnuc, nuc
 
             ! Nucleated so4 and soa mass mixing ratio per second [kg kg-1 s-1]
             ! used density of particle phase, not of condensing gas 
-            nuclso4(i,k)=rhopart(l_so4_n)*nuclvolume(i,k)*frach2so4  
-            nuclorg(i,k)=rhopart(l_soa_n)*nuclvolume(i,k)*(1.0_r8-frach2so4)
+            nuclso4(i,k)=rhopart(l_so4_na)*nuclvolume(i,k)*frach2so4  
+            nuclorg(i,k)=rhopart(l_soa_na)*nuclvolume(i,k)*(1.0_r8-frach2so4)
 
         end do
     end do

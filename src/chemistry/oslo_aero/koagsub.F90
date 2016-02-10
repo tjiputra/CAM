@@ -17,7 +17,7 @@ module koagsub
 
    real(r8), parameter :: rhoh2o = 1000._r8 ! Density of water
 
-   integer, parameter :: numberOfCoagulatingModes = 7
+   integer, parameter :: numberOfCoagulatingModes = 6
    integer, parameter :: numberOfCoagulationReceivers = 6
 
 
@@ -28,10 +28,8 @@ module koagsub
    !These are the modes which are coagulating!
    integer, dimension(numberOfCoagulatingModes) :: coagulatingMode =    & 
      (/MODE_IDX_BC_EXT_AC                                               &  !inert mode
-!cka     , MODE_IDX_SO4_AIT, MODE_IDX_BC_AIT, MODE_IDX_OMBC_INTMIX_COAT_AIT &  !internally mixed small modes
      , MODE_IDX_SO4SOA_AIT, MODE_IDX_BC_AIT, MODE_IDX_OMBC_INTMIX_COAT_AIT &  !internally mixed small modes
-!cka     , MODE_IDX_SO4_NUC, MODE_IDX_BC_NUC, MODE_IDX_OMBC_INTMIX_AIT /)      !externally mixed small modes
-     , MODE_IDX_SO4SOA_NUC, MODE_IDX_BC_NUC, MODE_IDX_OMBC_INTMIX_AIT /)      !externally mixed small modes
+     , MODE_IDX_BC_NUC, MODE_IDX_OMBC_INTMIX_AIT /)      !externally mixed small modes
 
    !These are the modes which are receiving coagulating material
    !NOTE: INCONSISTENCY WITH AEROTAB!! IN AEROTAB MODE_IDX_SO4_AC RECEIVES COAGULATE!!
@@ -124,12 +122,10 @@ subroutine initializeCoagulationReceivers()
    lifeCycleReceiver(chemistryIndex(l_bc_a))   = chemistryIndex(l_bc_ac)   !create bc coagulate  from bc in mode 2
    lifeCycleReceiver(chemistryIndex(l_bc_ai))  = chemistryIndex(l_bc_ac)   !create bc coagulate from bc in mode 4
    lifeCycleReceiver(chemistryIndex(l_om_ai))  = chemistryIndex(l_om_ac)   !create om coagulate from om in mode 4
-   lifeCycleReceiver(chemistryIndex(l_so4_n)) = chemistryIndex(l_so4_ac)   !create so4 coagulate from so4 in mode 11
    lifeCycleReceiver(chemistryIndex(l_bc_n))  = chemistryIndex(l_bc_ac)    !create bc coagulate from bc in mode 12
    lifeCycleReceiver(chemistryIndex(l_bc_ni)) = chemistryIndex(l_bc_ac)    !create bc coagulate from om in mode 14
    lifeCycleReceiver(chemistryIndex(l_om_ni)) = chemistryIndex(l_om_ac)    !create om coagulate from om in mode 14
    lifeCycleReceiver(chemistryIndex(l_so4_a1)) = chemistryIndex(l_so4_ac)  !Create so4 coagulate from so4 condensate
-   lifeCycleReceiver(chemistryIndex(l_soa_n)) = chemistryIndex(l_soa_a1)
    lifeCycleReceiver(chemistryINdex(l_soa_na)) = chemistryIndex(l_soa_a1)
 
   !These are the lifecycle-species receiving coagulate
@@ -139,12 +135,10 @@ subroutine initializeCoagulationReceivers()
    CloudAerReceiver(chemistryIndex(l_bc_a))   = chemistryIndex(l_bc_ac)   !create bc coagulate  from bc in mode 2
    CloudAerReceiver(chemistryIndex(l_bc_ai))  = chemistryIndex(l_bc_ac)   !create bc coagulate from bc in mode 4
    CloudAerReceiver(chemistryIndex(l_om_ai))  = chemistryIndex(l_om_ac)   !create om coagulate from om in mode 4
-   CloudAerReceiver(chemistryIndex(l_so4_n)) = chemistryIndex(l_so4_a2)   !create so4 coagulate from so4 in mode 11
    CloudAerReceiver(chemistryIndex(l_bc_n))  = chemistryIndex(l_bc_ac)    !create bc coagulate from bc in mode 12
    CloudAerReceiver(chemistryIndex(l_bc_ni)) = chemistryIndex(l_bc_ac)    !create bc coagulate from om in mode 14
    CloudAerReceiver(chemistryIndex(l_om_ni)) = chemistryIndex(l_om_ac)    !create om coagulate from om in mode 14
    CloudAerReceiver(chemistryIndex(l_so4_a1)) = chemistryIndex(l_so4_a2)  !Create so4 coagulate from so4 condensate
-   cloudAerReceiver(chemistryIndex(l_soa_n)) = chemistryIndex(l_soa_a1)
    cloudAerReceiver(chemistryIndex(l_soa_na)) = chemistryIndex(l_soa_a1)
 
 

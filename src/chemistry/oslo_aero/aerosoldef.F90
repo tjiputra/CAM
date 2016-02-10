@@ -87,13 +87,13 @@ module aerosoldef
 !cka: add l_soa_n, l_soa_na (particles) l_soa_a1 (condensate) and l_soa_lv, l_soa_sv (SOA precursors)
 ! following are species indices for individual camuio species
   integer,public :: &
-  l_so4_n,    l_so4_na,   l_so4_a1, l_so4_a2, l_so4_ac,             &
+  l_so4_na,   l_so4_a1, l_so4_a2, l_so4_ac,             &
   l_bc_n,     l_bc_ax,    l_bc_ni,  l_bc_a,  l_bc_ai,l_bc_ac,     &
   l_om_ni,    l_om_ai  ,l_om_ac,               &
   l_so4_pr,   &
   l_dst_a2,   l_dst_a3,              &
   l_ss_a1,    l_ss_a2,    l_ss_a3, l_h2so4, &
-  l_soa_n, l_soa_na, l_soa_a1, l_soa_lv, l_soa_sv 
+  l_soa_na, l_soa_a1, l_soa_lv, l_soa_sv 
 
 ! some code here has been moved to commondefinitions...
 
@@ -102,8 +102,8 @@ module aerosoldef
    integer                                 :: imozart
 
    !Number of transported tracers in each mode 
-   integer, parameter, dimension(0:nmodes) :: n_tracers_in_mode = (/ 1, 4, 3, 0, 5, 7, 7, 7, 7, 7, 7, 2, 1, 0, 2 /) !cka: added organic condensate to mode 1,2,4-10
-   integer, parameter, dimension(0:nmodes) :: n_background_tracers_in_mode = (/ 1,2,1,0,2,1,1,1,1,1,1,2,1,0,2 /) !cka: added soa to mode 1 and 11
+   integer, parameter, dimension(0:nmodes) :: n_tracers_in_mode = (/ 1, 4, 3, 0, 5, 7, 7, 7, 7, 7, 7, 0, 1, 0, 2 /) !cka: added organic condensate to mode 1,2,4-10
+   integer, parameter, dimension(0:nmodes) :: n_background_tracers_in_mode = (/ 1,2,1,0,2,1,1,1,1,1,1,0,1,0,2 /) !cka: added soa to mode 1 and 11
 
    integer, dimension(0:nmodes, max_tracers_per_mode) :: tracer_in_mode
 
@@ -202,7 +202,6 @@ contains
 
 !   register the species
 
-    call cnst_get_ind('SO4_N', l_so4_n, abort=.true.)    !Nucleation mode sulfate
     call cnst_get_ind('SO4_NA',l_so4_na, abort=.true.)   !Aitken mode sulfate (growth from so4_n)
     call cnst_get_ind('SO4_A1',l_so4_a1, abort=.true.)   !sulfate condensate (gas phase production)
     call cnst_get_ind('SO4_A2',l_so4_a2, abort=.true.)   !sulfate produced in aq. chemistry
@@ -228,7 +227,6 @@ contains
     call cnst_get_ind('SS_A3',l_ss_a3, abort=.true.)      !Sea salt coarse mode
 
 !cka: register SOA species
-    call cnst_get_ind('SOA_N',l_soa_n, abort=.true.)   !Nucleation mode SOA
     call cnst_get_ind('SOA_NA',l_soa_na, abort=.true.) !Aitken mode SOA with SO4 and SOA condensate
     call cnst_get_ind('SOA_A1',l_soa_a1, abort=.true.) !SOA condensate 
     call cnst_get_ind('SOA_LV',l_soa_lv, abort=.true.) !Gas phase low volatile SOA
@@ -242,7 +240,6 @@ contains
 
     !Set the aerosol types
     aerosolType(:)=-99
-    aerosolType(l_so4_n)=AEROSOL_TYPE_SULFATE
     aerosolType(l_so4_na)=AEROSOL_TYPE_SULFATE
     aerosolType(l_so4_a1)=AEROSOL_TYPE_SULFATE
     aerosolType(l_so4_a2)=AEROSOL_TYPE_SULFATE
@@ -262,7 +259,6 @@ contains
     aerosolType(l_ss_a1)=AEROSOL_TYPE_SALT
     aerosolType(l_ss_a2)=AEROSOL_TYPE_SALT
     aerosolType(l_ss_a3)=AEROSOL_TYPE_SALT
-    aerosolType(l_soa_n) =AEROSOL_TYPE_OM 
     aerosolType(l_soa_na)=AEROSOL_TYPE_OM 
     aerosolType(l_soa_a1)=AEROSOL_TYPE_OM 
 
@@ -522,8 +518,8 @@ contains
       tracer_in_mode(MODE_IDX_SS_A2, 1:n_tracers_in_mode(MODE_IDX_SS_A2))   = (/l_ss_a2, l_bc_ac, l_om_ac, l_so4_a1, l_so4_ac, l_so4_a2, l_soa_a1 /)
       !coarse mode ss sulfate coagulate, condensate sulfate and wet-phase sulfate
       tracer_in_mode(MODE_IDX_SS_A3, 1:n_tracers_in_mode(MODE_IDX_SS_A3))   = (/l_ss_a3, l_bc_ac, l_om_ac, l_so4_a1, l_so4_ac, l_so4_a2, l_soa_a1 /)
-      !sulfate + soa nucleation mode. cka: added soa
-      tracer_in_mode(MODE_IDX_SO4SOA_NUC, 1:n_tracers_in_mode(MODE_IDX_SO4SOA_NUC)) = (/l_so4_n, l_soa_n/)
+      !sulfate + soa nucleation mode (mode no longer used)
+      !tracer_in_mode(MODE_IDX_SO4SOA_NUC, 1:n_tracers_in_mode(MODE_IDX_SO4SOA_NUC)) = (/ -1 /)
       !bc in nucleation mode
       tracer_in_mode(MODE_IDX_BC_NUC, 1:n_tracers_in_mode(MODE_IDX_BC_NUC)) = (/l_bc_n/)
       !lumped organics
@@ -676,7 +672,6 @@ contains
     rdivr0(:,:)=1._r8
 
     do i=1,10
-       rdivr0(i,l_so4_n)=rr0so4(i)
        rdivr0(i,l_so4_na)=rr0so4(i)
        rdivr0(i,l_so4_a1)=rr0so4(i)
        rdivr0(i,l_so4_a2)=rr0so4(i)
@@ -700,7 +695,6 @@ contains
        rdivr0(i,l_ss_a3)=rr0ss(i)
 
 !cka: Add hygroscopic properties for soa. Assume identical to bcoc properties.
-       rdivr0(i,l_soa_n)=rr0bcoc(i)
        rdivr0(i,l_soa_na)=rr0bcoc(i)
 !       rdivr0(i,l_soa_a1)=rr0bcoc(i)
 	

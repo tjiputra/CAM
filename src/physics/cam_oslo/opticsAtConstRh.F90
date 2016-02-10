@@ -1,8 +1,8 @@
 
  subroutine opticsAtConstRh (lchnk, ncol, pint, rhoda, Nnatk, xrh, irh1, irh2, &
                              Cam, camnull, fcm, fbcm, faqm, &
-                             faqm4, fnbc, faitbc, focm, f_soana, f_soan, &
-                             vnbc, vaitbc, v_soana, v_soan)
+                             faqm4, fnbc, faitbc, focm, f_soana,  &
+                             vnbc, vaitbc, v_soana)
 
 !     Extra AeroCom diagnostics requiring table look-ups with RH=0%.
 
@@ -39,12 +39,10 @@
    real(r8), intent(in) :: camnull(pcols,pver,nbmodes)
    real(r8), intent(in) :: faqm4(pcols,pver) 
    real(r8), intent(in) :: f_soana(pcols,pver)
-   real(r8), intent(in) :: f_soan(pcols,pver)
    real(r8), intent(in) :: focm(pcols,pver,4)     ! = fraction of added mass which is either SOA cond. or OC coag.
    real(r8), intent(in) :: vnbc(pcols,pver)
    real(r8), intent(in) :: vaitbc(pcols,pver)
    real(r8), intent(in) :: v_soana(pcols,pver)
-   real(r8), intent(in) :: v_soan(pcols,pver)
 !
 !
 !---------------------------Local variables-----------------------------
@@ -89,7 +87,7 @@
    real(r8) bebglt1t(pcols,pver), bebclt1t(pcols,pver), &
             beoclt1t(pcols,pver), bes4lt1t(pcols,pver)
    real(r8) basu550tot(pcols,pver), babc550tot(pcols,pver), baoc550tot(pcols,pver), &
-            basu550xt(pcols,pver), babc550xt(pcols,pver), baoc550xt(pcols,pver), &
+            babc550xt(pcols,pver), baoc550xt(pcols,pver), &
             ba550x(pcols,pver,nbmp1:nmodes), belt1x(pcols,pver,nbmp1:nmodes)
 !           Additional AeroCom Phase III output:   
    real(r8) ec440dry_aer(pcols,pver), abs440dry_aer(pcols,pver), &
@@ -133,7 +131,7 @@
             backsc550n(pcols,pver,0:nbmodes)
    real(r8) bedustlt1(pcols,pver), bedustgt1(pcols,pver), &
             besslt1(pcols,pver), bessgt1(pcols,pver)
-   real(r8) bs4lt1xt(pcols,pver), bbclt1xt(pcols,pver), &
+   real(r8) bbclt1xt(pcols,pver), &
             boclt1xt(pcols,pver), bocgt1xt(pcols,pver)
 
 
@@ -248,19 +246,6 @@
            beoclt1n, beocgt1n, bes4lt1n, bes4gt1n,                     &
            backsc550n, babg550n, babc550n, baoc550n, basu550n)
 
-      mplus10=1
-        call intaeropt1(lchnk, ncol, xrh, irh1, irh2, mplus10,           &
-           Nnatk, f_soan, camnull, focm,                                 &
-           bext440n, bext500n, bext550n, bext670n, bext870n,             &
-           bebg440n, bebg500n, bebg550n, bebg670n, bebg870n,             &
-           bebc440n, bebc500n, bebc550n, bebc670n, bebc870n,             &
-           beoc440n, beoc500n, beoc550n, beoc670n, beoc870n,             &
-           besu440n, besu500n, besu550n, besu670n, besu870n,             &
-           babs440n, babs500n, babs550n, babs670n, babs870n,             &
-           bebglt1n, bebggt1n, bebclt1n, bebcgt1n,                       &
-           beoclt1n, beocgt1n, bes4lt1n, bes4gt1n,                       &
-           backsc550n, babg550n, babc550n, baoc550n, basu550n)
-
 !     and finally the BC&OC(n) mode:
       mplus10=1
         call intaeropt4(lchnk, ncol, xrh, irh1, irh2, mplus10, Nnatk, fnbc, camnull, focm, faqm4, &
@@ -316,16 +301,14 @@
             ec550drylt1_ss(icol,k) = besslt1(icol,k)
 
 !soa: *(1-v_soan) for the sulfate volume fraction of mode 11
-            bs4lt1xt(icol,k) = Nnatk(icol,k,11)*belt1x(icol,k,11)*(1.0_r8-v_soan(icol,k))
             bbclt1xt(icol,k) = Nnatk(icol,k,12)*belt1x(icol,k,12) &
                              + Nnatk(icol,k,14)*belt1x(icol,k,14)*vnbc(icol,k)
 !soa + v_soan part of mode 11 for the OC volume fraction of that mode
             boclt1xt(icol,k) = Nnatk(icol,k,13)*belt1x(icol,k,13) &
-                             + Nnatk(icol,k,14)*belt1x(icol,k,14)*(1.0_r8-vnbc(icol,k)) &
-               +v_soan(icol,k)*Nnatk(icol,k,11)*belt1x(icol,k,11)
+                             + Nnatk(icol,k,14)*belt1x(icol,k,14)*(1.0_r8-vnbc(icol,k)) 
 
 !soa: *(1-v_soana) for the sulfate volume fraction of mode 1
-            ec550drylt1_su(icol,k) = bes4lt1t(icol,k)+bs4lt1xt(icol,k)        &  ! condensate + n-mode (11)
+            ec550drylt1_su(icol,k) = bes4lt1t(icol,k)                         &  ! condensate
                   + Nnatk(icol,k,1)*bebglt1(icol,k,1)*(1.0_r8-v_soana(icol,k))&  ! background, SO4(Ait) mode (1)
                   + Nnatk(icol,k,5)*bebglt1(icol,k,5)                            ! background, SO4(Ait75) mode (5)
             ec550drylt1_bc(icol,k) = bebclt1t(icol,k)+bbclt1xt(icol,k)        &  ! coagulated + n-mode BC (12)
@@ -349,24 +332,23 @@
                                  + Nnatk(icol,k,9)*babg550(icol,k,9) &
                                  + Nnatk(icol,k,10)*babg550(icol,k,10)
 !soa: *(1-v_soana) for the sulfate volume fraction of mode 1
-            abs550dry_su(icol,k) = basu550tot(icol,k)+basu550xt(icol,k) &  ! condensate + n-mode (11)
+            abs550dry_su(icol,k) = basu550tot(icol,k)                   &  ! condensate:w
+
            + (1.0_r8-v_soana(icol,k))*Nnatk(icol,k,1)*babg550(icol,k,1) &  ! background, SO4(Ait) mode (1)
                                     + Nnatk(icol,k,5)*babg550(icol,k,5)    ! background, SO4(Ait75) mode (5)
 
 !soa: *(1-v_soan) for the sulfate volume fraction
-            basu550xt(icol,k) = Nnatk(icol,k,11)*ba550x(icol,k,11)*(1.0_r8-v_soan(icol,k))
             babc550xt(icol,k) = Nnatk(icol,k,12)*ba550x(icol,k,12)  &
                               + Nnatk(icol,k,14)*ba550x(icol,k,14)*vnbc(icol,k)
-!soa + v_soan part of mode 11 for the OC volume fraction of that mode
+!soa 
             baoc550xt(icol,k) = Nnatk(icol,k,13)*ba550x(icol,k,13) &
-                              + Nnatk(icol,k,14)*ba550x(icol,k,14)*(1.0_r8-vnbc(icol,k)) &
-                              + Nnatk(icol,k,11)*ba550x(icol,k,11)*v_soan(icol,k)
+                              + Nnatk(icol,k,14)*ba550x(icol,k,14)*(1.0_r8-vnbc(icol,k)) 
 
             abs550dry_bc(icol,k) = babc550tot(icol,k)+babc550xt(icol,k) &     ! coagulated + n-mode BC (12)
                                  + Nnatk(icol,k,2)*babg550(icol,k,2) &        ! background, BC(Ait) mode (2)
                   + vaitbc(icol,k)*Nnatk(icol,k,4)*babg550(icol,k,4) &        ! background in OC&BC(Ait) mode (4)
                                  + Nnatk(icol,k,0)*babg550(icol,k,0)          ! background, BC(ax) mode (0)
-!soa + v_soana part of mode 11 for the OC volume fraction of that mode
+!soa 
             abs550dry_oc(icol,k) = baoc550tot(icol,k)+baoc550xt(icol,k) &     ! coagulated + n-mode OC (13)
                   + v_soana(icol,k)*Nnatk(icol,k,1)*babg550(icol,k,1) &       ! SOA fraction of mode 1
                                   + Nnatk(icol,k,3)*babg550(icol,k,3) &       ! background, OC(Ait) mode (3)

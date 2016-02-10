@@ -51,14 +51,12 @@ contains
       !the externally mixed modes receive condensate,
       !e.g. the receiver of l_so4_n mass is the tracer l_so4_na 
       lifeCycleReceiver(:) = -99
-      lifeCycleReceiver(chemistryIndex(l_so4_n))  = chemistryIndex(l_so4_na)  !create SO4_na from SO4_n
       lifeCycleReceiver(chemistryIndex(l_bc_n))   = chemistryIndex(l_bc_a)    !create bc int mix from bc in mode 12
       lifeCycleReceiver(chemistryIndex(l_bc_ni))  = chemistryIndex(l_bc_ai)   !create bc int mix from bc in mode 14 
       lifeCycleReceiver(chemistryIndex(l_om_ni))  = chemistryIndex(l_om_ai)
       !!create om int mix from om in mode 14
       lifeCycleReceiver(chemistryIndex(l_bc_ax))  = chemistryIndex(l_bc_ai)
       !!create bc int mix from bc in mode 0. Note Mass is conserved but not number 
-      lifeCycleReceiver(chemistryIndex(l_soa_n))  = chemistryIndex(l_soa_na)  !create SOA_na from SOA_N in mode 11 (cka)
 
       !Sticking coeffcients for H2SO4 condensation
       !See table 1 in Kirkevag et al (2013) 
@@ -98,7 +96,7 @@ contains
       real(r8), parameter :: radair = 1.73e-10_r8   ![m] Typical air molecule collision radius
       real(r8), parameter :: Mair = 28.97_r8        ![amu/molec] Molecular weight for dry air
       !Diffusion volumes for simple molecules [Poling et al], table 11-1
-      real(r8), dimension(N_COND_VAP), parameter :: vad = (/51.96_r8, 298.18_r8, 298.18_r8/) ![cm3/mol]
+      real(r8), dimension(N_COND_VAP), parameter :: vad = (/51.96_r8, 208.18_r8, 208.18_r8/) ![cm3/mol]
       real(r8), parameter :: vadAir       = 19.7_r8                                          ![cm3/mol]
       real(r8), parameter :: aThird = 1.0_r8/3.0_r8
       real(r8), parameter :: cm2Tom2 = 1.e-4_r8       !convert from cm2 ==> m2
@@ -222,7 +220,7 @@ contains
             end if
          end if
       end do
-      !Need to add so4_a1 and soa_a1 also (which are not parts of the donor-receiver stuff) 
+      !Need to add so4_a1, soa_na, so4_na, soa_a1 also (which are not parts of the donor-receiver stuff) 
       fieldname_receiver = trim(solsym(chemistryIndex(l_so4_a1)))//"condTend"
       call addfld( fieldname_receiver, horiz_only, 'A', unit, "condensation tendency")
       if(history_aerosol)then
@@ -230,6 +228,16 @@ contains
       end if
       fieldname_receiver = trim(solsym(chemistryIndex(l_soa_a1)))//"condTend"
       call addfld( fieldname_receiver, horiz_only, "A", unit, "condensation tendency" )
+      if(history_aerosol)then
+         call add_default( fieldname_receiver, 1, ' ' )
+      end if
+      fieldname_receiver = trim(solsym(chemistryIndex(l_so4_na)))//"condTend"
+      call addfld( fieldname_receiver, unit, 1, 'A', "condensation tendency", phys_decomp )
+      if(history_aerosol)then
+         call add_default( fieldname_receiver, 1, ' ' )
+      end if
+      fieldname_receiver = trim(solsym(chemistryIndex(l_soa_na)))//"condTend"
+      call addfld( fieldname_receiver, unit, 1, 'A', "condensation tendency", phys_decomp )
       if(history_aerosol)then
          call add_default( fieldname_receiver, 1, ' ' )
       end if
@@ -281,14 +289,16 @@ contains
    integer :: l_receiver
    integer :: iDonor                                 ![idx] counter for externally mixed modes
    real(r8) :: condensationSink(0:nmodes, N_COND_VAP)![1/s] loss rate per mode (mixture)
+   real(r8) :: condensationSinkFraction(pcols,pver,numberOfExternallyMixedModes,N_COND_VAP) ![frc]
    real(r8) :: sumCondensationSink(pcols,pver, N_COND_VAP)       ![1/s] sum of condensation sink
    real(r8) :: totalLoss(pcols,pver,gas_pcnst) ![kg/kg] tracer lost
    real(r8) :: numberConcentration(0:nmodes) ![#/m3] number concentration
+   real(r8) :: numberConcentrationExtMix(pcols,pver,numberOfExternallyMixedModes)
    real(r8), dimension(pcols, gas_pcnst)            :: coltend
    real(r8), dimension(pcols)                       :: tracer_coltend
 
    real(r8) :: intermediateConcentration(pcols,pver,N_COND_VAP)
-   real(r8) :: rhoAir                           ![kg/m3] density of air
+   real(r8) :: rhoAir(pcols,pver)                           ![kg/m3] density of air
 ! Volume of added  material from condensate;  surface area of core particle; 
    real(r8) :: volume_shell, area_core,vol_monolayer 
    real (r8) :: frac_transfer                   ! Fraction of hydrophobic material converted to an internally mixed mode 
@@ -312,7 +322,8 @@ contains
    
     !Initialize h2so4 and soa nucl variables
     coagulationSink(:,:)=0.0_r8             
-!cka:-
+    condensationSinkFraction(:,:,:,:) = 0.0_r8  !Sink to the coming "receiver" of any vapour
+    numberConcentrationExtMix(:,:,:) = 0.0_r8
 
     do k=1,pver
       do i=1,ncol
@@ -323,7 +334,8 @@ contains
          !Initialize number concentration for this receiver
 
          !Air density
-         rhoAir = pmid(i,k)/rair/temperature(i,k)
+         rhoAir(i,k) = pmid(i,k)/rair/temperature(i,k)
+
 
          numberConcentration(:) = 0.0_r8
 
@@ -341,7 +353,7 @@ contains
                                              + q(i,k,l_receiver)                   &  !kg/kg
                                              / rhopart(physicsIndex(l_receiver))   &  !m3/kg ==> m3_{aer}/kg_{air} 
                                              * volumeToNumber(mode_index_receiver) &  !#/m3 ==> #/kg_{air}
-                                             * rhoAir                                 !kg/m3 ==> #/m3_{air}
+                                             * rhoAir(i,k)                                 !kg/m3 ==> #/m3_{air}
             end do !Lifecycle "core" species in this mode
          enddo
 
@@ -371,6 +383,25 @@ contains
             intermediateConcentration(i,k,cond_vap_idx) = &
                                  ( q(i,k,cond_vap_map(cond_vap_idx)) + cond_vap_gasprod(i,k,cond_vap_idx)*dt ) & 
                                  / (1.0_r8 + sumCondensationSink(i,k,cond_vap_idx)*dt)
+         end do
+
+         !Save the fraction of condensation sink for the externally mixed modes
+         !(Needed below to find volume shell)
+         do cond_vap_idx=1,N_COND_VAP
+
+            do iDonor = 1,numberOfExternallyMixedModes 
+            !Find the mode in question
+            mode_index_donor    = externallyMixedMode(iDonor) 
+
+               !Remember fraction of cond sink for this mode
+               condensationSinkFraction(i,k,iDonor,cond_vap_idx) = & 
+                  condensationSink(mode_index_donor,cond_vap_idx)    &
+                   / sumCondensationSink(i,k,cond_vap_idx)
+
+               !Remember number concentration in this mode
+               numberConcentrationExtMix(i,k,iDonor) =  &
+                     numberConcentration(mode_index_donor)
+            end do
          end do
 
          !Assume only a fraction of ORG_LV left can contribute to nucleation
@@ -462,15 +493,15 @@ contains
                
                !Add up volume shell for this 
                !condenseable vapour
-               volume_shell = volume_shell                                    & 
-                     + condensationSink(mode_index_donor,cond_vap_idx)/sumCondensationSink(i,k,cond_vap_idx)   & ![frc]
-                     * gasLost(i,k,cond_vap_idx)*(1.0_r8-fracNucl(i,k,cond_vap_idx))                           & ![kg/kg]
-                     * invRhoPart(physicsIndex(cond_vap_map(cond_vap_idx)))      &                               !*[m3/kg] ==> [m3/kg_{air}
-                     * rhoair                                                                                    !*[kg/m3] ==> m3/m3
+               volume_shell = volume_shell                                               & 
+                     + condensationSinkFraction(i,k,iDonor,cond_vap_idx)                 & ![frc]
+                     * gasLost(i,k,cond_vap_idx)*(1.0_r8-fracNucl(i,k,cond_vap_idx))     & ![kg/kg]
+                     * invRhoPart(physicsIndex(cond_vap_map(cond_vap_idx)))              & !*[m3/kg] ==> [m3/kg_{air}
+                     * rhoAir(i,k)                                                         !*[kg/m3] ==> m3/m3
         
             end do
                            
-            area_core=numberConcentration(mode_index_donor)*numberToSurface(mode_index_donor)   !#/m3 * m2/# ==> m2/m3
+            area_core=numberConcentrationExtMix(i,k,iDonor)*numberToSurface(mode_index_donor)   !#/m3 * m2/# ==> m2/m3
             vol_monolayer=area_core*dr_so4_monolayers_age
 
             ! Small fraction retained to avoid numerical irregularities
@@ -557,9 +588,12 @@ contains
       end do
       long_name=trim(solsym(chemistryIndex(l_so4_a1)))//"condTend"
       call outfld(long_name, coltend(:ncol,chemistryIndex(l_so4_a1)),pcols,lchnk)
-      !cka: Output the condensation of organics
       long_name=trim(solsym(chemistryIndex(l_soa_a1)))//"condTend"
       call outfld(long_name, coltend(:ncol,chemistryIndex(l_soa_a1)),pcols,lchnk)
+      long_name=trim(solsym(chemistryIndex(l_so4_na)))//"condTend"
+      call outfld(long_name, coltend(:ncol,chemistryIndex(l_so4_na)),pcols,lchnk)
+      long_name=trim(solsym(chemistryIndex(l_soa_na)))//"condTend"
+      call outfld(long_name, coltend(:ncol,chemistryIndex(l_soa_na)),pcols,lchnk)
 
    endif
 

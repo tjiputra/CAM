@@ -45,7 +45,7 @@ contains
                   ,f_acm             &        !O [frc] carbon fraction in mode
                   ,f_bcm             &        !O [frc] fraction of c being bc
                   ,f_aqm             &        !O [frc] fraction of sulfate being aquous
-                  ,f_condm           &        !O [frc] fraction of non-aquous SO4 being condensate
+                  ,f_so4_condm       &        !O [frc] fraction of non-aquous SO4 being condensate
                   ,f_soam            &
                   ,numberConcentration &      !O [#/m3] number concentration
                   ,volumeConcentration &      !O [m3/m3] volume concentration
@@ -70,7 +70,7 @@ contains
       real(r8), intent(out) :: f_acm(pcols,pver, nbmodes)
       real(r8), intent(out) :: f_bcm(pcols,pver, nbmodes)
       real(r8), intent(out) :: f_aqm(pcols, pver, nbmodes)
-      real(r8), intent(out) :: f_condm(pcols, pver, nbmodes)            !Needed in "get component fraction"
+      real(r8), intent(out) :: f_so4_condm(pcols, pver, nbmodes)            !Needed in "get component fraction"
       real(r8), intent(out) :: f_soam(pcols, pver, nbmodes)            !Needed in "get component fraction"
       real(r8), intent(out) :: numberConcentration(pcols,pver,0:nmodes) ![#/m3] number concentraiton
       real(r8), intent(out) :: volumeConcentration(pcols,pver,nmodes)   ![m3/m3] volume concentration
@@ -90,7 +90,6 @@ contains
 
       real(r8)              :: f_aitbc(pcols,pver) ! [-] bc fraction in the coated bc-oc mode 
       real(r8)              :: f_nbc(pcols,pver)   ! [-] mass fraction of bc in uncoated bc/oc mode
-      real(r8)              :: f_soan(pcols,pver)  ! [-] 
       real(r8)              :: f_soana(pcols,pver) ! [-] 
 
       !Get mass, number concentration and the total add-ons (previous convaer)
@@ -107,7 +106,6 @@ contains
                            , f_soa                &  !O 
                            , f_aitbc              &  !O
                            , f_nbc                &  !O
-                           , f_soan               &  !O 
                            , f_soana              &  !O
                            )
    
@@ -127,7 +125,7 @@ contains
                            ,f_acm          &  !O [frc] as f_c per mode
                            ,f_bcm          &  !O [frc] as f_bc per mode
                            ,f_aqm          &  !O [frc] as f_aq per mode
-                           ,f_condm        &  !O [frc] as f_so4_cond per mode
+                           ,f_so4_condm    &  !O [frc] as f_so4_cond per mode
                            ,f_soam         &  !O [frc]
                            )
 
@@ -180,7 +178,6 @@ contains
                ,f_soa                  & !O [-] fraction of OM which is SOA
                ,f_aitbc                & !O [-] fraction of bc in the background tracer mode
                ,f_nbc                  & !O [-] fraction of bc in the background tracer mode 14
-               ,f_soan                 & !O [-] fraction of soa in background ext-mix mode (11)
                ,f_soana                & !O [-] fraction of soa in background int-mix mode (1)
                )
 
@@ -204,7 +201,6 @@ contains
       real(r8), intent(out) :: f_soa(pcols,pver)      ![-] mass fraction of OM being SOA
       real(r8), intent(out) :: f_aitbc(pcols,pver)    ![-] mass fraction of bc in bc/oc mixed, coated mode
       real(r8), intent(out) :: f_nbc(pcols,pver)      ![-] mass fraction of bc in bc/oc mixed, un-coated mode
-      real(r8), intent(out) :: f_soan(pcols,pver)     ![-] mass fraction of soa in background in ext-mix nucl-mode(11)
       real(r8), intent(out) :: f_soana(pcols,pver)    ![-] mass fraction of soa in background in int mix ait mode (1)
       !Local variables
 		real(r8) :: totalProcessModes(pcols,pver)    ! [kg/kg] Int. mixed (cond./coag./aq.) SO4+BC+OC concentration
@@ -220,16 +216,16 @@ contains
          !Total coagulated bc and oc and SO4 (condensate, wet phase and coagulated) (kg/kg) 
          !internally mixed with background modes
          totalProcessModes(:ncol,k)  = qm(:ncol,k,l_bc_ac) + qm(:ncol,k,l_om_ac) &
-               +  qm(:ncol,k,l_so4_a1) + qm(:ncol,k,l_so4_a2) + qm(:ncol,k,l_so4_ac)
+               +  qm(:ncol,k,l_so4_a1) + qm(:ncol,k,l_so4_a2) + qm(:ncol,k,l_so4_ac) + qm(:ncol,k,l_soa_a1)
 
          CProcessModes(:ncol,k) = rho_air(:ncol,k)*totalProcessModes(:ncol,k)  !==> kg/m3
 
-         !fraction of process-mode being coagulate
-         f_c(:ncol,k)   = min((qm(:ncol,k,l_bc_ac)+qm(:ncol,k,l_om_ac))&
+         !fraction of process-mode being carbonaceous
+         f_c(:ncol,k)   = min((qm(:ncol,k,l_bc_ac)+qm(:ncol,k,l_om_ac)+qm(:ncol,k,l_soa_a1) )&
                  /(totalProcessModes(:ncol,k)+smallNumber), 1.0_r8)
 
-         !fraction of coagulate being bc (total is oc and bc)
-         f_bc(:ncol,k)  = min(qm(:ncol,k,l_bc_ac)/(qm(:ncol,k,l_bc_ac)+qm(:ncol,k,l_om_ac)+smallNumber), 1.0_r8)
+         !fraction of "c" being bc (total is oc and bc)
+         f_bc(:ncol,k)  = min(qm(:ncol,k,l_bc_ac)/(qm(:ncol,k,l_bc_ac)+qm(:ncol,k,l_om_ac)+qm(:ncol,k,l_soa_a1)+smallNumber), 1.0_r8)
 
          !fraction of non-aqeous phase sulphate being condensate
          f_so4_cond(:ncol,k) = min(qm(:ncol,k,l_so4_a1)/(qm(:ncol,k,l_so4_a1)+qm(:ncol,k,l_so4_ac)+smallNumber), 1.0_r8)
@@ -246,9 +242,6 @@ contains
 
          !fraction of OM process-mode which is SOA
          f_soa(:ncol,k) = min(qm(:ncol,k,l_soa_a1) / (qm(:ncol,k,l_om_ac) + qm(:ncol,k,l_soa_a1) + smallNumber), 1.0_r8)
-
-         !fraction of "background" ext-mix (mode 11) which is SOA
-         f_soan(:ncol,k) = min(qm(:ncol,k,l_soa_n) / (qm(:ncol,k,l_soa_n) + qm(:ncol,k,l_so4_n) + smallNumber), 1.0_r8)
 
          !fraction of "background" int-mix (mode 1) which is SOA
          f_soana(:ncol,k) = min(qm(:ncol,k,l_soa_na) / (qm(:ncol,k,l_soa_na) + qm(:ncol,k,l_so4_na) + smallNumber), 1.0_r8 )
@@ -848,7 +841,7 @@ contains
          endif
 
          !initialize
-         lnsigma(:,:,:) = log(2.0_r8)
+         lnsigma(:,:,kcomp) = log(2.0_r8)
 
          !The whole point of the interpolation routines is to get the new sigma ==> so trust the sigma
 

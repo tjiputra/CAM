@@ -35,7 +35,7 @@ contains
    integer,  intent(in)      :: lchnk      ! chunk id
    logical, intent(in)       :: inv_oh, inv_ho2
    integer, intent(in)       :: id_oh, id_ho2
-   real(r8), intent(inout)   ::  invariants(pcols,pver,nfs)
+   real(r8), intent(inout)   ::  invariants(ncol,pver,nfs)
 
 
 
@@ -92,7 +92,7 @@ contains
          tset  = tset/24._r8
          tlight = tset - trise
          if (tlight < 0._r8) then
-            tset = tset + 1.0
+            tset = tset + 1.0_r8
             tlight = tlight + 1._r8
          end if
       else
@@ -102,31 +102,35 @@ contains
          else
             tset = 0._r8
          end if
-         tlight = tset - trise
+         tlight = tset - trise  !length of light period in a day
       end if
 
 ! if all day or all night (or very close to it), set fdiurn = 1.0
+! Also in periods with all night, we put the mean value for all night steps
       if ((tlight .ge. 0.99_r8) .or. (tlight .le. 0.01_r8)) then
          fdiurn_oxid = 1._r8
 ! otherwise determine overlap between current timestep and daylight times
 ! to account for all overlap possibilities, need to try this 
 ! with rise/set times shifted by +/- 1 day 
-      else
-         t1 = ncsec/86400._r8
-         t2 = t1 + dtc/86400._r8
+      else  !==> There is diurnal cycle
+         t1 = ncsec/86400._r8          !start of timestep (days)
+         t2 = t1 + dtc/86400._r8       !end of timestep (days)
          sum = 0._r8
          do j = -1, 1
-            trisej = trise + j
-            tsetj  = trisej + tlight
-            ta = max( t1, trisej )
-            tb = min( t2, tsetj )
-            sum = sum + max( tb-ta, 0._r8 )/tlight
+            trisej = trise + dfloat(j)  !one day before sunrise, sunrise, one day after runrise
+            tsetj  = trisej + tlight    !time of sunset given "j"
+            ta = max( t1, trisej )      !start or sunrise (if later)
+            tb = min( t2, tsetj )       !end of step or sunset (if earlier)
+            sum = sum + max( tb-ta, 0._r8 )
+
          end do
-         fdiurn_oxid = sum/(t2-t1)
 
-
-
-!         fdiurn_oxid(i) = 1.0_r8
+         !sum is length of timestep (in days) which has light
+         !"sum"/(t1-t2) is fraction of timestep which has light
+         !"tlight is fraction of day which has light
+         !So if fraction of dt is higher than avg fraction during day ==> increase oxidants
+         !   if fraction of dt is lower than  avg fraction during day ==> decrease oxidants
+         fdiurn_oxid = max(1.0e-3_r8, sum/(t2-t1)/tlight)
 
       end if
 !if(deglat.gt.0._r8.and.deglat.lt.1._r8) &

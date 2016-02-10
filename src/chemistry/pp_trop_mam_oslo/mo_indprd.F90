@@ -48,23 +48,23 @@
 
          prod(:,:,7) = 0._r8
 
-         prod(:,:,8) = 0._r8
+         prod(:,:,8) = + extfrc(:,:,6)
 
-         prod(:,:,9) = + extfrc(:,:,6)
+         prod(:,:,9) = + extfrc(:,:,4)
 
-         prod(:,:,10) = + extfrc(:,:,4)
+         prod(:,:,10) = + extfrc(:,:,3)
 
-         prod(:,:,11) = + extfrc(:,:,3)
+         prod(:,:,11) = + extfrc(:,:,2)
 
-         prod(:,:,12) = + extfrc(:,:,2)
+         prod(:,:,12) = 0._r8
 
          prod(:,:,13) = 0._r8
 
          prod(:,:,14) = 0._r8
 
-         prod(:,:,15) = 0._r8
+         prod(:,:,15) = + extfrc(:,:,5)
 
-         prod(:,:,16) = + extfrc(:,:,5)
+         prod(:,:,16) = 0._r8
 
          prod(:,:,17) = 0._r8
 
@@ -91,10 +91,6 @@
          prod(:,:,28) = 0._r8
 
          prod(:,:,29) = 0._r8
-
-         prod(:,:,30) = 0._r8
-
-         prod(:,:,31) = 0._r8
 
       end if
 

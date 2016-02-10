@@ -631,7 +631,6 @@ end function radiation_nextsw_cday
     use opttab,           only: nbands, eps
     use constituents,     only: pcnst
     use oslo_control,     only: oslo_getopts
-!    use cloud_cover_diags, only: cloud_cover_diags_out   ! hjalp ikke
 #endif
 
     ! Arguments
@@ -763,9 +762,9 @@ end function radiation_nextsw_cday
     real(r8) :: aer_tau_w_g(pcols,0:pver,nbndsw) ! aerosol assymetry parameter * w * tau
     real(r8) :: aer_tau_w_f(pcols,0:pver,nbndsw) ! aerosol forward scattered fraction * w * tau
     real(r8) :: aer_lw_abs (pcols,pver,nbndlw)   ! aerosol absorption optics depth (LW)
-#ifdef AEROCOM
-    real(r8) :: aerlwabs01 (pcols,pver)          ! aerosol absorption optics depth (LW) at 3.077-3.846 um.
-#endif
+!#ifdef AEROCOM
+!    real(r8) :: aerlwabs01 (pcols,pver)          ! aerosol absorption optics depth (LW) at 3.077-3.846 um.
+!#endif
 
     ! Gathered indices of day and night columns 
     !  chunk_column_index = IdxDay(daylight_column_index)
@@ -793,8 +792,8 @@ end function radiation_nextsw_cday
     real(r8) absvis(pcols)              ! absorptive AOD vis
     real(r8) clearodvis(pcols), clearabsvis(pcols), cloudfree(pcols), cloudfreemax(pcols)
 #ifdef AEROCOM
-   real(r8) dod550(pcols),dod870(pcols),abs550(pcols),abs550alt(pcols)
-   real(r8) clearod550(pcols),clearod870(pcols),clearabs550(pcols),clearabs550alt(pcols)
+   real(r8) dod440(pcols),dod550(pcols),dod870(pcols),abs550(pcols),abs550alt(pcols)
+   real(r8) clearod440(pcols),clearod550(pcols),clearod870(pcols),clearabs550(pcols),clearabs550alt(pcols)
 !   This (dslon and dslat) is only correct with 1.9*2.5 deg. hor. resolution:
     real(r8), parameter :: dslat = 1.89473684210526_r8
     real(r8), parameter :: dslon = 2.5_r8
@@ -812,16 +811,8 @@ end function radiation_nextsw_cday
     real(r8) faerobg(pcols,pverp)       ! level background aerosol forcing
     real(r8) faero(pcols,pverp)         ! level anthropogenic aerosol forcing
     real(r8) Nnatk(pcols,pver,0:nmodes) ! Modal aerosol number concentration
-!x    real(r8) ssatot(pcols,pver,nbands)  ! aerosol single scattering albedo
-!x    real(r8) asymtot(pcols,pver,nbands) ! aerosol asymmetry factor
-!x    real(r8) betot(pcols,pver,nbands)   ! aerosol extinction
-!lw
-!?    real(r8) batotlw(pcols,pver,nlwbands)  ! spectral aerosol absportion extinction in LW
     real(r8) batotlw(pcols,pver,nbndlw)  ! spectral aerosol absportion extinction in LW
-!lw
-    real(r8) Ctot(pcols,pver)           ! aerosol mass concentration
     real(r8) rhoda(pcols,pver)          ! air mass density, unit kg/m^3
-!    real(r8) deltah_km(pcols,pver)      ! Layer thickness, unit km
     real(r8) :: pmxrgnrf(pcols,pverp)   ! temporary copy of pmxrgn
     integer  :: nmxrgnrf(pcols)         ! temporary copy of nmxrgn
     real(r8) :: rhtrunc(pcols,pver)     ! relative humidity (as fraction)
@@ -831,14 +822,6 @@ end function radiation_nextsw_cday
     real(r8) :: per_tau_w_f(pcols,0:pver,nbndsw) ! aerosol forward scattered fraction * w * tau
     real(r8) :: per_lw_abs (pcols,pver,nbndlw)   ! aerosol absorption optics depth (LW)
     integer ns                          ! spectral loop index
-    integer iant                        ! anthrop. aerosol (1) or nat./backgr. (0)
-!#ifdef AEROFFL
-!    real(r8) :: zer_tau    (pcols,0:pver,nbndsw) ! zero aerosol extinction optical depth
-!    real(r8) :: zer_tau_w  (pcols,0:pver,nbndsw) ! aerosol single scattering albedo * tau
-!    real(r8) :: zer_tau_w_g(pcols,0:pver,nbndsw) ! aerosol assymetry parameter * w * tau
-!    real(r8) :: zer_tau_w_f(pcols,0:pver,nbndsw) ! aerosol forward scattered fraction * w * tau
-!    real(r8) :: zer_lw_abs (pcols,pver,nbndlw)   ! aerosol absorption optics depth (LW)
-!#endif
 #endif
 
     ! tropopause diagnostic
@@ -1076,18 +1059,21 @@ end function radiation_nextsw_cday
        if (dosw) then
 
 #ifdef DIRIND
+!TEST
+!       qdirind(:ncol,:,l_soa_a1) = 0.0_r8
+!       qdirind(:ncol,:,l_soa_na) = 0.0_r8
+!       qdirind(:ncol,:,l_so4_a1) = 0.0_r8
+!       qdirind(:ncol,:,l_so4_na) = 0.0_r8
+!TEST
 !cak+  Calculate CAM5-Oslo/NorESM2 aerosol optical parameters  
-! (move to aer_rad_props.F90? No, then it cannot be called for nighttime calculations...)
-          iant=1
-!o           call pmxsub(lchnk, ncol, pnm, state%pmid, iant,  &
+! (move to aer_rad_props.F90? No, then it cannot be called for night-time calculations...)
           call pmxsub(lchnk, ncol, pnm, state%pmid,  &
                       coszrs, state, state%t, qdirind, Nnatk, &
-!lw                      ssatot, asymtot, betot,   Ctot,       deltah_km, & 
                       per_tau, per_tau_w, per_tau_w_g, per_tau_w_f, &
-!lw                      batotlw, Ctot, deltah_km, & 
-                      per_lw_abs, Ctot, & 
+                      per_lw_abs, & 
 #ifdef AEROCOM
-                      aodvis, absvis, dod550, dod870, abs550, abs550alt)
+                      aodvis, absvis, dod440, dod550, dod870, abs550, abs550alt)
+!                      aodvis, absvis, dod550, dod870, abs550, abs550alt)
 #else
                       aodvis, absvis)
 #endif
@@ -1116,7 +1102,6 @@ end function radiation_nextsw_cday
                   call rad_rrtmg_sw( &
                        lchnk,        ncol,         num_rrtmg_levs, r_state,                    &
                        state%pmid,   rd%cldfprime,                                                &
-                       !rd%aer_tau,   aer_tau_w,    aer_tau_w_g,  aer_tau_w_f,                  &
                        per_tau*0._r8,      per_tau_w,    per_tau_w_g,  per_tau_w_f,            &
                        eccf,         coszrs,       rd%solin(:,icall),        sfac,                         &
                        cam_in%asdir, cam_in%asdif, cam_in%aldir, cam_in%aldif,                 &
@@ -1157,7 +1142,7 @@ end function radiation_nextsw_cday
                        lchnk,        ncol,         num_rrtmg_levs, r_state,                    &
                        state%pmid,   rd%cldfprime, & 
 #ifdef DIRIND                                                       
-                       per_tau*0._r8,      per_tau_w,    per_tau_w_g,  per_tau_w_f,            &
+                       per_tau,      per_tau_w,    per_tau_w_g,  per_tau_w_f,            &
 #else
                        rd%aer_tau,   aer_tau_w,    aer_tau_w_g,  aer_tau_w_f,                  &
 #endif
@@ -1220,11 +1205,13 @@ end function radiation_nextsw_cday
        call outfld('CLDFREE ',cloudfree,pcols,lchnk)
 #ifdef AEROCOM
        do i = 1, ncol
+         clearod440(i)=cloudfree(i)*dod440(i)
          clearod550(i)=cloudfree(i)*dod550(i)
          clearod870(i)=cloudfree(i)*dod870(i)
          clearabs550(i)=cloudfree(i)*abs550(i)
          clearabs550alt(i)=cloudfree(i)*abs550alt(i)
        end do
+       call outfld('CDOD440 ',clearod440  ,pcols,lchnk)
        call outfld('CDOD550 ',clearod550  ,pcols,lchnk)
        call outfld('CDOD870 ',clearod870  ,pcols,lchnk)
        call outfld('CABS550 ',clearabs550  ,pcols,lchnk)
@@ -1335,14 +1322,14 @@ end function radiation_nextsw_cday
                   call outfld('FLUS    ',ftem_1d ,pcols,lchnk)
 #endif  ! AEROCOM
 #endif  ! AEROFFL
-#ifdef AEROCOM
-                  do i=1,ncol
-                    do k=1,pver
-                      aerlwabs01(i,k) = aer_lw_abs(i,k,16)   
-                    end do
-                  end do
-                  call outfld('AERLWA01',aerlwabs01,pcols,lchnk)
-#endif
+!#ifdef AEROCOM
+!                  do i=1,ncol
+!                    do k=1,pver
+!                      aerlwabs01(i,k) = aer_lw_abs(i,k,16)   
+!                    end do
+!                  end do
+!                  call outfld('AERLWA01',aerlwabs01,pcols,lchnk)
+!#endif
 #endif  ! DIRIND
 
                   if (spectralflux) then

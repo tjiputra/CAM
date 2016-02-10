@@ -419,7 +419,8 @@ subroutine initdryp
 !ccccccccc1ccccccccc2ccccccccc3ccccccccc4ccccccccc5ccccccccc6ccccccccc7cc
 
 
-  993 format(I2,3e10.3,f5.2,19e10.3)
+!  993 format(I2,3e10.3,f5.2,19e10.3)
+  993 format(I2,23e10.3)
   994 format(I2,21e10.3)
   995 format(I2,23e10.3)
   996 format(I2,7e11.4)

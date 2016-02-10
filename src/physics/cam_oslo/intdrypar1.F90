@@ -1,4 +1,4 @@
-subroutine intdrypar1 (lchnk, ncol, Nnatk, xfombgnin, xfombgin, Camk, xfacsoain,      & 
+subroutine intdrypar1 (lchnk, ncol, Nnatk, xfombgin, Camk, xfacsoain,      & 
            cintbg, cintbg05, cintbg125, cintbc, cintbc05, cintbc125, & 
            cintoc, cintoc05, cintoc125, cintsc, cintsc05, cintsc125, &
            cintsa, cintsa05, cintsa125, aaeros, aaerol, vaeros, vaerol, &
@@ -19,7 +19,6 @@ subroutine intdrypar1 (lchnk, ncol, Nnatk, xfombgnin, xfombgin, Camk, xfacsoain,
    integer, intent(in) :: ncol                      ! number of atmospheric columns
    real(r8), intent(in) :: Nnatk(pcols,pver,0:nmodes) ! modal aerosol number concentration  
    real(r8), intent(in) :: Camk(pcols,pver,nbmodes) ! modal internally mixed SO4+BC+OC conc.
-   real(r8), intent(in) :: xfombgnin(pcols,pver)    ! SOA/(SOA+H2SO4) for the background mode (11)
    real(r8), intent(in) :: xfombgin(pcols,pver)     ! SOA/(SOA+H2SO4) for the background mode (1)
    real(r8), intent(in) :: xfacsoain(pcols,pver)    ! OC/(SO4+OC) added to the background mode
 !
@@ -48,7 +47,7 @@ subroutine intdrypar1 (lchnk, ncol, Nnatk, xfombgnin, xfombgin, Camk, xfacsoain,
 !---------------------------Local variables-----------------------------
 !
       real(r8) a, b, e, eps, catot 
-      real(r8) xfombgn(pcols,pver), xfombg(pcols,pver), xct(pcols,pver), xfac(pcols,pver)
+      real(r8) xfombg(pcols,pver), xct(pcols,pver), xfac(pcols,pver)
 
       integer iv, ierr, ifombg, ictot, ifac, kcomp, k, icol
       integer ifombgn1(pcols,pver), ifombgn2(pcols,pver), &

@@ -5,33 +5,31 @@
       (  2)  H2SO4           
       (  3)  DMS                (CH3SCH3)
       (  4)  H2O2            
-      (  5)  SO4_N              (H2SO4)
-      (  6)  SO4_NA             (H2SO4)
-      (  7)  SO4_A1             (H2SO4)
-      (  8)  SO4_A2             (NH4HSO4)
-      (  9)  SO4_AC             (H2SO4)
-      ( 10)  SO4_PR             (H2SO4)
-      ( 11)  BC_N               (C)
-      ( 12)  BC_AX              (C)
-      ( 13)  BC_NI              (C)
-      ( 14)  BC_A               (C)
-      ( 15)  BC_AI              (C)
-      ( 16)  BC_AC              (C)
-      ( 17)  OM_NI              (C)
-      ( 18)  OM_AI              (C)
-      ( 19)  OM_AC              (C)
-      ( 20)  DST_A2             (AlSiO5)
-      ( 21)  DST_A3             (AlSiO5)
-      ( 22)  SS_A1              (NaCl)
-      ( 23)  SS_A2              (NaCl)
-      ( 24)  SS_A3              (NaCl)
-      ( 25)  SOA_N              (C10H16O2)
-      ( 26)  SOA_NA             (C10H16O2)
-      ( 27)  SOA_A1             (C10H16O2)
-      ( 28)  SOA_LV             (C10H16O2)
-      ( 29)  SOA_SV             (C10H16O2)
-      ( 30)  monoterp           (C10H16)
-      ( 31)  isoprene           (C5H8)
+      (  5)  SO4_NA             (H2SO4)
+      (  6)  SO4_A1             (H2SO4)
+      (  7)  SO4_A2             (NH4HSO4)
+      (  8)  SO4_AC             (H2SO4)
+      (  9)  SO4_PR             (H2SO4)
+      ( 10)  BC_N               (C)
+      ( 11)  BC_AX              (C)
+      ( 12)  BC_NI              (C)
+      ( 13)  BC_A               (C)
+      ( 14)  BC_AI              (C)
+      ( 15)  BC_AC              (C)
+      ( 16)  OM_NI              (C)
+      ( 17)  OM_AI              (C)
+      ( 18)  OM_AC              (C)
+      ( 19)  DST_A2             (AlSiO5)
+      ( 20)  DST_A3             (AlSiO5)
+      ( 21)  SS_A1              (NaCl)
+      ( 22)  SS_A2              (NaCl)
+      ( 23)  SS_A3              (NaCl)
+      ( 24)  SOA_NA             (C10H16O2)
+      ( 25)  SOA_A1             (C10H16O2)
+      ( 26)  SOA_LV             (C10H16O2)
+      ( 27)  SOA_SV             (C10H16O2)
+      ( 28)  monoterp           (C10H16)
+      ( 29)  isoprene           (C5H8)
   
   
      Invariant species
@@ -57,34 +55,32 @@ Class List
       (  1)  DMS             
       (  2)  SO2             
       (  3)  H2O2            
-      (  4)  SO4_N           
-      (  5)  SO4_NA          
-      (  6)  SO4_A1          
-      (  7)  SO4_A2          
-      (  8)  SO4_AC          
-      (  9)  SO4_PR          
-      ( 10)  BC_N            
-      ( 11)  BC_AX           
-      ( 12)  BC_NI           
-      ( 13)  BC_A            
-      ( 14)  BC_AI           
-      ( 15)  BC_AC           
-      ( 16)  OM_NI           
-      ( 17)  OM_AI           
-      ( 18)  OM_AC           
-      ( 19)  DST_A2          
-      ( 20)  DST_A3          
-      ( 21)  SS_A1           
-      ( 22)  SS_A2           
-      ( 23)  SS_A3           
-      ( 24)  H2SO4           
-      ( 25)  SOA_N           
-      ( 26)  SOA_NA          
-      ( 27)  SOA_A1          
-      ( 28)  SOA_LV          
-      ( 29)  SOA_SV          
-      ( 30)  monoterp        
-      ( 31)  isoprene        
+      (  4)  SO4_NA          
+      (  5)  SO4_A1          
+      (  6)  SO4_A2          
+      (  7)  SO4_AC          
+      (  8)  SO4_PR          
+      (  9)  BC_N            
+      ( 10)  BC_AX           
+      ( 11)  BC_NI           
+      ( 12)  BC_A            
+      ( 13)  BC_AI           
+      ( 14)  BC_AC           
+      ( 15)  OM_NI           
+      ( 16)  OM_AI           
+      ( 17)  OM_AC           
+      ( 18)  DST_A2          
+      ( 19)  DST_A3          
+      ( 20)  SS_A1           
+      ( 21)  SS_A2           
+      ( 22)  SS_A3           
+      ( 23)  H2SO4           
+      ( 24)  SOA_NA          
+      ( 25)  SOA_A1          
+      ( 26)  SOA_LV          
+      ( 27)  SOA_SV          
+      ( 28)  monoterp        
+      ( 29)  isoprene        
   
      Photolysis
   jh2o2            (  1)   H2O2 + hv -> (No products)                                           rate = ** User defined **         (  1)
@@ -97,7 +93,7 @@ Class List
                    (  5)   SO2 + OH + M ->  H2SO4 + M                                           troe : ko=3.00E-31*(300/t)**3.30  (  6)
                                                                                                        ki=1.50E-12                
                                                                                                         f=0.60                    
-  usr_DMS_OH       (  6)   DMS + OH ->  .5*SO2 + .5*HO2 + 4.0*OM_NI                             rate = ** User defined **         (  7)
+  usr_DMS_OH       (  6)   DMS + OH ->  .75*SO2 + .5*HO2 + 0.029*SOA_LV + 0.114*SOA_SV          rate = ** User defined **         (  7)
                    (  7)   monoterp + O3 ->  .15*SOA_LV                                         rate = 8.05E-16*exp(   -640./t)   (  8)
                    (  8)   monoterp + OH ->  .15*SOA_SV                                         rate = 1.20E-11*exp(    440./t)   (  9)
                    (  9)   monoterp + NO3 ->  .15*SOA_SV                                        rate = 1.20E-12*exp(    490./t)   ( 10)
@@ -118,13 +114,12 @@ Extraneous prod/loss species
   
  Equation Report
   
-    d(SO2)/dt = r3*OH*DMS  + r4*NO3*DMS  + .5*r6*OH*DMS                                                                 
+    d(SO2)/dt = r3*OH*DMS  + r4*NO3*DMS  + .75*r6*OH*DMS                                                                
                  - r5*OH*M*SO2                                                                                          
     d(H2SO4)/dt = r5*OH*M*SO2                                                                                           
     d(DMS)/dt =  - r3*OH*DMS  - r4*NO3*DMS  - r6*OH*DMS                                                                 
     d(H2O2)/dt = r1                                                                                                     
                   - j1*H2O2  - r2*OH*H2O2                                                                               
-    d(SO4_N)/dt = 0                                                                                                     
     d(SO4_NA)/dt = 0                                                                                                    
     d(SO4_A1)/dt = 0                                                                                                    
     d(SO4_A2)/dt = 0                                                                                                    
@@ -136,7 +131,7 @@ Extraneous prod/loss species
     d(BC_A)/dt = 0                                                                                                      
     d(BC_AI)/dt = 0                                                                                                     
     d(BC_AC)/dt = 0                                                                                                     
-    d(OM_NI)/dt = 4*r6*OH*DMS                                                                                           
+    d(OM_NI)/dt = 0                                                                                                     
     d(OM_AI)/dt = 0                                                                                                     
     d(OM_AC)/dt = 0                                                                                                     
     d(DST_A2)/dt = 0                                                                                                    
@@ -144,12 +139,11 @@ Extraneous prod/loss species
     d(SS_A1)/dt = 0                                                                                                     
     d(SS_A2)/dt = 0                                                                                                     
     d(SS_A3)/dt = 0                                                                                                     
-    d(SOA_N)/dt = 0                                                                                                     
     d(SOA_NA)/dt = 0                                                                                                    
     d(SOA_A1)/dt = 0                                                                                                    
-    d(SOA_LV)/dt = .15*r7*O3*monoterp                                                                                   
-    d(SOA_SV)/dt = .15*r8*OH*monoterp  + .15*r9*NO3*monoterp  + .05*r10*O3*isoprene  + .05*r11*OH*isoprene              
-                    + .05*r12*NO3*isoprene                                                                              
+    d(SOA_LV)/dt = .029*r6*OH*DMS  + .15*r7*O3*monoterp                                                                 
+    d(SOA_SV)/dt = .114*r6*OH*DMS  + .15*r8*OH*monoterp  + .15*r9*NO3*monoterp  + .05*r10*O3*isoprene                   
+                    + .05*r11*OH*isoprene  + .05*r12*NO3*isoprene                                                       
     d(monoterp)/dt =  - r7*O3*monoterp  - r8*OH*monoterp  - r9*NO3*monoterp                                             
     d(isoprene)/dt =  - r10*O3*isoprene  - r11*OH*isoprene  - r12*NO3*isoprene                                          
   

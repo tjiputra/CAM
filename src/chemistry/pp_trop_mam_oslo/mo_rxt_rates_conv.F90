@@ -15,11 +15,11 @@ contains
       rxt_rates(:ncol,:,     5) = rxt_rates(:ncol,:,     5)*sol(:ncol,:,     3)                                                ! rate_const*NO3*DMS
       rxt_rates(:ncol,:,     6) = rxt_rates(:ncol,:,     6)*sol(:ncol,:,     1)                                                ! rate_const*OH*M*SO2
       rxt_rates(:ncol,:,     7) = rxt_rates(:ncol,:,     7)*sol(:ncol,:,     3)                                                ! rate_const*OH*DMS
-      rxt_rates(:ncol,:,     8) = rxt_rates(:ncol,:,     8)*sol(:ncol,:,    30)                                                ! rate_const*O3*monoterp
-      rxt_rates(:ncol,:,     9) = rxt_rates(:ncol,:,     9)*sol(:ncol,:,    30)                                                ! rate_const*OH*monoterp
-      rxt_rates(:ncol,:,    10) = rxt_rates(:ncol,:,    10)*sol(:ncol,:,    30)                                                ! rate_const*NO3*monoterp
-      rxt_rates(:ncol,:,    11) = rxt_rates(:ncol,:,    11)*sol(:ncol,:,    31)                                                ! rate_const*O3*isoprene
-      rxt_rates(:ncol,:,    12) = rxt_rates(:ncol,:,    12)*sol(:ncol,:,    31)                                                ! rate_const*OH*isoprene
-      rxt_rates(:ncol,:,    13) = rxt_rates(:ncol,:,    13)*sol(:ncol,:,    31)                                                ! rate_const*NO3*isoprene
+      rxt_rates(:ncol,:,     8) = rxt_rates(:ncol,:,     8)*sol(:ncol,:,    28)                                                ! rate_const*O3*monoterp
+      rxt_rates(:ncol,:,     9) = rxt_rates(:ncol,:,     9)*sol(:ncol,:,    28)                                                ! rate_const*OH*monoterp
+      rxt_rates(:ncol,:,    10) = rxt_rates(:ncol,:,    10)*sol(:ncol,:,    28)                                                ! rate_const*NO3*monoterp
+      rxt_rates(:ncol,:,    11) = rxt_rates(:ncol,:,    11)*sol(:ncol,:,    29)                                                ! rate_const*O3*isoprene
+      rxt_rates(:ncol,:,    12) = rxt_rates(:ncol,:,    12)*sol(:ncol,:,    29)                                                ! rate_const*OH*isoprene
+      rxt_rates(:ncol,:,    13) = rxt_rates(:ncol,:,    13)*sol(:ncol,:,    29)                                                ! rate_const*NO3*isoprene
   end subroutine set_rates
 end module mo_rxt_rates_conv
