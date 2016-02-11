@@ -262,6 +262,7 @@ contains
     aerosolType(l_soa_na)=AEROSOL_TYPE_OM 
     aerosolType(l_soa_a1)=AEROSOL_TYPE_OM 
 
+    rhopart(:)= 1000.0_r8
     !assign values based on aerosol type
     do m=0,nmodes
        do l=1,n_tracers_in_mode(m)

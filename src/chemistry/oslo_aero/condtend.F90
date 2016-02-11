@@ -232,12 +232,12 @@ contains
          call add_default( fieldname_receiver, 1, ' ' )
       end if
       fieldname_receiver = trim(solsym(chemistryIndex(l_so4_na)))//"condTend"
-      call addfld( fieldname_receiver, unit, 1, 'A', "condensation tendency", phys_decomp )
+      call addfld( fieldname_receiver, horiz_only, 'A', unit , "condensation tendency" )
       if(history_aerosol)then
          call add_default( fieldname_receiver, 1, ' ' )
       end if
       fieldname_receiver = trim(solsym(chemistryIndex(l_soa_na)))//"condTend"
-      call addfld( fieldname_receiver, unit, 1, 'A', "condensation tendency", phys_decomp )
+      call addfld( fieldname_receiver, horiz_only, 'A', unit, "condensation tendency" )
       if(history_aerosol)then
          call add_default( fieldname_receiver, 1, ' ' )
       end if
