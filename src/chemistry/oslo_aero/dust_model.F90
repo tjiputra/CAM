@@ -219,8 +219,8 @@ contains
          totalEmissionFlux(:ncol) = totalEmissionFlux(:ncol) + cflx(:ncol,tracerMap(n))
       end do
 
-      call outfld('MBL_BSN_FCT',soil_erod_tmp,pcols,lchnk) 
-      call outfld('OSLO_DUST_EMIS',totalEmissionFlux,pcols,lchnk)
+      !call outfld('MBL_BSN_FCT',soil_erod_tmp,pcols,lchnk) 
+      !call outfld('OSLO_DUST_EMIS',totalEmissionFlux,pcols,lchnk)
 
       return
    end subroutine oslo_dust_emis_intr

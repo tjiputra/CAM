@@ -773,7 +773,7 @@ contains
           do lspec = 1,getNumberOfTracersInMode(m)   ! loop over number + chem constituents + water
 
            
-            mm = getTracerIndex(m,lspec,.false.) 
+            mm = getTracerIndex(m,lspec,.false.)
             if(is_done(mm,lphase) .eqv. .true. )then
                cycle
             endif
@@ -802,9 +802,14 @@ contains
                 if(convproc_do_aer) then
                    !Feed in the saved cloudborne mixing ratios from phase 2
                    qqcw_in(:,:) = qqcw_sav(:,:,mm)
+                   !Not implemented for oslo aerosols
                 else
-                   fldcw => qqcw_get_field(pbuf, mm,lchnk)
-                   qqcw_in(:,:) = fldcw(:,:)
+                   fldcw => qqcw_get_field(pbuf, mm,lchnk, .TRUE.)
+                   if(.not. associated(fldcw))then
+                      qqcw_in(:,:) = zeroAerosolConcentration(:,:)
+                   else
+                     qqcw_in(:,:) = fldcw(:,:)
+                   end if
              endif
 
              call wetdepa_v2( state%pmid, state%q(:,:,1), state%pdel, &
@@ -837,7 +842,7 @@ contains
              enddo
                 if (.not.convproc_do_aer) call outfld( trim(cnst_name(mm))//'SFWET', sflx, pcols, lchnk)
              aerdepwetis(:ncol,mm) = sflx(:ncol)
-
+         
              sflx(:)=0._r8
              do k=1,pver
                 do i=1,ncol
@@ -882,8 +887,12 @@ contains
                    if (convproc_do_aer) then
                       fldcw => qqcw_get_field(pbuf,mm,lchnk)
                       qqcw_sav(1:ncol,:,mm) = fldcw(1:ncol,:)
+                      !This option yet not implemented for OSLO_AERO
                    else
-                      fldcw => qqcw_get_field(pbuf, mm,lchnk)
+                      fldcw => qqcw_get_field(pbuf, mm,lchnk, .TRUE.)
+                      if(.not. associated(fldcw))then
+                         cycle
+                      end if
                    endif
 
              call wetdepa_v2(state%pmid, state%q(:,:,1), state%pdel, &

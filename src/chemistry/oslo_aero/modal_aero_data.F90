@@ -26,7 +26,7 @@
           if(index>0 .and. index <= pcnst ) then
              qqcw(index)=iptr
           else
-             call endrun('attempting to set qqcw pointer already defined')
+             call endrun("attempting to set qqcw ptr already defined" )
           end if
         end subroutine qqcw_set_ptr
 

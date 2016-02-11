@@ -238,7 +238,7 @@ contains
 
     call dust_init()
     call seasalt_init() !seasalt_emis_scale)
-    !call wetdep_init()
+    call wetdep_init()
 
 
     nwetdep = 0

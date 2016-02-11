@@ -416,7 +416,9 @@ contains
 
       do m=1,nmodes
          do k=1,pver
-            where(numberConcentration(:ncol,k,m) .gt. smallNumber)
+            !The line below causes numerical errors, come back to this??
+            !where(numberConcentration(:ncol,k,m) .gt. smallNumber)
+            where(numberConcentration(:ncol,k,m) .gt. 1.e-10_r8) !smallNumber)
                hasAerosol(:ncol,k,m)= .true.
             elsewhere
                hasAerosol(:ncol,k,m) = .false.
