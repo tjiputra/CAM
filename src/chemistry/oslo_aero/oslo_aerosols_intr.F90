@@ -282,11 +282,10 @@ contains
     integer :: i
 
     real(r8) :: tvs(pcols,pver)
+    real(r8) :: rho(pcols,pver)                    ! air density in kg/m3
     real(r8) :: sflx(pcols)            ! deposition flux
     real(r8)::  dep_trb(pcols)       !kg/m2/s
-    real(r8)::  dep_dry(pcols)       !kg/m2/s (total of grav and trb)
     real(r8)::  dep_grv(pcols)       !kg/m2/s (total of grav and trb)
-    real (r8) :: rho(pcols,pver)                    ! air density in kg/m3
     real(r8) :: pvmzaer(pcols,pverp)    ! sedimentation velocity in Pa
     real(r8) :: dqdt_tmp(pcols,pver)   ! temporary array to hold tendency for 1 species
 
@@ -312,10 +311,16 @@ contains
     real(r8) :: lossRate(pcols)
     real(r8) :: totalProd(pcols)
     real(r8) :: fallFromAbove(pcols)
-    !-----------------------------------------------------------------------
 
     real(r8) :: logSigma     
     logical  :: is_done(pcnst,2)
+    !-----------------------------------------------------------------------
+
+    landfrac => cam_in%landfrac(:)
+    icefrac  => cam_in%icefrac(:)
+    ocnfrac  => cam_in%ocnfrac(:)
+    fvin     => cam_in%fv(:)
+    ram1in   => cam_in%ram1(:)
 
     lchnk = state%lchnk
     ncol  = state%ncol

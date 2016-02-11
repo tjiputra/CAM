@@ -47,7 +47,7 @@ contains
     !-----------------------------------------------------------------
     integer, intent(in)     :: ncol
     real(r8), intent(in)    :: mbar(ncol,pver)
-    real(r8), intent(in)    :: mmr(pcols,pver,gas_pcnst)
+    real(r8), intent(in)    :: mmr(ncol,pver,gas_pcnst)
     real(r8), intent(inout) :: vmr(ncol,pver,gas_pcnst)
 
     !-----------------------------------------------------------------
@@ -159,9 +159,9 @@ contains
     !-----------------------------------------------------------------
     integer, intent(in)     :: ncol
     real(r8), intent(in)    :: mi
-    real(r8), intent(in)    :: mbar(:,:)
-    real(r8), intent(in)    :: mmr(:,:)
-    real(r8), intent(inout) :: vmr(:,:)
+    real(r8), intent(in)    :: mbar(ncol,pver)
+    real(r8), intent(in)    :: mmr(ncol,pver)
+    real(r8), intent(inout) :: vmr(ncol,pver)
 
     !-----------------------------------------------------------------
     !	... Local variables
@@ -192,7 +192,7 @@ contains
     integer, intent(in)     :: ncol
     real(r8), intent(in)    :: mbar(ncol,pver)
     real(r8), intent(in)    :: vmr(ncol,pver,gas_pcnst)
-    real(r8), intent(inout) :: mmr(pcols,pver,gas_pcnst)
+    real(r8), intent(inout) :: mmr(ncol,pver,gas_pcnst)
 
     !-----------------------------------------------------------------
     !	... Local variables
@@ -226,7 +226,7 @@ contains
     real(r8), intent(in)    :: mi
     real(r8), intent(in)    :: mbar(ncol,pver)
     real(r8), intent(in)    :: vmr(ncol,pver)
-    real(r8), intent(inout) :: mmr(pcols,pver)
+    real(r8), intent(inout) :: mmr(ncol,pver)
 
     !-----------------------------------------------------------------
     !	... local variables
@@ -255,7 +255,7 @@ contains
     !	... Dummy arguments
     !-----------------------------------------------------------------------
     integer, intent(in) ::    ncol
-    real(r8), dimension(pcols,pver), intent(in) :: &
+    real(r8), dimension(ncol,pver), intent(in) :: &
          h2o_mmr                ! specific humidity ( mmr )
     real(r8), dimension(ncol,pver), intent(in)  :: &
          mbar                   ! atmos mean mass
@@ -290,7 +290,7 @@ contains
          mbar                   ! atmos mean mass
     real(r8), dimension(ncol,pver), intent(in)  :: &
          h2o_vmr               ! water vapor vmr
-    real(r8), dimension(pcols,pver), intent(out) :: &
+    real(r8), dimension(ncol,pver), intent(out) :: &
          h2o_mmr                ! specific humidity ( mmr )
 
     !-----------------------------------------------------------------------

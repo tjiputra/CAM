@@ -416,9 +416,7 @@ contains
 
       do m=1,nmodes
          do k=1,pver
-            !The line below causes numerical errors, come back to this??
-            !where(numberConcentration(:ncol,k,m) .gt. smallNumber)
-            where(numberConcentration(:ncol,k,m) .gt. 1.e-10_r8) !smallNumber)
+            where(numberConcentration(:ncol,k,m) .gt. smallNumber)
                hasAerosol(:ncol,k,m)= .true.
             elsewhere
                hasAerosol(:ncol,k,m) = .false.
@@ -492,6 +490,15 @@ contains
       volumeConcentration(:,:,:)=0.0_r8
 
       do kcomp=1,nmodes
+
+         !Don't do anything if no tracers in mode
+         if(getNumberOfBackgroundTracersInMode(kcomp) .lt. 1)then
+            volumeCore(:,:,kcomp)=smallNumber
+            volumeCoat(:,:,kcomp)=smallNumber
+            volumeConcentration(:,:,kcomp)=smallNumber
+            hygroscopicity(:,:,kcomp) = smallNumber
+            cycle
+         end if
 
          hygroscopicityAvg(:,:) = 0.0_r8
          volumeCore(:,:,kcomp) = 0.0_r8
@@ -600,11 +607,11 @@ contains
 
             !Finally, when the sums are calculated, Apply finally eqn 4 here!!
 
-            where (hasAerosol(:ncol,k,kcomp))
+            where (hasAerosol(:ncol,k,kcomp)) 
                !If there is enough soluble material, a coating will be formed: In that case, the 
                !volume of the aerosol in question is only the volume of the coating!
                hygroscopicityCoat(:ncol,k) = molecularWeightWater*hygroscopicityAvg(:ncol,k) &
-                                             & /( density_water * volumeCoat(:ncol,k,kcomp)) !Note use of volume Coating here
+                                             & /( density_water * ( volumeCoat(:ncol,k,kcomp) + smallNumber) ) !Note use of volume Coating here
             
                !mode total volume:
                volumeConcentration(:ncol,k,kcomp) = volumeCore(:ncol,k,kcomp) + volumeCoat(:ncol,k,kcomp)

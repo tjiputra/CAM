@@ -245,6 +245,20 @@ contains
     ndrydep = 0
 
 
+    call inidrydep(rair, gravit)
+    dummy = 'RAM1'
+    call addfld (dummy,horiz_only, 'A','frac','RAM1')
+    if ( history_aerosol ) then  
+       call add_default (dummy, 1, ' ')
+    endif
+    dummy = 'airFV'
+    call addfld (dummy,horiz_only, 'A','frac','FV')
+    if ( history_aerosol ) then  
+       call add_default (dummy, 1, ' ')
+    endif
+
+
+
   end subroutine aero_model_init
 
   !=============================================================================
@@ -414,7 +428,7 @@ contains
     real(r8), intent(inout) :: vmr(:,:,:)         ! mixing ratios ( vmr )
 
     type(physics_buffer_desc), pointer :: pbuf(:)
-    
+   
     ! local vars 
     ! do nothing for now   
  
