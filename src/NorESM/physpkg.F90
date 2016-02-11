@@ -814,10 +814,6 @@ subroutine phys_init( phys_state, phys_tend, pbuf2d, cam_out )
     call aircraft_emit_init()
     call prescribed_volcaero_init()
     call prescribed_strataero_init()
-#ifdef OSLO_AERO
-    call oslo_ocean_init()
-#endif
-
 
     ! co2 cycle            
     if (co2_transport()) then
@@ -902,17 +898,6 @@ subroutine phys_init( phys_state, phys_tend, pbuf2d, cam_out )
     end if
 !CAM5-Oslo specific code
 
-#ifdef OSLO_AERO
-   call constants
-   call initopt
-   call initlogn
-   call initopt_lw
-   call initializeCondensation()
-#ifdef AEROCOM
-       call initaeropt
-       call initdryp
-#endif ! aerocom
-#endif
 
 end subroutine phys_init
 

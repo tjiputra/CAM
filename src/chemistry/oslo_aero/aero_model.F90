@@ -182,7 +182,10 @@ contains
     use condtend,            only: initializeCondensation
     use oslo_ocean_intr,     only: oslo_ocean_init  
     use oslo_aerosols_intr,      only: oslo_aero_initialize
- 
+
+    use opttab, only  :      initopt
+    use opttab_lw, only: initopt_lw
+
     !use modal_aero_calcsize,   only: modal_aero_calcsize_init
     !use modal_aero_coag,       only: modal_aero_coag_init
     !use modal_aero_deposition, only: modal_aero_deposition_init
@@ -217,6 +220,16 @@ contains
     call phys_getopts(history_aerosol_out = history_aerosol, &
                       convproc_do_aer_out = convproc_do_aer)
 
+#ifdef OSLO_AERO
+   call constants
+   call initopt
+   call initlogn
+   call initopt_lw
+#ifdef AEROCOM
+       call initaeropt
+       call initdryp
+#endif ! aerocom
+#endif
 
     call initializeCondensation()
     call oslo_ocean_init()

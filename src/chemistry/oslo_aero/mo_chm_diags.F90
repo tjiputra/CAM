@@ -323,6 +323,7 @@ contains
        call addfld( depflx_name(m), horiz_only,  'A', 'kg/m2/s', 'dry deposition flux ' )
        call addfld( dtchem_name(m), (/ 'lev' /), 'A', 'kg/s',    'net tendency from chem' )
 
+       wetdep_name_area(m)='WD_A_'//trim(spc_name)
        wetdep_name(m) = 'WD_'//trim(spc_name)
        wtrate_name(m) = 'WDR_'//trim(spc_name)
 
