@@ -722,6 +722,10 @@ if ($cfg->get('debug')) {
 }
 
 my $prescribe_aerosols = $TRUE; # assume prescribed aerosols are needed
+if( $chem =~ /_oslo/){
+$prescribe_aerosols = $FALSE;
+print " ==> Using Oslo aerosols: PRESCRIBED AERO = FALSE (not yet implemented) \n"
+}
 # Chemistry deposition lists
 if ( ($chem ne 'none') or ( $prog_species ) ){
     my $chem_proc_src = $cfg->get('chem_proc_src');
@@ -2978,6 +2982,7 @@ add_default($nl, 'opom_source');
 add_default($nl, 'opom_source_type');
 add_default($nl, 'opom_cycle_year');
 
+if ($chem =~ /_mam_oslo/) {$nl->set_variable_value('phys_ctl_nl','use_hetfrz_classnuc','.true.');}
 # Chemistry options
 
 # Add the name of the chemistry package based on the info in configure.  If the user tries

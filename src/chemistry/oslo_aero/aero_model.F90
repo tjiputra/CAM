@@ -186,6 +186,8 @@ contains
     use opttab, only  :      initopt
     use opttab_lw, only: initopt_lw
 
+    use modal_aero_deposition , only: modal_aero_deposition_init
+
     !use modal_aero_calcsize,   only: modal_aero_calcsize_init
     !use modal_aero_coag,       only: modal_aero_coag_init
     !use modal_aero_deposition, only: modal_aero_deposition_init
@@ -239,6 +241,7 @@ contains
     call dust_init()
     call seasalt_init() !seasalt_emis_scale)
     call wetdep_init()
+    call modal_aero_deposition_init()
 
 
     nwetdep = 0

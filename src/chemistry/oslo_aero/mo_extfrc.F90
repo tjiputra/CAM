@@ -376,17 +376,15 @@ contains
     frc_loop : do n = 1,extcnt
        if (frc_from_dataset(n)) then
 
-          xfcname = trim(extfrc_lst(n))//'_XFRC'
-       call outfld( xfcname, frcing(:ncol,:,n), ncol, lchnk )
-
        frcing_col(:ncol) = 0._r8
        do k = 1,pver
           frcing_col(:ncol) = frcing_col(:ncol) + frcing(:ncol,k,n)*(zint(:ncol,k)-zint(:ncol,k+1))*km_to_cm
        enddo
 
+          xfcname = trim(extfrc_lst(n))
+
 #ifdef OSLO_AERO
        !redefine to kg/m2/s if oslo aerosols
-       xfcname = trim(forcings(m)%species)
        spc_ndx = get_spc_ndx(trim(xfcname))
        !It makes more sense to output in kg/m2/s to compare with other terms
        frcing_col(:ncol) = frcing_col(:ncol)     &
@@ -396,7 +394,7 @@ contains
                            *1.e-3_r8                 !==>> kg/m2
 #endif
 
-          xfcname = trim(extfrc_lst(n))//'_CLXF'
+          xfcname = trim(xfcname)//'_CLXF'
        call outfld( xfcname, frcing_col(:ncol), ncol, lchnk )
        endif
     end do frc_loop

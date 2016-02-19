@@ -186,7 +186,6 @@ subroutine hetfrz_classnuc_oslo_init(mincld_in)
 
    ! This parameterization currently assumes that prognostic modal aerosols are on.  Check...
    call phys_getopts(prog_modal_aero_out=prog_modal_aero)
-   if (.not. prog_modal_aero) call endrun(routine//': cannot use hetfrz_classnuc without prognostic modal aerosols')
 
    mincld = mincld_in
 
@@ -330,6 +329,13 @@ subroutine hetfrz_classnuc_oslo_init(mincld_in)
    ! parameterization which requires constituent information from the chemistry
    ! code which provides that information.
 
+   ! Allocate space for copy of cloud borne aerosols before modification by droplet nucleation.
+   allocate(aer_cb(pcols,pver,pcnst,begchunk:endchunk), stat=istat)
+   call alloc_err(istat, routine, 'aer_cb', pcols*pver*ncnst*(endchunk-begchunk+1))
+
+   ! Allocate space for copy of interstitial aerosols with modified basis
+   allocate(aer(pcols,pver,pcnst,begchunk:endchunk), stat=istat)
+   call alloc_err(istat, routine, 'aer', pcols*pver*ncnst*(endchunk-begchunk+1))
    call hetfrz_classnuc_init( &
       rair, cpair, rh2o, rhoh2o, mwh2o, &
       tmelt, pi, iulog)
@@ -685,8 +691,10 @@ subroutine hetfrz_classnuc_oslo_save_cbaero(state, pbuf)
    do m=1,nmodes_oslo
       do n=1,getNumberOfTracersInMode(m)
         kk=getTracerIndex(m,n,.false.)! This gives the tracer index used in the q-array
-        qqcw(kk)%fldcw => qqcw_get_field(pbuf,kk,lchnk)
-        aer_cb(:,:,kk,lchnk) = qqcw(kk)%fldcw
+        qqcw(kk)%fldcw => qqcw_get_field(pbuf,kk,lchnk,.TRUE.)
+        if(associated(qqcw(kk)%fldcw))then
+         aer_cb(:,:,kk,lchnk) = qqcw(kk)%fldcw
+        end if
       end do
    end do
 
