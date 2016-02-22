@@ -202,6 +202,11 @@ contains
          soil_erod_tmp(:)=soil_erodibility(:,lchnk)
       end where
 
+      totalEmissionFlux(:)=0.0_r8
+      do i=1,ncol
+         totalEmissionFlux(i) = totalEmissionFlux(i) + sum(cam_in%dstflx(i,:))
+      end do
+
       cflx => cam_in%cflx
    
       !Note that following CESM use of "dust_emis_fact", the emissions are 
@@ -210,14 +215,10 @@ contains
       !same formulation as MAM now and tune later
       !As of NE-380: Oslo dust emissions are 2/3 of CAM emissions
       do n=1, numberOfDustModes
-!cak         cflx(:ncol, tracerMap(n)) = cflx(:ncol,tracerMap(n))*soil_erod_tmp(:ncol)/(dust_emis_fact)*1.15_r8*(2.0_r8) !factor 2 is CAM-Oslo specific
-         cflx(:ncol, tracerMap(n)) = cflx(:ncol,tracerMap(n))*soil_erod_tmp(:ncol)/(dust_emis_fact)*1.15_r8  ! gives better AOD close to dust sources
+         cflx(:ncol, tracerMap(n)) = -1.0_r8*emis_fraction_in_mode(n) &
+            *totalEmissionFlux(:ncol)*soil_erod_tmp(:ncol)/(dust_emis_fact)*1.15_r8  ! gives better AOD close to dust sources
       end do
-     
-      totalEmissionFlux(:)=0.0_r8
-      do n=1,numberOfDustModes
-         totalEmissionFlux(:ncol) = totalEmissionFlux(:ncol) + cflx(:ncol,tracerMap(n))
-      end do
+    
 
       !call outfld('MBL_BSN_FCT',soil_erod_tmp,pcols,lchnk) 
       !call outfld('OSLO_DUST_EMIS',totalEmissionFlux,pcols,lchnk)
