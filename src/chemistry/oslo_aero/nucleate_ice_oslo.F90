@@ -63,32 +63,9 @@ integer :: &
    ast_idx   = -1, &
    dgnum_idx = -1
 
-! Bulk aerosols
-character(len=20), allocatable :: aername(:)
-real(r8), allocatable :: num_to_mass_aer(:)
-
-integer :: naer_all      ! number of aerosols affecting climate
-integer :: idxsul   = -1 ! index in aerosol list for sulfate
-integer :: idxdst1  = -1 ! index in aerosol list for dust1
-integer :: idxdst2  = -1 ! index in aerosol list for dust2
-integer :: idxdst3  = -1 ! index in aerosol list for dust3
-integer :: idxdst4  = -1 ! index in aerosol list for dust4
-integer :: idxbcphi = -1 ! index in aerosol list for Soot (BCPHIL)
-
 ! modal aerosols
 logical :: clim_modal_aero = .TRUE.
 
-integer :: nmodes = -1
-integer :: mode_accum_idx  = -1  ! index of accumulation mode
-integer :: mode_aitken_idx = -1  ! index of aitken mode
-integer :: mode_coarse_idx = -1  ! index of coarse mode
-integer :: mode_coarse_dst_idx = -1  ! index of coarse dust mode
-integer :: mode_coarse_slt_idx = -1  ! index of coarse sea salt mode
-integer :: coarse_dust_idx = -1  ! index of dust in coarse mode
-integer :: coarse_nacl_idx = -1  ! index of nacl in coarse mode
-
-logical  :: separate_dust = .false.
-real(r8) :: sigmag_aitken
 
 !===============================================================================
 contains
@@ -218,10 +195,11 @@ subroutine nucleate_ice_oslo_calc( &
    , numberConcentration)
 
    use aerosoldef, only : MODE_IDX_DST_A2, MODE_IDX_DST_A3 &
-                        , MODE_IDX_SO4_AC,MODE_IDX_OMBC_INTMIX_COAT_AIT
+                        , MODE_IDX_SO4_AC,MODE_IDX_OMBC_INTMIX_COAT_AIT 
+   use commondefinitions, only: nmodes
 
    ! arguments
-   real(r8), intent(in)                       :: numberConcentration(:,:,:)
+   real(r8), intent(in)                       :: numberConcentration(pcols,pver,0:nmodes)
    type(physics_state), target, intent(in)    :: state
    real(r8),                    intent(in)    :: wsubi(:,:)
    type(physics_buffer_desc),   pointer       :: pbuf(:)
