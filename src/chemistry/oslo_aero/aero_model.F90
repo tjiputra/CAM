@@ -330,6 +330,11 @@ contains
   subroutine aero_model_surfarea( &
                   mmr, radmean, relhum, pmid, temp, strato_sad, &
                   sulfate, rho, ltrop, dlat, het1_ndx, pbuf, ncol, sfc, dm_aer, sad_total )
+   
+    use commondefinitions, only: nmodes_oslo => nmodes
+    use const            , only: numberToSurface
+    use aerosoldef       , only: lifeCycleNumberMedianRadius
+    use oslo_utils       , only: calculateNumberConcentration
 
     ! dummy args
     real(r8), intent(in)    :: pmid(:,:)
@@ -351,22 +356,40 @@ contains
     real(r8), intent(inout) :: sad_total(:,:)
 
     ! local vars
-    real(r8), pointer, dimension(:,:,:) :: dgnumwet
-    integer :: beglev(ncol)
-    integer :: endlev(ncol)
+    !HAVE TO GET RID OF THIS MODE 0!! MESSES UP EVERYTHING!!
+    real(r8)         :: numberConcentration(pcols,pver,0:nmodes_oslo)
+    real(r8), target :: sad_mode(pcols,pver, nmodes_oslo)
+    real(r8) :: rho_air(pcols,pver)
+    integer :: l,m
     integer :: i,k
 
-    call pbuf_get_field(pbuf, dgnumwet_idx, dgnumwet )
+   !Get air density
+    do k=1,top_lev,pver
+       do i=1,ncol
+          rho_air(i,k) = pmid(i,k)/temp(i,k)*287.04_r8
+       end do
+    end do
+    !    
+    !Get number concentrations
+    call calculateNumberConcentration(ncol, mmr, rho_air, numberConcentration) 
+    
+    !Convert to area using lifecycle-radius
+    sad_mode = 0._r8
+    sad_total = 0._r8
+    do m=1,nmodes_oslo
+       do k=1,pver
+         sad_mode(:ncol,k,m) = numberConcentration(:ncol,k,m)*numberToSurface(m)*1.e-2_r8 !m2/m3 ==> cm2/cm3
+         sad_total(:ncol,k) = sad_total(:ncol,k) + sad_mode(:ncol,k,m)
+       end do
+    end do
 
-    beglev(:ncol)=ltrop(:ncol)
-    endlev(:ncol)=pver
-    call surf_area_dens( ncol, mmr, pmid, temp, dgnumwet, beglev, endlev, sad_total, sfc=sfc )
+    do m=1,nmodes_oslo
+       do k=1,pver
+         sfc(:ncol,k,m) = sad_mode(:ncol,k,m)     ! aitken_idx:aitken_idx)
+         dm_aer(:ncol,k,m) = 2.0_r8*lifeCycleNumberMedianRadius(m)
+       end do
+    end do
 
-    do i = 1,ncol
-       do k = ltrop(i),pver
-          dm_aer(i,k,:) = dgnumwet(i,k,:) * 1.e2_r8 ! convert m to cm
-       enddo
-    enddo
 
   end subroutine aero_model_surfarea
 

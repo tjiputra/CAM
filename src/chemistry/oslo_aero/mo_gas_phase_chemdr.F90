@@ -344,7 +344,7 @@ contains
     use infnan,           only : nan, assignment(=)
     use rate_diags,       only : rate_diags_calc
     use mo_mass_xforms,    only : mmr2vmr, vmr2mmr, h2o_to_vmr, mmr2vmri &
-                                  ,vmr2qqcw
+                                  ,vmr2qqcw, qqcw2vmr
     use orbit,             only : zenith
 !
 ! LINOZ
@@ -605,6 +605,9 @@ contains
     !-----------------------------------------------------------------------      
     call mmr2vmr( mmr(:ncol,:,:), vmr(:ncol,:,:), mbar(:ncol,:), ncol )
 
+#if (defined MODAL_AERO) || (defined OSLO_AERO)
+    call qqcw2vmr( lchnk, vmrcw, mbar, ncol, imozart-1, pbuf )
+#endif
 !
 ! CCMI
 !
