@@ -45,6 +45,7 @@ contains
 
 #ifdef OSLO_AERO
    cloud_borne = .TRUE.
+   modal_aerosols = .TRUE.
 #endif
 
     !-----------------------------------------------------------------

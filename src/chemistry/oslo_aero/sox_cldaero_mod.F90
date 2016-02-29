@@ -307,6 +307,43 @@ contains
            endif
 
         end do
+
+    ! diagnostics
+
+    l = id_so4_1a !Index of the a2-tracer in cloud water
+    n = 1         !Only distribute to one "mode" 
+    aqso4(n,:)=0._r8
+    do k=1,pver
+       do i=1,ncol
+          aqso4(n,i)=aqso4(n,i)+dqdt_aqso4(i,k,l)*adv_mass(l)/mbar(i,k) &
+               *pdel(i,k)/gravit ! kg/m2/s
+       enddo
+    enddo
+
+    aqh2so4(n,:)=0._r8
+    do k=1,pver
+       do i=1,ncol
+          aqh2so4(n,i)=aqh2so4(n,i)+dqdt_aqh2so4(n,k,l)*adv_mass(l)/mbar(i,k) &
+               *pdel(i,k)/gravit ! kg/m2/s
+       enddo
+    enddo
+
+    aqso4_h2o2(:) = 0._r8
+    do k=1,pver
+       do i=1,ncol
+          aqso4_h2o2(i)=aqso4_h2o2(i)+dqdt_aqhprxn(i,k)*adv_mass(l)/mbar(i,k) &
+                  *pdel(i,k)/gravit ! kg SO4 /m2/s
+       enddo
+    enddo
+
+    aqso4_o3(:)=0._r8
+    do k=1,pver
+       do i=1,ncol
+          aqso4_o3(i)=aqso4_o3(i)+dqdt_aqo3rxn(i,k)*adv_mass(l)/mbar(i,k) &
+                  *pdel(i,k)/gravit ! kg SO4 /m2/s
+       enddo
+    enddo
+
   end subroutine sox_cldaero_update
 
   !----------------------------------------------------------------------------------

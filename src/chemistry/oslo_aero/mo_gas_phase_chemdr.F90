@@ -27,7 +27,6 @@ module mo_gas_phase_chemdr
   integer :: ndx_cldfr, ndx_cmfdqr, ndx_nevapr, ndx_cldtop, ndx_prain
   integer :: ndx_h2so4
 #ifdef OSLO_AERO
-  integer :: ndx_soa_lv, ndx_soa_sv
   logical :: inv_o3, inv_oh, inv_no3, inv_ho2
   integer :: id_o3, id_oh, id_no3, id_ho2
 #endif
@@ -100,10 +99,6 @@ contains
 #endif
 
     ndx_h2so4 = get_spc_ndx('H2SO4')
-#ifdef OSLO_AERO
-    ndx_soa_lv = get_spc_ndx('SOA_LV')
-    ndx_soa_sv = get_spc_ndx('SOA_SV')
-#endif
 !
 ! CCMI
 !
