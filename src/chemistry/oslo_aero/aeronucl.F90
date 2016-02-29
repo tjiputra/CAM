@@ -1,4 +1,4 @@
-subroutine aeronucl(lchnk, ncol, t, pmid, h2ommr, h2so4pc, oxidorg, coagnuc, nuclso4, nuclorg, zi, pblht)
+subroutine aeronucl(lchnk, ncol, t, pmid, h2ommr, h2so4pc, oxidorg, coagnuc, nuclso4, nuclorg, zm, pblht)
 
 ! Subroutine to calculate nucleation (formation) rates of new particles
 ! At the moment, the final nucleation rate consists of
@@ -35,7 +35,7 @@ subroutine aeronucl(lchnk, ncol, t, pmid, h2ommr, h2so4pc, oxidorg, coagnuc, nuc
     real(r8), intent(in)  :: coagnuc(pcols,pver)      ! Coagulation sink for nucleating particles [1/s]
     real(r8), intent(out) :: nuclorg(pcols,pver)      ! Nucleated mass (ORG)
     real(r8), intent(out) :: nuclso4(pcols,pver)      ! Nucleated mass (H2SO4)
-    real(r8), intent(in)  :: zi(pcols,pverp)          ! Height at layer interfaces (m)
+    real(r8), intent(in)  :: zm(pcols,pver)           ! Height at layer midpoints (m)
     real(r8), intent(in)  :: pblht(pcols)             ! Planetary boundary layer height (m)
 
     !-- Local variables
@@ -288,7 +288,7 @@ subroutine aeronucl(lchnk, ncol, t, pmid, h2ommr, h2so4pc, oxidorg, coagnuc, nuc
         do i=1,ncol
          
             !-- Nucleation rate #/cm3/s
-            if(pblht_lim(i)>zi(i,k) .AND. pbl_nucleation>0) then
+            if(pblht_lim(i)>zm(i,k) .AND. pbl_nucleation>0) then
             
                 if(pbl_nucleation .EQ. 1) then
 

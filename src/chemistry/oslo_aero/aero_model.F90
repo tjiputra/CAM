@@ -21,14 +21,21 @@ module aero_model
   use cam_history,    only: outfld, fieldname_len
   use chem_mods,      only: gas_pcnst, adv_mass
   use mo_tracname,    only: solsym
-
+  use aerosoldef, only: chemistryIndex, physicsIndex &
+                        , getCloudTracerIndexDirect &
+                        , getCloudTracerName
+  use condtend, only: N_COND_VAP, COND_VAP_ORG_SV, COND_VAP_ORG_LV, COND_VAP_H2SO4 &
+                      , condtend_sub
+  use koagsub, only: coagtend, clcoag 
+  use sox_cldaero_mod, only: sox_cldaero_init
   !use modal_aero_data,only: cnst_name_cw, lptr_so4_cw_amode
   !use modal_aero_data,only: ntot_amode, modename_amode, nspec_max
 
   use ref_pres,       only: top_lev => clim_modal_aero_top_lev
 
   !use modal_aero_wateruptake, only: modal_strat_sulfate
-  use mo_setsox,              only: setsox, has_sox
+  use mo_setsox,              only: setsox
+  use mo_mass_xforms,         only: vmr2mmr, mmr2vmr, mmr2vmri
 
   implicit none
   private
@@ -75,8 +82,7 @@ module aero_model
   integer,allocatable :: index_tot_mass(:,:)
   integer,allocatable :: index_chm_mass(:,:)
 
-  integer :: ndx_h2so4
-  character(len=fieldname_len), allocatable :: dgnum_name(:), dgnumwet_name(:)
+  integer :: ndx_h2so4, ndx_soa_lv, ndx_soa_sv
 
   ! Namelist variables
   character(len=16) :: wetdep_list(pcnst) = ' '
@@ -93,7 +99,6 @@ module aero_model
   logical :: drydep_lq(pcnst)
   logical :: wetdep_lq(pcnst)
 
-  logical :: modal_accum_coarse_exch = .false.
 
   logical :: convproc_do_aer
 
@@ -260,9 +265,73 @@ contains
        call add_default (dummy, 1, ' ')
     endif
 
+    !Get height of boundary layer for boundary layer nucleation
+    pblh_idx            = pbuf_get_index('pblh')
 
+    call cnst_get_ind ( "H2SO4", ndx_h2so4, abort=.true. )
+    ndx_h2so4 = chemistryIndex(ndx_h2so4)
+    call cnst_get_ind ( "SOA_LV", ndx_soa_lv,abort=.true.)
+    ndx_soa_lv = chemistryIndex(ndx_soa_lv)
+    call cnst_get_ind ( "SOA_SV", ndx_soa_sv, abort=.true.)
+    ndx_soa_sv = chemistryIndex(ndx_soa_sv)
 
-  end subroutine aero_model_init
+    do m = 1,gas_pcnst
+
+       unit_basename = 'kg'  ! Units 'kg' or '1' 
+
+       call addfld( 'GS_'//trim(solsym(m)),horiz_only, 'A', unit_basename//'/m2/s ', &
+                    trim(solsym(m))//' gas chemistry/wet removal (for gas species)')
+       call addfld( 'AQ_'//trim(solsym(m)),horiz_only, 'A', unit_basename//'/m2/s ', &
+                    trim(solsym(m))//' aqueous chemistry (for gas species)')
+
+       if (getCloudTracerIndexDirect(physicsIndex(m)) .gt. 0)then
+         call addfld( 'AQ_'//getCloudTracerName(physicsIndex(m)),horiz_only, 'A', unit_basename//'/m2/s ', &
+                    trim(solsym(m))//' aqueous chemistry (for cloud species)')
+       end if
+
+       if ( history_aerosol ) then 
+          call add_default( 'GS_'//trim(solsym(m)), 1, ' ')
+          call add_default( 'AQ_'//trim(solsym(m)), 1, ' ')
+          if(getCloudTracerIndexDirect(physicsIndex(m)).gt.0)then
+             call add_default( 'AQ_'//getCloudTracerName(physicsIndex(m)),1,' ')
+          end if
+       endif
+       
+    enddo
+
+    call addfld ('NUCLRATE',(/'lev'/), 'A','#/cm3/s','Nucleation rate')
+    call addfld ('FORMRATE',(/'lev'/), 'A','#/cm3/s','Formation rate of 12nm particles')
+    call addfld ('COAGNUCL',(/'lev'/), 'A', '/s','Coagulation sink for nucleating particles')
+    call addfld ('GRH2SO4',(/'lev'/), 'A', 'nm/hour','Growth rate H2SO4')
+    call addfld ('GRSOA',(/'lev'/),'A','nm/hour','Growth rate SOA')
+    call addfld ('GR',(/'lev'/), 'A', 'nm/hour','Growth rate, H2SO4+SOA')
+    call addfld ('NUCLSOA',(/'lev'/),'A','kg/kg','SOA nucleate')
+    call addfld ('ORGNUCL',(/'lev'/),'A','kg/kg','Organic gas available for nucleation')
+
+    if(history_aerosol)then
+       call add_default ('NUCLRATE', 1, ' ')
+       call add_default ('FORMRATE', 1, ' ')
+       call add_default ('COAGNUCL', 1, ' ')
+       call add_default ('GRH2SO4', 1, ' ')
+       call add_default ('GRSOA', 1, ' ')
+       call add_default ('GR', 1, ' ')
+       call add_default ('NUCLSOA', 1, ' ')
+       call add_default ('ORGNUCL', 1, ' ')
+    end if
+
+    call addfld( 'XPH_LWC',    (/ 'lev' /), 'A','kg/kg',   'pH value multiplied by lwc')
+    call addfld ('AQSO4_H2O2', horiz_only,  'A','kg/m2/s', 'SO4 aqueous phase chemistry due to H2O2')
+    call addfld ('AQSO4_O3',   horiz_only,  'A','kg/m2/s', 'SO4 aqueous phase chemistry due to O3')
+
+    if ( history_aerosol ) then
+       call add_default ('XPH_LWC', 1, ' ')
+       call add_default ('AQSO4_H2O2', 1, ' ')
+       call add_default ('AQSO4_O3', 1, ' ')
+    endif
+
+    
+
+end subroutine aero_model_init
 
   !=============================================================================
   !=============================================================================
@@ -428,6 +497,9 @@ contains
                                     airdens, invariants, del_h2so4_gasprod,  &
                                     vmr0, vmr, pbuf )
 
+    use time_manager,          only : get_nstep
+    use condtend,              only : condtend_sub
+    use aerosoldef,            only: getCloudTracerName
     !-----------------------------------------------------------------------
     !      ... dummy arguments
     !-----------------------------------------------------------------------
@@ -444,7 +516,7 @@ contains
     real(r8), intent(in) :: relhum(:,:)            ! relative humidity
     real(r8), intent(in) :: airdens(:,:)           ! total atms density (molec/cm**3)
     real(r8), intent(in) :: invariants(:,:,:)
-    real(r8), intent(in) :: del_h2so4_gasprod(:,:) 
+    real(r8), intent(inout) :: del_h2so4_gasprod(:,:)  ![molec/molec/sec] 
     real(r8), intent(in) :: zm(:,:) 
     real(r8), intent(in) :: qh2o(:,:) 
     real(r8), intent(in) :: cwat(:,:)          ! cloud liquid water content (kg/kg)
@@ -456,8 +528,175 @@ contains
     type(physics_buffer_desc), pointer :: pbuf(:)
    
     ! local vars 
-    ! do nothing for now   
- 
+    
+    integer :: n, m
+    integer :: i,k,l
+    integer :: nstep
+
+    integer, parameter :: nmodes_aq_chem = 1
+
+    real(r8), dimension(ncol) :: wrk
+    character(len=32)         :: name
+    real(r8) :: dvmrcwdt(ncol,pver,gas_pcnst)
+    real(r8) :: dvmrdt(ncol,pver,gas_pcnst)
+    real(r8) :: vmrcw(ncol,pver,gas_pcnst)            ! cloud-borne aerosol (vmr)
+
+    real(r8) :: del_h2so4_aeruptk(ncol,pver)
+    real(r8) :: del_h2so4_aqchem(ncol,pver)
+    real(r8) :: mmr_cond_vap_start_of_timestep(pcols,pver,N_COND_VAP)
+    real(r8) :: mmr_cond_vap_gasprod(pcols,pver,N_COND_VAP)
+    real(r8) :: del_soa_lv_gasprod(ncol,pver)
+    real(r8) :: del_soa_sv_gasprod(ncol,pver)
+    real(r8) :: dvmrdt_sv1(ncol,pver,gas_pcnst)
+    real(r8) :: dvmrcwdt_sv1(ncol,pver,gas_pcnst)
+    real(r8) :: mmr_tend(pcols, pver, gas_pcnst)
+
+    integer  :: cond_vap_idx
+    real(r8) ::  aqso4(nmodes_aq_chem,pver)               ! aqueous phase chemistry
+    real(r8) ::  aqh2so4(nmodes_aq_chem,pver)             ! aqueous phase chemistry
+    real(r8) ::  aqso4_h2o2(pver)                     ! SO4 aqueous phase chemistry due to H2O2
+    real(r8) ::  aqso4_o3(pver)                       ! SO4 aqueous phase chemistry due to O3
+    real(r8) ::  xphlwc(ncol,pver)                    ! pH value multiplied by lwc
+    real(r8) ::  delt_inverse                         ! 1 / timestep
+
+    real(r8), pointer :: pblh(:)
+   
+    nstep = get_nstep()
+
+    delt_inverse = 1.0_r8 / delt
+
+    !Get height of boundary layer (needed for boundary layer nucleation)
+    call pbuf_get_field(pbuf, pblh_idx,     pblh)
+
+    ! calculate tendency due to gas phase chemistry and processes
+    dvmrdt(:ncol,:,:) = (vmr(:ncol,:,:) - vmr0(:ncol,:,:)) / delt
+    do m = 1, gas_pcnst
+      wrk(:) = 0._r8
+      do k = 1,pver
+        wrk(:ncol) = wrk(:ncol) + dvmrdt(:ncol,k,m)*adv_mass(m)/mbar(:ncol,k)*pdel(:ncol,k)/gravit
+      end do
+      name = 'GS_'//trim(solsym(m))
+      call outfld( name, wrk(:ncol), ncol, lchnk )
+    enddo
+
+!  Get mass mixing ratios at start of time step
+   call vmr2mmr( vmr0, mmr_tend, mbar, ncol )
+   mmr_cond_vap_start_of_timestep(:ncol,:,COND_VAP_H2SO4) = mmr_tend(1:ncol,:,ndx_h2so4)
+   mmr_cond_vap_start_of_timestep(:ncol,:,COND_VAP_ORG_LV) = mmr_tend(1:ncol,:,ndx_soa_lv)
+   mmr_cond_vap_start_of_timestep(:ncol,:,COND_VAP_ORG_SV) = mmr_tend(1:ncol,:,ndx_soa_sv)
+!
+! Aerosol processes ...
+!
+    call qqcw2vmr( lchnk, vmrcw, mbar, ncol, loffset, pbuf )
+
+    ! save h2so4 change by gas phase chem (for later new particle nucleation)
+    if (ndx_h2so4 > 0) then
+       del_h2so4_gasprod(1:ncol,:) = vmr(1:ncol,:,ndx_h2so4) - vmr0(1:ncol,:,ndx_h2so4)
+    endif
+
+    del_soa_lv_gasprod(1:ncol,:) = vmr(1:ncol,:,ndx_soa_lv) - vmr0(1:ncol,:,ndx_soa_lv)
+    del_soa_sv_gasprod(1:ncol,:) = vmr(1:ncol,:,ndx_soa_sv) - vmr0(1:ncol,:,ndx_soa_sv)
+
+    !Save intermediate concentrations
+    dvmrdt_sv1 = vmr
+    dvmrcwdt_sv1 = vmrcw
+
+    ! aqueous chemistry ...
+
+    call setsox(   &
+        ncol,     &
+        lchnk,    &
+        loffset,  &
+        delt,     &
+        pmid,     &
+        pdel,     &
+        tfld,     &
+        mbar,     &
+        cwat,     &
+        cldfr,    &
+        cldnum,   &
+        airdens,  &
+        invariants, &
+        vmrcw,    &
+        vmr,      &
+        xphlwc,   &
+        aqso4,    &
+        aqh2so4,  &
+        aqso4_h2o2, &
+        aqso4_o3  &
+        )
+
+      call outfld( 'AQSO4_H2O2', aqso4_h2o2(:ncol), ncol, lchnk)
+      call outfld( 'AQSO4_O3',   aqso4_o3(:ncol),   ncol, lchnk)
+      call outfld( 'XPH_LWC',    xphlwc(:ncol,:),   ncol, lchnk )
+
+
+    ! vmr tendency from aqchem and soa routines
+    dvmrdt_sv1 = (vmr - dvmrdt_sv1)/delt
+    dvmrcwdt_sv1 = (vmrcw - dvmrcwdt_sv1)/delt
+
+    if(ndx_h2so4 .gt. 0)then
+       del_h2so4_aqchem(:ncol,:) = dvmrdt_sv1(:ncol,:,ndx_h2so4)*delt !"production rate" of H2SO4
+    else
+       del_h2so4_aqchem(:ncol,:) = 0.0_r8
+    end if
+
+    do m = 1,gas_pcnst
+       wrk(:ncol) = 0._r8
+       do k = 1,pver
+          wrk(:ncol) = wrk(:ncol) + dvmrdt_sv1(:ncol,k,m)*adv_mass(m)/mbar(:ncol,k)*pdel(:ncol,k)/gravit
+       end do
+       name = 'AQ_'//trim(solsym(m))
+       call outfld( name, wrk(:ncol), ncol, lchnk )
+
+       !In oslo aero also write out the tendencies for the 
+       !cloud borne aerosols... 
+       n = physicsIndex(m) 
+       if(getCloudTracerIndexDirect(n) .gt. 0)then
+          name = 'AQ_'//trim(getCloudTracerName(n))
+          wrk(:ncol)=0.0_r8
+          do k=1,pver
+            wrk(:ncol) = wrk(:ncol) + dvmrcwdt_sv1(:ncol,k,m)*adv_mass(m)/mbar(:ncol,k)*pdel(:ncol,k)/gravit  
+          end do
+          call outfld( name, wrk(:ncol), ncol, lchnk )
+       end if
+    enddo
+
+   !condensation
+   call vmr2mmr( vmr, mmr_tend, mbar, ncol )
+   do k = 1,pver
+      mmr_cond_vap_gasprod(:ncol,k,COND_VAP_H2SO4) = adv_mass(ndx_h2so4) * (del_h2so4_gasprod(:ncol,k)+del_h2so4_aqchem(:ncol,k)) / mbar(:ncol,k)/delt
+      mmr_cond_vap_gasprod(:ncol,k,COND_VAP_ORG_LV) = adv_mass(ndx_soa_lv) * del_soa_lv_gasprod(:ncol,k) / mbar(:ncol,k)/delt !cka
+      mmr_cond_vap_gasprod(:ncol,k,COND_VAP_ORG_SV) = adv_mass(ndx_soa_sv) * del_soa_sv_gasprod(:ncol,k) / mbar(:ncol,k)/delt !cka
+   end do
+
+   !This should not happen since there are only 
+   !production terms for these gases!!
+   do cond_vap_idx=1,N_COND_VAP
+      where(mmr_cond_vap_gasprod(:ncol,:,cond_vap_idx).lt. 0.0_r8)
+         mmr_cond_vap_gasprod(:ncol,:,cond_vap_idx) = 0.0_r8
+      end where
+   end do
+   mmr_tend(:ncol,:,ndx_h2so4) = mmr_cond_vap_start_of_timestep(:ncol,:,COND_VAP_H2SO4)
+   mmr_tend(:ncol,:,ndx_soa_lv) = mmr_cond_vap_start_of_timestep(:ncol,:,COND_VAP_ORG_LV)
+   mmr_tend(:ncol,:,ndx_soa_sv) = mmr_cond_vap_start_of_timestep(:ncol,:,COND_VAP_ORG_SV)
+  
+   !Note use of "zm" here. In CAM5.3-implementation "zi" was used.. 
+   !zm is passed through the generic interface, and it should not change much
+   !to check if "zm" is below boundary layer height instead of zi
+   call condtend_sub( lchnk, mmr_tend, mmr_cond_vap_gasprod,tfld, pmid, &
+                     pdel, delt, ncol, pblh, zm, qh2o)  !cka
+
+
+   !coagulation
+   ! OS 280415  Concentratiions in cloud water is in vmr space and as a
+   ! temporary variable  (vmrcw) Coagulation between aerosol and cloud
+   ! droplets moved to after vmrcw is moved into qqcw (in mmr spac)
+
+   call coagtend( mmr_tend, pmid, pdel, tfld, delt_inverse, ncol, lchnk) 
+
+   call mmr2vmr( mmr_tend, vmr, mbar, ncol )
+
     return
 
   end subroutine aero_model_gasaerexch
@@ -477,8 +716,6 @@ contains
     ! local vars
 
     integer :: lchnk, ncol
-   ! integer :: m, mm
-    !real(r8) :: soil_erod_tmp(pcols)
     real(r8) :: sflx(pcols)   ! accumulate over all bins for output
     real (r8), parameter :: z0=0.0001_r8  ! m roughness length over oceans--from ocean model
 
@@ -490,26 +727,12 @@ contains
        call oslo_dust_emis_intr( state, cam_in)
 
        ! some dust emis diagnostics ...
-       !sflx(:)=0._r8
-       !do m=1,dust_nbin+dust_nnum
-       !   mm = dust_indices(m)
-       !   if (m<=dust_nbin) sflx(:ncol)=sflx(:ncol)+cam_in%cflx(:ncol,mm)
-       !   call outfld(trim(dust_names(m))//'SF',cam_in%cflx(:,mm),pcols, lchnk)
-       !enddo
-       !call outfld('DSTSFMBL',sflx(:),pcols,lchnk)
-       !call outfld('LND_MBL',soil_erod_tmp(:),pcols, lchnk )
     endif
 
     if (seasalt_active) then
 
        call oslo_salt_emis_intr(state, cam_in)
 
-       !do m=1,seasalt_nbin
-       !   mm = seasalt_indices(m)
-       !   sflx(:ncol)=sflx(:ncol)+cam_in%cflx(:ncol,mm)
-       !   call outfld(trim(seasalt_names(m))//'SF',cam_in%cflx(:,mm),pcols,lchnk)
-       !enddo
-       !call outfld('SSTSFMBL',sflx(:),pcols,lchnk)
     endif
 
   end subroutine aero_model_emissions

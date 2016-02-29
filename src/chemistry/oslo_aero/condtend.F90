@@ -249,7 +249,7 @@ contains
 
 
    subroutine condtend_sub(lchnk,  q, cond_vap_gasprod, temperature, &
-               pmid, pdel, dt, ncol, pblh,zi,qh20) 
+               pmid, pdel, dt, ncol, pblh,zm,qh20) 
 
 ! Calculate the sulphate nucleation rate, and condensation rate of 
 ! aerosols used for parameterising the transfer of externally mixed 
@@ -257,7 +257,7 @@ contains
 ! Note the parameterisation for conversion of externally mixed particles 
 ! used the h2so4 lifetime onto the particles, and not a given 
 ! increase in particle radius. Will be improved in future versions of the model
-! Added input for h2so4 and soa nucleation: soa_lv_gasprod, soa_sv_gasprod, pblh,zi,qh20 (cka)
+! Added input for h2so4 and soa nucleation: soa_lv_gasprod, soa_sv_gasprod, pblh,zm,qh20 (cka)
 
    use cam_history,     only: outfld,fieldname_len
    use koagsub,         only: normalizedCoagulationSink,receiverMode,numberOfCoagulationReceivers ! h2so4 and soa nucleation(cka)
@@ -276,7 +276,7 @@ contains
    real(r8), intent(in) :: dt                         ! Time step
    ! Needed for soa nucleation treatment
    real(r8), intent(in)    :: pblh(pcols)               ! pbl height (m)
-   real(r8), intent(in)    :: zi(pcols,pverp)           ! interface geopotential height above the surface (m) (pver+1)
+   real(r8), intent(in)    :: zm(pcols,pverp)           ! midlayer geopotential height above the surface (m) (pver+1)
    real(r8), intent(in)    :: qh20(pcols,pver)          ! specific humidity (kg/kg)
 
    ! local
@@ -429,7 +429,7 @@ contains
    !following RM's parameterization (cka)
    call aeronucl(lchnk,ncol,temperature, pmid, qh20, &
                intermediateConcentration(:,:,COND_VAP_H2SO4), soa_lv_forNucleation, &
-               coagulationSink, nuclso4, nuclsoa, zi, pblh)
+               coagulationSink, nuclso4, nuclsoa, zm, pblh)
 
 
    firstOrderLossRateNucl(:,:,:)=0.0_r8

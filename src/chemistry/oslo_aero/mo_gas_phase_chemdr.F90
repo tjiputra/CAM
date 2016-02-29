@@ -11,11 +11,6 @@ module mo_gas_phase_chemdr
   use spmd_utils,       only : iam
   use phys_control,     only : phys_getopts
   use carma_flags_mod,  only : carma_hetchem_feedback
-#if defined (OSLO_AERO)
-  use aerosoldef,       only : physicsIndex, getCloudTracerIndexDirect &
-                               ,getCloudTracerName
-  use condtend, only: N_COND_VAP, COND_VAP_H2SO4, COND_VAP_ORG_LV, COND_VAP_ORG_SV
-#endif
 
   implicit none
   save
@@ -232,27 +227,6 @@ contains
     call chm_diags_inti()
     call rate_diags_init()
    
-!cka: Add output for soa nucleation testing
-!#ifdef OSLO_AERO
-!    call addfld ('NUCLRATE','#/cm3/s',pver, 'A','Nucleation rate',phys_decomp)
-!    call addfld ('FORMRATE','#/cm3/s',pver, 'A','Formation rate of 12nm particles',phys_decomp)
-!    call addfld ('COAGNUCL','/s',pver, 'A','Coagulation sink for nucleating particles',phys_decomp)
-!    call addfld ('GRH2SO4','nm/hour',pver, 'A','Growth rate H2SO4',phys_decomp)
-!    call addfld ('GRSOA','nm/hour',pver, 'A','Growth rate SOA',phys_decomp)
-!    call addfld ('GR','nm/hour',pver, 'A','Growth rate, H2SO4+SOA',phys_decomp)
-!    call addfld ('NUCLSOA','kg/kg',pver, 'A','SOA nucleate',phys_decomp)
-!    call addfld ('ORGNUCL','kg/kg',pver, 'A','Organic gas available for nucleation',phys_decomp)
-!    call add_default ('NUCLRATE', 1, ' ')
-!    call add_default ('FORMRATE', 1, ' ')
-!    call add_default ('COAGNUCL', 1, ' ')
-!    call add_default ('GRH2SO4', 1, ' ')
-!    call add_default ('GRSOA', 1, ' ')
-!    call add_default ('GR', 1, ' ')
-!    call add_default ('NUCLSOA', 1, ' ')
-!    call add_default ('ORGNUCL', 1, ' ')
-!#endif
-
-
 !-----------------------------------------------------------------------
 ! get pbuf indicies
 !-----------------------------------------------------------------------
@@ -336,15 +310,13 @@ contains
     use mo_chm_diags,      only : chm_diags, het_diags
     use perf_mod,          only : t_startf, t_stopf
 #if (defined OSLO_AERO)
-    use koagsub,           only: coagtend,clcoag
     use oxi_diurnal_var,   only : set_diurnal_invariants
 #endif
     use mo_neu_wetdep,    only : do_neu_wetdep
     use physics_buffer,   only : physics_buffer_desc, pbuf_get_field, pbuf_old_tim_idx
     use infnan,           only : nan, assignment(=)
     use rate_diags,       only : rate_diags_calc
-    use mo_mass_xforms,    only : mmr2vmr, vmr2mmr, h2o_to_vmr, mmr2vmri &
-                                  ,vmr2qqcw, qqcw2vmr
+    use mo_mass_xforms,    only : mmr2vmr, vmr2mmr, h2o_to_vmr, mmr2vmri
     use orbit,             only : zenith
 !
 ! LINOZ
@@ -426,10 +398,6 @@ contains
     real(r8)     ::  col_delta(ncol,0:pver,max(1,nabscol)) ! layer column densities (molecules/cm^2)
     real(r8)     ::  extfrc(ncol,pver,max(1,extcnt))
     real(r8)     ::  vmr(ncol,pver,gas_pcnst)              ! xported species (vmr)
-#if defined OSLO_AERO
-    real(r8)     ::  vmrcw(ncol,pver,gas_pcnst)            ! cloud-borne aerosol (vmr)
-   real(r8), pointer :: fldcw(:,:)
-#endif
     real(r8)     ::  reaction_rates(ncol,pver,max(1,rxntot))      ! reaction rates
     real(r8)     ::  depvel(ncol,gas_pcnst)                ! dry deposition velocity (cm/s)
     real(r8)     ::  het_rates(ncol,pver,max(1,gas_pcnst))    ! washout rate (1/s)
@@ -520,18 +488,6 @@ contains
         gprob_hocl_hcl, &
         gprob_hobr_hcl, &
         wtper
-#if defined (OSLO_AERO)
-    real(r8) :: del_h2so4_aeruptk(ncol,pver)
-    real(r8) :: del_h2so4_aqchem(ncol,pver)
-    real(r8) :: mmr_cond_vap_start_of_timestep(pcols,pver,N_COND_VAP)
-    real(r8) :: mmr_cond_vap_gasprod(pcols,pver,N_COND_VAP)
-    real(r8) :: del_soa_lv_gasprod(ncol,pver)
-    real(r8) :: del_soa_sv_gasprod(ncol,pver)
-    real(r8) :: dvmrdt_sv1(ncol,pver,gas_pcnst)
-    real(r8) :: dvmrcwdt_sv1(ncol,pver,gas_pcnst)
-
-    integer  :: cond_vap_idx
-#endif
 
     ! initialize to NaN to hopefully catch user defined rxts that go unset
     reaction_rates(:,:,:) = nan
@@ -590,11 +546,6 @@ contains
 
     call get_short_lived_species( mmr, lchnk, ncol, pbuf )
 
-#ifdef OSLO_AERO
-    mmr_cond_vap_start_of_timestep(:ncol,:,COND_VAP_H2SO4) = mmr(:ncol,:,ndx_h2so4)
-    mmr_cond_vap_start_of_timestep(:ncol,:,COND_VAP_ORG_LV) = mmr(:ncol,:,ndx_soa_lv)
-    mmr_cond_vap_start_of_timestep(:ncol,:,COND_VAP_ORG_SV) = mmr(:ncol,:,ndx_soa_sv)
-#endif OSLO_AERO
     !-----------------------------------------------------------------------      
     !        ... Set atmosphere mean mass
     !-----------------------------------------------------------------------      
@@ -605,9 +556,6 @@ contains
     !-----------------------------------------------------------------------      
     call mmr2vmr( mmr(:ncol,:,:), vmr(:ncol,:,:), mbar(:ncol,:), ncol )
 
-#if (defined MODAL_AERO) || (defined OSLO_AERO)
-    call qqcw2vmr( lchnk, vmrcw, mbar, ncol, imozart-1, pbuf )
-#endif
 !
 ! CCMI
 !
@@ -963,11 +911,6 @@ contains
 
     vmr0(:ncol,:,:) = vmr(:ncol,:,:) ! mixing ratios before chemistry changes
 
-#ifdef OSLO_AERO
-    del_soa_lv_gasprod(1:ncol,:) = vmr(1:ncol,:,ndx_soa_lv)
-    del_soa_sv_gasprod(1:ncol,:) = vmr(1:ncol,:,ndx_soa_sv)
-#endif
-
     !=======================================================================
     !        ... Call the class solution algorithms
     !=======================================================================
@@ -1086,7 +1029,7 @@ contains
 
     !-----------------------------------------------------------------------      
     !         ... Set upper boundary mmr values
-    !-----------------------------------------------------------------------      
+    !-----------------------------------------------------------------------
     call set_fstrat_vals( vmr, pmid, pint, troplev, calday, ncol,lchnk )
 
     !-----------------------------------------------------------------------      
@@ -1107,13 +1050,6 @@ contains
     !         ... Xform from vmr to mmr
     !-----------------------------------------------------------------------      
     call vmr2mmr( vmr(:ncol,:,:), mmr_tend(:ncol,:,:), mbar(:ncol,:), ncol )
-
-#if defined OSLO_AERO
-
-    call vmr2qqcw( lchnk, vmrcw, mbar, ncol, imozart-1, pbuf )
-
-   call clcoag( mmr_tend, pmid, pdel, tfld, ncldwtr ,cldfr, delt_inverse, ncol, lchnk,imozart-1,pbuf) 
-#endif
 
     call set_short_lived_species( mmr_tend, lchnk, ncol, pbuf )
 
