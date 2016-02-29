@@ -488,6 +488,10 @@ contains
             !Find the mode in question
             mode_index_donor    = externallyMixedMode(iDonor) 
 
+            if(getNumberOfTracersInMode(mode_index_donor) .eq. 0)then
+               cycle
+            end if
+
             volume_shell = 0.0_r8
             do cond_vap_idx = 1, N_COND_VAP
                
