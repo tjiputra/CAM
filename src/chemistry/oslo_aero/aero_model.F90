@@ -695,6 +695,13 @@ end subroutine aero_model_init
 
    call coagtend( mmr_tend, pmid, pdel, tfld, delt_inverse, ncol, lchnk) 
 
+   !Convert cloud water to mmr again ==> values in buffer
+   call vmr2qqcw( lchnk, vmrcw, mbar, ncol, loffset, pbuf )
+
+   !Call cloud coagulation routines (all in mass mixing ratios)
+   call clcoag( mmr_tend, pmid, pdel, tfld, cldnum ,cldfr, delt_inverse, ncol, lchnk,loffset,pbuf)
+
+   !Go back to volume mixing ratio for chemistry
    call mmr2vmr( mmr_tend, vmr, mbar, ncol )
 
     return
