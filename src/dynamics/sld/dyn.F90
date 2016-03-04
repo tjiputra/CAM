@@ -21,16 +21,10 @@ subroutine dyn(irow    ,grlps1  ,grt1    ,grq1    ,grz1    , &
 ! Modified: P. Worley, October 2002
 !
 !-----------------------------------------------------------------------
-!
-! $Id$
-! $Author$
-!
-!-----------------------------------------------------------------------
 
   use shr_kind_mod, only: r8 => shr_kind_r8
   use pmgrid
   use pspect
-  use rgrid
   use comspe
   use commap
   use physconst, only: rearth

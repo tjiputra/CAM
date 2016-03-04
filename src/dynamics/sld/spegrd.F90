@@ -214,7 +214,7 @@ subroutine spegrd_ift (nlon_fft_in, nlon_fft_out, fftbuf_in, fftbuf_out)
 ! Modified:          P. Worley, October 2002
 !
 !-----------------------------------------------------------------------
-   use rgrid,  only: nlon, pmmax
+   use pspect, only: pmmax
    use pmgrid, only: plat, plon, beglat, endlat
    use comspe, only: maxm
 #if ( defined SPMD )
@@ -278,7 +278,7 @@ subroutine spegrd_ift (nlon_fft_in, nlon_fft_out, fftbuf_in, fftbuf_out)
 !$OMP PARALLEL DO PRIVATE (LAT, WORK)
    do lat=beglat,endlat
       call fft991 (fftbuf_out(1,1,1,lat), work, trig(1,lat), ifax(1,lat), inc, &
-                   nlon_fft_out, nlon(lat), ntr, isign)
+                   nlon_fft_out, plon, ntr, isign)
    enddo
 !
    return

@@ -1,5 +1,202 @@
 ===============================================================
 
+Tag name: cam5_4_30
+Originator(s): cacraig, andrew, katec, eaton
+Date: Mon Dec  7 09:00:08 MST 2015
+One-line Summary: Refactoring init sequence; remove rgrid; bug fixes
+
+Purpose of changes:
+
+. Continue refactoring initialization sequence
+  - More cleanup in runtime_opts: move call of sat_hist_readnl to
+    history_readnl. 
+  - Move call to trunc from cam_init to the dyn_init calls in
+    the EUL and SLD dycores
+  - Remove call to init_masterlinkedlist from cam_init.  This call was not
+    needed. 
+
+. Finish removing code for unsupported rgrid functionality.  This is
+  responsible for the bulk of the changes in this tag.
+
+. Fix threading problem in clubb when micro_do_icesupersat=.true.
+
+. Fix in MG code for analytic radar reflectivity diagnostic calc
+
+. Update SILHS external.
+
+Bugs fixed (include bugzilla ID):
+
+bugzilla 2247: fix test in analytic radar reflectivity calc
+
+Describe any changes made to build system: none
+
+Describe any changes made to the namelist: none
+
+List any changes to the defaults for the boundary datasets: none
+
+Describe any substantial timing or memory changes: none
+
+Code reviewed by: eaton
+
+List all subroutines eliminated:
+
+components/cam/src/control/pspect.F90
+. moved to eul and sld dycore directories
+
+components/cam/src/control/rgrid.F90
+. removed -- unsupported functionality
+
+components/cam/src/dynamics/eul/trunc.F90
+components/cam/src/dynamics/sld/trunc.F90
+. subroutine moved into 
+
+components/cam/src/dynamics/fv/comspe.F90
+components/cam/src/dynamics/fv/comsta.h
+. remove unused files
+
+components/cam/src/dynamics/fv/trunc.F90
+components/cam/src/dynamics/se/trunc.F90
+. refactoring initialization allows removing these stubs
+
+List all subroutines added and what they do:
+
+components/cam/src/dynamics/eul/pspect.F90
+components/cam/src/dynamics/sld/pspect.F90
+. copied from control directory.  These are only used by the global
+  spectral dycores.
+
+List all existing files that have been modified, and describe the changes:
+
+components/cam/SVN_EXTERNAL_DIRECTORIES
+. update silhs from silhs_07_n02 to silhs_07_n04
+
+components/cam/src/advection/slt/bandij.F90
+. remove rgrid
+
+components/cam/src/control/cam_comp.F90
+. remove calls to init_masterlinkedlist() and trunc()
+. remove unused arg in call to init_pio_subsystem
+
+components/cam/src/control/cam_history.F90
+. remove init_masterlinkedlist().  Not needed since nullifying the pointers
+  masterlinkedlist and tape is now done in the declaration statements.
+. remove public attribute from namelist variables that are passed as args to the
+  sat_hist_readnl routine.  Now sat_hist_readnl is called from history_readnl.
+
+components/cam/src/control/cam_restart.F90
+. remove unused ref to pmgrid.  remove unused var tmp_rgrid
+
+components/cam/src/control/runtime_opts.F90
+. move call of sat_hist_readnl to history_readnl. 
+
+components/cam/src/dynamics/eul/comspe.F90
+components/cam/src/dynamics/sld/comspe.F90
+. Remove public attribute for specific variables since whole module is
+  public data. 
+
+components/cam/src/dynamics/eul/dp_coupling.F90
+components/cam/src/dynamics/eul/dyn.F90
+components/cam/src/dynamics/eul/dyn_grid.F90
+components/cam/src/dynamics/eul/dynpkg.F90
+components/cam/src/dynamics/eul/grcalc.F90
+components/cam/src/dynamics/eul/herxin.F90
+components/cam/src/dynamics/eul/inidat.F90
+components/cam/src/dynamics/eul/initcom.F90
+components/cam/src/dynamics/eul/linemsdyn.F90
+components/cam/src/dynamics/eul/quad.F90
+components/cam/src/dynamics/eul/scan2.F90
+components/cam/src/dynamics/eul/scandyn.F90
+components/cam/src/dynamics/eul/scanslt.F90
+components/cam/src/dynamics/eul/spegrd.F90
+components/cam/src/dynamics/eul/spetru.F90
+components/cam/src/dynamics/eul/spmd_dyn.F90
+components/cam/src/dynamics/eul/stepon.F90
+components/cam/src/dynamics/sld/dp_coupling.F90
+components/cam/src/dynamics/sld/dyn.F90
+components/cam/src/dynamics/sld/dyn_grid.F90
+components/cam/src/dynamics/sld/grcalc.F90
+components/cam/src/dynamics/sld/initcom.F90
+components/cam/src/dynamics/sld/quad.F90
+components/cam/src/dynamics/sld/scan2.F90
+components/cam/src/dynamics/sld/scandyn.F90
+components/cam/src/dynamics/sld/scanslt.F90
+components/cam/src/dynamics/sld/spegrd.F90
+components/cam/src/dynamics/sld/spetru.F90
+components/cam/src/dynamics/sld/spmd_dyn.F90
+components/cam/src/dynamics/sld/stepon.F90
+components/cam/src/physics/cam/phys_gmean.F90
+components/cam/src/utils/cam_dom/sst_data.F90
+. remove rgrid
+. replace refs to nlon by plon
+. replace refs to nmmax by pmmax
+. replace refs to beglatpair by 1
+. remove any conditional code in (.not. fullgrid) branches
+
+components/cam/src/dynamics/eul/dyn_comp.F90
+. remove unused dyndecomp_set
+. add call to trunc()
+. subroutine trunc as private routine in this module
+
+components/cam/src/dynamics/eul/pmgrid.F90
+components/cam/src/dynamics/fv/pmgrid.F90
+components/cam/src/dynamics/se/pmgrid.F90
+components/cam/src/dynamics/sld/pmgrid.F90
+. remove unused dyndecomp_set
+
+components/cam/src/dynamics/fv/dp_coupling.F90
+components/cam/src/dynamics/fv/dyn_grid.F90
+components/cam/src/dynamics/fv/initcom.F90
+. remove unused rgrid
+
+components/cam/src/dynamics/fv/dyn_comp.F90
+components/cam/src/dynamics/se/dyn_comp.F90
+. remove unused dyndecomp_set
+
+components/cam/src/dynamics/sld/dyn_comp.F90
+. remove unused dyndecomp_set
+. add call to trunc()
+. subroutine trunc as private routine in this module
+. bug fix for addfld calls missing gridname='gauss_grid' arg
+
+components/cam/src/dynamics/sld/inidat.F90
+. bug fix -- read PS from fh_ini, not fh_topi
+. remove rgrid
+. replace refs to nlon by plon
+
+components/cam/src/physics/cam/clubb_intr.F90
+. Fix threading problem with micro_do_icesupersat=.true.  Put init of lq2
+  in init method.
+
+components/cam/src/physics/cam/micro_mg1_0.F90
+components/cam/src/physics/cam/micro_mg2_0.F90
+. fix test in analytic radar reflectivity calc
+
+components/cam/src/physics/cam/radiation.F90
+components/cam/src/physics/rrtmg/radiation.F90
+. remove unused ref to pspect
+
+components/cam/src/utils/cam_pio_utils.F90
+. remove unused dummy arg in routine init_pio_subsystem
+
+If there were any failures reported from running test_driver.sh on any test
+platform, and checkin with these failures has been OK'd by the gatekeeper,
+then copy the lines from the td.*.status files for the failed tests to the
+appropriate machine below.  All failed tests must be justified.
+
+yellowstone/intel: All PASS
+
+hobart/nag: All PASS
+
+hobart/pgi: All PASS
+
+CAM tag used for the baseline comparison tests if different than previous
+tag:
+
+Summarize any changes to answers: BFB
+
+===============================================================
+===============================================================
+
 Tag name: cam5_4_29
 Originator(s): fvitt, jedwards, cacraig, aliceb, goldy
 Date: November 24, 2015

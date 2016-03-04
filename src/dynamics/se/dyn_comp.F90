@@ -82,11 +82,10 @@ CONTAINS
     use hycoef,          only: hycoef_init
     use ref_pres,        only: ref_pres_init
 
-    use pmgrid,          only: dyndecomp_set
     use dyn_grid,        only: dyn_grid_init, define_cam_grids
     use dyn_grid,        only: fvm, elem, get_dyn_grid_parm
     use dyn_grid,        only: set_horiz_grid_cnt_d
-    use rgrid,           only: fullgrid
+
     use spmd_utils,      only: mpi_integer, mpicom, mpi_logical, mpi_success
     use spmd_dyn,        only: spmd_readnl
     use native_mapping,  only: create_native_mapping_files, native_mapping_readnl
@@ -152,9 +151,6 @@ CONTAINS
     ! Initialize physics grid reference pressures (needed by initialize_radbuffer)
     call ref_pres_init()
 
-    ! legacy reduced grid code -- should be removed
-    fullgrid=.true.
-
 #ifdef _OPENMP    
 !   Set by driver
 !$omp parallel
@@ -199,8 +195,6 @@ CONTAINS
        neltmp(2) = 0
        neltmp(3) = 0
     endif
-
-    dyndecomp_set = .true.
 
     if (par%nprocs .lt. npes_cam) then
 ! Broadcast quantities to auxiliary processes

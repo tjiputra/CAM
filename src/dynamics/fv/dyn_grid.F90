@@ -60,12 +60,10 @@ contains
     use shr_kind_mod,   only: r8 => shr_kind_r8
     use physconst,      only: pi, rair
     use pmgrid
-    use pspect
     use commap,         only: w, clat, clon, w_staggered, clat
     use commap,         only: clat_staggered, clon, latdeg, londeg
     use commap,         only: latdeg_st, londeg_st
     use cam_abortutils, only: endrun
-    use rgrid,          only: fullgrid
     use spmd_utils,     only: masterproc
     use cam_logfile,    only: iulog
     implicit none
@@ -162,10 +160,7 @@ contains
       write(iulog,*) 'INITCOM 2: weights do not sum to 2. sum=',sum
       call endrun
     end if
-    !
-    ! Determine whether full or reduced grid
-    !
-    fullgrid = .true.
+
     if (masterproc) write(iulog,*) 'Number of longitudes per latitude = ', plon
     !
     ! Longitude array
@@ -1133,7 +1128,7 @@ end subroutine dyn_grid_get_elem_coords
 !#######################################################################
 
 subroutine define_cam_grids()
-  use pspect,           only: ptrm
+
   use pmgrid,           only: plon, plat, beglonxy, endlonxy, beglatxy, endlatxy
   use spmd_utils,       only: iam
 #ifdef SPMD

@@ -7,7 +7,6 @@ module cam_restart
    use shr_kind_mod,     only: r8 => shr_kind_r8, cl=>shr_kind_cl
    use spmd_utils,       only: masterproc
    use ppgrid,           only: begchunk, endchunk
-   use pmgrid,           only: plev, plevp, plat
    use cam_control_mod,  only: restart_run, branch_run, caseid, brnch_retain_casename
    use ioFileMod,        only: getfil, opnfil
    use camsrfexch,       only: cam_in_t, cam_out_t     
@@ -273,7 +272,6 @@ end subroutine cam_restart_readnl
 !
    character(len=cl) :: locfn          ! Local filename
    character(len=cl+40) :: errstr
-   real(r8) :: tmp_rgrid(plat)
    integer :: ierr, aeres_int, xtype
    integer(pio_offset_kind) :: slen
    type(file_desc_t) :: File

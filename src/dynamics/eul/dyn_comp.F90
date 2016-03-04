@@ -9,7 +9,7 @@ use shr_kind_mod, only: r8 => shr_kind_r8, r4 => shr_kind_r4
 use spmd_utils,   only: masterproc
 use constituents, only: pcnst, cnst_name, cnst_longname
 use constituents, only: sflxnam, tendnam, fixcnam, tottnam, hadvnam, vadvnam, cnst_get_ind
-use pmgrid,       only: plev, plevp, dyndecomp_set
+use pmgrid,       only: plev, plevp
 use hycoef,       only: hycoef_init
 use cam_history,  only: addfld, add_default, horiz_only
 use phys_control, only: phys_getopts
@@ -58,7 +58,7 @@ subroutine dyn_init(file, nlfilename)
    integer :: history_budget_histfile_num  ! output history file number for budget fields
    !----------------------------------------------------------------------------
 
-   dyndecomp_set=.true.
+   call trunc()
 
    call dyn_eul_readnl(nlfilename)
    if (masterproc) write(iulog,*) 'EUL subcycling - eul_nsplit = ', eul_nsplit
@@ -156,5 +156,82 @@ subroutine dyn_init(file, nlfilename)
    end if
 
 end subroutine dyn_init
+
+!#######################################################################
+! Private routines
+!#######################################################################
+
+subroutine trunc()
+!----------------------------------------------------------------------- 
+! 
+! Purpose: 
+! Check consistency of truncation parameters and evaluate pointers
+! and displacements for spectral arrays
+! 
+! Method: 
+! 
+! Author: 
+! Original version:  CCM1
+! Standardized:      L. Bath, June 1992
+!                    T. Acker, March 1996
+! Reviewed:          J. Hack, D. Williamson, August 1992
+! Reviewed:          J. Hack, D. Williamson, April 1996
+!-----------------------------------------------------------------------
+   use shr_kind_mod,   only: r8 => shr_kind_r8
+   use pspect,         only: ptrm, ptrn, ptrk, pmmax
+   use comspe,         only: nstart, nlen, locm, lnstart
+   use cam_abortutils, only: endrun
+
+   implicit none
+
+!---------------------------Local variables-----------------------------
+!
+   integer m              ! loop index
+!
+!-----------------------------------------------------------------------
+!
+! trunc first evaluates truncation parameters for a general pentagonal 
+! truncation for which the following parameter relationships are true
+!
+! 0 .le. |m| .le. ptrm
+!
+! |m| .le. n .le. |m|+ptrn for |m| .le. ptrk-ptrn
+!
+! |m| .le. n .le. ptrk     for (ptrk-ptrn) .le. |m| .le. ptrm
+!
+! Most commonly utilized truncations include:
+!  1: triangular  truncation for which ptrk=ptrm=ptrn
+!  2: rhomboidal  truncation for which ptrk=ptrm+ptrn
+!  3: trapezoidal truncation for which ptrn=ptrk .gt. ptrm
+!
+! Simple sanity check
+! It is necessary that ptrm .ge. ptrk-ptrn .ge. 0
+!
+   if (ptrm.lt.(ptrk-ptrn)) then
+      call endrun ('TRUNC: Error in truncation parameters.  ntrm < (ptrk-ptrn)')
+   end if
+   if (ptrk.lt.ptrn) then
+      call endrun ('TRUNC: Error in truncation parameters.  ptrk < ptrn')
+   end if
+!
+! Evaluate pointers and displacement info based on truncation params
+!
+   nstart(1) = 0
+   nlen(1) = ptrn + 1
+   do m=2,pmmax
+      nstart(m) = nstart(m-1) + nlen(m-1)
+      nlen(m) = min0(ptrn+1,ptrk+2-m)
+   end do
+!
+! Assign wavenumbers  and spectral offsets if not SPMD
+!
+#if ( ! defined SPMD )
+   do m=1,pmmax
+      locm(m,0) = m
+      lnstart(m) = nstart(m)
+   enddo
+#endif
+
+end subroutine trunc
 
 end module dyn_comp

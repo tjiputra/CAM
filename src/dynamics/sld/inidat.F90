@@ -12,7 +12,6 @@ module inidat
 !-----------------------------------------------------------------------
 
    use pmgrid,              only: plon, plat, plev, beglat, endlat, plnlv, plevp
-   use rgrid,               only: nlon
    use prognostics,         only : ps, u3, v3, t3, tm, tl, ed1, div, ps, phis, &
         phism, phisl, q3, qm, dpsm, dpsl, ql
    use shr_kind_mod,        only: r8 => shr_kind_r8
@@ -132,27 +131,27 @@ contains
 !              
 ! Accumulate average mass of atmosphere
 !
-             call pdelb0 (ps_tmp(1,lat),pdelb   ,nlon(lat))
+             call pdelb0 (ps_tmp(1,lat),pdelb   ,plon)
              pssum  = 0._r8
              zgssum = 0._r8
-             do i = 1,nlon(lat)
+             do i = 1, plon
                 pssum  = pssum  + ps_tmp  (i,lat)
                 zgssum = zgssum + phis_tmp(i,lat)
              end do
-             tmassf_tmp = tmassf_tmp + w(irow)*pssum/nlon(lat)
-             zgsint_tmp = zgsint_tmp + w(irow)*zgssum/nlon(lat)
+             tmassf_tmp = tmassf_tmp + w(irow)*pssum/plon
+             zgsint_tmp = zgsint_tmp + w(irow)*zgssum/plon
 !
 ! Calculate global integrals needed for water vapor adjustment
 !
              do k = 1,plev
                 dotproda = 0._r8
                 dotprodb = 0._r8
-                do i = 1,nlon(lat)
+                do i = 1, plon
                    dotproda = dotproda + q3_tmp(i,k,lat)*pdela(i,k)
                    dotprodb = dotprodb + q3_tmp(i,k,lat)*pdelb(i,k)
                 end do
-                qmass1_tmp = qmass1_tmp + w(irow)*dotproda/nlon(lat)
-                qmass2_tmp = qmass2_tmp + w(irow)*dotprodb/nlon(lat)
+                qmass1_tmp = qmass1_tmp + w(irow)*dotproda/plon
+                qmass2_tmp = qmass2_tmp + w(irow)*dotprodb/plon
              end do
           end do
        end do                  ! end of latitude loop
@@ -188,7 +187,7 @@ contains
           fixmas = (tmass0 + qmass1_tmp)/(tmassf_tmp - qmass2_tmp)
        end if
        do lat = 1,plat
-          do i = 1,nlon(lat)
+          do i = 1, plon
              ps_tmp(i,lat) = ps_tmp(i,lat)*fixmas
           end do
        end do
@@ -220,10 +219,7 @@ contains
        call mpiscatterv (ps_tmp    ,numsend, displs, mpir8,ps    (1,beglat,1) ,numrecv, mpir8,0,mpicom)
     end if
 #else
-!$omp parallel do private(lat)
-    do lat = 1,plat
-       ps(:nlon(lat),lat,1) = ps_tmp(:nlon(lat),lat)
-    end do
+    ps(:,:,1) = ps_tmp(:,:)
 #endif
     return
 
@@ -396,7 +392,7 @@ contains
     call process_inidat_pio('PHIS', fh=fh_topo)
 
     fieldname = 'PS'
-    call cam_pio_get_var(fieldname, fh_topo, arraydims2, ps_tmp, found=readvar)
+    call cam_pio_get_var(fieldname, fh_ini, arraydims2, ps_tmp, found=readvar)
     if (.not. readvar) then
       call endrun(trim(subname)//': Error reading '//trim(fieldname))
     end if
@@ -547,7 +543,7 @@ contains
                   pertlim,' to initial temperature field'
              do lat = 1,plat
                 do k = 1,plev
-                   do i = 1,nlon(lat)
+                   do i = 1, plon
                       call random_number (pertval)
                       pertval = 2._r8*pertlim*(0.5_r8 - pertval)
                       t3_tmp(i,k,lat) = t3_tmp(i,k,lat)*(1._r8 + pertval)
@@ -617,49 +613,60 @@ contains
              call endrun('  '//trim(subname)//' Error:  Q must be on Initial File')
           end if
 
-        arr3d_a(:,:,:) = 0._r8
-        allocate(gcid(plon))
-        do j=1,plat
-           gcid(:) = j
-           if(masterproc) write(iulog,*) 'Warning:  Not reading ',cnst_name(m_cnst), ' from IC file.'
-           if (microp_driver_implements_cnst(cnst_name(m_cnst))) then
-              call microp_driver_init_cnst(cnst_name(m_cnst),arr3d_a(:,:,j) , gcid)
-              if(masterproc) write(iulog,*) '          ', cnst_name(m_cnst), ' initialized by "microp_driver_init_cnst"'
-           else if (clubb_implements_cnst(cnst_name(m_cnst))) then
-              call clubb_init_cnst(cnst_name(m_cnst), arr3d_a(:,:,j), gcid)
-              if(masterproc) write(iulog,*) '          ', cnst_name(m_cnst), ' initialized by "clubb_init_cnst"'
-           else if (rk_stratiform_implements_cnst(cnst_name(m_cnst))) then
-              call rk_stratiform_init_cnst(cnst_name(m_cnst), arr3d_a(:,:,j), gcid)
-              if(masterproc) write(iulog,*) '          ', cnst_name(m_cnst), ' initialized by "rk_stratiform_init_cnst"'
-           else if (chem_implements_cnst(cnst_name(m_cnst))) then
-              call chem_init_cnst(cnst_name(m_cnst), arr3d_a(:,:,j), gcid)
-              if(masterproc) write(iulog,*) '          ', cnst_name(m_cnst), ' initialized by "chem_init_cnst"'
-           else if (tracers_implements_cnst(cnst_name(m_cnst))) then
-              call tracers_init_cnst(cnst_name(m_cnst), arr3d_a(:,:,j), gcid)
-              if(masterproc) write(iulog,*) '          ', cnst_name(m_cnst), ' initialized by "tracers_init_cnst"'
-           else if (aoa_tracers_implements_cnst(cnst_name(m_cnst))) then
-              call aoa_tracers_init_cnst(cnst_name(m_cnst), arr3d_a(:,:,j), gcid)
-              if(masterproc) write(iulog,*) '          ', cnst_name(m_cnst), ' initialized by "aoa_tracers_init_cnst"'
-           else if (carma_implements_cnst(cnst_name(m_cnst))) then
-              call carma_init_cnst(cnst_name(m_cnst), arr3d_a(:,:,j), gcid)
-              if(masterproc) write(iulog,*) '          ', cnst_name(m_cnst), ' initialized by "carma_init_cnst"'
-           else if (co2_implements_cnst(cnst_name(m_cnst))) then
-              call co2_init_cnst(cnst_name(m_cnst), arr3d_a(:,:,j), gcid)
-              if(masterproc) write(iulog,*) '          ', cnst_name(m_cnst), ' initialized by "co2_init_cnst"'
-           else if (unicon_implements_cnst(cnst_name(m_cnst))) then
-              call unicon_init_cnst(cnst_name(m_cnst), arr3d_a(:,:,j), gcid)
-              if(masterproc) write(iulog,*) '          ', cnst_name(m_cnst), ' initialized by "unicon_init_cnst"'
-           else
-              if(masterproc) write(iulog,*) '          ', cnst_name(m_cnst), ' set to 0.'
-           end if
-        end do
+          if(masterproc) write(iulog,*) 'Warning:  Not reading ',cnst_name(m_cnst), ' from IC file.'
+
+          arr3d_a(:,:,:) = 0._r8
+          allocate(gcid(plon))
+          do j=1,plat
+             gcid(:) = j
+             if (microp_driver_implements_cnst(cnst_name(m_cnst))) then
+                call microp_driver_init_cnst(cnst_name(m_cnst),arr3d_a(:,:,j) , gcid)
+                if(masterproc .and. j==1) write(iulog,*) '          ', trim(cnst_name(m_cnst)),&
+                                          ' initialized by "microp_driver_init_cnst"'
+             else if (clubb_implements_cnst(cnst_name(m_cnst))) then
+                call clubb_init_cnst(cnst_name(m_cnst), arr3d_a(:,:,j), gcid)
+                if(masterproc .and. j==1) write(iulog,*) '          ', trim(cnst_name(m_cnst)),&
+                                          ' initialized by "clubb_init_cnst"'
+             else if (rk_stratiform_implements_cnst(cnst_name(m_cnst))) then
+                call rk_stratiform_init_cnst(cnst_name(m_cnst), arr3d_a(:,:,j), gcid)
+                if(masterproc .and. j==1) write(iulog,*) '          ', trim(cnst_name(m_cnst)),&
+                                          ' initialized by "rk_stratiform_init_cnst"'
+             else if (chem_implements_cnst(cnst_name(m_cnst))) then
+                call chem_init_cnst(cnst_name(m_cnst), arr3d_a(:,:,j), gcid)
+                if(masterproc .and. j==1) write(iulog,*) '          ', trim(cnst_name(m_cnst)),&
+                                          ' initialized by "chem_init_cnst"'
+             else if (tracers_implements_cnst(cnst_name(m_cnst))) then
+                call tracers_init_cnst(cnst_name(m_cnst), arr3d_a(:,:,j), gcid)
+                if(masterproc .and. j==1) write(iulog,*) '          ', trim(cnst_name(m_cnst)),&
+                                          ' initialized by "tracers_init_cnst"'
+             else if (aoa_tracers_implements_cnst(cnst_name(m_cnst))) then
+                call aoa_tracers_init_cnst(cnst_name(m_cnst), arr3d_a(:,:,j), gcid)
+                if(masterproc .and. j==1) write(iulog,*) '          ', trim(cnst_name(m_cnst)),&
+                                          ' initialized by "aoa_tracers_init_cnst"'
+             else if (carma_implements_cnst(cnst_name(m_cnst))) then
+                call carma_init_cnst(cnst_name(m_cnst), arr3d_a(:,:,j), gcid)
+                if(masterproc .and. j==1) write(iulog,*) '          ', trim(cnst_name(m_cnst)),&
+                                          ' initialized by "carma_init_cnst"'
+             else if (co2_implements_cnst(cnst_name(m_cnst))) then
+                call co2_init_cnst(cnst_name(m_cnst), arr3d_a(:,:,j), gcid)
+                if(masterproc .and. j==1) write(iulog,*) '          ', trim(cnst_name(m_cnst)),&
+                                          ' initialized by "co2_init_cnst"'
+             else if (unicon_implements_cnst(cnst_name(m_cnst))) then
+                call unicon_init_cnst(cnst_name(m_cnst), arr3d_a(:,:,j), gcid)
+                if(masterproc .and. j==1) write(iulog,*) '          ', trim(cnst_name(m_cnst)),&
+                                          ' initialized by "unicon_init_cnst"'
+             else
+                if(masterproc .and. j==1) write(iulog,*) '          ', trim(cnst_name(m_cnst)),&
+                                          ' set to 0.'
+             end if
+          end do
         
-        deallocate ( gcid )
+          deallocate ( gcid )
        end if
 
 !$omp parallel do private(lat)
        do lat = 1,plat
-          call qneg3(trim(subname), lat   ,nlon(lat),plon   ,plev    , &
+          call qneg3(trim(subname), lat   , plon, plon   ,plev    , &
                m_cnst, m_cnst, qmin(m_cnst) ,arr3d_a(1,1,lat))
        end do
 !
@@ -788,9 +795,9 @@ contains
 #else
 !$omp parallel do private(lat)
        do lat = 1,plat
-          phis (:nlon(lat),lat) = phis_tmp(:nlon(lat),lat)
-          phisl(:nlon(lat),lat) = tmp2d_a (:nlon(lat),lat)
-          phism(:nlon(lat),lat) = tmp2d_b (:nlon(lat),lat)
+          phis (:plon,lat) = phis_tmp(:plon,lat)
+          phisl(:plon,lat) = tmp2d_a (:plon,lat)
+          phism(:plon,lat) = tmp2d_b (:plon,lat)
        end do
 #endif
 

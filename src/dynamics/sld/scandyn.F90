@@ -19,11 +19,6 @@ subroutine scandyn(ztodt   ,detam   ,cwava   ,etamid  ,          &
 ! Author:  J. Olson
 !
 !-----------------------------------------------------------------------
-!
-! $Id$
-! $Author$
-!
-!-----------------------------------------------------------------------
 
   use shr_kind_mod, only: r8 => shr_kind_r8
   use pmgrid,       only: plev, plat, plon, beglat, endlat
@@ -31,7 +26,6 @@ subroutine scandyn(ztodt   ,detam   ,cwava   ,etamid  ,          &
                           tarrsld, n3, n3m1, prhs, trhs, vrhs, urhs, &
                           omga, phism, phisl, phis, dpsm, dpsl, ql, &
                           tl, ed1, qm, tm
-  use rgrid,        only: nlon
   use comspe,       only: maxm
   use scanslt,      only: advection_state, slt_run, slt_run_setup
   use perf_mod
@@ -96,7 +90,7 @@ subroutine scandyn(ztodt   ,detam   ,cwava   ,etamid  ,          &
                     phis      (1,lat)       ,phisl  (1,lat)      ,phism(1,lat)      , &
                        omga   (1,1,lat)     ,                                         &
                        urhs   (1,1,lat)     ,vrhs   (1,1,lat)    ,                    &
-                    trhs      (1,1,lat)     ,prhs   (1,1,lat)    ,nlon (lat),         &
+                    trhs      (1,1,lat)     ,prhs   (1,1,lat)    , plon,              &
                        cwava(lat), flx_net(1,lat))
 
   end do

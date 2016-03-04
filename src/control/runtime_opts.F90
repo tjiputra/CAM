@@ -78,9 +78,6 @@ subroutine read_namelist(nlfilename, single_column, scmlat, scmlon)
    use prescribed_ghg,      only: prescribed_ghg_readnl
    use aircraft_emit,       only: aircraft_emit_readnl
    use cospsimulator_intr,  only: cospsimulator_intr_readnl
-   use sat_hist,            only: sat_hist_readnl
-   ! Needed by sat_hist_readnl
-   use cam_history,         only: hfilename_spec, mfilt, fincl, nhtfrq, avgflag_pertape
    use vertical_diffusion,  only: vd_readnl
    use rayleigh_friction,   only: rayleigh_friction_readnl
 
@@ -170,7 +167,6 @@ subroutine read_namelist(nlfilename, single_column, scmlat, scmlon)
    call co2_cycle_readnl(nlfilename)
    call aircraft_emit_readnl(nlfilename)
    call cospsimulator_intr_readnl(nlfilename)
-   call sat_hist_readnl(nlfilename, hfilename_spec, mfilt, fincl, nhtfrq, avgflag_pertape)
    call diag_readnl(nlfilename)
    call check_energy_readnl(nlfilename)
    call radheat_readnl(nlfilename)

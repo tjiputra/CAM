@@ -25,7 +25,6 @@ subroutine initcom
    use grmult,          only: grmult_init
    use pspect
    use comspe
-   use rgrid,           only: nlon, nmmax, wnummax, beglatpair, fullgrid
    use gauaw_mod,       only: gauaw
    use commap
    use physconst,       only: rair, rearth, ra
@@ -205,39 +204,29 @@ subroutine initcom
 
    call grmult_init()
 !
-! Determine whether full or reduced grid
-!
-   fullgrid = .true.
-   do j=1,plat
-      if (masterproc) then
-         write(iulog,*)'nlon(',j,')=',nlon(j),' wnummax(',j,')=',wnummax(j)
-      end if
-      if (nlon(j).lt.plon) fullgrid = .false.
-   end do
-!
 ! Mirror latitudes south of south pole
 !
    lat = 1
    do j=j1-2,1,-1
-      nlonex(j) = nlon(lat)
+      nlonex(j) = plon
       lat = lat + 1
    end do
-   nlonex(j1-1) = nlon(1)     ! south pole
+   nlonex(j1-1) = plon     ! south pole
 !
 ! Real latitudes
 !
    j = j1
    do lat=1,plat
-      nlonex(j) = nlon(lat)
+      nlonex(j) = plon
       j = j + 1
    end do
-   nlonex(j1+plat) = nlon(plat)  ! north pole
+   nlonex(j1+plat) = plon  ! north pole
 !
 ! Mirror latitudes north of north pole
 !
    lat = plat
    do j=j1+plat+1,platd
-      nlonex(j) = nlon(lat)
+      nlonex(j) = plon
       lat = lat - 1
    end do
 !
@@ -245,38 +234,18 @@ subroutine initcom
 !
    pi = 4.0_r8*atan(1.0_r8)
    do lat=1,plat
-      do i=1,nlon(lat)
-         londeg(i,lat) = (i-1)*360._r8/nlon(lat)
-         clon(i,lat)   = (i-1)*2.0_r8*pi/nlon(lat)
+      do i=1, plon
+         londeg(i,lat) = (i-1)*360._r8/plon
+         clon(i,lat)   = (i-1)*2.0_r8*pi/plon
       end do
    end do
 
-   do j=1,plat/2
-      nmmax(j) = wnummax(j) + 1
-   end do
-   do m=1,pmmax
-      do irow=1,plat/2
-         if (nmmax(irow) .ge. m) then
-            beglatpair(m) = irow
-            goto 10
-         end if
-      end do
-      call endrun ('INITCOM: Should not ever get here')
-10    continue
-   end do
 !
 ! Set up trigonometric tables for fft
 !
    do j=1,plat
-      call set99(trig(1,j),ifax(1,j),nlon(j))
+      call set99(trig(1,j),ifax(1,j), plon)
    end do
-!
-! Set flag indicating dynamics grid is now defined.
-! NOTE: this ASSUMES initcom is called after spmdinit.  The setting of nlon done here completes
-! the definition of the dynamics grid.
-!
-
-   return
 
 9910 format( 1x,i3,13f9.5)
 9920 format(/,      13i9)

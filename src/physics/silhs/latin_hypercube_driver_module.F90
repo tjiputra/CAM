@@ -668,8 +668,10 @@ module latin_hypercube_driver_module
         lh_rv(k,isample) = lh_rt(k,isample) - lh_rc(k,isample)
 
         ! Compute lh_Nc
-        lh_Nc(k,isample) = Ncn_to_Nc( real( X_nl_all_levs(k,isample,iiPDF_Ncn), kind=core_rknd ), &
-                                      real( X_nl_all_levs(k,isample,iiPDF_chi), kind=core_rknd ) )
+        ! KTC: CAM requires that Nc exist even if CLW = 0. Thus, Ncn_to_Nc causes many problems, 
+        ! KTC: and I am removing it. Future version of this code use a flag to turn this
+        ! KTC: on and off, but for cam, we only need it off.
+        lh_Nc(k,isample) = real( X_nl_all_levs(k,isample,iiPDF_Ncn), kind=core_rknd )
 
       end do ! isample=1, num_samples
 

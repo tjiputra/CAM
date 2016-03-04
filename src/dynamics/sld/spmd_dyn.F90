@@ -14,8 +14,7 @@ module spmd_dyn
 #if (defined SPMD)
 
    use shr_kind_mod,     only: r8 => shr_kind_r8
-   use rgrid,            only: nlon
-   use pmgrid,           only: plat, numlats, &
+   use pmgrid,           only: plon, plat, numlats, &
                                beglat, endlat, begirow, endirow, plev
    use mpishorthand,     only: mpir8, mpicom
    use cam_abortutils,   only: endrun
@@ -135,7 +134,6 @@ CONTAINS
     use units,           only: getunit, freeunit	
     use namelist_utils,  only: find_group_name	
     use spmd_utils,      only: npes, masterproc	
-    use pmgrid,          only: plat, plev, plon	
     use mpishorthand	
      
     implicit none
@@ -343,7 +341,7 @@ CONTAINS
 !
       tot_cols = 0
       do lat=1,plat
-         tot_cols = tot_cols + nlon(lat)
+         tot_cols = tot_cols + plon
       enddo
 !
 ! Make sure number of PEs, latitudes, and columns are kosher
@@ -394,7 +392,7 @@ CONTAINS
 !
          ncol_p(0) = 0
          do lat=1,plat
-            ncol_p(0) = ncol_p(0) + nlon(lat)
+            ncol_p(0) = ncol_p(0) + plon
          enddo
 !
          if (iam .eq. 0) then
@@ -525,11 +523,11 @@ CONTAINS
                         write(iulog,*)'SPMDINIT_DYN: error in assigning latitudes to processes'
                         call endrun
                      endif
-                     if (ncol_curtot + nlon(iend+1) .le. &
-                         ncol_curgoal + alpha*nlon(iend+1)) then
+                     if (ncol_curtot + plon .le. &
+                         ncol_curgoal + alpha*plon) then
                         iend = iend + 1
-                        ncol = ncol + nlon(iend)
-                        ncol_curtot = ncol_curtot + nlon(iend)
+                        ncol = ncol + plon
+                        ncol_curtot = ncol_curtot + plon
                      else
                         done = .true.
                      endif
@@ -571,12 +569,12 @@ CONTAINS
 !
                do while ((.not. done) .and. &
                   (ncol_curtot < ncol_curgoal))
-                  if (ncol_curtot + nlon(iend+1) .le. &
-                     ncol_curgoal + opt_alpha*nlon(iend+1)) then
+                  if (ncol_curtot + plon .le. &
+                     ncol_curgoal + opt_alpha*plon) then
                      iend = iend + 1
                      cut(2,procids_s) = iend
-                     ncol_p(procids_s) = ncol_p(procids_s) + nlon(iend)
-                     ncol_curtot = ncol_curtot + nlon(iend)
+                     ncol_p(procids_s) = ncol_p(procids_s) + plon
+                     ncol_curtot = ncol_curtot + plon
                      nlat_p(procids_s) = nlat_p(procids_s) + 1
                   else
                      done = .true.
@@ -627,7 +625,7 @@ CONTAINS
 !
                ncol_p(procids_s) = 0
                do lat=cut(1,procids_s),cut(2,procids_s)
-                  ncol_p(procids_s) = ncol_p(procids_s) + nlon(lat)
+                  ncol_p(procids_s) = ncol_p(procids_s) + plon
                enddo
 !
 ! Assign mirror latitudes
@@ -638,7 +636,7 @@ CONTAINS
 !
                ncol_p(procidn_s) = 0
                do lat=cut(1,procidn_s),cut(2,procidn_s)
-                  ncol_p(procidn_s) = ncol_p(procidn_s) + nlon(lat)
+                  ncol_p(procidn_s) = ncol_p(procidn_s) + plon
                enddo
 !
 ! Save local information

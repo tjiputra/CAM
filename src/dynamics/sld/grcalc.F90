@@ -32,20 +32,12 @@ subroutine grcalcs (irow    ,ztodt   ,grts    ,grqs    ,grths   , &
 !  3. "grpls" and "grpla" contain the latitudinal component of the 
 !      surface pressure gradient.
 !
-! Original version:  CCM1
-!
-!-----------------------------------------------------------------------
-!
-! $Id$
-! $Author$
-!
 !-----------------------------------------------------------------------
 
     use shr_kind_mod, only: r8 => shr_kind_r8
     use pmgrid
     use pspect
     use comspe
-    use rgrid
     use commap
     use physconst, only: ra
     use sld_control_mod
@@ -320,7 +312,6 @@ subroutine grcalca (irow    ,ztodt   ,grta    ,grqa    ,grtha   , &
     use pmgrid
     use pspect
     use comspe
-    use rgrid
     use commap
     use physconst, only: ra
     use sld_control_mod

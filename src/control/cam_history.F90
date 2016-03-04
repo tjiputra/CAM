@@ -18,7 +18,6 @@ module cam_history
   !   read_restart_history
   !   outfld
   !   wshist
-  !   initialize_iop_history
   !-----------------------------------------------------------------------
 
    use shr_kind_mod,    only: r8 => shr_kind_r8, r4 => shr_kind_r4
@@ -280,20 +279,15 @@ module cam_history
     module procedure addfld_nd
   end interface
 
-  ! needed by history_default
-  public :: init_masterlinkedlist
-
-  ! Needed by runtime_opts
-  public :: hfilename_spec, mfilt, fincl, nhtfrq, avgflag_pertape
   ! Needed by cam_diagnostics
   public :: inithist_all
 
   integer :: lcltod_start(ptapes) ! start time of day for local time averaging (sec)
   integer :: lcltod_stop(ptapes)  ! stop time of day for local time averaging, stop > start is wrap around (sec)
 
-  ! Needed by stepon
+  ! Needed by stepon and cam_restart
   public :: hstwr
-  public :: nfils
+  public :: nfils, mfilt
 
   ! Functions
   public :: history_readnl            ! Namelist reader for CAM history
@@ -316,14 +310,6 @@ module cam_history
   ! each column in a chunk
 
 CONTAINS
-
-  subroutine init_masterlinkedlist()
-
-    nullify(masterlinkedlist)
-    nullify(tape)
-
-  end subroutine init_masterlinkedlist
-
 
   subroutine intht ()
     !
@@ -482,6 +468,7 @@ CONTAINS
     use spmd_utils,     only: mpi_integer, mpi_logical, mpi_character
     use shr_string_mod, only: shr_string_toUpper
     use time_manager,   only: get_step_size
+    use sat_hist,       only: sat_hist_readnl
 
     ! Dummy argument
     character(len=*), intent(in)   :: nlfile  ! filepath of namelist input file
@@ -769,7 +756,6 @@ CONTAINS
       end if
     end if
 
-#ifdef SPMD
     ! Broadcast namelist variables
     call mpi_bcast(ndens, ptapes, mpi_integer, masterprocid, mpicom, ierr)
     call mpi_bcast(nhtfrq, ptapes, mpi_integer, masterprocid, mpicom, ierr)
@@ -794,7 +780,6 @@ CONTAINS
     call mpi_bcast(interpolate_gridtype, t, mpi_integer, masterprocid, mpicom, ierr)
     call mpi_bcast(interpolate_type, t, mpi_integer, masterprocid, mpicom, ierr)
     call mpi_bcast(interpolate_output, ptapes, mpi_logical, masterprocid, mpicom, ierr)
-#endif
 
     ! Setup the interpolate_info structures
     do t = 1, size(interpolate_info)
@@ -804,7 +789,12 @@ CONTAINS
       interpolate_info(t)%interp_nlon = interpolate_nlon(t)
     end do
 
+    ! separate namelist reader for the satellite history file
+    call sat_hist_readnl(nlfile, hfilename_spec, mfilt, fincl, nhtfrq, avgflag_pertape)
+
   end subroutine history_readnl
+
+!==================================================================================================
 
   subroutine set_field_dimensions(field)
     use cam_history_support, only: hist_coord_size
@@ -5149,7 +5139,6 @@ end subroutine print_active_fldlst
     !
     use pio, only : pio_file_is_open
     use shr_kind_mod,  only: r8 => shr_kind_r8
-    use pspect
     use ioFileMod
     use time_manager,  only: get_nstep, get_curr_date, get_curr_time
     use cam_pio_utils, only: cam_pio_openfile, cam_pio_closefile

@@ -597,7 +597,6 @@ end function radiation_nextsw_cday
     use hirsbtpar,       only: pnb_hirs, pnf_msu, hirsname, msuname
     use radheat,         only: radheat_tend
     use ppgrid
-    use pspect
     use physconst,        only: cpair, stebol
     use radconstants,     only: nlwbands,idx_sw_diag
     use radsw,            only: rad_rrtmg_sw

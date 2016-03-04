@@ -70,7 +70,6 @@ subroutine stepon_init(dyn_in, dyn_out)
    use commap,         only: clat
    use constituents,   only: pcnst
    use physconst,      only: gravit
-   use rgrid,          only: nlon
    use eul_control_mod,only: eul_nsplit
 #if ( defined BFB_CAM_SCAM_IOP )
    use iop,            only:init_iop_fields
@@ -99,7 +98,7 @@ subroutine stepon_init(dyn_in, dyn_out)
    if (is_first_step()) then
       do lat=beglat,endlat
 	 if (.not. single_column) then
-            do i=1,nlon(lat)
+            do i=1,plon
                coslat(i) = cos(clat(lat))
                rcoslat(i) = 1._r8/coslat(i)
             end do
@@ -107,10 +106,10 @@ subroutine stepon_init(dyn_in, dyn_out)
          !     
          ! Set current time pressure arrays for model levels etc.
          !
-         call plevs0(nlon(lat), plon, plev, ps(1,lat,n3), pint, pmid, pdel)
+         call plevs0(plon, plon, plev, ps(1,lat,n3), pint, pmid, pdel)
          !
          do k=1,plev
-            do i=1,nlon(lat)
+            do i=1,plon
                rpmid(i,k) = 1._r8/pmid(i,k)
             end do
          end do
@@ -121,7 +120,7 @@ subroutine stepon_init(dyn_in, dyn_out)
          !
             call omcalc (rcoslat, div(1,1,lat,n3), u3(1,1,lat,n3), v3(1,1,lat,n3), dpsl(1,lat), &
                       dpsm(1,lat), pmid, pdel, rpmid   ,pint(1,plevp), &
-                      omga(1,1,lat), nlon(lat))
+                      omga(1,1,lat), plon)
          else
          
             omga(1,:,lat)=wfld(:)
@@ -306,7 +305,6 @@ end subroutine stepon_run3
 subroutine apply_fq(qminus,q3,fq,dt)
    use shr_kind_mod, only: r8 => shr_kind_r8
    use pmgrid,       only: plon, plat, plev, plevp, beglat, endlat
-   use rgrid,        only: nlon
    use constituents,   only: pcnst
 
    real(r8), intent(in) :: q3(plon,plev,beglat:endlat,pcnst)
@@ -321,7 +319,7 @@ subroutine apply_fq(qminus,q3,fq,dt)
    do q=1,pcnst 
    do c=beglat,endlat
    do k=1,plev
-   do i=1,nlon(c)
+   do i=1,plon
       fq_tmp = dt*fq(i,k,c,q)
       q_tmp  = q3(i,k,c,q)
       ! if forcing is > 0, do nothing (it makes q less negative)

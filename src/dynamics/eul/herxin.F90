@@ -28,7 +28,6 @@ subroutine herxin(pf      ,pkcnst  ,fb      ,fxl     ,fxr     , &
    use shr_kind_mod,   only: r8 => shr_kind_r8
    use pmgrid,         only: plev, plon
    use scanslt,        only: plond, beglatex, endlatex, platd, nxpt
-   use rgrid,          only: fullgrid
    use cam_abortutils, only: endrun
 !-----------------------------------------------------------------------
    implicit none
@@ -108,161 +107,37 @@ subroutine herxin(pf      ,pkcnst  ,fb      ,fxl     ,fxr     , &
    if(ppdy .ne. 4) then
       call endrun ('HERXIN:Fatal error: ppdy must be set to 4')
    end if
-!
-   if (fullgrid) then
-      dx (1) = x(nxpt+2,1) - x(nxpt+1,1)
-      rdx(1) = 1._r8/dx(1)
+
+   dx (1) = x(nxpt+2,1) - x(nxpt+1,1)
+   rdx(1) = 1._r8/dx(1)
 !$OMP PARALLEL DO PRIVATE (K, I, XL, XR)
-      do k=1,plev
-         do i=1,nlon
-            xl = ( x(idp(i,k,1)+1,1) - xdp(i,k) )*rdx(1)
-            xr = 1._r8 - xl
-            hl (i,k) = ( 3.0_r8 - 2.0_r8*xl)*xl**2
-            hr (i,k) = ( 3.0_r8 - 2.0_r8*xr )*xr**2
-            dhl(i,k) = -dx(1)*( xl - 1._r8 )*xl**2
-            dhr(i,k) =  dx(1)*( xr - 1._r8 )*xr**2
-         end do
+   do k=1,plev
+      do i=1,nlon
+         xl = ( x(idp(i,k,1)+1,1) - xdp(i,k) )*rdx(1)
+         xr = 1._r8 - xl
+         hl (i,k) = ( 3.0_r8 - 2.0_r8*xl)*xl**2
+         hr (i,k) = ( 3.0_r8 - 2.0_r8*xr )*xr**2
+         dhl(i,k) = -dx(1)*( xl - 1._r8 )*xl**2
+         dhr(i,k) =  dx(1)*( xr - 1._r8 )*xr**2
       end do
-!
-! x interpolation at each latitude needed for y interpolation.
-! Once for each field.
-! 
-      do m = 1,pf
+   end do
+
+   ! x interpolation at each latitude needed for y interpolation.
+   ! Once for each field.
+
+   do m = 1,pf
 !$OMP PARALLEL DO PRIVATE (N, K, I)
-         do n=1,4
-            do k = 1,plev
-               do i = 1,nlon
-                  fint(i,k,n,m) = &
-                       fb (idp(i,k,1)  ,k,m,jdp(i,k)+(n-2))*hl (i,k) + &
-                       fb (idp(i,k,1)+1,k,m,jdp(i,k)+(n-2))*hr (i,k) + &
-                       fxl(idp(i,k,1)  ,k,m,jdp(i,k)+(n-2))*dhl(i,k) + &
-                       fxr(idp(i,k,1)  ,k,m,jdp(i,k)+(n-2))*dhr(i,k)      
-               enddo
+      do n=1,4
+         do k = 1,plev
+            do i = 1,nlon
+               fint(i,k,n,m) = &
+                  fb (idp(i,k,1)  ,k,m,jdp(i,k)+(n-2))*hl (i,k) + &
+                  fb (idp(i,k,1)+1,k,m,jdp(i,k)+(n-2))*hr (i,k) + &
+                  fxl(idp(i,k,1)  ,k,m,jdp(i,k)+(n-2))*dhl(i,k) + &
+                  fxr(idp(i,k,1)  ,k,m,jdp(i,k)+(n-2))*dhr(i,k)      
             enddo
          enddo
       enddo
-!
-   else
-!
-!$OMP PARALLEL DO PRIVATE (J)
-      do j = 1,platd
-         dx (j) = x(nxpt+2,j) - x(nxpt+1,j)
-         rdx(j) = 1._r8/dx(j)
-      end do
-!
-!$OMP PARALLEL DO PRIVATE (K, I, XL, XR)
-      do k=1,plev
-         do i=1,nlon
-            xl = ( x(idp(i,k,1)+1,jdp(i,k)-1) - xdp(i,k) )*  &
-               rdx(jdp(i,k)-1)
-            xr = 1._r8 - xl
-            hl (i,k) = ( 3.0_r8 - 2.0_r8*xl )*xl**2
-            hr (i,k) = ( 3.0_r8 - 2.0_r8*xr )*xr**2
-            dhl(i,k) = -dx(jdp(i,k)-1)*( xl - 1._r8 )*xl**2
-            dhr(i,k) =  dx(jdp(i,k)-1)*( xr - 1._r8 )*xr**2
-         end do
-      end do
-!
-! x interpolation at each latitude needed for y interpolation.
-! Once for each field.
-! 
-      do m = 1,pf
-!$OMP PARALLEL DO PRIVATE (K, I)
-         do k = 1,plev
-            do i = 1,nlon
-               fint(i,k,1,m) = &
-                  fb (idp(i,k,1)  ,k,m,jdp(i,k)-1)*hl (i,k) + &
-                  fb (idp(i,k,1)+1,k,m,jdp(i,k)-1)*hr (i,k) + &
-                  fxl(idp(i,k,1)  ,k,m,jdp(i,k)-1)*dhl(i,k) + &
-                  fxr(idp(i,k,1)  ,k,m,jdp(i,k)-1)*dhr(i,k)
-            end do
-         end do
-      end do
+   enddo
 
-!$OMP PARALLEL DO PRIVATE (K, I, XL, XR)
-      do k=1,plev
-         do i=1,nlon
-            xl = ( x(idp(i,k,2)+1,jdp(i,k)) - xdp(i,k) )* rdx(jdp(i,k))
-            xr = 1._r8 - xl
-            hl (i,k) = ( 3.0_r8 - 2.0_r8*xl )*xl**2
-            hr (i,k) = ( 3.0_r8 - 2.0_r8*xr )*xr**2
-            dhl(i,k) = -dx(jdp(i,k))*( xl - 1._r8 )*xl**2
-            dhr(i,k) =  dx(jdp(i,k))*( xr - 1._r8 )*xr**2
-         end do
-      end do
-!
-! x interpolation at each latitude needed for y interpolation.
-! Once for each field.
-! 
-      do m = 1,pf
-!$OMP PARALLEL DO PRIVATE (K, I)
-         do k = 1,plev
-            do i = 1,nlon
-               fint(i,k,2,m) = &
-                  fb (idp(i,k,2)  ,k,m,jdp(i,k)  )*hl (i,k) + &
-                  fb (idp(i,k,2)+1,k,m,jdp(i,k)  )*hr (i,k) + &
-                  fxl(idp(i,k,2)  ,k,m,jdp(i,k)  )*dhl(i,k) + &
-                  fxr(idp(i,k,2)  ,k,m,jdp(i,k)  )*dhr(i,k)
-            end do
-         end do
-      end do
-
-!$OMP PARALLEL DO PRIVATE (K, I, XL, XR)
-      do k=1,plev
-         do i=1,nlon
-            xl = ( x(idp(i,k,3)+1,jdp(i,k)+1) - xdp(i,k) )* rdx(jdp(i,k)+1)
-            xr = 1._r8 - xl
-            hl (i,k) = ( 3.0_r8 - 2.0_r8*xl )*xl**2
-            hr (i,k) = ( 3.0_r8 - 2.0_r8*xr )*xr**2
-            dhl(i,k) = -dx(jdp(i,k)+1)*( xl - 1._r8 )*xl**2
-            dhr(i,k) =  dx(jdp(i,k)+1)*( xr - 1._r8 )*xr**2
-         end do
-      end do
-!
-! x interpolation at each latitude needed for y interpolation.
-! Once for each field.
-! 
-      do m = 1,pf
-!$OMP PARALLEL DO PRIVATE (K, I)
-         do k = 1,plev
-            do i = 1,nlon
-               fint(i,k,3,m) = &
-                  fb (idp(i,k,3)  ,k,m,jdp(i,k)+1)*hl (i,k) + &
-                  fb (idp(i,k,3)+1,k,m,jdp(i,k)+1)*hr (i,k) + &
-                  fxl(idp(i,k,3)  ,k,m,jdp(i,k)+1)*dhl(i,k) + &
-                  fxr(idp(i,k,3)  ,k,m,jdp(i,k)+1)*dhr(i,k)
-            end do
-         end do
-      end do
-!
-!$OMP PARALLEL DO PRIVATE (K, I, XL, XR)
-      do k=1,plev
-         do i=1,nlon
-            xl = ( x(idp(i,k,4)+1,jdp(i,k)+2) - xdp(i,k) )*rdx(jdp(i,k)+2)
-            xr = 1._r8 - xl
-            hl (i,k) = ( 3.0_r8 - 2.0_r8*xl )*xl**2
-            hr (i,k) = ( 3.0_r8 - 2.0_r8*xr )*xr**2
-            dhl(i,k) = -dx(jdp(i,k)+2)*( xl - 1._r8 )*xl**2
-            dhr(i,k) =  dx(jdp(i,k)+2)*( xr - 1._r8 )*xr**2
-         end do
-      end do
-!
-! x interpolation at each latitude needed for y interpolation.
-! Once for each field.
-! 
-      do m = 1,pf
-!$OMP PARALLEL DO PRIVATE (K, I)
-         do k = 1,plev
-            do i = 1,nlon
-               fint(i,k,4,m) = &
-                  fb (idp(i,k,4)  ,k,m,jdp(i,k)+2)*hl (i,k) + &
-                  fb (idp(i,k,4)+1,k,m,jdp(i,k)+2)*hr (i,k) + &
-                  fxl(idp(i,k,4)  ,k,m,jdp(i,k)+2)*dhl(i,k) + &
-                  fxr(idp(i,k,4)  ,k,m,jdp(i,k)+2)*dhr(i,k)
-            end do
-         end do
-      end do
-   end if
-!
-   return
 end subroutine herxin

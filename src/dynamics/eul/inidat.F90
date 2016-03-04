@@ -11,7 +11,6 @@ module inidat
 !-----------------------------------------------------------------------
    use ppgrid,              only: begchunk, endchunk, pcols
    use pmgrid,              only: beglat, endlat, plon, plat, plev, plnlv 
-   use rgrid,               only: nlon
    use prognostics,         only : div, vort, t3, u3, v3, q3, n3, phis, dpsm, dpsl, ps
    use ncdio_atm,           only: infld
    use shr_kind_mod,        only: r8 => shr_kind_r8
@@ -211,10 +210,7 @@ contains
 
     
     if (single_column) then
-       !$omp parallel do private(lat)
-       do lat = 1,plat
-          ps(:nlon(lat),lat,1) = ps_tmp(:nlon(lat),lat)
-       end do
+       ps(:,:,1) = ps_tmp(:,:)
     else	
 !
 ! Integrals of mass, moisture and geopotential height
@@ -446,7 +442,7 @@ contains
                pertlim,' to initial temperature field'
           do lat = 1,plat
              do k = 1,plev
-                do i = 1,nlon(lat)
+                do i = 1,plon
                    call random_number (pertval)
                    pertval = 2._r8*pertlim*(0.5_r8 - pertval)
                    t3_tmp(i,k,lat) = t3_tmp(i,k,lat)*(1._r8 + pertval)
@@ -552,7 +548,7 @@ contains
 
 !$omp parallel do private(lat)
      do lat = 1,plat
-        call qneg3(trim(subname), lat   ,nlon(lat),plon   ,plev    , &
+        call qneg3(trim(subname), lat, plon, plon, plev    , &
              m_cnst, m_cnst, qmin(m_cnst) ,arr3d_a(1,1,lat))
      end do
 !
@@ -656,10 +652,7 @@ contains
        call compute_gsfactors (numperlat, numrecv, numsend, displs)
        call mpiscatterv (phis_tmp  ,numsend, displs, mpir8,phis ,numrecv, mpir8,0,mpicom)
 #else
-!$omp parallel do private(lat)
-       do lat = 1,plat
-          phis(:nlon(lat),lat) = phis_tmp(:nlon(lat),lat)
-       end do
+       phis = phis_tmp
 #endif
 
     end select
@@ -762,30 +755,30 @@ contains
 !              
 ! Accumulate average mass of atmosphere
 !
-             call pdelb0 (ps_tmp(1,lat),pdelb   ,nlon(lat))
+             call pdelb0 (ps_tmp(1,lat), pdelb, plon)
              pssum  = 0._r8
-             do i = 1,nlon(lat)
+             do i = 1, plon
                 pssum  = pssum  + ps_tmp  (i,lat)
              end do
-             tmassf_tmp = tmassf_tmp + w(irow)*pssum/nlon(lat)
+             tmassf_tmp = tmassf_tmp + w(irow)*pssum/plon
 
              zgssum = 0._r8
-             do i = 1,nlon(lat)
+             do i = 1, plon
                 zgssum = zgssum + phis_tmp(i,lat)
              end do
-             zgsint_tmp = zgsint_tmp + w(irow)*zgssum/nlon(lat)
+             zgsint_tmp = zgsint_tmp + w(irow)*zgssum/plon
 !
 ! Calculate global integrals needed for water vapor adjustment
 !
              do k = 1,plev
                 dotproda = 0._r8
                 dotprodb = 0._r8
-                do i = 1,nlon(lat)
+                do i = 1, plon
                    dotproda = dotproda + q3_tmp(i,k,lat)*pdela(i,k)
                    dotprodb = dotprodb + q3_tmp(i,k,lat)*pdelb(i,k)
                 end do
-                qmass1_tmp = qmass1_tmp + w(irow)*dotproda/nlon(lat)
-                qmass2_tmp = qmass2_tmp + w(irow)*dotprodb/nlon(lat)
+                qmass1_tmp = qmass1_tmp + w(irow)*dotproda/plon
+                qmass2_tmp = qmass2_tmp + w(irow)*dotprodb/plon
              end do
           end do
        end do                  ! end of latitude loop
@@ -821,11 +814,7 @@ contains
        else
           fixmas = (tmass0 + qmass1_tmp)/(tmassf_tmp - qmass2_tmp)
        end if
-       do lat = 1,plat
-          do i = 1,nlon(lat)
-             ps_tmp(i,lat) = ps_tmp(i,lat)*fixmas
-          end do
-       end do
+       ps_tmp = ps_tmp*fixmas
 !
 ! Global integerals
 !
@@ -849,10 +838,7 @@ contains
     call compute_gsfactors (numperlat, numrecv, numsend, displs)
     call mpiscatterv (ps_tmp    ,numsend, displs, mpir8,ps    (:,beglat:endlat,1) ,numrecv, mpir8,0,mpicom)
 #else
-!$omp parallel do private(lat)
-    do lat = 1,plat
-       ps(:nlon(lat),lat,1) = ps_tmp(:nlon(lat),lat)
-    end do
+    ps(:,:,1) = ps_tmp(:,:)
 #endif
     return
 
@@ -862,7 +848,6 @@ contains
    use pmgrid,       only: plon, plev, plevp, beglat, endlat
    use prognostics,  only: ps, u3, v3, t3, q3, vort, div, ptimelevels, pdeld
    use comspe,       only: alp, dalp
-   use rgrid,        only: nlon
 
 !---------------------------Local variables-----------------------------
 !
@@ -884,9 +869,9 @@ contains
 ! First, set current time pressure arrays for model levels etc. to get pdel
 !
       do lat=beglat,endlat
-         call plevs0(nlon(lat), plon, plev, ps(1,lat,1), pint, pmid, pdel)
+         call plevs0(plon, plon, plev, ps(:,lat,1), pint, pmid, pdel)
          do k=1,plev
-            do i=1,nlon(lat)
+            do i=1, plon
                pdeld(i,k,lat,1) = pdel(i,k)*(1._r8-q3(i,k,1,lat,1))
             end do !i
          end do !k

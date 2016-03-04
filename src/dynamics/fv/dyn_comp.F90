@@ -155,7 +155,6 @@ subroutine dyn_init(file, dyn_state, dyn_in, dyn_out, NLFileName )
                                     npr_y, npr_z, nprxy_x, nprxy_y,           &
                                     twod_decomp
    use time_manager,  only : get_step_size
-   use pmgrid,        only : dyndecomp_set
    use dynamics_vars, only : dynamics_init
    use dycore,        only : get_resolution
    use dyn_grid,      only : define_cam_grids, initgrid
@@ -573,7 +572,6 @@ subroutine dyn_init(file, dyn_state, dyn_in, dyn_out, NLFileName )
 #if ( defined OFFLINE_DYN )
   call metdata_dyn_init(grid)
 #endif
-  dyndecomp_set=.true.
 
   deallocate (jmyz)
   deallocate (kmyz)

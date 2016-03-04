@@ -85,7 +85,7 @@ subroutine cam_init(EClock, &
 #endif
 
    use camsrfexch,       only: hub2atm_alloc, atm2hub_alloc
-   use cam_history,      only: intht, init_masterlinkedlist
+   use cam_history,      only: intht
    use history_scam,     only: scm_intht
    use cam_pio_utils,    only: init_pio_subsystem
    use cam_instance,     only: inst_suffix
@@ -131,6 +131,8 @@ subroutine cam_init(EClock, &
    integer           :: ref_tod     ! Reference time of day (sec)
    !-----------------------------------------------------------------------
 
+   call init_pio_subsystem()
+
    ! Initializations using data passed from coupler.
    call cam_ctrl_init( &
       caseid, ctitle, start_type, adiabatic, ideal_phys, &
@@ -156,22 +158,9 @@ subroutine cam_init(EClock, &
    filein = "atm_in" // trim(inst_suffix)
    call read_namelist(filein, single_column, scmlat, scmlon)
 
-   !
-   ! Initialization needed for cam_history
-   ! 
-   call init_masterlinkedlist()
-   !
-   ! Set up spectral arrays
-   !
-   call trunc()
-
    ! Register advected tracers and physics buffer fields
    call phys_register ()
 
-   ! Do appropriate dynamics and history initialization depending on whether initial, restart, or 
-   ! branch.  On restart run intht need not be called because all the info is on restart dataset.
-   !
-   call init_pio_subsystem(filein)
 
    if (initial_run) then
 

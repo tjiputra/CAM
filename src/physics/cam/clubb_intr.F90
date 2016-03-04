@@ -61,7 +61,7 @@ module clubb_intr
       grid_type    = 3, &               ! The 2 option specifies stretched thermodynamic levels
       hydromet_dim = 0                  ! The hydromet array in SAM-CLUBB is currently 0 elements
    
-  real(r8), dimension(0) :: &
+  real(r8), parameter, dimension(0) :: &
       sclr_tol = 1.e-8_r8               ! Total water in kg/kg
 
   character(len=6), parameter :: &
@@ -104,6 +104,7 @@ module clubb_intr
     
   logical            :: lq(pcnst)
   logical            :: lq2(pcnst)
+  logical            :: lqice(pcnst)
   logical            :: prog_modal_aero
   logical            :: do_rainturb
   logical            :: do_expldiff
@@ -509,7 +510,7 @@ end subroutine clubb_init_cnst
     integer :: ntop_eddy                        ! Top    interface level to which eddy vertical diffusion is applied ( = 1 )
     integer :: nbot_eddy                        ! Bottom interface level to which eddy vertical diffusion is applied ( = pver )
     integer :: nmodes, nspec, pmam_ncnst, m
-    integer :: ixnumliq
+    integer :: ixcldice, ixcldliq, ixnumliq, ixnumice
     integer :: lptr
 
     real(r8)  :: zt_g(pverp+1-top_lev)          ! Height dummy array
@@ -541,6 +542,11 @@ end subroutine clubb_init_cnst
     lq(1:pcnst) = .true.
     edsclr_dim  = pcnst
 
+    call cnst_get_ind('NUMICE',ixnumice)
+    call cnst_get_ind('NUMLIQ',ixnumliq)
+    call cnst_get_ind('CLDLIQ',ixcldliq)
+    call cnst_get_ind('CLDICE',ixcldice)
+
     if (prog_modal_aero) then
        ! Turn off modal aerosols and decrement edsclr_dim accordingly
        call rad_cnst_get_info(0, nmodes=nmodes)
@@ -561,11 +567,24 @@ end subroutine clubb_init_cnst
        !  In addition, if running with MAM, droplet number is transported
        !  in dropmixnuc, therefore we do NOT want CLUBB to apply transport
        !  tendencies to avoid double counted.  Else, we apply tendencies.
-       call cnst_get_ind('NUMLIQ',ixnumliq)
        lq(ixnumliq) = .false.
        edsclr_dim = edsclr_dim-1
     endif
 
+
+    if (micro_do_icesupersat) then
+       lq2(:)  = .FALSE.
+       lq2(1)  = .TRUE.
+       lq2(ixcldice) = .TRUE.
+       lq2(ixnumice) = .TRUE.
+    end if
+   
+    lqice(:)        = .false.
+    lqice(ixcldliq) = .true.
+    lqice(ixcldice) = .true.
+    lqice(ixnumliq) = .true.
+    lqice(ixnumice) = .true.
+    
     ! ----------------------------------------------------------------- !
     ! Set the debug level.  Level 2 has additional computational expense since
     ! it checks the array variables in CLUBB for invalid values.
@@ -1125,7 +1144,6 @@ end subroutine clubb_init_cnst
    
    integer                               :: time_elapsed                ! time keep track of stats          [s]
    real(r8), dimension(nparams)          :: clubb_params                ! These adjustable CLUBB parameters (C1, C2 ...)
-   real(r8), dimension(sclr_dim)         :: sclr_tol                    ! Tolerance on passive scalar       [units vary]
    type(pdf_parameter), dimension(pverp) :: pdf_params                  ! PDF parameters                    [units vary]
    character(len=200)                    :: temp1, sub                  ! Strings needed for CLUBB output
    logical                               :: l_Lscale_plume_centered, l_use_ice_latent
@@ -1179,7 +1197,6 @@ end subroutine clubb_init_cnst
    real(r8)  qvtend(pcols,pver)
    real(r8)  qitend(pcols,pver)
    real(r8)  initend(pcols,pver)
-   logical            :: lqice(pcnst)
    
    integer :: ixorg
 
@@ -1219,11 +1236,7 @@ end subroutine clubb_init_cnst
    call cnst_get_ind('NUMLIQ',ixnumliq)
    call cnst_get_ind('NUMICE',ixnumice)
 
- !  Initialize physics tendency arrays, copy the state to state1 array to use in this routine
-
-   if (.not. micro_do_icesupersat) then    
-     call physics_ptend_init(ptend_loc,state%psetcols, 'clubb', ls=.true., lu=.true., lv=.true., lq=lq)
-   endif
+ !  Copy the state to state1 array to use in this routine
 
    call physics_state_copy(state,state1)
 
@@ -1297,11 +1310,6 @@ end subroutine clubb_init_cnst
      ! Ice Saturation Adjustment Computation  !
      ! -------------------------------------- !
 
-     lq2(:)  = .FALSE.
-     lq2(1)  = .TRUE.
-     lq2(ixcldice) = .TRUE.
-     lq2(ixnumice) = .TRUE.
-   
      latsub = latvap + latice
    
      call physics_ptend_init(ptend_loc, state%psetcols, 'iceadj', ls=.true., lq=lq2 )
@@ -1487,9 +1495,8 @@ end subroutine clubb_init_cnst
      enddo
    enddo
 
-   if (micro_do_icesupersat) then
-     call physics_ptend_init(ptend_loc,state%psetcols, 'clubb', ls=.true., lu=.true., lv=.true., lq=lq)
-   endif
+   !  Initialize physics tendencies
+   call physics_ptend_init(ptend_loc,state%psetcols, 'clubb', ls=.true., lu=.true., lv=.true., lq=lq)
 
    !  Loop over all columns in lchnk to advance CLUBB core
    do i=1,ncol   ! loop over columns
@@ -2111,12 +2118,6 @@ end subroutine clubb_init_cnst
    !  Initialize the shallow convective detrainment rate, will always be zero
    dlf2(:,:) = 0.0_r8
 
-   lqice(:)        = .false.
-   lqice(ixcldliq) = .true.
-   lqice(ixcldice) = .true.
-   lqice(ixnumliq) = .true.
-   lqice(ixnumice) = .true.
-    
    call physics_ptend_init(ptend_loc,state%psetcols, 'clubb', ls=.true., lq=lqice)
    
    do k=1,pver

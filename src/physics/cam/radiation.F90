@@ -520,7 +520,6 @@ end function radiation_nextsw_cday
     use cam_history_support, only : fillvalue
     use radheat,         only: radheat_tend
     use ppgrid
-    use pspect
     use physconst,        only: cpair, stebol
     use radconstants,     only: nlwbands, nswbands
     use radsw,            only: radcswmx

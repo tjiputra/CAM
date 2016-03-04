@@ -27,16 +27,11 @@ subroutine bandij(dlam    ,phib    ,lamp    ,phip    ,iband   , &
 ! Author: J. Olson
 ! 
 !-----------------------------------------------------------------------
-!
-! $Id$
-! $Author$
-!
-!-----------------------------------------------------------------------
 
   use shr_kind_mod, only: r8 => shr_kind_r8
   use pmgrid,       only: plon, plev
   use scanslt,      only: platd, i1
-  use rgrid,        only: fullgrid
+
   implicit none
 
 !------------------------------Arguments--------------------------------
@@ -80,15 +75,9 @@ subroutine bandij(dlam    ,phib    ,lamp    ,phip    ,iband   , &
 ! Longitude indices.
 !
         iband(i,k,1) = i1 + int( lamp(i,k)*rdlam(jband(i,k)-1))
-        if (fullgrid) then
-           iband(i,k,2) = iband(i,k,1)
-           iband(i,k,3) = iband(i,k,1)
-           iband(i,k,4) = iband(i,k,1)
-        else
-           iband(i,k,2) = i1 + int( lamp(i,k)*rdlam(jband(i,k)  ))
-           iband(i,k,3) = i1 + int( lamp(i,k)*rdlam(jband(i,k)+1))
-           iband(i,k,4) = i1 + int( lamp(i,k)*rdlam(jband(i,k)+2))
-        end if
+        iband(i,k,2) = iband(i,k,1)
+        iband(i,k,3) = iband(i,k,1)
+        iband(i,k,4) = iband(i,k,1)
      end do
   end do
 

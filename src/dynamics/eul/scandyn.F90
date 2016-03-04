@@ -32,7 +32,6 @@ subroutine scandyn (ztodt,   etadot,  etamid,  grlps1,  grt1,   &
                            dpsm, ps, n3m1, n3, n3m2, qminus, pdeld
    use constituents, only: pcnst
    use scanslt,      only: hw1lat
-   use rgrid,        only: nlon
    use comspe, only: maxm
    use linemsdyn,    only: linemsdyn_bft, linemsdyn_fft, linemsdyn_aft, &
                      plondfft
@@ -124,7 +123,7 @@ subroutine scandyn (ztodt,   etadot,  etamid,  grlps1,  grt1,   &
 #endif
    do lat=beglat,endlat
 
-      call linemsdyn_bft (lat, nlon(lat), nlon_fft_in, &
+      call linemsdyn_bft (lat, plon, nlon_fft_in, &
                       ps(1,lat,n3m1), ps(1,lat,n3m2), u3(1,1,lat,n3m1), &
                       u3(1,1,lat,n3m2), v3(1,1,lat,n3m1), v3(1,1,lat,n3m2), t3(1,1,lat,n3m1), t3(1,1,lat,n3m2), &
                       q3(1,1,1,lat,n3m1), etadot(1,1,lat), etamid, &
@@ -190,7 +189,7 @@ subroutine scandyn (ztodt,   etadot,  etamid,  grlps1,  grt1,   &
 !
 ! Only pdel is needed pint and pmid are not.
 !
-      call plevs0 (nlon(lat),plon,plev,ps(1,lat,n3m2), pint, pmid, pdel)
+      call plevs0 (plon,plon,plev,ps(1,lat,n3m2), pint, pmid, pdel)
 !
 ! Calculate mass of moisture in field being advected
 !
@@ -198,7 +197,7 @@ subroutine scandyn (ztodt,   etadot,  etamid,  grlps1,  grt1,   &
 !  q3     is plon,plev,pcnst,beglat:endlat,ptimelevs
 !  qminus is plon,plev,pcnst,beglat:endlat
       call qmassarun (cwava(lat),w(irow) ,qminus(1,1,1,lat),pdel    , &
-                   hw1lat(1,lat),nlon(lat), q3(1,1,1,lat,n3m2), lat, &
+                   hw1lat(1,lat),plon, q3(1,1,1,lat,n3m2), lat, &
 		   pdeld(:,:,lat,n3m2 ))
    end do
    call t_stopf ('moisture_mass')

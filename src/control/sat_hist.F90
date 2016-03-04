@@ -503,7 +503,8 @@ contains
 !-------------------------------------------------------------------------------
   subroutine dump_columns( File, hitem, ncols, nfils, fdims, ldims, owners  )
     use cam_history_support,  only: field_info, hentry, hist_coords, fillvalue
-    use pio,            only: pio_initdecomp, pio_freedecomp, pio_setframe, pio_offset_kind, pio_iam_iotask, pio_setdebuglevel
+    use pio,            only: pio_initdecomp, pio_freedecomp, pio_setframe, pio_offset_kind, &
+         pio_rearr_box, pio_rearr_subset
 
     type(File_desc_t),intent(inout)  :: File
     type(hentry),     intent(in), target     :: hitem
@@ -521,7 +522,7 @@ contains
     integer, allocatable :: dimlens(:)
 
     real(r8), allocatable :: buf(:)
-    integer,  allocatable :: dof(:)
+    integer(kind=pio_offset_kind),  allocatable :: dof(:)
     integer :: i,k, cnt
 
     call t_startf ('sat_hist::dump_columns')
@@ -569,13 +570,12 @@ contains
           endif
        enddo
     enddo
-
-    call pio_setframe(File,vardesc, int(-1,kind=pio_offset_kind))
-    call pio_initdecomp(sat_iosystem, pio_double, dimlens, dof, iodesc )
+    call pio_initdecomp(sat_iosystem, pio_double, dimlens, dof, &
+         iodesc,rearr=PIO_REARR_SUBSET )
     call pio_setframe(File,vardesc, int(nfils,kind=pio_offset_kind))
     call pio_write_darray(File, vardesc, iodesc, buf, ierr, fillval=fillvalue)
 
-    call pio_freedecomp(sat_iosystem, iodesc)
+    call pio_freedecomp(File, iodesc)
 
     deallocate( buf )
     deallocate( dof )

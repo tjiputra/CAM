@@ -1,4 +1,3 @@
-
 module metdata
 !----------------------------------------------------------------------- 
 !
@@ -1528,6 +1527,7 @@ contains
 
        call infld(met_shflx_name, fids(i), 'lon', 'lat',  1, pcols, begchunk, endchunk, &
             met_shflxi(i)%data, readvar, gridname='physgrid',timelevel=recnos(i))
+       
        call infld(met_qflx_name, fids(i), 'lon', 'lat',  1, pcols, begchunk, endchunk, &
             met_qflxi(i)%data, readvar, gridname='physgrid',timelevel=recnos(i))
        call infld('TAUX', fids(i), 'lon', 'lat',  1, pcols, begchunk, endchunk, &
@@ -1548,30 +1548,47 @@ contains
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
   subroutine interp_phys_srf_flds( )
-
+    use phys_grid,           only: get_ncols_p
     real(r4) :: fact1, fact2
     real(r8) :: deltat
+    integer :: i, c, ncol
 
     deltat = datatimep - datatimem
     fact1 = (datatimep - curr_mod_time)/deltat
     fact2 = D1_0-fact1
+    
 
-    met_shflx(:,:) = fact1*met_shflxi(nm)%data(:,:) + fact2*met_shflxi(np)%data(:,:)
-    met_qflx(:,:) = fact1*met_qflxi(nm)%data(:,:) + fact2*met_qflxi(np)%data(:,:)
-    met_taux(:,:) = fact1*met_tauxi(nm)%data(:,:) + fact2*met_tauxi(np)%data(:,:)
-    met_tauy(:,:) = fact1*met_tauyi(nm)%data(:,:) + fact2*met_tauyi(np)%data(:,:)
+    do c=begchunk,endchunk
+       ncol = get_ncols_p(c)
+       do i=1,ncol
+          met_shflx(i,c) = fact1*met_shflxi(nm)%data(i,c) + fact2*met_shflxi(np)%data(i,c)
+          met_qflx(i,c) = fact1*met_qflxi(nm)%data(i,c) + fact2*met_qflxi(np)%data(i,c)
+          met_taux(i,c) = fact1*met_tauxi(nm)%data(i,c) + fact2*met_tauxi(np)%data(i,c)
+          met_tauy(i,c) = fact1*met_tauyi(nm)%data(i,c) + fact2*met_tauyi(np)%data(i,c)
+       enddo
+    enddo
     if ( .not.met_srf_feedback ) then
-       met_snowh(:,:) = fact1*met_snowhi(nm)%data(:,:) + fact2*met_snowhi(np)%data(:,:)
+       do c=begchunk,endchunk
+          ncol = get_ncols_p(c)
+          do i=1,ncol
+             met_snowh(i,c) = fact1*met_snowhi(nm)%data(i,c) + fact2*met_snowhi(np)%data(i,c)
+          enddo
+       enddo
     endif
     if (has_ts) then
-       met_ts(:,:) = fact1*met_tsi(nm)%data(:,:) + fact2*met_tsi(np)%data(:,:)
+       do c=begchunk,endchunk
+          ncol = get_ncols_p(c)
+          do i=1,ncol
+             met_ts(i,c) = fact1*met_tsi(nm)%data(i,c) + fact2*met_tsi(np)%data(i,c)
+          enddo
+       enddo
     endif
-
+    
   end subroutine interp_phys_srf_flds
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
   subroutine interpolate_metdata(grid)
-
+    use phys_grid,           only: get_ncols_p
 #if defined( SPMD )
     use mod_comm, only : mp_send4d_ns, mp_recv4d_ns
 #endif
@@ -1582,7 +1599,7 @@ contains
     real(r4) fact1, fact2
     real(r4) nfact1, nfact2
     real(r8) deltat,deltatn
-    integer :: i,j,k
+    integer :: i,c,k, ncol
     integer :: im, jm, km, jfirst, jlast, kfirst, klast, ng_d, ng_s
 
     im      = grid%im
@@ -1607,9 +1624,15 @@ contains
     nfact1 = (datatimepn - next_mod_time)/deltatn
 !    nfact2 = (next_mod_time - datatimemn)/deltatn
     nfact2 = D1_0-nfact1
-
-    met_t(:,:,:) = fact1*met_ti(nm)%data(:,:,:) + fact2*met_ti(np)%data(:,:,:)
-    met_q(:,:,:) = fact1*met_qi(nm)%data(:,:,:) + fact2*met_qi(np)%data(:,:,:)
+    do c=begchunk,endchunk
+       ncol = get_ncols_p(c)
+       do k=1,pver
+          do i=1,ncol
+             met_t(i,k,c) = fact1*met_ti(nm)%data(i,k,c) + fact2*met_ti(np)%data(i,k,c)
+             met_q(i,k,c) = fact1*met_qi(nm)%data(i,k,c) + fact2*met_qi(np)%data(i,k,c)
+          enddo
+       enddo
+    enddo
 
     if (.not. online_test) where (met_q .lt. D0_0) met_q = D0_0
 
@@ -1619,7 +1642,12 @@ contains
     call interp_phys_srf_flds()
 
     if (has_ts) then
-       met_ts(:,:) = fact1*met_tsi(nm)%data(:,:) + fact2*met_tsi(np)%data(:,:)
+       do c=begchunk,endchunk
+          ncol = get_ncols_p(c)
+          do i=1,ncol
+             met_ts(i,c) = fact1*met_tsi(nm)%data(i,c) + fact2*met_tsi(np)%data(i,c)
+          enddo
+       enddo
     endif
 
     if ( .not. met_cell_wall_winds ) then

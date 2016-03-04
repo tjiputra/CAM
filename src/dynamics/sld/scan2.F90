@@ -16,14 +16,6 @@ subroutine scan2 (ztodt, cwava, etamid)
 ! are applied and the global integrals of the constituent fields are 
 ! computed for the mass fixer.
 !
-! Author: 
-! Original version:  CCM1
-!
-!-----------------------------------------------------------------------
-!
-! $Id$
-! $Author$
-!
 !-----------------------------------------------------------------------
 
    use shr_kind_mod, only: r8 => shr_kind_r8
@@ -32,7 +24,6 @@ subroutine scan2 (ztodt, cwava, etamid)
                            n3, n3m1, ps, qm, ql, tm, tl, shift_time_indices
    use constituents, only: pcnst
    use comspe, only: maxm
-   use rgrid,        only: nlon
 #ifdef SPMD
    use mpishorthand, only: mpicom
 #endif
@@ -275,7 +266,7 @@ grqla(:,:,:) = nan
 
    do lat=beglat,endlat
       j = lat
-      call spegrd_aft (ztodt, lat, nlon(lat), nlon_fft_out, &
+      call spegrd_aft (ztodt, lat, plon, nlon_fft_out, &
                        cwava(lat), qfcst(1,1,1,lat), q3(1,1,1,j,n3), &
                        etamid, ps(1,lat,n3m1), u3(1,1,j,n3m1), v3(1,1,j,n3m1), t3(1,1,j,n3m1), &
                        div(1,1,lat,n3m1), hw2al(1,lat), hw2bl(1,lat), hw3al(1,lat), hw3bl(1,lat), &
@@ -414,7 +405,7 @@ grqla(:,:,:) = nan
       call tfilt_massfix (ztodt, lat, u3(1,1,j,n3m1), v3(1,1,j,n3m1), t3(1,1,j,n3m1), &
                           q3(1,1,1,j,n3), q3(1,1,1,j,n3m1), ps(1,lat,n3m1), cwava(lat), alpha, &
                           etamid, qfcst(1,1,1,lat), div(1,1,lat,n3m1), phis(1,lat), omga(1,1,lat), &
-                          dpsl(1,lat), dpsm(1,lat), nlon(lat), u3(1,1,j,n3), v3(1,1,j,n3), t3(1,1,j,n3), &
+                          dpsl(1,lat), dpsm(1,lat), plon, u3(1,1,j,n3), v3(1,1,j,n3), t3(1,1,j,n3), &
                           qm1(1,1,1,j), ps(1,lat,n3), beta)
    end do
 
