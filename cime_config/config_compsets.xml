@@ -271,6 +271,10 @@
     <lname>2000_CAM%ADIAB_SLND_SICE_SOCN_SROF_SGLC_SWAV</lname>
   </compset>
 
+  <compset>
+   <alias>NFPTAERO</alias>
+   <lname>2000_CAM5%PTAERO_CLM40%SP_CICE%PRES_DOCN%DOM_RTM_SGLC_SWAV</lname>
+  </compset>
   <!-- FG compsets -->
 
   <compset>

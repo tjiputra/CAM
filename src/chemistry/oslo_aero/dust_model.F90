@@ -5,7 +5,6 @@ module dust_model
 
 use constituents,     only: cnst_name
 use aerosoldef,       only: l_dst_a2, l_dst_a3
-use shr_kind_mod,     only: r8 => shr_kind_r8, cl => shr_kind_cl
 use camsrfexch,       only: cam_in_t
 use ppgrid,           only: pcols
 use cam_logfile,      only: iulog

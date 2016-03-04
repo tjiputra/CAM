@@ -11,7 +11,7 @@ use camsrfexch,       only: cam_in_t, cam_out_t
 use ppgrid,           only: pcols, pver,pverp
 use constituents,     only: pcnst, cnst_add, cnst_name, cnst_get_ind
 use aerodep_flx,      only: aerodep_flx_prescribed
-use abortutils,       only: endrun
+use cam_abortutils,   only: endrun
 use cam_logfile,      only: iulog
 use oslo_ocean_intr,  only: oslo_opom_emis_intr, oslo_opom_inq
 

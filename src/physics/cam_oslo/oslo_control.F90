@@ -7,7 +7,7 @@ module oslo_control
 
 use spmd_utils,    only: masterproc
 use cam_logfile,   only: iulog
-use abortutils,    only: endrun
+use cam_abortutils, only: endrun
 use shr_kind_mod,  only: r8 => shr_kind_r8
 use cam_cpl_indices, only:index_x2a_Faoo_fdms_ocn
 

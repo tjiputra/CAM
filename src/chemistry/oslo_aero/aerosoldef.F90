@@ -13,7 +13,7 @@ module aerosoldef
    use mo_tracname, only : solsym
    use shr_kind_mod, only: r8 => shr_kind_r8
    use constituents, only: pcnst, cnst_name,cnst_get_ind
-   use abortutils,       only: endrun
+   use cam_abortutils,       only: endrun
 
   implicit none
   save

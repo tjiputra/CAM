@@ -77,7 +77,9 @@
       <value compset="_CAM%ADIAB"     >-phys adiabatic</value>              
       <value compset="_AQUAP"         >-ocn aquaplanet</value>              
       
-      <value compset="%PORT"          >-offline_drv rad</value>              
+      <value compset="%PORT"          >-offline_drv rad</value> 
+
+      <value compset="_CAM5%PTAERO"   >-phys cam5 -chem trop_mam_oslo</value>             
     </values>
     <group>build_component_cam</group>
     <file>env_build.xml</file>
@@ -280,6 +282,8 @@
     <desc compset="%AQUAP"			>CAM atmosphere in aquaplanet mode: </desc>
     <desc compset="%PORT"			>CAM Parallel Offline Radiation Tool:</desc>
     <desc compset="_CAM.%L60"			>CAM 60 layers and full gravity wave spectrum:</desc>
+
+    <desc compset="_CAM5%PTAERO">cam 5 physics an Production tagged aerosols (OSLO_AERO)</desc>
   </description>
 
   <help>
