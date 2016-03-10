@@ -5,6 +5,7 @@
 <start_ymd>19870101</start_ymd>
 
 <!--Species IC -->
+<ncdata dyn="fv"  hgrid="0.9x1.25">atm/waccm/ic/f.e14.FWTC5L45CCMIR1.f09_f09.cam5_4.CLUBB.03.cam.i.1987-01-05-00000_c151002.nc</ncdata>
 <ncdata dyn="fv"  hgrid="1.9x2.5" >atm/waccm/ic/b.waccm-tsmlt-mam3_1.9x2.5_L70.cam.i.1987-01-01.c140818.nc</ncdata>
 <ncdata dyn="fv"  hgrid="4x5"     >atm/waccm/ic/f2000.waccm-mam3_4x5_L70.cam2.i.0017-01-01.c121113.nc</ncdata>
 
@@ -53,7 +54,7 @@
   'pom_a1 -> $INPUTDATA_ROOT/atm/cam/chem/trop_mozart_aero/emis/ar5_mam3_pom_elev_1850-2005_c130424.nc',
   'so4_a1 -> $INPUTDATA_ROOT/atm/cam/chem/trop_mozart_aero/emis/ar5_mam3_so4_a1_elev_1850-2005_c090804.nc',
   'so4_a2 -> $INPUTDATA_ROOT/atm/cam/chem/trop_mozart_aero/emis/ar5_mam3_so4_a2_elev_1850-2005_c090804.nc',
-  'SO2    -> $INPUTDATA_ROOT/atm/cam/chem/stratvolc/StratVolcSO2Emis1990-2014SchmidtV1.1_Pin10Tg_2deg_c150818.nc'
+  'SO2    -> $INPUTDATA_ROOT/atm/cam/chem/stratvolc/GlobalVolcSO2Emis1850-2015_VEI_Pin10Tg_2deg_c151111.nc'
 </ext_frc_specifier>
 <ext_frc_specifier hgrid="0.9x1.25">
   'NO2 -> $INPUTDATA_ROOT/atm/cam/chem/emis/ccmi_1960-2008/CCMI_emissions_aircraft_NO2_1850-2100_1.9x2.5_c130314.nc',
@@ -64,7 +65,7 @@
   'pom_a1 -> $INPUTDATA_ROOT/atm/cam/chem/trop_mozart_aero/emis/ar5_mam3_pom_elev_1850-2005_c130424.nc',
   'so4_a1 -> $INPUTDATA_ROOT/atm/cam/chem/trop_mozart_aero/emis/ar5_mam3_so4_a1_elev_1850-2005_c090804.nc',
   'so4_a2 -> $INPUTDATA_ROOT/atm/cam/chem/trop_mozart_aero/emis/ar5_mam3_so4_a2_elev_1850-2005_c090804.nc',
-  'SO2    -> $INPUTDATA_ROOT/atm/cam/chem/stratvolc/StratVolcSO2Emis1990-2014SchmidtV1.1_Pin10Tg_1deg_c150828.nc'
+  'SO2    -> $INPUTDATA_ROOT/atm/cam/chem/stratvolc/GlobalVolcSO2Emis1850-2015_VEI_Pin10Tg_1deg_c151111.nc'
 </ext_frc_specifier>
 <ext_frc_type>'INTERP_MISSING_MONTHS'</ext_frc_type>
 
@@ -271,6 +272,5 @@
 <inithist>'YEARLY'</inithist>
 <aoa_read_from_ic_file>.true.</aoa_read_from_ic_file>
 <cldfrc_rhminl>0.89D0</cldfrc_rhminl>
-<use_gw_front_igw>.true.</use_gw_front_igw>
 
 </namelist_defaults>

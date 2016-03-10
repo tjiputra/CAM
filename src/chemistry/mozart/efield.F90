@@ -222,8 +222,8 @@
       use time_manager,   only : get_curr_calday, get_curr_date
       use mo_solar_parms, only : solar_parms_get
       use mag_parms,      only : get_mag_parms
-      use cam_control_mod, only: magfield_fix_year
-      use spmd_utils,      only: masterproc
+      use mo_apex,        only : geomag_year
+      use spmd_utils,     only : masterproc
 
       integer :: idum1, idum2, tod ! time of day [s] 
 
@@ -233,7 +233,7 @@
 !-----------------------------------------------------------------------
       iday = get_curr_calday()                   ! day of year
       call get_curr_date (iyear,imo,iday_m,tod)  ! year, time of day [sec]
-      iyear = magfield_fix_year
+      iyear = geomag_year
 
       if( iyear < 1900 ) then
         write(iulog,"(/,'>>> get_efield: year < 1900 not possible: year=',i5)") iyear

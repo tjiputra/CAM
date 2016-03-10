@@ -68,7 +68,6 @@ contains
     use camsrfexch,       only: cam_out_t, cam_in_t
     use physics_buffer,   only: physics_buffer_desc
     use radiation,        only: radiation_tend
-    use radiation_utils,  only: rad_diagdata_type
 
     type(physics_state), intent(inout) :: state
     type(cam_out_t),     intent(inout) :: cam_out
@@ -79,12 +78,8 @@ contains
     type(physics_ptend) :: ptend
     real(r8) :: net_flx(pcols)
 
-    type(rad_diagdata_type) :: rd             ! structure to hold diagnostic data for output
-
-    call radiation_tend(state, ptend, pbuf, &
-         cam_out, cam_in, &
-         cam_in%icefrac, cam_in%snowhland, &
-         net_flx, rd)
+    call radiation_tend( &
+       state, ptend, pbuf, cam_out, cam_in, net_flx)
 
     call physics_ptend_dealloc(ptend)
 

@@ -609,8 +609,8 @@ Default: 1
 
 <entry id="dyn_spectral_dif2" type="real"  category="dyn_spectral"
        group="dyn_spectral_inparm" valid_values="" >
-del^2 horizontal diffusion coefficient.  This is used in the top 3 or 4
-model layers (sponge layers).  Used in both EUL and SLD.
+del^2 horizontal diffusion coefficient.  This is used above the Nth order
+diffusion in EUL, and above the 4th order diffusion in SLD.
 Default: set by build-namelist
 </entry>
 
@@ -621,7 +621,14 @@ N must be a positive multiple of 2.  Used in EUL only.
 Default: 4
 </entry>
 
-<entry id="eul_hdif_coef" type="integer"  category="dyn_spectral"
+<entry id="eul_hdif_kmnhdn" type="integer"  category="dyn_spectral"
+       group="dyn_spectral_inparm" valid_values="">
+The order N horizontal diffusion operator will be used in and below the
+layer specified by this variable.  Used in EUL only.
+Default: 4
+</entry>
+
+<entry id="eul_hdif_coef" type="real"  category="dyn_spectral"
        group="dyn_spectral_inparm" valid_values="">
 Nth order horizontal diffusion coefficient.  Used in EUL only.
 Default: set by build-namelist
@@ -751,6 +758,19 @@ In the low-top model, this helps to conserve momentum and produce a QBO.
 Default: set by build-namelist.
 </entry>
 
+<entry id="gw_limit_tau_without_eff" type="logical" category="gw_drag"
+       group="gw_drag_nl" valid_values="" >
+Apply limiters to tau before applying the efficiency factor, rather than
+afterward.
+Default: .false.
+</entry>
+
+<entry id="gw_apply_tndmax" type="logical" category="gw_drag"
+       group="gw_drag_nl" valid_values="" >
+Apply limiter on maximum wind tendency from stress divergence in gravity wave drag scheme.
+Default: .true.
+</entry>
+
 <entry id="effgw_beres_dp" type="real" category="gw_drag"
        group="gw_drag_nl" valid_values="" >
 Efficiency associated with convective gravity waves from the Beres
@@ -787,6 +807,32 @@ Default: set by build-namelist.
        group="gw_drag_nl" valid_values="" >
 Critical Froude number squared (used only for orographic waves).
 Default: set by build-namelist.
+</entry>
+
+<entry id="gw_oro_south_fac" type="real" category="gw_drag"
+       group="gw_drag_nl" valid_values="" >
+Factor to multiply tau by, for orographic waves in the southern hemisphere.
+Default: 1._r8
+</entry>
+
+<entry id="gw_prndl" type="real" category="gw_drag"
+       group="gw_drag_nl" valid_values="" >
+Inverse Prandtl number used in gravity wave diffusion
+Default: 0.5
+</entry>
+
+<entry id="gw_qbo_hdepth_scaling" type="real" category="gw_drag"
+       group="gw_drag_nl" valid_values="" >
+Scaling factor for heating depth in gravity waves from convection.  If less than 1.0
+this acts as an effective reduction of the gravity wave phase speeds needed to drive 
+the QBO.
+Default: 1.0
+</entry>
+
+<entry id="gw_lndscl_sgh" type="logical" category="gw_drag"
+       group="gw_drag_nl" valid_values="" >
+Scale SGH by land fraction in gravity wave drag
+Default: TRUE
 </entry>
 
 <entry id="frontgfc" type="real" category="gw_drag"
@@ -1107,6 +1153,7 @@ are:
  I ==&gt; Instantaneous
  M ==&gt; Minimum
  X ==&gt; Maximum
+ L ==&gt; Local-time
 
 Default:  set in code via the addfld and add_default subroutine calls.
 </entry>
@@ -5142,21 +5189,63 @@ Default: TRUE
 
 <!-- SE dycore -->
 
-<entry id="se_nsplit" type="integer" category="se"
-       group="ctl_nl" valid_values="" >
-Number of dynamics steps per physics timestep.
+<entry id="se_fine_ne" type="integer" category="se"
+       group="dyn_se_inparm" valid_values="" >
+Set for refined exodus meshes (variable viscosity).
+Viscosity in namelist specified for regions with a resolution equivilant
+to a uniform grid with se_ne = se_fine_ne.
+Default: -1 (not used)
+</entry>
+
+<entry id="se_ftype" type="integer" category="se"
+       group="dyn_se_inparm" valid_values="0,1,2" >
+CAM physics forcing option:
+0: tendencies
+1: adjustments
+2: hybrid
 Default: Set by build-namelist.
 </entry>
 
-<entry id="se_phys_tscale" type="integer" category="se"
-       group="ctl_nl" valid_values="" >
-Physics timescale (in seconds) used to compute physics tendencies
-If 0, feature is disabled (use dtime).
-Default: Set by build-namelist. 
+<entry id="se_hypervis_order" type="integer" category="se"
+       group="dyn_se_inparm" valid_values="2" >
+Hyperviscosity operator is the Laplacian^hypervis_order.
+The only supported value in CAM is "2".
+Default: Set by build-namelist.
+</entry>
+
+<entry id="se_hypervis_power" type="real" category="se"
+       group="dyn_se_inparm" valid_values="" >
+Scalar viscosity with variable coefficient.
+Use variable hyperviscosity based on element area limited by
+se_max_hypervis_courant.
+</entry>
+
+<entry id="se_hypervis_scaling" type="real" category="se"
+       group="dyn_se_inparm" valid_values="" >
+Use tensor hyperviscosity.
+Citation: Guba, O., Taylor, M. A., Ullrich, P. A., Overfelt, J. R., and
+Levy, M. N.: The spectral element method (SEM) on variable-resolution
+grids: evaluating grid sensitivity and resolution-aware numerical
+viscosity, Geosci. Model Dev., 7, 2803-2816,
+doi:10.5194/gmd-7-2803-2014, 2014.
+Default: 0 (i.e., not used)
+</entry>
+
+<entry id="se_hypervis_subcycle" type="integer" category="se"
+       group="dyn_se_inparm" valid_values="" >
+Number of hyperviscosity subcycles per dynamics timestep.
+Default: Set by build-namelist (probably 2).
+</entry>
+
+<entry id="se_hypervis_subcycle_q" type="integer" category="se"
+       group="dyn_se_inparm" valid_values="1" >
+Number of hyperviscosity subcycles done in tracer advection code.
+The only supported value in CAM is 1.
+Default: Set by build-namelist.
 </entry>
 
 <entry id="se_limiter_option" type="integer" category="se"
-       group="ctl_nl" valid_values="0,4,8" >
+       group="dyn_se_inparm" valid_values="0,4,8" >
 Limiter used for horizontal tracer advection:
 0: None
 4: Sign-preserving limiter.
@@ -5164,8 +5253,110 @@ Limiter used for horizontal tracer advection:
 Default: Set by build-namelist (probably 8).
 </entry>
 
-<entry id="vert_remap_q_alg" type="integer" category="se"
-    group="ctl_nl" valid_values="0,1,2">
+<entry id="se_max_hypervis_courant" type="real" category="se"
+       group="dyn_se_inparm" valid_values="" >
+Upper bound for Courant number, used to limit se_hypervis_power.
+Default: 1.0e99 (i.e., not used)
+</entry>
+
+<entry id="se_mesh_file" type="char*256" input_pathname="abs" category="se"
+       group="dyn_se_inparm" valid_values="" >
+Filename of exodus file to read grid from (generated by CUBIT or SQuadGen).
+Default: ""
+</entry>
+
+<entry id="se_ne" type="integer" category="se"
+       group="dyn_se_inparm" valid_values="" >
+Number of elements along a cube edge.
+Must match value of grid. Set this to zero to use a refined mesh.
+Default: Set by build-namelist.
+</entry>
+
+<entry id="se_npes" type="integer" category="se"
+       group="dyn_se_inparm" valid_values="" >
+Number of PEs to be used by SE dycore.
+Default: Number of PEs used by CAM.
+</entry>
+
+<entry id="se_nsplit" type="integer" category="se"
+       group="dyn_se_inparm" valid_values="" >
+Number of dynamics steps per physics timestep.
+Default: Set by build-namelist.
+</entry>
+
+<entry id="se_nu" type="real" category="se"
+       group="dyn_se_inparm" valid_values="" >
+Dynamics hyperviscosity [m^4/s].
+Default: Set by build-namelist.
+</entry>
+
+<entry id="se_nu_div" type="real" category="se"
+       group="dyn_se_inparm" valid_values="" >
+Weighting of divergence component when applying hyperviscosity.
+If < 0, uses nu.
+Default: value of nu
+</entry>
+
+<entry id="se_nu_p" type="real" category="se"
+       group="dyn_se_inparm" valid_values="" >
+Hyperviscosity applied to dp3d (layer thickness when running
+vertically lagrangian dynamics) [m^4/s].
+Default: Set by build-namelist.
+</entry>
+
+<entry id="se_nu_q" type="real" category="se"
+       group="dyn_se_inparm" valid_values="" >
+Hyperviscosity applied during tracer advection [m^4/s].
+If < 0, uses nu.
+Default: Set by build-namelist.
+</entry>
+
+<entry id="se_nu_top" type="real" category="se"
+       group="dyn_se_inparm" valid_values="" >
+Second-order viscosity applied only near the model top [m^2/s].
+Default: Set by build-namelist.
+</entry>
+
+<entry id="se_qsplit" type="integer" category="se"
+       group="dyn_se_inparm" valid_values="" >
+Tracer advection is done every qsplit dynamics timesteps.
+Default: Set by build-namelist.
+</entry>
+
+<entry id="se_refined_mesh" type="logical" category="se"
+       group="dyn_se_inparm" valid_values="" >
+TRUE specified use of a refined grid (mesh) for this run.
+Default: FALSE
+</entry>
+
+<entry id="se_rsplit" type="integer" category="se"
+       group="dyn_se_inparm" valid_values="" >
+Vertically lagrangian code updates every rsplit tracer timesteps.
+If rsplit=0, vertically lagrangian code is off.
+Default: Set by build-namelist.
+</entry>
+
+<entry id="se_statefreq" type="integer" category="se"
+       group="dyn_se_inparm" valid_values="" >
+Frequency with which diagnostic output is written to log (output every
+statefreq dynamics timesteps).
+Default: Set by build-namelist.
+</entry>
+
+<entry id="se_tstep_type" type="integer" category="se"
+       group="dyn_se_inparm" valid_values="" >
+Time stepping method for SE dycore
+se_tstep_type=0  pure Leapfrog except for very first timestep
+se_tstep_type=1  RK2 followed by qsplit-1 Leapfrog steps; second-order accurate in time (CESM1.2.0 setting)
+se_tstep_type=2  RK2-SSP 3 stage (as used by tracers)
+se_tstep_type=3  classic Runga-Kutta (RK) 3 stage
+se_tstep_type=4  Kinnmark&Gray Runga-Kutta (RK) 4 stage
+se_tstep_type=5  Kinnmark&Gray Runga-Kutta (RK) 5 stage (3rd order accurate in time)
+Default: 5
+</entry>
+
+<entry id="se_vert_remap_q_alg" type="integer" category="se"
+    group="dyn_se_inparm" valid_values="0,1,2">
 CAM-SE vertical remap algorithm
 0: default value, Zerroukat monotonic splines
 1: PPM vertical remap with mirroring at the boundaries
@@ -5176,163 +5367,54 @@ CAM-SE vertical remap algorithm
 Default: Set by build-namelist.
 </entry>
 
-<entry id="se_ftype" type="integer" category="se"
-       group="ctl_nl" valid_values="0,1,2" >
-CAM physics forcing option:
-0: tendencies
-1: adjustments
-2: hybrid
-Default: Set by build-namelist.
-</entry>
-
-<entry id="integration" type="char*80" category="se"
-       group="ctl_nl" valid_values="explicit,semi_implicit" >
-Time integration method.
-Default: Set by build-namelist ("explicit").
-</entry>
-
-<entry id="se_ne" type="integer" category="se"
-       group="ctl_nl" valid_values="" >
-Element width of resolution.
-Must match value of grid. Do NOT set this yourself.
-Default: Set by build-namelist.
-</entry>
-
-<entry id="qsplit" type="integer" category="se"
-       group="ctl_nl" valid_values="" >
-Tracer advection is done every qsplit dynamics timesteps.
-Default: Set by build-namelist.
-</entry>
-
-<entry id="rsplit" type="integer" category="se"
-       group="ctl_nl" valid_values="" >
-Vertically lagrangian code updates every rsplit tracer timesteps.
-If rsplit=0, vertically lagrangian code is off.
-Default: Set by build-namelist.
-</entry>
-
-<entry id="tstep_type" type="integer" category="se"
-       group="ctl_nl" valid_values="" >
-Time stepping method for SE dycore
-tstep_type=0  pure Leapfrog except for very first timestep
-tstep_type=1  RK2 followed by qsplit-1 Leapfrog steps; second-order accurate in time (CESM1.2.0 setting)
-tstep_type=2  RK2-SSP 3 stage (as used by tracers)
-tstep_type=3  classic Runga-Kutta (RK) 3 stage
-tstep_type=4  Kinnmark&Gray Runga-Kutta (RK) 4 stage
-tstep_type=5  Kinnmark&Gray Runga-Kutta (RK) 5 stage (3rd order accurate in time)
-Default: Set by build-namelist.
-</entry>
-
-
-<entry id="hypervis_order" type="integer" category="se"
-       group="ctl_nl" valid_values="2" >
-Hyperviscosity operator is the Laplacian^hypervis_order.
-The only supported value in CAM is "2".
-Default: Set by build-namelist.
-</entry>
-
-<entry id="hypervis_subcycle" type="integer" category="se"
-       group="ctl_nl" valid_values="" >
-Number of hyperviscosity subcycles per dynamics timestep.
-Default: Set by build-namelist (probably 2).
-</entry>
-
-<entry id="hypervis_subcycle_q" type="integer" category="se"
-       group="ctl_nl" valid_values="1" >
-Number of hyperviscosity subcycles done in tracer advection code.
-The only supported value in CAM is 1.
-Default: Set by build-namelist.
-</entry>
-
-
-<entry id="nu" type="real" category="se"
-       group="ctl_nl" valid_values="" >
-Dynamics hyperviscosity [m^4/s].
-Default: Set by build-namelist.
-</entry>
-
-<entry id="nu_div" type="real" category="se"
-       group="ctl_nl" valid_values="" >
-Weighting of divergence component when applying hyperviscosity.
-If < 0, uses nu.
-Default: Set by build-namelist.
-</entry>
-
-<entry id="nu_p" type="real" category="se"
-       group="ctl_nl" valid_values="" >
-Hyperviscosity applied to dp3d (layer thickness when running
-vertically lagrangian dynamics) [m^4/s].
-Default: Set by build-namelist.
-</entry>
-
-<entry id="nu_q" type="real" category="se"
-       group="ctl_nl" valid_values="" >
-Hyperviscosity applied during tracer advection [m^4/s].
-If < 0, uses nu.
-Default: Set by build-namelist.
-</entry>
-
-<entry id="nu_top" type="real" category="se"
-       group="ctl_nl" valid_values="" >
-Second-order viscosity applied only near the model top [m^2/s].
-Default: Set by build-namelist.
-</entry>
-
-<entry id="se_partmethod" type="integer" category="se"
-       group="ctl_nl" valid_values="4" >
-Mesh partitioning method (METIS).
-The only supported value in CAM is 4 (space-filling).
-Default: Set by build-namelist.
-</entry>
-
-<entry id="statefreq" type="integer" category="se"
-       group="ctl_nl" valid_values="" >
-Frequency with which diagnostic output is written to log (output every
-statefreq dynamics timesteps).
-Default: Set by build-namelist.
-</entry>
-
-<entry id="se_topology" type="char*80" category="se"
-       group="ctl_nl" valid_values="cube" >
-SE's topology.
-Only "cube" is supported in CAM.
-Default: Set by build-namelist.
-</entry>
-
-<!-- CAM I/O  -->
+<!-- PIO  -->
 
 <entry id="pio_stride" type="integer" category="pio"
        group="pio_default_inparm" valid_values="" >
 Default: 4
 </entry>
+
+<entry id="pio_root" type="integer" category="pio"
+       group="pio_default_inparm" valid_values="" >
+Default: 1
+</entry>
+
 <entry id="pio_numiotasks" type="integer" category="pio"
        group="pio_default_inparm" valid_values="" >
 Default: -1
 </entry>
+
 <entry id="pio_typename" type="char*80" category="pio"
        group="pio_default_inparm" valid_values="netcdf,pnetcdf,netcdf4p,netcdf4c" >
 Default: "netcdf"
 </entry>
-<entry id="pio_root" type="integer" category="pio"
-       group="pio_default_inparm" valid_values="" >
-Default: 1
-<entry id="pio_debug_level" type="integer" category="pio"
-       group="pio_default_inparm" valid_values="" >
-Default: 0
-</entry>
-<entry id="pio_blocksize" type="integer" category="pio"
-       group="pio_default_inparm" valid_values="" >
-Default: -1
-</entry>
-<entry id="pio_buffer_size_limit" type="integer" category="pio"
-       group="pio_default_inparm" valid_values="" >
-Default: 0
-</entry>
+
 <entry id="pio_async_interface" type="logical" category="pio"
        group="pio_default_inparm" valid_values="" >
 Default: .false.
 </entry>
 
+<entry id="pio_debug_level" type="integer" category="pio"
+       group="pio_default_inparm" valid_values="" >
+Default: 0
+</entry>
+
+<entry id="pio_blocksize" type="integer" category="pio"
+       group="pio_default_inparm" valid_values="" >
+Default: -1
+</entry>
+
+<entry id="pio_buffer_size_limit" type="integer" category="pio"
+       group="pio_default_inparm" valid_values="" >
+Default: 0
+</entry>
+
+<entry id="pio_rearranger" type="integer" category="pio"
+       group="pio_default_inparm" valid_values="1,2" >
+pio_rearranger = 1 for box rearranger
+               = 2 for subset rearranger
+Default: box rearranger used by pio1, subset is default for pio2.
+</entry>
 
 <!-- DOCN -->
 
@@ -6430,6 +6512,12 @@ Default: set to shr_const value
 <entry id="mwdry" type="real" category="physconst"
        group="physconst_nl" valid_values="" >
 Molecular weight of dry air [g/mol]
+Default: set to shr_const value
+</entry>
+
+<entry id="cpair" type="real" category="physconst"
+       group="physconst_nl" valid_values="" >
+Heat capacity of dry air at constant pressure [J/kg/K].
 Default: set to shr_const value
 </entry>
 

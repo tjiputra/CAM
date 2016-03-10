@@ -40,7 +40,6 @@ real(r8), public :: hdfsdn(pnmax)   	       ! Del^N mult. for each wave (vort-di
 real(r8), public :: hdfstn(pnmax)   	       ! Del^N multiplier for each wave (t-q)
 real(r8), public :: hdiftq(pnmax,plev)      ! Temperature-tracer diffusion factors
 real(r8), public :: hdifzd(pnmax,plev)      ! Vorticity-divergence diffusion factors
-integer, parameter, public :: kmnhdn = 4    ! Top level for Nth order diffusion
 integer, parameter, public :: kmxhd2 = 2    ! Bottom level for increased del^2 diffusion
 integer,  public :: nindex(plev)            ! Starting index for spectral truncation
 integer,  public :: nmaxhd                  ! Maximum two dimensional wave number
@@ -48,7 +47,9 @@ integer,  public :: nmaxhd                  ! Maximum two dimensional wave numbe
 ! Variables set by namelist
 real(r8), public :: dif2             ! del2 horizontal diffusion coeff.
 integer,  public :: hdif_order       ! Order of horizontal diffusion operator
-real(r8), public :: hdif_coef        ! Horizontal diffusion coeff.
+integer,  public :: kmnhdn           ! Nth order diffusion applied at and below layer kmnhdn.
+                                     ! 2nd order diffusion is applied above layer kmnhdn.
+real(r8), public :: hdif_coef        ! Nth order horizontal diffusion coefficient.
 real(r8), public :: divdampn         ! Number of days (from nstep 0) to run divergence
 real(r8), public :: eps              ! time filter coefficient. Defaults to 0.06.
 integer,  public :: kmxhdc           ! number of levels (starting from model top) to apply Courant limiter.
@@ -76,13 +77,14 @@ subroutine dyn_eul_readnl(nlfile)
      
    real(r8) :: dyn_spectral_dif2          ! del2 horizontal diffusion coeff.
    integer  :: eul_hdif_order             ! Order of horizontal diffusion operator
-   real(r8) :: eul_hdif_coef              ! horizontal diffusion coeff.
+   integer  :: eul_hdif_kmnhdn            ! Nth order horizontal diffusion operator top level.
+   real(r8) :: eul_hdif_coef              ! Nth order horizontal diffusion coefficient.
    real(r8) :: dyn_spectral_divdampn      ! Number of days to invoke divergence damper
    real(r8) :: dyn_spectral_eps           ! time filter coefficient. Defaults to 0.06.
    integer  :: dyn_spectral_kmxhdc        ! Number of levels to apply Courant limiter
     
-   namelist /dyn_spectral_inparm/ dyn_spectral_dif2, eul_hdif_order, eul_hdif_coef, &
-      dyn_spectral_divdampn, dyn_spectral_eps, dyn_spectral_kmxhdc, eul_nsplit
+   namelist /dyn_spectral_inparm/ dyn_spectral_dif2, eul_hdif_order, eul_hdif_kmnhdn, &
+      eul_hdif_coef, dyn_spectral_divdampn, dyn_spectral_eps, dyn_spectral_kmxhdc, eul_nsplit
 
    character(len=*), parameter :: routine='dyn_eul_readnl'
 
@@ -104,6 +106,7 @@ subroutine dyn_eul_readnl(nlfile)
 #ifdef SPMD
     call mpibcast (dyn_spectral_dif2,     1, mpir8,  0, mpicom)
     call mpibcast (eul_hdif_order,        1, mpiint, 0, mpicom)
+    call mpibcast (eul_hdif_kmnhdn,       1, mpiint, 0, mpicom)
     call mpibcast (eul_hdif_coef,         1, mpir8,  0, mpicom)
     call mpibcast (dyn_spectral_divdampn, 1, mpir8,  0, mpicom)
     call mpibcast (dyn_spectral_eps,      1, mpir8,  0, mpicom)
@@ -113,6 +116,7 @@ subroutine dyn_eul_readnl(nlfile)
 
    dif2       = dyn_spectral_dif2
    hdif_order = eul_hdif_order
+   kmnhdn     = eul_hdif_kmnhdn
    hdif_coef  = eul_hdif_coef
    divdampn   = dyn_spectral_divdampn
    eps        = dyn_spectral_eps
@@ -143,15 +147,23 @@ subroutine dyn_eul_readnl(nlfile)
          call endrun (routine//':  ERROR:  KMXHDC must be between 0 and plev-1')
       end if
 
-      write(iulog,9108) eps, dif2, hdif_order, hdif_coef, kmxhdc, eul_nsplit
+      write(iulog,9108) eps, hdif_order, kmnhdn, hdif_coef, kmxhdc, eul_nsplit
+
+      if (kmnhdn > 1) then
+         write(iulog,9109) dif2
+      end if
+
    end if
 
 9108 format('   Time filter coefficient (EPS)                 ',f10.3,/,&
-            '   DEL2 Horizontal diffusion coefficient (DIF2)  ',e10.3/, &
-            '   Horizontal diffusion order                    ',i10/, &
-            '   Horizontal diffusion coefficient              ',e10.3/, &
+            '   Horizontal diffusion order (N)                ',i10/, &
+            '   Top layer for Nth order horizontal diffusion  ',i10/, &
+            '   Nth order horizontal diffusion coefficient    ',e10.3/, &
             '   Number of levels Courant limiter applied      ',i10/,   &
             '   Dynamics Subcycling                           ',i10)
+
+9109 format('   DEL2 horizontal diffusion applied above Nth order diffusion',/,&
+            '   DEL2 Horizontal diffusion coefficient (DIF2)  ',e10.3)
 
 end subroutine dyn_eul_readnl
 

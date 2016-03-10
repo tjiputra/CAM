@@ -49,8 +49,6 @@ module cam_restart
    ! (%c = caseid, $y = year, $m = month, $d = day, $s = seconds in day, %t = number)
    character(len=cl) :: rfilename_spec = '%c.cam.r.%y-%m-%d-%s.nc'
 
-   logical :: aeres                ! true => write absorptivities/emissivities to restart file
-
    ! Filenames used for restart or branch
    character(len=cl) :: rest_pfile = './rpointer.atm' ! Restart pointer file contains name of most recently
                                                         ! written restart file
@@ -133,7 +131,6 @@ end subroutine cam_restart_readnl
 !----------------------------------------------------------------------- 
      use physics_buffer,            only: physics_buffer_desc
       use cam_history,      only: write_restart_history, init_restart_history
-      use radiation,        only: radiation_do
       use filenames,        only: interpret_filename_spec
 
       use restart_dynamics, only: write_restart_dynamics, init_restart_dynamics
@@ -159,7 +156,6 @@ end subroutine cam_restart_readnl
       !
       integer ioerr                 ! write error status
       character(len=cl) :: fname  ! Restart filename
-      integer :: aeres_int = 0
       integer :: ierr
       type(file_desc_t) :: File
 
@@ -170,8 +166,6 @@ end subroutine cam_restart_readnl
 #ifdef DEBUG
       write(iulog,*)'Entered CAM_WRITE_RESTART: writing nstep+1=',nstep+1, ' data to restart file'
 #endif
-      aeres = radiation_do('aeres')
-      if ( aeres ) aeres_int = 1
 
       !-----------------------------------------------------------------------
       ! Write the master restart dataset
@@ -191,7 +185,6 @@ end subroutine cam_restart_readnl
       call init_restart_history(File)
 
       ierr = PIO_Put_att(File, PIO_GLOBAL, 'caseid', caseid)
-      ierr = PIO_Put_att(File, PIO_GLOBAL, 'aeres', aeres_int)
 
       ierr = pio_enddef(File)
 
@@ -272,13 +265,11 @@ end subroutine cam_restart_readnl
 !
    character(len=cl) :: locfn          ! Local filename
    character(len=cl+40) :: errstr
-   integer :: ierr, aeres_int, xtype
+   integer :: ierr, xtype
    integer(pio_offset_kind) :: slen
    type(file_desc_t) :: File
    logical :: filefound
    character(len=*), parameter :: sub = 'cam_read_restart'
-
-   aeres = .false.
 
    ! Only read the restart pointer file for a restart run.
    if (restart_run) then
@@ -304,9 +295,6 @@ end subroutine cam_restart_readnl
    ierr = PIO_Get_att(File, PIO_GLOBAL, 'caseid', caseid_prev)
    caseid_prev(slen+1:len(caseid_prev))=''
 
-   ierr = PIO_Get_att(File, PIO_GLOBAL, 'aeres', aeres_int)
-   if(aeres_int==1) aeres=.true.
-
    if (branch_run .and. caseid_prev==caseid .and. .not.brnch_retain_casename) then
       write(iulog,*) sub//': Must change case name on branch run'
       write(iulog,*) 'Prev case = ',caseid_prev,' current case = ',caseid
@@ -324,7 +312,6 @@ end subroutine cam_restart_readnl
 
    call hub2atm_alloc(cam_in)
    call atm2hub_alloc(cam_out)
-
 
    ! Initialize physics grid reference pressures (needed by initialize_radbuffer)
    call ref_pres_init()
@@ -363,7 +350,6 @@ end subroutine cam_restart_readnl
 ! Write out the restart pointer file
 !
 !----------------------------------------------------------------------- 
-   use restart_physics, only: get_abs_restart_filepath
    use cam_history,     only: get_ptapes, get_hist_restart_filepath, &
                               hstwr, get_hfilepath, nfils, mfilt
 !-----------------------------------------------------------------------
@@ -379,9 +365,6 @@ end subroutine cam_restart_readnl
                         ' (cam only reads the first line of this file).'
    write (nsds,'(a,a)') '# The files below refer to the files needed for the master restart file:', &
                        trim(pname)
-   if ( aeres )then
-      write (nsds,'(a,a)') '# ', trim(get_abs_restart_filepath())
-   end if
 !
 ! History files: Need restart history files when not a time-step to write history info
 ! Need: history files if they are not full

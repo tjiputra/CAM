@@ -125,7 +125,7 @@ module iondrag
   real(r8) alamxyi(pver)              ! alamxy interpoalted to waccm grid
 
   logical doiodrg
-  logical :: do_waccm_ions
+  logical, protected :: do_waccm_ions = .false.
 
   !
   ! Data statement for ALAMXX
@@ -389,7 +389,6 @@ contains
     use constituents, only: cnst_mw
     use efield,       only: efield_init
     use exbdrift,     only: exbdrift_init
-    use mo_apex,      only: apexmag
     use mo_chem_utls, only: get_spc_ndx
     use chem_mods,    only: adv_mass
     use mo_chem_utls, only: get_inv_ndx
@@ -409,7 +408,6 @@ contains
     !-------------------------------------------------------------------------------
     ! initialize related packages: electric field
     !-------------------------------------------------------------------------------
-    call apexmag
 
     call efield_init (efield_lflux_file, efield_hflux_file, efield_wei96_file)
     call exbdrift_init

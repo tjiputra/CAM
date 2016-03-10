@@ -356,6 +356,7 @@ contains
     real(r8),       pointer    :: cldfr(:,:)
     real(r8),       pointer    :: cldtop(:)
 
+    integer      ::  tropchemlev(pcols)       ! trop/strat reaction separation vertical index
     integer      ::  i, k, m, n
     integer      ::  tim_ndx
     real(r8)     ::  delt_inverse
@@ -525,6 +526,17 @@ contains
     !-----------------------------------------------------------------------      
     call mmr2vmr( mmr(:ncol,:,:), vmr(:ncol,:,:), mbar(:ncol,:), ncol )
 
+    ! Set vertical level separating tropospheric and stratospheric reactions
+    ! at tropopause, with minimum pressure of 300 hPa poleward of 50 latitude
+    do i = 1,ncol
+       tropchemlev(i)=troplev(i)
+       if ( abs( dlats(i) ) > 50._r8 ) then
+          do while (pmid(i,tropchemlev(i)) < 30000._r8)
+             tropchemlev(i) = tropchemlev(i) +1
+          end do
+       end if
+    end do
+    
 !
 ! CCMI
 !
@@ -587,7 +599,7 @@ contains
        strato_sad(:,:) = 0._r8
 
        ! Prognostic modal stratospheric sulfate: compute dry strato_sad
-       call aero_model_strat_surfarea( ncol, mmr, pmid, tfld, troplev, pbuf, strato_sad )
+       call aero_model_strat_surfarea( ncol, mmr, pmid, tfld, tropchemlev, pbuf, strato_sad )
 
     endif
 
@@ -698,7 +710,7 @@ contains
     !-----------------------------------------------------------------
     do k = 1, pver
        do i = 1, ncol
-          zero_aerosols = k < troplev(i)
+          zero_aerosols = k <= tropchemlev(i)
           if ( abs( dlats(i) ) > 50._r8 ) then
              zero_aerosols = pmid(i,k) < 30000._r8
           endif
@@ -724,7 +736,7 @@ contains
 
     call usrrxt( reaction_rates, tfld, tfld, tfld, invariants, h2ovmr, ps, &
                  pmid, invariants(:,:,indexm), sulfate, mmr, relhum, strato_sad, &
-                 troplev, dlats, ncol, sad_total, cwat, mbar, pbuf )
+                 tropchemlev, dlats, ncol, sad_total, cwat, mbar, pbuf )
 
     call outfld( 'SAD_TROP', sad_total(:ncol,:), ncol, lchnk )
 

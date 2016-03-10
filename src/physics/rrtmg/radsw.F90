@@ -645,10 +645,10 @@ subroutine rad_rrtmg_sw(lchnk,ncol       ,rrtmg_levs   ,r_state      , &
       call ExpDayNite(fds,Nday, IdxDay, Nnite, IdxNite, 1, pcols, 1, pverp)
       call ExpDayNite(fusc,Nday, IdxDay, Nnite, IdxNite, 1, pcols, 1, pverp)
       call ExpDayNite(fdsc,Nday, IdxDay, Nnite, IdxNite, 1, pcols, 1, pverp)
-      call outfld('FUS     ',fus * 1.e-3_r8 ,pcols,lchnk)
-      call outfld('FDS     ',fds * 1.e-3_r8 ,pcols,lchnk)
-      call outfld('FUSC    ',fusc,pcols,lchnk)
-      call outfld('FDSC    ',fdsc,pcols,lchnk)
+      call outfld('FUS     ', fus,  pcols, lchnk)
+      call outfld('FDS     ', fds,  pcols, lchnk)
+      call outfld('FUSC    ', fusc, pcols, lchnk)
+      call outfld('FDSC    ', fdsc, pcols, lchnk)
    endif
 
 end subroutine rad_rrtmg_sw

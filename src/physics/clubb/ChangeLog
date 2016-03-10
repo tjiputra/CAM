@@ -1,5 +1,19 @@
 ===============================================================
 
+Tag name: clubb_dev_n18_01_07
+Originator(s): Cheryl Craig
+Date: 01/07/16
+One-line Summary: Adjusted gamma_coef according to Cecile's runs for tuning TOA
+
+Purpose of changes:
+  - Tuning for TOA
+
+Files modified:
+M       parameters_tunable.F90
+
+===============================================================
+===============================================================
+
 Tag name: clubb_dev_n15_01_07
 Originator(s): Cheryl Craig
 Date: 09/21/15

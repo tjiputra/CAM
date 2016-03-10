@@ -137,7 +137,7 @@
   'QRL', 'QRLNLTE', 'QRS', 'RELHUM', 'SHFLX', 'SOLIN', 'SWCF', 'QCP',
   'QTHERMAL', 'QRL_TOT', 'QRS_TOT', 'QJOULE', 'PSL', 'HNO3_STS', 'HNO3_NAT', 
   'HNO3_GAS', 'NO_Aircraft', 'NO_Lightning', 'QNO', 'QRS_AUR', 'QRS_CO2NIR', 'QRS_EUV', 
-  'SAD_ICE', 'SAD_LNAT', 'SAD_SULFC', 'T', 'TREFHT', 
+  'SAD_ICE', 'SAD_LNAT', 'SAD_SULFC', 'T', 'TREFHT', 'TS', 'TSMX:X', 'TSMN:M',
   'TTGW', 'U', 'UTGWORO', 'UTGWSPEC', 'V', 'VERT', 'VTGWORO', 'VTGWSPEC', 'Z3', 'O2_1S', 
   'O2_1D', 'NOX', 'NOY', 'CLOX', 'CLOY', 'BROX', 'BROY', 'TCLY', 'TOTH', 'QJOULE', 'UE', 
   'VE', 'UIONTEND', 'VIONTEND', 'DTCORE', 'T_24_COS',  'T_24_SIN', 'T_12_COS', 'T_12_SIN',
@@ -200,6 +200,5 @@
 <sim_year>1850</sim_year>
 
 <cldfrc_rhminl>0.89D0</cldfrc_rhminl>
-<use_gw_front_igw>.true.</use_gw_front_igw>
 
 </namelist_defaults>

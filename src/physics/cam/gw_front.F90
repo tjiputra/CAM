@@ -181,7 +181,7 @@ subroutine gw_cm_src(ncol, band, desc, u, v, frontgf, &
   ! Use the top level wind at the top interface.
   ubi(:,1) = ubm(:,1)
 
-  ubi(:,2:desc%ksrc) = midpoint_interp(ubm(:,1:desc%ksrc))
+  ubi(:,2:pver) = midpoint_interp(ubm(:,1:pver))
 
   !-----------------------------------------------------------------------
   ! Gravity wave sources

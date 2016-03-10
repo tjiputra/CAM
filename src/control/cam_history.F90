@@ -102,7 +102,7 @@ module cam_history
   !
   !   The size of these parameters should match the assignments in restart_vars_setnames and restart_dims_setnames below
   !   
-  integer, parameter :: restartvarcnt              = 37
+  integer, parameter :: restartvarcnt              = 38
   integer, parameter :: restartdimcnt              = 10
   type(rvar_id)      :: restartvars(restartvarcnt)
   type(rdim_id)      :: restartdims(restartdimcnt)
@@ -328,13 +328,12 @@ CONTAINS
     ! Author: CCM Core Group
     ! 
     !-----------------------------------------------------------------------
-    use ioFileMod
-    use shr_sys_mod,     only: shr_sys_getenv
-    use time_manager,    only: get_prev_time, get_curr_time
-    use cam_control_mod, only: restart_run, branch_run
-    use sat_hist,        only: sat_hist_init
+    use shr_sys_mod,      only: shr_sys_getenv
+    use time_manager,     only: get_prev_time, get_curr_time
+    use cam_control_mod,  only: restart_run, branch_run
+    use sat_hist,         only: sat_hist_init
 #if (defined SPMD)
-    use spmd_utils,     only: mpichar, mpicom, masterprocid, mpicom, mpi_character
+    use spmd_utils,       only: mpicom, masterprocid, mpicom, mpi_character
 #endif
     !
     !-----------------------------------------------------------------------
@@ -731,7 +730,7 @@ CONTAINS
         end if
         ! Enforce no interpolation for IC files
         if (is_initfile(t) .and. interpolate_output(t)) then
-          write(iulog, *) 'WARNING: Interpolated output not supported for a satellite history file, ignored'
+          write(iulog, *) 'WARNING: Interpolated output not supported for an initial data (IC) history file, ignored'
           interpolate_output(t) = .false.
         end if
       end do
@@ -849,7 +848,7 @@ CONTAINS
     use interp_mod, only: setup_history_interpolation
 
     ! Local variables
-    integer :: hf, f, ii, ff
+    integer :: hf, f, ff
     logical :: interp_ok
     character(len=max_fieldname_len) :: mname
     character(len=max_fieldname_len) :: zname
@@ -1041,6 +1040,14 @@ CONTAINS
 
     rvindex = rvindex + 1
     restartvars(rvindex)%name = 'sampling_seq'
+    restartvars(rvindex)%type = pio_char
+    restartvars(rvindex)%ndims = 3
+    restartvars(rvindex)%dims(1) = max_chars_dim_ind
+    restartvars(rvindex)%dims(2) = maxnflds_dim_ind
+    restartvars(rvindex)%dims(3) = ptapes_dim_ind
+
+    rvindex = rvindex + 1
+    restartvars(rvindex)%name = 'cell_methods'
     restartvars(rvindex)%type = pio_char
     restartvars(rvindex)%ndims = 3
     restartvars(rvindex)%dims(1) = max_chars_dim_ind
@@ -1288,6 +1295,7 @@ CONTAINS
     type(var_desc_t), pointer ::  numlev_desc
     type(var_desc_t), pointer ::  avgflag_desc
     type(var_desc_t), pointer ::  sseq_desc
+    type(var_desc_t), pointer ::  cm_desc
     type(var_desc_t), pointer ::  longname_desc
     type(var_desc_t), pointer ::  units_desc
     type(var_desc_t), pointer ::  hwrt_prec_desc
@@ -1406,6 +1414,7 @@ CONTAINS
     hwrt_prec_desc => restartvar_getdesc('hwrt_prec')
 
     sseq_desc => restartvar_getdesc('sampling_seq')
+    cm_desc => restartvar_getdesc('cell_methods')
     longname_desc => restartvar_getdesc('long_name')
     units_desc => restartvar_getdesc('units')
     avgflag_desc => restartvar_getdesc('avgflag')
@@ -1444,6 +1453,7 @@ CONTAINS
 
         ierr = pio_put_var(File, hwrt_prec_desc,start,tape(t)%hlist(f)%hwrt_prec)
         ierr = pio_put_var(File, sseq_desc,startc,tape(t)%hlist(f)%field%sampling_seq)
+        ierr = pio_put_var(File, cm_desc,startc,tape(t)%hlist(f)%field%cell_methods)
         ierr = pio_put_var(File, longname_desc,startc,tape(t)%hlist(f)%field%long_name)
         ierr = pio_put_var(File, units_desc,startc,tape(t)%hlist(f)%field%units)
         ierr = pio_put_var(File, avgflag_desc,start, tape(t)%hlist(f)%avgflag)
@@ -1555,6 +1565,7 @@ CONTAINS
     type(var_desc_t)                 :: units_desc
     type(var_desc_t)                 :: avgflag_desc
     type(var_desc_t)                 :: sseq_desc
+    type(var_desc_t)                 :: cm_desc
     type(var_desc_t)                 :: fillval_desc
     type(var_desc_t)                 :: meridional_complement_desc
     type(var_desc_t)                 :: zonal_complement_desc
@@ -1744,6 +1755,7 @@ CONTAINS
     ierr = pio_inq_varid(File, 'long_name', longname_desc)
     ierr = pio_inq_varid(File, 'units', units_desc)
     ierr = pio_inq_varid(File, 'sampling_seq', sseq_desc)
+    ierr = pio_inq_varid(File, 'cell_methods', cm_desc)
 
     ierr = pio_inq_varid(File, 'fillvalue', fillval_desc)
     ierr = pio_inq_varid(File, 'meridional_complement', meridional_complement_desc)
@@ -1779,6 +1791,9 @@ CONTAINS
         tape(t)%hlist(f)%field%sampling_seq(1:max_chars) = ' '
         ierr = pio_get_var(File,sseq_desc, (/1,f,t/), tape(t)%hlist(f)%field%sampling_seq)
         call strip_null(tape(t)%hlist(f)%field%sampling_seq)
+        tape(t)%hlist(f)%field%cell_methods(1:max_chars) = ' '
+        ierr = pio_get_var(File,cm_desc, (/1,f,t/), tape(t)%hlist(f)%field%cell_methods)
+        call strip_null(tape(t)%hlist(f)%field%cell_methods)
         if(xyfill(f,t) ==1) then
           tape(t)%hlist(f)%field%flag_xyfill=.true.
         else
@@ -2137,7 +2152,6 @@ CONTAINS
     !
     integer t, f                   ! tape, field indices
     integer ff                     ! index into include, exclude and fprec list
-    integer num_patches            ! number of column areas
     character(len=fieldname_len) :: name ! field name portion of fincl (i.e. no avgflag separator)
     character(len=max_fieldname_len) :: mastername ! name from masterlist field
     character(len=max_chars) :: errormsg ! error output field
@@ -2480,6 +2494,7 @@ end subroutine print_active_fldlst
 !#########################################################################################
 
   subroutine inifld (t, listentry, avgflag, prec_wrt)
+    use cam_grid_support, only: cam_grid_is_zonal
     !
     !----------------------------------------------------------------------- 
     ! 
@@ -2496,12 +2511,12 @@ end subroutine print_active_fldlst
     !
     ! Arguments
     !
-    integer, intent(in) :: t            ! history tape index
+    integer, intent(in)          :: t         ! history tape index
 
-    type(master_entry), pointer :: listentry
+    type(master_entry), pointer  :: listentry
 
-    character*1, intent(in) :: avgflag  ! averaging flag
-    character*1, intent(in) :: prec_wrt ! history output precision flag
+    character(len=1), intent(in) :: avgflag   ! averaging flag
+    character(len=1), intent(in) :: prec_wrt  ! history output precision flag
     !
     ! Local workspace
     !
@@ -2514,7 +2529,6 @@ end subroutine print_active_fldlst
     if (htapes_defined) then
       call endrun ('INIFLD: Attempt to add field '//listentry%field%name//' after history files set')
     end if
-
 
     nflds(t) = nflds(t) + 1
     n = nflds(t)
@@ -2559,6 +2573,15 @@ end subroutine print_active_fldlst
     else
       tape(t)%hlist(n)%avgflag = avgflag
       call AvgflagToString(avgflag, tape(t)%hlist(n)%time_op)
+    end if
+
+    ! Some things can't be done with zonal fields
+    if (cam_grid_is_zonal(listentry%field%decomp_type)) then
+      if (tape(t)%hlist(n)%avgflag == 'L') then
+        call endrun("Cannot perform local time processing on zonal data ("//trim(listentry%field%name)//")")
+      else if (is_satfile(t)) then
+        call endrun("Zonal data not valid for satellite history ("//trim(listentry%field%name)//")")
+      end if
     end if
 
 #ifdef HDEBUG
@@ -3620,6 +3643,7 @@ end subroutine print_active_fldlst
     character(len=max_chars) :: str       ! character temporary 
     character(len=max_chars) :: fname_tmp ! local copy of field name
     character(len=max_chars) :: calendar  ! Calendar type
+    character(len=max_chars) :: cell_methods ! For cell_methods attribute
     character(len=16)        :: time_per_freq
     character(len=128)       :: errormsg
 
@@ -3721,7 +3745,7 @@ end subroutine print_active_fldlst
 
       ! Define the unlimited time dim
       call cam_pio_def_dim(tape(t)%File, 'time', pio_unlimited, timdim)
-      call cam_pio_def_dim(tape(t)%File, 'nbnd', 2, bnddim)
+      call cam_pio_def_dim(tape(t)%File, 'nbnd', 2, bnddim, existOK=.true.)
       call cam_pio_def_dim(tape(t)%File, 'chars', 8, chardim)
     end if   ! is satfile
 
@@ -4062,13 +4086,31 @@ end subroutine print_active_fldlst
         !
         ! Assign field attributes defining valid levels and averaging info
         !
+        cell_methods = ''
+        if (len_trim(tape(t)%hlist(f)%field%cell_methods) > 0) then
+          if (len_trim(cell_methods) > 0) then
+            cell_methods = trim(cell_methods)//' '//trim(tape(t)%hlist(f)%field%cell_methods)
+          else
+            cell_methods = trim(cell_methods)//trim(tape(t)%hlist(f)%field%cell_methods)
+          end if
+        end if
+        ! Time cell methods is after field method because time averaging is
+        ! applied later (just before output) than field method which is applied
+        ! before outfld call.
         str = tape(t)%hlist(f)%time_op
         select case (str)
         case ('mean', 'maximum', 'minimum' )
-          ierr = pio_put_att(tape(t)%File, varid, 'cell_methods', 'time: '//str)
+          if (len_trim(cell_methods) > 0) then
+            cell_methods = trim(cell_methods)//' '//'time: '//str
+          else
+            cell_methods = trim(cell_methods)//'time: '//str
+          end if
+        end select
+        if (len_trim(cell_methods) > 0) then
+          ierr = pio_put_att(tape(t)%File, varid, 'cell_methods', trim(cell_methods))
           call cam_pio_handle_error(ierr,                                     &
                'h_define: cannot define cell_methods for '//trim(fname_tmp))
-        end select
+        end if
         if (patch_output) then
           ierr = pio_put_att(tape(t)%File, varid, 'basename',                 &
                tape(t)%hlist(f)%field%name)
@@ -4804,7 +4846,8 @@ end subroutine print_active_fldlst
     ! 
     !-----------------------------------------------------------------------
     use cam_history_support, only: fillvalue, hist_coord_find_levels
-    use cam_grid_support,    only: cam_grid_id
+    use cam_grid_support,    only: cam_grid_id, cam_grid_is_zonal
+    use cam_grid_support,    only: cam_grid_get_coord_names
 
     !
     ! Arguments
@@ -4827,6 +4870,7 @@ end subroutine print_active_fldlst
     ! Local workspace
     !
     character(len=max_fieldname_len) :: fname_tmp ! local copy of fname
+    character(len=max_fieldname_len) :: coord_name ! for cell_methods
     character(len=128)               :: errormsg
     type(master_entry), pointer      :: listentry
 
@@ -4899,6 +4943,14 @@ end subroutine print_active_fldlst
       listentry%field%sampling_seq = sampling_seq
     else
       listentry%field%sampling_seq = ' '
+    end if
+    ! Indicate if some field pre-processing occurred (e.g., zonal mean)
+    if (cam_grid_is_zonal(listentry%field%decomp_type)) then
+      call cam_grid_get_coord_names(listentry%field%decomp_type, coord_name, errormsg)
+      ! Zonal method currently hardcoded to 'mean'.
+      listentry%field%cell_methods = trim(coord_name)//': mean'
+    else
+      listentry%field%cell_methods = ''
     end if
     !
     ! Whether to apply xy fillvalue: default is false
@@ -5153,7 +5205,6 @@ end subroutine print_active_fldlst
     ! Local workspace
     !
     integer  :: nstep            ! current timestep number
-    integer  :: ncdate           ! current date in integer format [yyyymmdd]
     integer  :: ncsec            ! time of day relative to current date [secs]
     integer  :: ndcur            ! days component of current time
     integer  :: nscur            ! seconds component of current time
@@ -5172,7 +5223,6 @@ end subroutine print_active_fldlst
 
     nstep = get_nstep()
     call get_curr_date(yr, mon, day, ncsec)
-    ncdate = yr*10000 + mon*100 + day
     call get_curr_time(ndcur, nscur)
     !
     !-----------------------------------------------------------------------

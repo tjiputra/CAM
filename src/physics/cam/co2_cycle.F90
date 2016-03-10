@@ -64,12 +64,15 @@ integer, parameter :: ncnst=4                      ! number of constituents impl
 
 character(len=7), dimension(ncnst), parameter :: & ! constituent names
    c_names = (/'CO2_OCN', 'CO2_FFF', 'CO2_LND', 'CO2    '/)
+
 real(r8), dimension(ncnst), parameter :: &         ! molecular weights
    c_mw = (/mwco2, mwco2, mwco2, mwco2/)
-real(r8), dimension(ncnst), parameter :: &         ! heat capacities
-   c_cp = (/cpair, cpair, cpair, cpair/)
+
+real(r8), dimension(ncnst)            :: c_cp      ! heat capacities
+
 real(r8), dimension(ncnst), parameter :: &         ! minimum mmr
    c_qmin = (/1.e-20_r8, 1.e-20_r8, 1.e-20_r8, 1.e-20_r8/)
+
 integer, dimension(ncnst) :: c_i                   ! global index
 
 !================================================================================================
@@ -138,7 +141,8 @@ subroutine co2_register
 
    if (.not. co2_flag) return
  
-! CO2 as dry tracer
+   ! CO2 as dry tracer
+   c_cp = (/cpair, cpair, cpair, cpair/)
    do i = 1, ncnst
       call cnst_add(c_names(i), c_mw(i), c_cp(i), c_qmin(i), c_i(i), longname=c_names(i), mixtype='dry')
    end do

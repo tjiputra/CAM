@@ -1984,10 +1984,10 @@ subroutine radcswmx(lchnk   ,ncol    ,                         &
       call ExpDayNite(fds,      Nday, IdxDay, Nnite, IdxNite, 1, pcols, 1, pverp)
       call ExpDayNite(fusc,     Nday, IdxDay, Nnite, IdxNite, 1, pcols, 1, pverp)
       call ExpDayNite(fdsc,     Nday, IdxDay, Nnite, IdxNite, 1, pcols, 1, pverp)
-      call outfld('FUS     ',fus * 1.e-3_r8 ,pcols,lchnk)
-      call outfld('FDS     ',fds * 1.e-3_r8 ,pcols,lchnk)
-      call outfld('FUSC    ',fusc,pcols,lchnk)
-      call outfld('FDSC    ',fdsc,pcols,lchnk)
+      call outfld('FUS     ', fus*1.e-3_r8,  pcols, lchnk)
+      call outfld('FDS     ', fds*1.e-3_r8,  pcols, lchnk)
+      call outfld('FUSC    ', fusc*1.e-3_r8, pcols, lchnk)
+      call outfld('FDSC    ', fdsc*1.e-3_r8, pcols, lchnk)
    endif
 !  write(iulog, '(a, x, i3)') 'radcswmx : exiting, chunk identifier', lchnk
 

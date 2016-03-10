@@ -41,12 +41,43 @@ module fvm_mod
   integer, public, parameter            :: IDEAL_TEST_SOLIDBODY = 2
   integer, public                       :: fvm_test_type = IDEAL_TEST_BOOMERANG
 
+  !! XXgoldyXX: v Should be moved to a CSLAM module (fvm_consistent_se_cslam?)?
+  public :: fvm_get_test_type
+  !! XXgoldyXX: ^ Should be moved to a CSLAM module (fvm_consistent_se_cslam?)?
+
   public :: cslam_runairdensity, cslam_runflux
   
   public :: cellghostbuf, edgeveloc, fvm_init1,fvm_init2, fvm_mcgregor, fvm_mcgregordss
   public :: fvm_init3, fvm_rkdss
 contains
   
+  !! XXgoldyXX: v Should be moved to a CSLAM module (fvm_consistent_se_cslam?)?
+  subroutine fvm_get_test_type(fvm_ideal_test_name, fvm_test_type_name, fvm_ideal_test, fvm_test_type)
+    use parallel_mod, only: abortmp
+
+    character(len=*), intent(in)  :: fvm_ideal_test_name
+    character(len=*), intent(in)  :: fvm_test_type_name
+    integer,          intent(out) :: fvm_ideal_test
+    integer,          intent(out) :: fvm_test_type
+
+    if (trim(fvm_ideal_test_name) == 'off') then
+      fvm_ideal_test = IDEAL_TEST_OFF
+    else if (trim(fvm_ideal_test_name) == 'analytical_departure') then
+      fvm_ideal_test = IDEAL_TEST_ANALYTICAL_DEPARTURE
+    else if (trim(fvm_ideal_test_name) == 'analytical_winds') then
+      fvm_ideal_test = IDEAL_TEST_ANALYTICAL_WINDS
+    else
+      call abortmp('Unknown ideal_fvm_test: '//trim(fvm_ideal_test_name))
+    end if
+    if (trim(fvm_test_type_name) == 'boomerang') then
+      fvm_test_type = IDEAL_TEST_BOOMERANG
+    else if (trim(fvm_test_type_name) == 'solidbody') then
+      fvm_test_type = IDEAL_TEST_SOLIDBODY
+    else
+      call abortmp('Unknown fvm test type: '//trim(fvm_test_type_name))
+    end if
+  end subroutine fvm_get_test_type
+  !! XXgoldyXX: ^ Should be moved to a FVM module (fvm_consistent_se_fvm?)
   
   subroutine cslam_runflux(elem,fvm,hybrid,deriv,tstep,tl,nets,nete)
     ! ---------------------------------------------------------------------------------

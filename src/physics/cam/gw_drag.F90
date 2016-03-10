@@ -69,6 +69,9 @@ module gw_drag
   ! Bottom level for frontal waves.
   integer :: kbot_front
 
+  ! Factor for SH orographic waves.
+  real(r8) :: gw_oro_south_fac = 1._r8
+
   ! Frontogenesis function critical threshold.
   real(r8) :: frontgfc = unset_r8
 
@@ -86,7 +89,7 @@ module gw_drag
 
   ! Horzontal wavelengths [m].
   real(r8), parameter :: wavelength_mid = 1.e5_r8
-  real(r8), parameter :: wavelength_long = 1.e6_r8
+  real(r8), parameter :: wavelength_long = 3.e5_r8
 
   ! Background stress source strengths.
   real(r8) :: taubgnd = unset_r8
@@ -100,6 +103,12 @@ module gw_drag
   ! the readnl phase and the init phase of the CAM physics; only gw_common
   ! should actually use it.)
   logical :: tau_0_ubc = .false.
+
+  ! Whether or not to limit tau *before* applying any efficiency factors.
+  logical :: gw_limit_tau_without_eff = .false.
+
+  ! Whether or not to apply tendency max
+  logical :: gw_apply_tndmax = .true.
 
   ! Files to read Beres source spectra from.
   character(len=256) :: gw_drag_file = ""
@@ -134,8 +143,11 @@ module gw_drag
   character(len=1), parameter :: beres_dp_pf = "B"
   character(len=1), parameter :: beres_sh_pf = "S"
 
-  ! namelist 
-  logical          :: history_amwg                   ! output the variables used by the AMWG diag package
+  ! namelist
+  logical :: history_amwg          ! output the variables used by the AMWG diag package
+  logical  :: gw_lndscl_sgh = .true. ! scale SGH by land frac
+  real(r8) :: gw_prndl = 0.25_r8
+  real(r8) :: gw_qbo_hdepth_scaling = 1._r8 ! heating depth scaling factor
 
 !==========================================================================
 contains
@@ -168,7 +180,8 @@ subroutine gw_drag_readnl(nlfile)
   namelist /gw_drag_nl/ pgwv, gw_dc, pgwv_long, gw_dc_long, tau_0_ubc, &
        effgw_beres_dp, effgw_beres_sh, effgw_cm, effgw_cm_igw, effgw_oro, &
        fcrit2, frontgfc, gw_drag_file, gw_drag_file_sh, taubgnd, &
-       taubgnd_igw, gw_polar_taper
+       taubgnd_igw, gw_polar_taper, gw_oro_south_fac, gw_limit_tau_without_eff, &
+       gw_lndscl_sgh, gw_prndl, gw_apply_tndmax, gw_qbo_hdepth_scaling
   !----------------------------------------------------------------------
 
   if (masterproc) then
@@ -197,6 +210,7 @@ subroutine gw_drag_readnl(nlfile)
   call mpibcast(effgw_cm,       1, mpir8,  0, mpicom)
   call mpibcast(effgw_cm_igw,   1, mpir8,  0, mpicom)
   call mpibcast(effgw_oro,      1, mpir8,  0, mpicom)
+  call mpibcast(gw_oro_south_fac,1, mpir8,  0, mpicom)
   call mpibcast(fcrit2,         1, mpir8,  0, mpicom)
   call mpibcast(frontgfc,       1, mpir8,  0, mpicom)
   call mpibcast(taubgnd,        1, mpir8,  0, mpicom)
@@ -204,6 +218,11 @@ subroutine gw_drag_readnl(nlfile)
   call mpibcast(gw_polar_taper, 1, mpilog, 0, mpicom)
   call mpibcast(gw_drag_file, len(gw_drag_file), mpichar, 0, mpicom)
   call mpibcast(gw_drag_file_sh, len(gw_drag_file_sh), mpichar, 0, mpicom)
+  call mpibcast(gw_limit_tau_without_eff,1, mpilog, 0, mpicom)
+  call mpibcast(gw_apply_tndmax,1, mpilog, 0, mpicom)
+  call mpibcast(gw_lndscl_sgh,1, mpilog, 0, mpicom)
+  call mpibcast(gw_prndl,    1, mpir8,  0, mpicom)
+  call mpibcast(gw_qbo_hdepth_scaling, 1, mpir8,  0, mpicom)
 #endif
 
   ! Check if fcrit2 was set.
@@ -247,7 +266,7 @@ subroutine gw_init()
   use physconst,  only: gravit, rair
 
   use gw_common,  only: gw_common_init
-  use gw_front,   only: flat_cm_desc, gaussian_cm_desc
+  use gw_front,   only: gaussian_cm_desc
 
   !---------------------------Local storage-------------------------------
 
@@ -380,7 +399,8 @@ subroutine gw_init()
 
   ! Initialize subordinate modules.
   call gw_common_init(pver,&
-       tau_0_ubc, ktop, gravit, rair, alpha, errstring)
+       tau_0_ubc, ktop, gravit, rair, alpha, &
+       gw_limit_tau_without_eff, gw_apply_tndmax, gw_prndl, gw_qbo_hdepth_scaling, errstring)
   call shr_assert(trim(errstring) == "", "gw_common_init: "//errstring// &
        errMsg(__FILE__, __LINE__))
 
@@ -499,8 +519,8 @@ subroutine gw_init()
         write(iulog,*) ' '
      end if
 
-     cm_igw_desc = flat_cm_desc(band_long, kbot_front, kfront, frontgfc, &
-          taubgnd_igw)
+     cm_igw_desc = gaussian_cm_desc(band_long, kbot_front, kfront, frontgfc, &
+          taubgnd_igw, front_gaussian_width)
 
      ! Output for gravity waves from frontogenesis.
      call gw_spec_addflds(prefix=cm_igw_pf, scheme="C&M IGW", &
@@ -524,8 +544,8 @@ subroutine gw_init()
         write (iulog,*) 'Beres deep level =',beres_dp_desc%k
      end if
 
-     ! Don't use deep convection heating depths below 2.5 km.
-     beres_dp_desc%min_hdepth = 2500._r8
+     ! Don't use deep convection heating depths below 1 km.
+     beres_dp_desc%min_hdepth = 1000._r8
 
      ! Read Beres file.
 
@@ -821,7 +841,7 @@ subroutine gw_tend(state, pbuf, dt, ptend, cam_in, flx_heat)
   integer :: lchnk                  ! chunk identifier
   integer :: ncol                   ! number of atmospheric columns
 
-  integer :: k                      ! loop index
+  integer :: i, k                   ! loop indices
 
   type(Coords1D) :: p               ! Pressure coordinates
 
@@ -895,6 +915,11 @@ subroutine gw_tend(state, pbuf, dt, ptend, cam_in, flx_heat)
 
   ! Scale sgh to account for landfrac.
   real(r8) :: sgh_scaled(state%ncol)
+
+  ! Parameters for the IGW polar taper.
+  real(r8), parameter :: degree2radian = pi/180._r8
+  real(r8), parameter :: al0 = 82.5_r8 * degree2radian
+  real(r8), parameter :: dlat0 = 5.0_r8 * degree2radian
 
   ! effective gw diffusivity at interfaces needed for output
   real(r8) :: egwdffi(state%ncol,pver+1)
@@ -974,7 +999,7 @@ subroutine gw_tend(state, pbuf, dt, ptend, cam_in, flx_heat)
   ! Totals that accumulate over different sources.
   egwdffi_tot = 0._r8
   flx_heat = 0._r8
-  
+
   if (use_gw_convect_dp) then
      !------------------------------------------------------------------
      ! Convective gravity waves (Beres scheme, deep).
@@ -1236,6 +1261,18 @@ subroutine gw_tend(state, pbuf, dt, ptend, cam_in, flx_heat)
      ! Efficiency of gravity wave momentum transfer.
      effgw = effgw_cm_igw
 
+     ! Frontogenesis is too high at the poles (at least for the FV
+     ! dycore), so introduce a polar taper.
+     if (gw_polar_taper) then
+        where (abs(state%lat(:ncol)) <= 89._r8*degree2radian)
+           effgw = effgw * 0.25_r8 * &
+                (1._r8+tanh((state%lat(:ncol)+al0)/dlat0)) * &
+                (1._r8-tanh((state%lat(:ncol)-al0)/dlat0))
+        elsewhere
+           effgw = 0._r8
+        end where
+     end if
+
      ! Determine the wave source for C&M background spectrum
      call gw_cm_src(ncol, band_long, cm_igw_desc, u, v, frontgf(:ncol,:), &
           src_level, tend_level, tau, ubm, ubi, xv, yv, c)
@@ -1310,18 +1347,32 @@ subroutine gw_tend(state, pbuf, dt, ptend, cam_in, flx_heat)
      ! Take into account that wave sources are only over land.
      call pbuf_get_field(pbuf, sgh_idx, sgh)
 
-     where (cam_in%landfrac(:ncol) >= epsilon(1._r8))
-        effgw = effgw_oro * cam_in%landfrac(:ncol)
-        sgh_scaled = sgh(:ncol) / sqrt(cam_in%landfrac(:ncol))
-     elsewhere
-        effgw = 0._r8
-        sgh_scaled = 0._r8
-     end where
+     if (gw_lndscl_sgh) then
+        where (cam_in%landfrac(:ncol) >= epsilon(1._r8))
+           effgw = effgw_oro * cam_in%landfrac(:ncol)
+           sgh_scaled = sgh(:ncol) / sqrt(cam_in%landfrac(:ncol))
+        elsewhere
+           effgw = 0._r8
+           sgh_scaled = 0._r8
+        end where
 
-     ! Determine the orographic wave source
-     call gw_oro_src(ncol, band_oro, p, &
-          u, v, t, sgh_scaled, zm, nm, &
-          src_level, tend_level, tau, ubm, ubi, xv, yv, c)
+        ! Determine the orographic wave source
+        call gw_oro_src(ncol, band_oro, p, &
+             u, v, t, sgh_scaled, zm, nm, &
+             src_level, tend_level, tau, ubm, ubi, xv, yv, c)
+     else
+        effgw = effgw_oro
+
+        ! Determine the orographic wave source
+        call gw_oro_src(ncol, band_oro, p, &
+             u, v, t, sgh(:ncol), zm, nm, &
+             src_level, tend_level, tau, ubm, ubi, xv, yv, c)
+     endif
+     do i = 1, ncol
+        if (state%lat(i) < 0._r8) then
+           tau(i,:,:) = tau(i,:,:) * gw_oro_south_fac
+        end if
+     end do
 
      ! Solve for the drag profile with orographic sources.
      call gw_drag_prof(ncol, band_oro, p, src_level, tend_level,   dt,   &

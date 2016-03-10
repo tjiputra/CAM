@@ -41,7 +41,7 @@ module aero_model
   public :: aero_model_wetdep     ! aerosol wet removal
   public :: aero_model_emissions  ! aerosol emissions
   public :: aero_model_surfarea  ! tropopspheric aerosol wet surface area for chemistry
-  public :: aero_model_strat_surfarea ! stratospheric aerosol dry surface area for chemistry
+  public :: aero_model_strat_surfarea ! stratospheric aerosol wet surface area for chemistry
 
  ! Misc private data 
 
@@ -1616,12 +1616,12 @@ contains
 
     call pbuf_get_field(pbuf, dgnumwet_idx, dgnumwet )
 
-    beglev(:ncol)=ltrop(:ncol)
+    beglev(:ncol)=ltrop(:ncol)+1
     endlev(:ncol)=pver
     call surf_area_dens( ncol, mmr, pmid, temp, dgnumwet, beglev, endlev, sad_total, sfc=sfc )
 
     do i = 1,ncol
-       do k = ltrop(i),pver
+       do k = ltrop(i)+1,pver
           dm_aer(i,k,:) = dgnumwet(i,k,:) * 1.e2_r8 ! convert m to cm
        enddo
     enddo

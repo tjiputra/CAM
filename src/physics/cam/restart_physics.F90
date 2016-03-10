@@ -4,7 +4,10 @@ module restart_physics
   use spmd_utils,         only: masterproc
   use co2_cycle,          only: co2_transport
   use constituents,       only: pcnst
-  use radae,              only: abstot_3d, absnxt_3d, emstot_3d, initialize_radbuffer, ntoplw
+
+  use radiation,          only: radiation_define_restart, radiation_write_restart, &
+                                radiation_read_restart
+
   use ioFileMod
   use cam_abortutils,     only: endrun
   use camsrfexch,         only: cam_in_t, cam_out_t
@@ -16,8 +19,6 @@ module restart_physics
                                 pio_inq_varid, &
                                 pio_def_var, pio_def_dim, &
                                 pio_put_var, pio_get_var
-  use cospsimulator_intr, only: docosp
-  use radiation,          only: cosp_cnt_init, cosp_cnt
 
   implicit none
   private
@@ -27,18 +28,15 @@ module restart_physics
 !
   public :: write_restart_physics    ! Write the physics restart info out
   public :: read_restart_physics     ! Read the physics restart info in
-  public :: get_abs_restart_filepath ! Get the name of the restart filepath
   public :: init_restart_physics
 
 !
 ! Private data
 !
-    character(len=256) :: pname  ! Full abs-ems restart filepath
-    character(len=8)   :: num
 
     type(var_desc_t) :: flwds_desc, &
          solld_desc, co2prog_desc, co2diag_desc, sols_desc, soll_desc, &
-         solsd_desc, emstot_desc, absnxt_desc(4)
+         solsd_desc
 
     type(var_desc_t) :: bcphidry_desc, bcphodry_desc, ocphidry_desc, ocphodry_desc, &
        dstdry1_desc, dstdry2_desc, dstdry3_desc, dstdry4_desc
@@ -49,15 +47,10 @@ module restart_physics
     type(var_desc_t) :: wsy_desc
     type(var_desc_t) :: shf_desc
 
-    type(var_desc_t), allocatable :: abstot_desc(:)
-
-    type(var_desc_t) :: cospcnt_desc
-
   CONTAINS
     subroutine init_restart_physics ( File, pbuf2d)
       
     use physics_buffer,      only: pbuf_init_restart, physics_buffer_desc
-    use radiation,           only: radiation_do
     use ppgrid,              only: pver, pverp
     use chemistry,           only: chem_init_restart
     use prescribed_ozone,    only: init_prescribed_ozone_restart
@@ -74,11 +67,11 @@ module restart_physics
     type(physics_buffer_desc), pointer :: pbuf2d(:,:)
 
     integer                      :: grid_id
-    integer                      :: hdimcnt, ierr, i, vsize
+    integer                      :: hdimcnt, ierr, i
     integer                      :: dimids(4)
     integer, allocatable         :: hdimids(:)
-    integer                      :: ndims, pver_id, pverp_id
     type(cam_grid_header_info_t) :: info
+    character(len=4)   :: num
 
     call pio_seterrorhandling(File, PIO_BCAST_ERROR)
     ! Probably should have the grid write this out.
@@ -92,13 +85,6 @@ module restart_physics
     allocate(hdimids(hdimcnt))
     hdimids(1:hdimcnt) = dimids(1:hdimcnt)
 
-    call cam_pio_def_dim(File, 'lev', pver, pver_id, existOK=.true.)
-    call cam_pio_def_dim(File, 'ilev', pverp, pverp_id, existOK=.true.)
-
-    ndims=hdimcnt
-
-    ndims=hdimcnt+1
-
     call pbuf_init_restart(File, pbuf2d)
 
     if ( .not. adiabatic .and. .not. ideal_phys )then
@@ -110,9 +96,6 @@ module restart_physics
        call init_prescribed_aero_restart(File)
        call init_prescribed_volcaero_restart(File)
 
-
-       call cam_pio_def_dim(File, 'pcnst', pcnst, dimids(hdimcnt+1), existOK=.true.)
-    
        ierr = pio_def_var(File, 'FLWDS', pio_double, hdimids, flwds_desc)
        ierr = pio_def_var(File, 'SOLS', pio_double, hdimids, sols_desc)
        ierr = pio_def_var(File, 'SOLL', pio_double, hdimids, soll_desc)
@@ -148,39 +131,10 @@ module restart_physics
        ierr = pio_def_var(File, 'wsy',  pio_double, hdimids, wsy_desc)
        ierr = pio_def_var(File, 'shf',  pio_double, hdimids, shf_desc)
  
-    end if
-
-
-    if( radiation_do('aeres')  ) then
-       vsize = (pverp-ntoplw+1)
-       if(vsize/=pverp) then
-          ierr = pio_def_dim(File, 'lwcols', vsize, dimids(hdimcnt+1))
-       else
-          dimids(hdimcnt+1) = pverp_id
-       end if
-!
-! split this into vsize variables to avoid excessive memory usage in IO
-!
-       allocate(abstot_desc(ntoplw:pverp))
-       do i=ntoplw,pverp
-          write(pname,'(a,i3.3)') 'NAL_absorp',i
-          ierr = pio_def_var(File, trim(pname), pio_double, dimids(1:hdimcnt+1), abstot_desc(i))
-       end do
-	
-       dimids(hdimcnt+1) = pverp_id
-       ierr = pio_def_var(File, 'Emissivity', pio_double, dimids(1:hdimcnt+1), emstot_desc)
-
-       dimids(hdimcnt+1) = pver_id
-       do i=1,4
-          write(pname,'(a,i3.3)') 'NN_absorp',i
-          ierr = pio_def_var(File, pname, pio_double, dimids(1:hdimcnt+1), absnxt_desc(i))
-       end do
-
+       call radiation_define_restart(file)
 
     end if
-    if (docosp) then
-      ierr = pio_def_var(File, 'cosp_cnt_init', pio_int, cospcnt_desc)
-    end if
+
 
     if (is_subcol_on()) then
       call subcol_init_restart(file, hdimids)
@@ -200,7 +154,7 @@ module restart_physics
       use prescribed_ghg,      only: write_prescribed_ghg_restart
       use prescribed_aero,     only: write_prescribed_aero_restart
       use prescribed_volcaero, only: write_prescribed_volcaero_restart
-      use radiation,           only: radiation_do
+
       use cam_history_support, only: fillvalue
       use spmd_utils,          only: iam
       use cam_grid_support,    only: cam_grid_write_dist_array, cam_grid_id
@@ -382,54 +336,8 @@ module restart_physics
          end do
          call pio_write_darray(File, shf_desc, iodesc, tmpfield, ierr)
 
-      end if
-    !
-    !-----------------------------------------------------------------------
-    ! Write the abs/ems restart dataset if necessary    
-    !-----------------------------------------------------------------------
-    !
+         call radiation_write_restart(file)
 
-    if ( radiation_do('aeres')  ) then
-         
-      do i = begchunk, endchunk
-        ncol = cam_out(i)%ncol
-        if(ncol < pcols) then
-          abstot_3d(ncol+1:pcols,:,:,i) = fillvalue
-          absnxt_3d(ncol+1:pcols,:,:,i) = fillvalue
-          emstot_3d(ncol+1:pcols,:,i) = fillvalue
-        end if
-      end do
-!      abstot_3d is written as a series of 3D variables
-      dims(1) = size(abstot_3d, 1) ! Should be pcols
-      dims(2) = size(abstot_3d, 2) ! Should be (pverp-ntoplw+1)
-      dims(3) = size(abstot_3d, 4) ! Should be endchunk - begchunk + 1
-      gdims(nhdims+1) = dims(2)
-      do i = ntoplw, pverp
-        call cam_grid_write_dist_array(File, physgrid, dims(1:3),             &
-             gdims(1:nhdims+1), abstot_3d(:,:,i,:), abstot_desc(i))
-      end do
-
-      dims(1) = size(emstot_3d, 1) ! Should be pcols
-      dims(2) = size(emstot_3d, 2) ! Should be pverp
-      dims(3) = size(emstot_3d, 3) ! Should be endchunk - begchunk + 1
-      gdims(nhdims+1) = dims(2)
-      call cam_grid_write_dist_array(File, physgrid, dims(1:3),               &
-           gdims(1:nhdims+1), emstot_3d, emstot_desc)
-
-      dims(1) = size(absnxt_3d, 1) ! Should be pcols
-      dims(2) = size(absnxt_3d, 2) ! Should be pver
-      dims(3) = size(absnxt_3d, 4) ! Should be endchunk - begchunk + 1
-      gdims(nhdims+1) = dims(2)
-      do i = 1, 4
-        call cam_grid_write_dist_array(File, physgrid, dims(1:3),             &
-             gdims(1:nhdims+1), absnxt_3d(:,:,i,:), absnxt_desc(i))
-      end do
-
-      deallocate(abstot_desc)
-    end if
-
-      if (docosp) then
-        ierr = pio_put_var(File, cospcnt_desc, (/cosp_cnt(begchunk)/))
       end if
 
       
@@ -447,7 +355,7 @@ module restart_physics
      use cam_grid_support,    only: cam_grid_read_dist_array, cam_grid_id
      use cam_grid_support,    only: cam_grid_get_decomp, cam_grid_dimensions
      use cam_history_support, only: fillvalue
-     use radiation,           only: radiation_do
+
      use prescribed_ozone,    only: read_prescribed_ozone_restart
      use prescribed_ghg,      only: read_prescribed_ghg_restart
      use prescribed_aero,     only: read_prescribed_aero_restart
@@ -476,12 +384,6 @@ module restart_physics
      integer                  :: err_handling
      integer                  :: physgrid
      !-----------------------------------------------------------------------
-
-     ! Allocate memory in physics buffer, buffer, and radbuffer modules.
-     ! (This is done in subroutine initial_conds for an initial run.)
-     call initialize_radbuffer()
-
-     ! Physics buffer
 
      ! subcol_read_restart must be called before pbuf_read_restart
      if (is_subcol_on()) then
@@ -699,70 +601,11 @@ module restart_physics
 
         deallocate(tmpfield2)
 
+        call radiation_read_restart(file)
+
      end if camphys
 
 
-     !
-     !-----------------------------------------------------------------------
-     ! Read the abs/ems restart dataset if necessary    
-     !-----------------------------------------------------------------------
-     !
-     if ( radiation_do('aeres')  ) then
-        call pio_seterrorhandling( File, PIO_BCAST_ERROR,err_handling)
-        ierr = pio_inq_varid(File, 'Emissivity', vardesc)
-        call pio_seterrorhandling( File, err_handling)
-        if(ierr/=PIO_NOERR) then
-           if(masterproc) write(iulog,*) 'Warning: Emissivity variable not found on restart file.'
-           return
-        end if
-
-        dims(1) = pcols
-        dims(2) = pverp
-        dims(3) = csize
-        gdims(nhdims+1) = dims(2)
-        call cam_grid_read_dist_array(File, physgrid, dims(1:3),           &
-             gdims(1:nhdims+1), emstot_3d, vardesc)
-        
-        vsize = pverp-ntoplw+1
-        dims(2) = vsize
-        gdims(nhdims+1) = dims(2)
-        
-        do i=ntoplw,pverp
-           write(pname,'(a,i3.3)') 'NAL_absorp',i
-           ierr = pio_inq_varid(File, trim(pname), vardesc)
-           call cam_grid_read_dist_array(File, physgrid, dims(1:3),           &
-                gdims(1:nhdims+1), abstot_3d(:,:,i,:), vardesc)
-        end do
-
-        dims(2) = pver
-        gdims(nhdims+1) = dims(2)
-        do i=1,4
-           write(pname,'(a,i3.3)') 'NN_absorp',i
-           ierr = pio_inq_varid(File, trim(pname), vardesc)
-           call cam_grid_read_dist_array(File, physgrid, dims(1:3),           &
-                gdims(1:nhdims+1), absnxt_3d(:,:,i,:), vardesc)
-        end do
-     end if
-
-     if (docosp) then
-        call pio_seterrorhandling( File, PIO_BCAST_ERROR, err_handling)
-        ierr = pio_inq_varid(File, 'cosp_cnt_init', vardesc)
-        call pio_seterrorhandling( File, err_handling)
-        if(ierr/=PIO_NOERR) then
-           cosp_cnt_init=0
-        else
-           ierr = pio_get_var(File, vardesc, cosp_cnt_init)
-        end if
-     end if
-
    end subroutine read_restart_physics
-
-
-   character(len=256) function get_abs_restart_filepath ( )
-     !	
-     ! Return the full filepath to the abs-ems restart file
-     !	
-     get_abs_restart_filepath = pname
-   end function get_abs_restart_filepath
 
  end module restart_physics

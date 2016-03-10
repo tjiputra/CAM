@@ -98,7 +98,7 @@ module parameters_tunable
     c_K_hm      = 0.750000_core_rknd, & ! Coef. of Eddy Diffusion: hmm   [m^2/s]
     c_K_hmb     = 0.10000_core_rknd,  & ! Coef. of Non-Local Factor, Eddy Diffusion: hmm   [m^2/s]
     K_hm_min_coef = 0.10000_core_rknd,& ! Min. of Non-Local Factor, Eddy Diffusion: hmm   [m^2/s]
-    gamma_coef  = 0.290000_core_rknd, & ! Low Skw.: gamma coef. Skw. Fnct.   [-]
+    gamma_coef  = 0.287000_core_rknd, & ! Low Skw.: gamma coef. Skw. Fnct.   [-]
     gamma_coefb = 0.320000_core_rknd, & ! High Skw.: gamma coef. Skw. Fnct.  [-]
     gamma_coefc = 5.000000_core_rknd, & ! Deg. Slope: gamma coef. Skw. Fnct. [-]
 #ifdef CLUBBND_CAM

@@ -459,6 +459,12 @@ contains
     pio_subsystem => shr_pio_getiosys(atm_id)
     pio_iotype =  shr_pio_getiotype(atm_id)
 
+    if (masterproc) then
+       write(iulog,*)' '
+       write(iulog,*)'Initialize PIO subsystem:'
+       write(iulog,*)'  iotype  = ', pio_iotype
+    end if
+
   end subroutine init_pio_subsystem
 
   ! cam_pio_get_decomp: retrieve or create a PIO decomposition for the field

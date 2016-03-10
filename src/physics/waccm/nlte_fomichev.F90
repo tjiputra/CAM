@@ -8,6 +8,7 @@ module nlte_fomichev
   use physconst,          only: r_universal, rearth, avogad, boltz
   use chem_surfvals,      only: chem_surfvals_get
   use cam_abortutils,     only: endrun
+  use ref_pres,           only: pref_mid
 
   implicit none
   private
@@ -54,6 +55,9 @@ module nlte_fomichev
   real(r8), parameter :: a10=1.5988_r8         ! reaction constant
   real(r8), parameter :: const=2.63187E11_r8   ! reaction constant
   real(r8), parameter :: constb=9.08795e9_r8   ! reaction constant
+
+  real(r8), parameter :: ptop_co2cool=7.42e-3_r8 ! top pressure level for co2 cool calculation (Pa)
+  integer :: ktop_co2cool                        ! the level index defining the top of CO2 cool calculation
 
 !VERTICAL GRIDs to be used in IR scheme
 !XR(67) - pressure scale heights, psh's, (=0-16.5) at which input parameter
@@ -1039,6 +1043,7 @@ contains
     real(r8), intent(in) :: n2_mwi                      ! N2 molecular weight
     real(r8), intent(in) :: no_mwi                      ! NO molecular weight
 
+    integer :: k
 
 ! set molecular weights
     co2_mw = co2_mwi
@@ -1047,6 +1052,11 @@ contains
     o2_mw = o2_mwi
     o3_mw = o3_mwi
     no_mw = no_mwi
+
+    ktop_co2cool = 1
+    do k=1,pver
+       if (pref_mid(k) < ptop_co2cool) ktop_co2cool = k
+    enddo
 
   end subroutine nlte_fomichev_init
 
@@ -1127,7 +1137,8 @@ contains
 
 !==================================================================================================
 
-      subroutine nlte_fomichev_calc (ncol,pmid,pint,t,xo2,xo,xo3,xn2,xco2,coolf)
+      subroutine nlte_fomichev_calc (ncol,pmid,pint,t,xo2,xo,xo3,xn2,xco2,coolf,&
+                                     co2cool_out, o3cool_out, c2scool_out )
 
 !
 !     author: F. Sassi (Dec, 1999)
@@ -1186,7 +1197,10 @@ implicit none
 
 !     Output variables
       real(r8), intent(out) :: coolf(pcols,pver)          ! Total cooling
-      
+      real(r8), intent(out) :: co2cool_out(pcols,pver)        ! CO2 cooling 
+      real(r8), intent(out) :: o3cool_out(pcols,pver)         ! O3 cooling
+      real(r8), intent(out) :: c2scool_out(pcols,pver)        ! Cooling to Space
+
 !    Local variables
       
       real(r8) rmo2                        ! O2 molecular weight
@@ -1575,12 +1589,30 @@ implicit none
       call cool2space (ncol,ti,mwair,vn2,vo2,vo,vco2,ndenair,xnorm,flux,hc2s)
 
 !     Calculate total cooling
-      do  k=1,pver
+
+      ! Above ptop_co2cool use cool to space approx.
+      do k=1,ktop_co2cool-1
          kinv=pver-k+1
          do  i=1,ncol
-! Convert to J/kg/s
-            coolf(i,kinv) = (co2cooln(i,k) + o3cooln(i,k) + hc2s(i,k)) * 1.e-4_r8
+            ! Convert to J/kg/s
+            coolf(i,k) = (o3cooln(i,kinv) + hc2s(i,kinv)) * 1.e-4_r8
          enddo
+      enddo
+      ! Below ptop_co2cool use nlte calculation
+      do k=ktop_co2cool,pver
+         kinv=pver-k+1
+         do  i=1,ncol
+            ! Convert to J/kg/s
+            coolf(i,k) = (co2cooln(i,kinv) + o3cooln(i,kinv)) * 1.e-4_r8
+         enddo
+      enddo
+
+      ! diagnostics ...
+      do k=1,pver
+         kinv=pver-k+1
+         co2cool_out(:ncol,k) = co2cooln(:ncol,kinv) * 1.e-4_r8
+         o3cool_out(:ncol,k) = o3cooln(:ncol,kinv) * 1.e-4_r8
+         c2scool_out(:ncol,k) = hc2s(:ncol,kinv) * 1.e-4_r8
       enddo
 
       return
@@ -2395,14 +2427,13 @@ real(r8) function a18lin (x,xn,yn,m,n)
 
 !==================================================================================================
 
-   subroutine nocooling(lchnk,ncol                      &
+   subroutine nocooling(ncol                      &
         ,t,pmid,nommr,o1mmr,o2mmr,o3mmr,n2mmr,nocool)
 
 !
 ! Calculate NO cooling (ref: Kockarts, GRL, vol. 7, pp 137-140, 1980)
 !
 
-     integer, intent(in) :: lchnk                 ! chunck number
      integer, intent(in) :: ncol                  ! number of column in chunck
 
      real(r8), intent(in) :: t(pcols,pver)        ! neutral gas temperature (K)

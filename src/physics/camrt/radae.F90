@@ -34,7 +34,7 @@ module radae
   private
   save
 
-  public :: radabs, radems, radtpl, radae_init, initialize_radbuffer, radoz2, trcpth
+  public :: radabs, radems, radtpl, radae_init, radoz2, trcpth, initialize_radbuffer
 
   integer, public, parameter :: nbands = 2          ! Number of spectral bands
 
@@ -2934,6 +2934,12 @@ subroutine radae_init( &
    ierr =  pio_get_var (ncid_ae, ln_eh2owid, ln_eh2ow)
       
    call pio_closefile(ncid_ae)
+
+   ! check whether arrays have already been allocated before calling
+   ! initialize_radbuffer.  This will be the case for restart and branch
+   ! runs since those arrays are restored from the restart file before
+   ! this routine is called.
+   if (.not. allocated(abstot_3d)) call initialize_radbuffer()
 
 end subroutine radae_init
 

@@ -225,7 +225,6 @@
 
 <!-- Misc Settings -->
 <cldfrc_rhminl>0.90D0</cldfrc_rhminl>
-<use_gw_front_igw>.true.</use_gw_front_igw>
  
 <do_circulation_diags>.true.</do_circulation_diags>
 <gas_wetdep_method>'NEU'</gas_wetdep_method>

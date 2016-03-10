@@ -46,9 +46,6 @@ real(r8), protected :: lambm0      ! Mean longitude of perihelion at the
 real(r8), protected :: mvelpp      ! Earth's moving vernal equinox longitude
                                    ! of perihelion plus pi (radians)
 
-! Temporary -- will move to appropriate location in chem code
-integer :: magfield_fix_year = 1995
-
 !================================================================================================
 contains
 !================================================================================================

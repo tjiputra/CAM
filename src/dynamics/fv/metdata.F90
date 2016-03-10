@@ -1624,6 +1624,8 @@ contains
     nfact1 = (datatimepn - next_mod_time)/deltatn
 !    nfact2 = (next_mod_time - datatimemn)/deltatn
     nfact2 = D1_0-nfact1
+
+    met_q = 0.0_r8
     do c=begchunk,endchunk
        ncol = get_ncols_p(c)
        do k=1,pver

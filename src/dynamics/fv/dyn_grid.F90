@@ -51,6 +51,7 @@ module dyn_grid
   integer, parameter, public :: dyn_stagger_decomp = 102 !Backward compatibility
   integer, parameter, public :: dyn_ustag_decomp   = 102
   integer, parameter, public :: dyn_vstag_decomp   = 103
+  integer, parameter, public :: dyn_zonal_decomp   = 104
 
 contains
 
@@ -1138,14 +1139,17 @@ subroutine define_cam_grids()
   use commap,           only: w_staggered, w
   use cam_grid_support, only: horiz_coord_t, horiz_coord_create, iMap
   use cam_grid_support, only: cam_grid_register, cam_grid_attribute_register
+  use cam_grid_support, only: cam_grid_attribute_copy
 
   integer                      :: i, j, ind
   type(horiz_coord_t), pointer :: lat_coord
   type(horiz_coord_t), pointer :: lon_coord
   type(horiz_coord_t), pointer :: slat_coord
   type(horiz_coord_t), pointer :: slon_coord
+  type(horiz_coord_t), pointer :: zlon_coord
   integer(iMap),       pointer :: coord_map(:)
   integer(iMap),       pointer :: grid_map(:,:)
+  real(r8)                     :: zlon_bnds(2,1)
   real(r8), allocatable        :: latvals(:)
   real(r8),            pointer :: rattval(:)
   integer,             pointer :: iattval(:)
@@ -1160,6 +1164,7 @@ subroutine define_cam_grids()
   nullify(lon_coord)
   nullify(slat_coord)
   nullify(slon_coord)
+  nullify(zlon_coord)
   nullify(coord_map)
   nullify(grid_map)
   nullify(rattval)
@@ -1285,6 +1290,32 @@ subroutine define_cam_grids()
        slon_coord, grid_map, unstruct=.false.)
   call cam_grid_attribute_register('fv_v_stagger', 'w_stag',                  &
        'staggered latitude weights', 'lat', w_staggered)
+  nullify(grid_map) ! Belongs to the grid
+
+  ! Zonal mean grid
+  ! Make a map
+  allocate(grid_map(4, (endlatxy - beglatxy + 1)))
+  ind = 0
+  do i = beglatxy, endlatxy
+    ind = ind + 1
+    grid_map(1, ind) = 1
+    grid_map(2, ind) = i
+    grid_map(3, ind) = 1
+    grid_map(4, ind) = i
+  end do
+  ! We need a special, size-one "longigude" coordinate
+  zlon_bnds(1,1) = minval(londeg)
+  zlon_bnds(2,1) = maxval(londeg)
+  allocate(latvals(1))
+  latvals(1) = 0._r8
+  zlon_coord => horiz_coord_create('zlon', '', 1, 'longitude',                &
+       'degrees_east', 1, 1, latvals(1:1), bnds=zlon_bnds)
+  deallocate(latvals)
+  ! Zonal mean grid
+  call cam_grid_register('fv_centers_zonal', dyn_zonal_decomp, lat_coord,     &
+       zlon_coord, grid_map, unstruct=.false., zonal_grid=.true.)
+  ! Make sure 'gw' attribute shows up even if all variables are zonal mean
+  call cam_grid_attribute_copy('fv_centers', 'fv_centers_zonal', 'gw')
   nullify(grid_map) ! Belongs to the grid
 
 end subroutine define_cam_grids

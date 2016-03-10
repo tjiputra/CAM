@@ -74,14 +74,14 @@
       real(r8), parameter :: grav   = 870._r8          ! (cm/s^2)
 
       integer  :: lev1 = 1
-      real(r8) :: twopi
+      real(r8), parameter :: twopi = 2._r8*pi
       real(r8) :: rmass_o1
       real(r8) :: rmass_o2
       real(r8) :: rmass_n2
       real(r8) :: rmassinv_o1
       real(r8) :: rmassinv_o2
       real(r8) :: rmassinv_n2
-      real(r8) :: dtr
+      real(r8), parameter :: dtr = pi/180._r8
 
 !-----------------------------------------------------------------------
 ! 	... polar drizzle parameters:
@@ -217,8 +217,6 @@
 !-----------------------------------------------------------------------
 !	... initialize module variables
 !-----------------------------------------------------------------------
-      twopi  = 2._r8*pi
-      dtr    = pi/180._r8
 
 !-----------------------------------------------------------------------
 !	... set molecular weights
@@ -306,9 +304,9 @@
         end if
         write(iulog,"(' ')")
 #endif
-        call addfld('ALATM', horiz_only,  'I','RADIANS', &
+        call addfld('ALATM', horiz_only,  'I','degrees', &
              'Magnetic latitude at each geographic coordinate')
-        call addfld('ALONM', horiz_only,  'I','RADIANS', &
+        call addfld('ALONM', horiz_only,  'I','degrees', &
              'Magnetic longitude at each geographic coordinate')
         call addfld( 'QSUM', (/ 'lev' /), 'I','/s',      &
              'total ion production' )
@@ -417,6 +415,7 @@
 !-----------------------------------------------------------------------
 
       use mo_apex,     only : alatm, alonm                      ! magnetic latitude,longitude grid (radians)
+      use mo_apex,     only : maglon0
       use ppgrid,      only : pcols, pver
       use cam_history, only : outfld
       use physics_buffer,only: physics_buffer_desc
@@ -456,7 +455,6 @@
       integer  :: hemis(ncol)
       real(r8) :: r2d
       real(r8) :: ofda, cosofa, sinofa, aslona
-      real(r8) :: sunlons(ncol)                     ! sun's mag longitudes
       real(r8) :: dlat_aur(ncol)
       real(r8) :: dlon_aur(ncol)
       real(r8) :: colat(ncol)
@@ -475,6 +473,8 @@
       real(r8) :: drizl(ncol)
       real(r8) :: qteaur(ncol)                         ! for electron temperature
       logical  :: do_aurora(ncol)
+
+      real(r8) :: dayfrac, rotation
 
       if (.not. has_ions) return
 
@@ -505,14 +505,15 @@
       end if
 
 !-----------------------------------------------------------------------
-! 	... set sun location
+! 	... set rotation based on sun location
 !-----------------------------------------------------------------------
-      call sunloc( calday, sunlons, lchnk, ncol )
+      dayfrac = (calday - int(calday))
+      rotation = maglon0 + dayfrac*twopi-pi
 
       do i = 1,ncol
         if( do_aurora(i) ) then
           dlat_aur(i) = alatm(i,lchnk)
-          dlon_aur(i) = alonm(i,lchnk) - sunlons(i)
+          dlon_aur(i) = alonm(i,lchnk) + rotation ! rotate it 
           if( dlon_aur(i) > pi ) then
              dlon_aur(i) = dlon_aur(i) - twopi
           else if( dlon_aur(i) < -pi ) then
@@ -552,8 +553,6 @@
       write(iulog,'(1p,5g15.7)') r2d*alonm(:ncol,lchnk)
       write(iulog,*) '        mag table lons'
       write(iulog,'(1p,5g15.7)') r2d*dlon_aur(:ncol)
-      write(iulog,*) '        sunlons'
-      write(iulog,'(1p,5g15.7)') r2d*sunlons(:ncol)
       write(iulog,*) '     min,max mag lons = ',r2d*minval(alonm(:ncol,lchnk)),r2d*maxval(alonm(:ncol,lchnk))
       write(iulog,*) '-----------------------------------------------------'
 #endif
@@ -588,6 +587,7 @@
 !-----------------------------------------------------------------------
 
       use mo_apex, only : alatm, alonm                      ! magnetic latitude,longitude grid (radians)
+      use mo_apex, only : maglon0
       use ppgrid,  only : pcols, pver
 
       implicit none
@@ -627,7 +627,6 @@
       integer  :: hemis(ncol)
       real(r8) :: r2d
       real(r8) :: ofda, cosofa, sinofa, aslona
-      real(r8) :: sunlons(ncol)                     ! sun's mag longitudes
       real(r8) :: dlat_aur(ncol)
       real(r8) :: dlon_aur(ncol)
       real(r8) :: colat(ncol)
@@ -647,6 +646,8 @@
       real(r8) :: qteaur(ncol)                         ! for electron temperature
       real(r8) :: qsum(ncol,pver)                      ! total ion production (1/s)
       logical  :: do_aurora(ncol)
+
+      real(r8) :: dayfrac, rotation
 
 !-----------------------------------------------------------------------
 ! 	... initialize ion production
@@ -668,14 +669,15 @@
       end if
 
 !-----------------------------------------------------------------------
-! 	... set sun location
+! 	... set rotation based on sun location
 !-----------------------------------------------------------------------
-      call sunloc( calday, sunlons, lchnk, ncol )
+      dayfrac = (calday - int(calday))
+      rotation = maglon0 + dayfrac*twopi-pi
 
       do i = 1,ncol
         if( do_aurora(i) ) then
           dlat_aur(i) = alatm(i,lchnk)
-          dlon_aur(i) = alonm(i,lchnk) - sunlons(i)
+          dlon_aur(i) = alonm(i,lchnk) + rotation ! rotate it 
           if( dlon_aur(i) > pi ) then
              dlon_aur(i) = dlon_aur(i) - twopi
           else if( dlon_aur(i) < -pi ) then
@@ -715,8 +717,6 @@
       write(iulog,'(1p,5g15.7)') r2d*alonm(:ncol,lchnk)
       write(iulog,*) '        mag table lons'
       write(iulog,'(1p,5g15.7)') r2d*dlon_aur(:ncol)
-      write(iulog,*) '        sunlons'
-      write(iulog,'(1p,5g15.7)') r2d*sunlons(:ncol)
       write(iulog,*) '     min,max mag lons = ',r2d*minval(alonm(:ncol,lchnk)),r2d*maxval(alonm(:ncol,lchnk))
       write(iulog,*) '-----------------------------------------------------'
 #endif
@@ -884,7 +884,7 @@
       use cam_history, only : outfld
 
       use physics_buffer,only: physics_buffer_desc, pbuf_set_field, pbuf_get_field
-      
+
       implicit none
 
 !-----------------------------------------------------------------------
@@ -965,7 +965,7 @@
 
       qia(:) = 0._r8
       wrk(:,:) = 0._r8
- 
+
       !-----------------------------------------------------------
       !  Point to production rates array in physics buffer where 
       !  rates will be stored for ionosphere module access.  Also, 
@@ -976,7 +976,7 @@
         call pbuf_get_field(pbuf, indxAIPRS, aurIPRateSum)
         aurIPRateSum(:,:) = 0._r8
       endif
- 
+
 level_loop : &
       do k = 1,lev1
           where( do_aurora(:) )
@@ -1348,87 +1348,5 @@ level_loop : &
 
       end subroutine bion
 
-      subroutine sunloc( calday, sunlons, lchnk, ncol )
-!-----------------------------------------------------------------------
-! 	... calculate sun's longitude in dipole coordinates, defining sunlon
-!-----------------------------------------------------------------------
-      use dyn_grid,   only : get_dyn_grid_parm, get_horiz_grid_d
-      use spmd_utils, only : masterproc
-      use  phys_grid, only : get_lat_all_p, get_rlat_all_p, get_rlon_all_p
-      use  mo_apex,   only : glonm                                              ! magnetic longitude grid (radians)
-
-      implicit none
-
-!-----------------------------------------------------------------------
-! 	... dummy arguments
-!-----------------------------------------------------------------------
-      integer,  intent(in)   :: ncol
-      integer,  intent(in)   :: lchnk
-      real(r8), intent(in)   :: calday  ! calendar day of year
-      real(r8), intent(out)  :: sunlons(ncol)
-
-!-----------------------------------------------------------------------
-! 	... local variables
-!-----------------------------------------------------------------------
-      integer  :: col
-      integer  :: latndx(ncol)
-      integer  :: sunlon_ndx
-      integer  :: sunlon_ndxp1
-      integer :: plon, plat
-      real(r8), allocatable :: clon(:)
-      real(r8) :: wght1, wght2, dellon, r2d
-      real(r8) :: rlats(ncol), rlons(ncol)
-
-      r2d = 180._r8/pi
-!-----------------------------------------------------------------------
-! 	... sun's geographic coordinates
-!-----------------------------------------------------------------------
-      plon = get_dyn_grid_parm('plon')
-      plat = get_dyn_grid_parm('plat')
-      allocate(clon(plon))
-      call get_horiz_grid_d(plon,clon_d_out=clon)
-
-
-      dellon       = .5_r8 - (calday - int(calday))
-      sunlon_ndx   = mod( nint( dellon*plon ) - 1,plon ) + 1
-      if( sunlon_ndx < 1 ) then
-         sunlon_ndx = plon + sunlon_ndx
-      end if
-      sunlon_ndxp1 = mod( sunlon_ndx,plon ) + 1
-      wght2        = min( 1._r8, max( (dellon*twopi - clon(sunlon_ndx))*plon/twopi,0._r8 ) )
-      wght1        = 1._r8 - wght2
-      deallocate(clon)
-
-!-----------------------------------------------------------------------      
-!        ... get chunck latitudes
-!-----------------------------------------------------------------------      
-      call get_lat_all_p( lchnk, ncol, latndx )
-      call get_rlat_all_p( lchnk, ncol, rlats )
-      call get_rlon_all_p( lchnk, ncol, rlons )
-
-      do col = 1,ncol
-!        sunlons(col) = wght1*glonm(sunlon_ndx,latndx(col)) + wght2*glonm(sunlon_ndxp1,latndx(col))
-	 sunlons(col) = wght1*glonm(sunlon_ndx,plat/2) + wght2*glonm(sunlon_ndxp1,plat/2)
-      end do
-
-#ifdef AURORA_DIAGS
-      write(iulog,*) '-----------------------------------------------------'
-      write(iulog,*) 'sunloc: diagnostics for lchnk = ',lchnk
-      write(iulog,*) '        dellon,sunlon_ndx,sunlon_ndxp1,wght1,wght2'
-      write(iulog,'(1p,g15.7,2i6,2g15.7)') dellon,sunlon_ndx,sunlon_ndxp1,wght1,wght2
-      write(iulog,*) '   phys lons'
-      write(iulog,'(1p,5g15.7)') r2d*rlons(:ncol)
-      write(iulog,*) '  phys lats'
-!     write(iulog,'(10i5)') latndx(:ncol)
-      write(iulog,'(1p,5g15.7)') r2d*rlats(:ncol)
-      write(iulog,*) '    mag lons'
-      write(iulog,'(1p,5g15.7)') r2d*glonm(sunlon_ndx,latndx(:ncol))
-      write(iulog,*) '    mag lons'
-      write(iulog,'(1p,5g15.7)') r2d*glonm(sunlon_ndxp1,latndx(:ncol))
-      write(iulog,*) '-----------------------------------------------------'
-      write(iulog,"('sunloc: sunlons=',/,(e12.4))") sunlons
-#endif
-
-      end subroutine sunloc
 
       end module mo_aurora

@@ -319,10 +319,8 @@ CONTAINS
     use dyn_comp, only : dyn_init1, dyn_init2
     use dimensions_mod, only : nlev, np, ne, nelemd, qsize_d
     use cam_abortutils,   only: endrun
-    use namelist_mod, only: readnl
     use constituents, only : cnst_name
     use cam_pio_utils, only : pio_subsystem
-    use spmd_dyn, only: spmd_readnl
     use fvm_control_volume_mod, only: fvm_struct
     use control_mod,            only: qsplit
     use time_mod,               only: TimeLevel_Qdp
@@ -343,7 +341,7 @@ CONTAINS
     type(element_t), pointer :: elem(:)               ! pointer to dyn_in element array
     type(fvm_struct), pointer :: fvm(:)
     integer(kind=pio_offset_kind), parameter :: t = 1
-    integer :: i, k, cnt, st, en, tl, tlQdp, ii, jj, s2d, q, j
+    integer :: i, k, cnt, st, tl, tlQdp, s2d, q, j
     integer :: timelevel_dimid, timelevel_chk
     integer :: npes_se
 !    type(file_desc_t) :: ncid

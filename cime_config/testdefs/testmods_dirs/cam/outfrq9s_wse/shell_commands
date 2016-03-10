@@ -8,7 +8,6 @@
 # Ideally, these copies would be done automatically when applying testmods in
 # create_newcase.
 ./xmlchange ROF_NCPL=\$ATM_NCPL
-./xmlchange RUN_STARTDATE=1995-01-01
 cp user_nl_cam  user_nl_cam_0001
 cp user_nl_cam  user_nl_cam_0002
 cp user_nl_clm  user_nl_clm_0001

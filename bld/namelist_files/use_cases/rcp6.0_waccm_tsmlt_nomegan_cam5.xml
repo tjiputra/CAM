@@ -48,8 +48,8 @@
   'NO2 -> $INPUTDATA_ROOT/atm/cam/chem/emis/ccmi_1960-2008/CCMI_emissions_aircraft_NO2_1850-2100_1.9x2.5_c130314.nc',
   'SO2 -> $INPUTDATA_ROOT/atm/cam/chem/emis/ccmi_1960-2008/IPCC_emissions_volc_SO2_1850-2100_1.9x2.5_c141106.nc',
   'bc_a1  -> $INPUTDATA_ROOT/atm/cam/chem/trop_mozart_aero/emis/RCP60_mam3_bc_elev_1850-2300_c20150128.nc',
-  'num_a1 -> $INPUTDATA_ROOT/atm/cam/chem/trop_mozart_aero/emis/RCP60_mam3_num_a2_elev_1850-2300_c20150128.nc',
-  'num_a2 -> $INPUTDATA_ROOT/atm/cam/chem/trop_mozart_aero/emis/RCP60_mam3_num_a1_elev_1850-2300_c20150128.nc',
+  'num_a1 -> $INPUTDATA_ROOT/atm/cam/chem/trop_mozart_aero/emis/RCP60_mam3_num_a1_elev_1850-2300_c20150128.nc',
+  'num_a2 -> $INPUTDATA_ROOT/atm/cam/chem/trop_mozart_aero/emis/RCP60_mam3_num_a2_elev_1850-2300_c20150128.nc',
   'pom_a1 -> $INPUTDATA_ROOT/atm/cam/chem/trop_mozart_aero/emis/RCP60_mam3_pom_elev_1850-2300_c20150128.nc',
   'so4_a1 -> $INPUTDATA_ROOT/atm/cam/chem/trop_mozart_aero/emis/RCP60_mam3_so4_a1_elev_1850-2300_c20150128.nc',
   'so4_a2 -> $INPUTDATA_ROOT/atm/cam/chem/trop_mozart_aero/emis/RCP60_mam3_so4_a2_elev_1850-2300_c20150128.nc'
@@ -265,6 +265,5 @@
 <aoa_read_from_ic_file>.true.</aoa_read_from_ic_file>
 
 <cldfrc_rhminl>0.89D0</cldfrc_rhminl>
-<use_gw_front_igw>.true.</use_gw_front_igw>
 
 </namelist_defaults>

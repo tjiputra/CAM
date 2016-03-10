@@ -434,11 +434,33 @@
         <machine compiler="intel" testtype="prebeta" testmods="cam/outfrq9s">yellowstone</machine>
       </test>
     </grid>
+    <grid name="ne30_ne30">
+      <test name="ERP_Ln9">
+        <machine compiler="intel" testtype="aux_wcm" testmods="cam/outfrq9s_wse">yellowstone</machine>
+      </test>
+      <test name="SMS_D_Ln9">
+        <machine compiler="intel" testtype="aux_wcm" testmods="cam/outfrq9s_wse">yellowstone</machine>
+      </test>
+    </grid>
   </compset>
   <compset name="FW5SC">
     <grid name="f19_f19">
       <test name="ERP_Ld3">
-        <machine compiler="intel" testtype="prealpha" testmods="cam/outfrq3d_sc">yellowstone</machine>
+        <machine compiler="intel" testtype="prealpha" testmods="cam/outfrq3d">yellowstone</machine>
+        <machine compiler="intel" testtype="aux_wcm" testmods="cam/outfrq3d">yellowstone</machine>
+      </test>
+      <test name="SMS_D_Ln9">
+        <machine compiler="intel" testtype="aux_wcm" testmods="cam/outfrq9s">yellowstone</machine>
+      </test>
+    </grid>
+  </compset>
+  <compset name="F55W5SC">
+    <grid name="f19_f19">
+      <test name="ERP_Ld3">
+        <machine compiler="intel" testtype="aux_wcm" testmods="cam/outfrq3d">yellowstone</machine>
+      </test>
+      <test name="SMS_D_Ln9">
+        <machine compiler="intel" testtype="aux_wcm" testmods="cam/outfrq9s">yellowstone</machine>
       </test>
     </grid>
   </compset>
@@ -475,22 +497,27 @@
   <compset name="FSDW5">
     <grid name="f19_f19">
       <test name="SMS_D_Ln3">
-        <machine compiler="intel" testtype="prebeta" testmods="cam/outfrq9s">yellowstone</machine>
+        <machine compiler="intel" testtype="prealpha" testmods="cam/outfrq9s">yellowstone</machine>
         <machine compiler="intel" testtype="aux_wcm" testmods="cam/outfrq9s">yellowstone</machine>
       </test>
       <test name="ERP_Ln9">
         <machine compiler="intel" testtype="prebeta" testmods="cam/outfrq9s">yellowstone</machine>
         <machine compiler="intel" testtype="aux_wcm" testmods="cam/outfrq9s">yellowstone</machine>
       </test>
+      <test name="SMS_Ln12">
+        <machine compiler="intel" testtype="prebeta" testmods="cam/sd_leapday">yellowstone</machine>
+        <machine compiler="intel" testtype="aux_wcm" testmods="cam/sd_leapday">yellowstone</machine>
+      </test>
     </grid>
   </compset>
   <compset name="FWSC">
     <grid name="f45_f45">
       <test name="ERP_D_Ld3">
-        <machine compiler="nag" testtype="prealpha" testmods="cam/outfrq3d_sc">hobart</machine>
+        <machine compiler="nag" testtype="prealpha" testmods="cam/outfrq3d">hobart</machine>
       </test>
       <test name="ERP_Ld3">
-        <machine compiler="gnu" testtype="prebeta" testmods="cam/outfrq3d_sc">yellowstone</machine>
+        <machine compiler="gnu" testtype="prebeta" testmods="cam/outfrq3d">yellowstone</machine>
+        <machine compiler="intel" testtype="aux_wcm" testmods="cam/outfrq3d">yellowstone</machine>
       </test>
     </grid>
   </compset>

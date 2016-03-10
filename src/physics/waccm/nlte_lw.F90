@@ -173,11 +173,17 @@ contains
 ! add to masterfield list
     call addfld ('QRLNLTE',(/ 'lev' /), 'A','K/s','Non-LTE LW heating (includes QNO)')
     call addfld ('QNO',    (/ 'lev' /), 'A','K/s','NO cooling')
+    call addfld ('QCO2',   (/ 'lev' /), 'A','K/s','CO2 cooling')
+    call addfld ('QO3',    (/ 'lev' /), 'A','K/s','O3 cooling')
+    call addfld ('QHC2S',  (/ 'lev' /), 'A','K/s','Cooling to Space')
 
 ! add output to default output for primary history tapes
     if (history_waccm) then
        call add_default ('QRLNLTE', 1, ' ')
        call add_default ('QNO ', 1, ' ')
+       call add_default ('QCO2', 1, ' ')
+       call add_default ('QO3',  1, ' ')
+       call add_default ('QHC2S',1, ' ')
     end if
 
   end subroutine nlte_init
@@ -232,6 +238,7 @@ contains
 
     real(r8) :: nocool (pcols,pver)  ! NO cooling
     real(r8) :: qout (pcols,pver)    ! temp for outfld
+    real(r8) :: co2cool(pcols,pver), o3cool(pcols,pver), c2scool(pcols,pver)
 
     real(r8), pointer, dimension(:,:) :: xco2mmr  ! CO2 mmr 
     real(r8), pointer, dimension(:,:) :: xommr    ! O   mmr 
@@ -283,10 +290,11 @@ contains
     xn2mmr  => n2mmr(:,:)
 
 ! do non-LTE parameterization 
-    call nlte_fomichev_calc (ncol,state%pmid,state%pint,state%t,xo2mmr,xommr,xo3mmr,xn2mmr,xco2mmr,qrlf)
+    call nlte_fomichev_calc (ncol,state%pmid,state%pint,state%t,xo2mmr,xommr,xo3mmr,xn2mmr,xco2mmr,qrlf,&
+        co2cool,o3cool,c2scool)
 
 ! do NO cooling 
-    call nocooling (lchnk, ncol, state%t, state%pmid, xnommr,xommr,xo2mmr,xo3mmr,xn2mmr,nocool)
+    call nocooling (ncol, state%t, state%pmid, xnommr,xommr,xo2mmr,xo3mmr,xn2mmr,nocool)
 
     do k = 1,pver
        qrlf(:ncol,k) = qrlf(:ncol,k) + nocool(:ncol,k)
@@ -296,6 +304,13 @@ contains
     call outfld ('QNO'    , qout, pcols, lchnk)
     qout(:ncol,:) = qrlf(:ncol,:)/cpairv(:ncol,:,lchnk)
     call outfld ('QRLNLTE', qout, pcols, lchnk)
+
+    qout(:ncol,:) = co2cool(:ncol,:)/cpairv(:ncol,:,lchnk)
+    call outfld ('QCO2', qout, pcols, lchnk)
+    qout(:ncol,:) = o3cool(:ncol,:)/cpairv(:ncol,:,lchnk)
+    call outfld ('QO3', qout, pcols, lchnk)
+    qout(:ncol,:) = c2scool(:ncol,:)/cpairv(:ncol,:,lchnk)
+    call outfld ('QHC2S', qout, pcols, lchnk)
 
   end subroutine nlte_tend
 

@@ -42,9 +42,11 @@
 #               Use this to replace default Fortran compiler optimization.
 # COSP_LIBDIR   Directory where COSP library will be built.
 # MCT_LIBDIR    Directory where MCT library will be built.
+# PIO_BUILD_DIR Directory where PIO will be built (pio2 only)
+# PIO_INSTALL_DIR Directory containing PIO libraries and include files (pio2 only)
 #
 # Note: An internal implementation of the ESMF time-manager interface is provided
-#       with the sequential CCSM distribution in $ROOTDIR/cime/share/esmf_wrf_timemgr.
+#       with the CESM distribution in $ROOTDIR/cime/share/esmf_wrf_timemgr.
 #
 #------------------------------------------------------------------------
 
@@ -59,16 +61,22 @@ comma := $(null),$(null)
 ifneq ($(strip $(F_OPTIMIZATION_OVERRIDE)),)
   FORTRAN_OPTIMIZATION := $(F_OPTIMIZATION_OVERRIDE)
 endif
+
 # Set user specified linker
 ifneq ($(strip $(USER_LINKER)),)
   LINKER := $(USER_LINKER)
+endif
+
+# Check for build of PIO in separate library.
+ifneq ($(strip $(PIO_INSTALL_DIR)),)
+  PIO_INC := $(PIO_INSTALL_DIR)/include
 endif
 
 # Load dependency search path.
 dirs := . $(shell cat Filepath)
 
 # Set cpp search path, include netcdf
-cpp_dirs := $(dirs) $(INC_NETCDF) $(INC_MPI) $(INC_PNETCDF)
+cpp_dirs := $(dirs) $(INC_NETCDF) $(INC_MPI) $(INC_PNETCDF) $(PIO_INC)
 cpp_path := $(foreach dir,$(cpp_dirs),-I$(dir)) # format for command line
 
 # Expand any tildes in directory names. Change spaces to colons.
@@ -100,16 +108,17 @@ SOURCES := $(SOURCES:%.F90.in=%.F90)
 # Newer makes set the CURDIR variable.
 CURDIR := $(shell pwd)
 
-# Make dependencies; also, make every source file depend on MCT so it will be built first.
+# Generate Make dependencies.
 $(CURDIR)/Depends: $(CURDIR)/Srcfiles $(CURDIR)/Filepath
 	$(ROOTDIR)/components/cam/bld/mkDepends Filepath Srcfiles > $@
 
+# Generate list of source files.
 $(CURDIR)/Srcfiles: $(CURDIR)/Filepath
 	$(ROOTDIR)/components/cam/bld/mkSrcfiles -e $(EXCLUDE_SOURCES) > $@
 
 OBJS      := $(addsuffix .o, $(basename $(SOURCES)))
 
-CPPDEF    := -DSEQ_MCT -DNO_C_SIZEOF $(USER_CPPDEFS)
+CPPDEF    := -DNO_C_SIZEOF $(USER_CPPDEFS)
 ifeq ($(SPMD),TRUE)
    # HAVE_MPI is used in the timing lib code
    CPPDEF += -DSPMD -DHAVE_MPI
@@ -125,7 +134,7 @@ CONTIGUOUS_FLAG    := -DUSE_CONTIGUOUS=contiguous,
 NO_CONTIGUOUS_FLAG := -DUSE_CONTIGUOUS=
 
 $(MODEL_EXEDIR)/$(EXENAME): $(OBJS)
-	$(LINKER) -o $@ $(OBJS) $(NC_LDFLAGS) $(LDFLAGS)
+	$(LINKER) -o $@ $(OBJS) $(LDFLAGS) $(NC_LDFLAGS)
 
 ifneq ($(strip $(COSP_LIBDIR)),)
 # Rules to build COSP in its own library.  Add cam_abortutils dependency so
@@ -136,14 +145,30 @@ $(COSP_LIBDIR)/libcosp.a: cam_abortutils.o
 cospsimulator_intr.o: $(COSP_LIBDIR)/libcosp.a
 endif
 
-# Rules to build MCT in its own library. 
+# Rules to build MCT library. 
 # SRCDIR is passed via the commandline because of a bug in the MCT configure.
 $(MCT_LIBDIR)/mct/libmct.a: 
 	$(MAKE) -C $(MCT_LIBDIR) SRCDIR=$(ROOTDIR)/cime/externals/mct
 shr_kind_mod.o: $(MCT_LIBDIR)/mct/libmct.a
 perf_utils.o: $(MCT_LIBDIR)/mct/libmct.a
-pio_kinds.o: $(MCT_LIBDIR)/mct/libmct.a
 RtmSpmd.o: $(MCT_LIBDIR)/mct/libmct.a
+
+# Rules to build PIO library.  If not building the library then need
+# to add the dependency on pio for the cam parallel build.
+ifneq ($(strip $(PIO_INC)),)
+  # Depends on MCT only for the mpi-serial library
+  $(PIO_INSTALL_DIR)/lib/libpiof.a: $(MCT_LIBDIR)/mct/libmct.a
+	$(MAKE) -C $(PIO_BUILD_DIR)
+	$(MAKE) -C $(PIO_BUILD_DIR) install
+  shr_pio_mod.o: $(PIO_INSTALL_DIR)/lib/libpiof.a
+  shr_pcdf_mod.o: $(PIO_INSTALL_DIR)/lib/libpiof.a
+  cam_map_utils.o: $(PIO_INSTALL_DIR)/lib/libpiof.a
+
+else
+  # If not building the library then need to
+  # add a dependency on pio for the cam parallel build.
+  pio_kinds.o: $(MCT_LIBDIR)/mct/libmct.a
+endif
 
 # Compilation rules:
 .SUFFIXES:
@@ -368,13 +393,8 @@ endif
 
 ifeq ($(FC_TYPE),intel)
 
-  # NO_SHR_VMATH used both to avoid depending on mkl, and because CESM has
-  # had to add it to get ecosys working and we want BFB with CESM on
-  # yellowstone.
-  # CPPDEF        += -DCPRINTEL -DNO_SHR_VMATH $(CONTIGUOUS_FLAG)
-
-  # CESM deleted NO_SHR_VMATH in Dec 2014
   CPPDEF        += -DCPRINTEL $(CONTIGUOUS_FLAG)
+  CFLAGS        += -std=gnu99
 
   FC_FLAGS      := -ftz -convert big_endian -fp-model source \
                    -no-opt-dynamic-align -assume realloc_lhs -xHost
@@ -485,6 +505,7 @@ endif
 ifeq ($(FC_TYPE),gnu)
 
   CPPDEF        += -DNO_R16 -DCPRGNU $(NO_CONTIGUOUS_FLAG)
+  CFLAGS        += -std=gnu99
   FC_FLAGS      := -fno-range-check -fcray-pointer
   FC_FLAGS_NOOPT:= $(FC_FLAGS) -O0
   FREEFLAGS     := -ffree-form -ffree-line-length-none
@@ -572,6 +593,7 @@ ifeq ($(FC_TYPE), nag)
 
   # NAG doesn't do Cray pointers.
   CPPDEF        += -DCPRNAG -DNO_CRAY_POINTERS $(NO_CONTIGUOUS_FLAG)
+  CFLAGS        += -std=gnu99
 
   # Bit of a pain: MPI functions are overloaded, so must specify
   # not to check them. -mismatch_all is alternative, but less

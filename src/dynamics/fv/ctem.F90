@@ -505,32 +505,24 @@ lat_loop3 : &
 ! 3D output
 !-------------------------------------------------------------
        do k = 1,plevp
-          do i = beglon,endlon
-             tmp3(i,k) = vth(k,j)
-          enddo
+          tmp3(grid%ifirstxy,k) = vth(k,j)
        enddo
-       call outfld( 'VTH3d', tmp3, nlons, j )
+       call outfld( 'VTH3d', tmp3(grid%ifirstxy:grid%ifirstxy,:), 1, j )
 
        do k = 1,plevp
-          do i = beglon,endlon
-             tmp3(i,k) = wth(k,j)
-          enddo
+          tmp3(grid%ifirstxy,k) = wth(k,j)
        enddo
-       call outfld( 'WTH3d', tmp3, nlons, j )
+       call outfld( 'WTH3d', tmp3(grid%ifirstxy:grid%ifirstxy,:), 1, j )
 
        do k = 1,plevp
-          do i = beglon,endlon
-             tmp3(i,k) = uv(k,j)
-          enddo
+          tmp3(grid%ifirstxy,k) = uv(k,j)
        enddo
-       call outfld( 'UV3d', tmp3, nlons, j )
+       call outfld( 'UV3d', tmp3(grid%ifirstxy:grid%ifirstxy,:), 1, j )
  
        do k = 1,plevp
-          do i = beglon,endlon
-             tmp3(i,k) = uw(k,j)
-          enddo
+          tmp3(grid%ifirstxy,k) = uw(k,j)
        enddo
-       call outfld( 'UW3d', tmp3, nlons, j )
+       call outfld( 'UW3d', tmp3(grid%ifirstxy:grid%ifirstxy,:), 1, j )
 
        do k = 1,plevp
           do i = beglon,endlon
@@ -594,12 +586,12 @@ lat_loop3 : &
 !-------------------------------------------------------------
 ! Initialize output buffer
 !-------------------------------------------------------------
-    call addfld ('VTH3d',(/ 'ilev' /),'A','MK/S','Meridional Heat Flux: 3D zon. mean', gridname='fv_centers' )
-    call addfld ('WTH3d',(/ 'ilev' /),'A','MK/S','Vertical Heat Flux: 3D zon. mean', gridname='fv_centers' )
+    call addfld ('VTH3d',(/ 'ilev' /),'A','MK/S','Meridional Heat Flux: 3D zon. mean', gridname='fv_centers_zonal' )
+    call addfld ('WTH3d',(/ 'ilev' /),'A','MK/S','Vertical Heat Flux: 3D zon. mean', gridname='fv_centers_zonal' )
     call addfld ('UV3d', (/ 'ilev' /),'A','M2/S2',    &
-         'Meridional Flux of Zonal Momentum: 3D zon. mean', gridname='fv_centers' )
+         'Meridional Flux of Zonal Momentum: 3D zon. mean', gridname='fv_centers_zonal' )
     call addfld ('UW3d', (/ 'ilev' /),'A','M2/S2',    &
-         'Vertical Flux of Zonal Momentum: 3D zon. mean', gridname='fv_centers' )
+         'Vertical Flux of Zonal Momentum: 3D zon. mean', gridname='fv_centers_zonal' )
     if( twod_output ) then
        call addfld ('VTH2d',horiz_only,'A','MK/S','Meridional Heat Flux: 2D prj of zon. mean - defined on ilev', &
             gridname='fv_centers' )

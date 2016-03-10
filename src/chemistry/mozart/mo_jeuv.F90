@@ -314,7 +314,7 @@
 	close( unit )
 	call freeunit( unit )
 
-	wc(:)     = .1_r8*(waves(:) + wavel(:))          ! A to nm
+	wc(:)     = .1_r8*(waves(:) + wavel(:))*0.5_r8          ! A to nm
 	energy(:) = heat_eff_fac*hc/wc(:)
 
         do m = 1,neuv

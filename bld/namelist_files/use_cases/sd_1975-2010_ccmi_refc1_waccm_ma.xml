@@ -252,6 +252,5 @@
 <cldfrc_rhminl>0.90D0</cldfrc_rhminl>
 <inithist>'MONTHLY'</inithist>
 <aoa_read_from_ic_file>.true.</aoa_read_from_ic_file>
-<use_gw_front_igw>.true.</use_gw_front_igw>
 
 </namelist_defaults>

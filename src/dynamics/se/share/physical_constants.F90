@@ -10,11 +10,11 @@ module physical_constants
   use kinds, only : real_kind, longdouble_kind
 #ifdef CAM
   use physconst, only : pi, & ! _EXTERNAL
-		        g => gravit, &
+                        g => gravit, &
                         rearth, &
                         omega, &
                         Rgas => rair, &
-                        cpair, &
+                        Cp => cpair, &
                         p0 => pstd, &
                         MWDAIR => mwdry, &
                         Rwater_vapor => rh2o, &
@@ -35,7 +35,7 @@ module physical_constants
   public                                   :: rearth         ! m
   public                                   :: omega          ! s^-1
   public                                   :: Rgas
-  real (kind=real_kind), public, parameter :: Cp           = cpair
+  public                                   :: Cp
   public                                   :: p0             ! Pa
   public                                   :: MWDAIR
   public                                   :: Rwater_vapor
@@ -61,7 +61,7 @@ module physical_constants
   real (kind=real_kind), public, parameter :: Rwater_vapor = 461.50D0
   real (kind=real_kind), public, parameter :: Cpwater_vapor= 1870.0D0 !ASC ANDII VERIFY PLS
   real (kind=real_kind), public, parameter :: kappa        = Rgas/Cp
-  real (kind=real_kind), public, parameter :: Rd_on_Rv     = Rgas/Rwater_vapor	
+  real (kind=real_kind), public, parameter :: Rd_on_Rv     = Rgas/Rwater_vapor  
   real (kind=real_kind), public, parameter :: Cpd_on_Cpv     = Cp/Cpwater_vapor
   real (kind=real_kind), public, parameter :: rrearth      = 1.0_real_kind/rearth         ! m
   real (kind=real_kind), public, parameter :: Lc           = 2.5D+6 ! multicloud J/Kg
