@@ -42,7 +42,7 @@
   'DV_CH3OOH', 'DV_DMS', 'DV_SO2', 'DV_SO4',
   'DF_O3', 'DF_H2O2', 'DF_NO', 'DF_NO2', 'DF_HNO3', 'DF_CO', 'DF_CH2O', 
   'DF_CH3OOH', 'DF_DMS', 'DF_SO2', 'DF_SO4', 'DF_NOY', 'DF_SOX', 'DF_NHX',
-  'WD_H2O2', 'WD_HNO3', 'WD_CH2O', 'WD_SO2', 'WD_NOY', 'WD_SOX', 'WD_NHX',  'SO4SFWET',
+  'WD_H2O2', 'WD_HNO3', 'WD_CH2O', 'WD_SO2',  'SO4SFWET',
   'O3_CHMP', 'OH_CHMP', 'HO2_CHMP', 'H2O2_CHMP', 'NO_CHMP', 'NO2_CHMP', 'HNO3_CHMP', 'CH2O_CHMP', 
   'CH3O2_CHMP', 'CH3OOH_CHMP', 'DMS_CHMP', 'SO2_CHMP', 'SO4_CHMP', 'ISOP_CHMP', 'CO_CHMP', 
   'O3_CHML', 'OH_CHML', 'HO2_CHML', 'H2O2_CHML', 'NO_CHML', 'NO2_CHML', 'HNO3_CHML', 'CH2O_CHML', 
@@ -51,13 +51,13 @@
   'm_N2O_c','cb_N2O_c','m_prsd_ch4_c','cb_prsd_ch4_c'
 </fincl1>
 <fincl1 dyn="fv">
-  'MSKtem','VTH2d','UV2d','UW2d','U2d','V2d','TH2d','W2d','UTGWORO',
+  'MSKtem','VTHzm','UVzm','UWzm','Uzm','Vzm','THzm','Wzm','UTGWORO',
   'NOX','DO3CHM','NO_Lightning',
   'DV_O3', 'DV_H2O2', 'DV_NO', 'DV_NO2', 'DV_HNO3', 'DV_CO', 'DV_CH2O', 
   'DV_CH3OOH', 'DV_DMS', 'DV_SO2', 'DV_SO4',
   'DF_O3', 'DF_H2O2', 'DF_NO', 'DF_NO2', 'DF_HNO3', 'DF_CO', 'DF_CH2O', 
   'DF_CH3OOH', 'DF_DMS', 'DF_SO2', 'DF_SO4', 'DF_NOY', 'DF_SOX', 'DF_NHX',
-  'WD_H2O2', 'WD_HNO3', 'WD_CH2O', 'WD_SO2', 'WD_NOY', 'WD_SOX', 'WD_NHX',  'SO4SFWET',
+  'WD_H2O2', 'WD_HNO3', 'WD_CH2O', 'WD_SO2', 'SO4SFWET',
   'O3_CHMP', 'OH_CHMP', 'HO2_CHMP', 'H2O2_CHMP', 'NO_CHMP', 'NO2_CHMP', 'HNO3_CHMP', 'CH2O_CHMP', 
   'CH3O2_CHMP', 'CH3OOH_CHMP', 'DMS_CHMP', 'SO2_CHMP', 'SO4_CHMP', 'ISOP_CHMP', 'CO_CHMP', 
   'O3_CHML', 'OH_CHML', 'HO2_CHML', 'H2O2_CHML', 'NO_CHML', 'NO2_CHML', 'HNO3_CHML', 'CH2O_CHML', 

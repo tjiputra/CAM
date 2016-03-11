@@ -214,12 +214,12 @@
   !   without cloud condensate or the opposite).
   !---------------------------------------------------------------------------------------------------------------
 
-      use mcica_random_numbers
+      use shr_RandNum_mod, only: ShrIntrinsicRandGen, ShrKissRandGen, &
+          ShrF95MtRandGen, ShrDsfmtRandGen
 ! The Mersenne Twister random number engine
-      use MersenneTwister, only: randomNumberSequence, &   
-                                 new_RandomNumberSequence, getRandomReal
 
-      type(randomNumberSequence) :: randomNumbers
+      type(ShrDsfmtRandGen) :: dsfmt_gen
+      type(ShrKissRandGen) :: kiss_gen
 
 ! -- Arguments
 
@@ -290,10 +290,10 @@
                                                         !  1 = Mersenne Twister
 
       real(kind=r8), dimension(nsubcol, ncol, nlay) :: CDF, CDF2      ! random numbers
-      integer, dimension(ncol) :: seed1, seed2, seed3, seed4 ! seed to create random number (kissvec)
-      real(kind=r8), dimension(ncol) :: rand_num      ! random number (kissvec)
-      integer :: iseed                       ! seed to create random number (Mersenne Teister)
-      real(kind=r8) :: rand_num_mt                    ! random number (Mersenne Twister)
+      integer, dimension(ncol,4) :: kiss_seed
+      real(kind=r8), dimension(ncol,1) :: rand_num_1d ! random number (kissvec)
+      real(kind=r8), dimension(ncol,nlay) :: rand_num ! random number (kissvec)
+      integer, dimension(ncol) :: iseed                       ! seed to create random number (Mersenne Teister)
 
 ! Flag to identify cloud fraction in subcolumns
       logical,  dimension(nsubcol, ncol, nlay) :: iscloudy   ! flag that says whether a gridbox is cloudy
@@ -326,16 +326,28 @@
             if (pmid(i,nlay).lt.pmid(i,nlay-1)) then 
                call endrun('MCICA_SUBCOL: KISSVEC SEED GENERATOR REQUIRES PMID FROM BOTTOM FOUR LAYERS.')
             endif 
-            seed1(i) = (pmid(i,nlay) - int(pmid(i,nlay)))  * 1000000000
-            seed2(i) = (pmid(i,nlay-1) - int(pmid(i,nlay-1)))  * 1000000000
-            seed3(i) = (pmid(i,nlay-2) - int(pmid(i,nlay-2)))  * 1000000000
-            seed4(i) = (pmid(i,nlay-3) - int(pmid(i,nlay-3)))  * 1000000000
-          enddo
+            kiss_seed(i,1) = (pmid(i,nlay) - int(pmid(i,nlay)))  * 1000000000
+            kiss_seed(i,2) = (pmid(i,nlay-1) - int(pmid(i,nlay-1)))  * 1000000000
+            kiss_seed(i,3) = (pmid(i,nlay-2) - int(pmid(i,nlay-2)))  * 1000000000
+            kiss_seed(i,4) = (pmid(i,nlay-3) - int(pmid(i,nlay-3)))  * 1000000000
+         enddo
+         kiss_gen = ShrKissRandGen(kiss_seed)
          do i=1,changeSeed
-            call kissvec(seed1, seed2, seed3, seed4, rand_num)
+            call kiss_gen%random(rand_num_1d)
          enddo
       elseif (irnd.eq.1) then
-         randomNumbers = new_RandomNumberSequence(seed = changeSeed)
+         ! NEW CODE
+         do i=1,ncol
+            if (pmid(i,nlay).lt.pmid(i,nlay-1)) then
+               call endrun('MCICA_SUBCOL: MT SEED GENERATOR REQUIRES PMID FROM BOTTOM FOUR LAYERS.')
+            endif
+            kiss_seed(i,1) = (pmid(i,nlay) - int(pmid(i,nlay)))  * 1000000000
+            kiss_seed(i,2) = (pmid(i,nlay-1) - int(pmid(i,nlay-1)))  * 1000000000
+            kiss_seed(i,3) = (pmid(i,nlay-2) - int(pmid(i,nlay-2)))  * 1000000000
+            kiss_seed(i,4) = (pmid(i,nlay-3) - int(pmid(i,nlay-3)))  * 1000000000
+          enddo
+         iseed = kiss_seed(:,1) + kiss_seed(:,2) + kiss_seed(:,3) + kiss_seed(:,4)
+         dsfmt_gen =ShrDsfmtRandGen(iseed,1)
       endif 
 
 
@@ -351,20 +363,14 @@
   
          if (irnd.eq.0) then 
             do isubcol = 1,nsubcol
-               do ilev = 1,nlay
-                  call kissvec(seed1, seed2, seed3, seed4, rand_num)  ! we get different random number for each level
-                  CDF(isubcol,:,ilev) = rand_num
-               enddo
+               call kiss_gen%random(rand_num)
+               CDF(isubcol,:,:) = rand_num(:,:)
             enddo
          elseif (irnd.eq.1) then
             do isubcol = 1, nsubcol
-               do i = 1, ncol
-                  do ilev = 1, nlay
-                     rand_num_mt = getRandomReal(randomNumbers)
-                     CDF(isubcol,i,ilev) = rand_num_mt
-                  enddo
-               enddo
-             enddo
+               call dsfmt_gen%random(rand_num)
+               CDF(isubcol,:,:) = rand_num(:,:) 
+            enddo
          endif
 
       case(2) 
@@ -376,20 +382,14 @@
 
          if (irnd.eq.0) then 
             do isubcol = 1,nsubcol
-               do ilev = 1,nlay
-                  call kissvec(seed1, seed2, seed3, seed4, rand_num) 
-                  CDF(isubcol,:,ilev) = rand_num
-               enddo
+               call kiss_gen%random(rand_num)
+               CDF(isubcol,:,:) = rand_num(:,:)
             enddo
          elseif (irnd.eq.1) then
             do isubcol = 1, nsubcol
-               do i = 1, ncol
-                  do ilev = 1, nlay
-                     rand_num_mt = getRandomReal(randomNumbers)
-                     CDF(isubcol,i,ilev) = rand_num_mt
-                  enddo
-               enddo
-             enddo
+               call dsfmt_gen%random(rand_num)
+               CDF(isubcol,:,:) = rand_num(:,:)
+            enddo
          endif
 
          do ilev = 2,nlay
@@ -410,20 +410,18 @@
 
          if (irnd.eq.0) then 
             do isubcol = 1,nsubcol
-               call kissvec(seed1, seed2, seed3, seed4, rand_num)
+               call kiss_gen%random(rand_num_1d)
                do ilev = 1,nlay
-                  CDF(isubcol,:,ilev) = rand_num
+                  CDF(isubcol,:,ilev) = rand_num_1d(:,1)
                enddo
             enddo
          elseif (irnd.eq.1) then
             do isubcol = 1, nsubcol
-               do i = 1, ncol
-                  rand_num_mt = getRandomReal(randomNumbers)
-                  do ilev = 1, nlay
-                     CDF(isubcol,i,ilev) = rand_num_mt
-                  enddo
+               call dsfmt_gen%random(rand_num_1d)
+               do ilev = 1, nlay
+                  CDF(isubcol,:,ilev) = rand_num_1d(:,1)
                enddo
-             enddo
+            enddo
          endif
 
 !    case(4) - inactive
@@ -538,74 +536,14 @@
 !      mean_ssac_stoch(:,:) = mean_ssac_stoch(:,:) / nsubcol
 !      mean_asmc_stoch(:,:) = mean_asmc_stoch(:,:) / nsubcol
 
+      if (irnd.eq.0) then 
+         call kiss_gen%finalize()
+      elseif (irnd.eq.1) then
+         call dsfmt_gen%finalize()
+      endif
       end subroutine generate_stochastic_clouds
 
 
-!------------------------------------------------------------------
-! Private subroutines
-!------------------------------------------------------------------
-
-!-------------------------------------------------------------------------------------------------- 
-      subroutine kissvec(seed1,seed2,seed3,seed4,ran_arr)
-!-------------------------------------------------------------------------------------------------- 
-
-! public domain code
-! made available from http://www.fortran.com/
-! downloaded by pjr on 03/16/04 for NCAR CAM
-! converted to vector form, functions inlined by pjr,mvr on 05/10/2004
-
-! safeguard against integer overflow, statement function changed to
-! internal function by santos, Nov. 2012
-
-! The  KISS (Keep It Simple Stupid) random number generator. Combines:
-! (1) The congruential generator x(n)=69069*x(n-1)+1327217885, period 2^32.
-! (2) A 3-shift shift-register generator, period 2^32-1,
-! (3) Two 16-bit multiply-with-carry generators, period 597273182964842497>2^59
-!  Overall period>2^123; 
-!
-      use shr_kind_mod, only: i8 => shr_kind_i8
-
-      real(kind=r8), dimension(:), intent(inout)  :: ran_arr
-      integer, dimension(:), intent(inout) :: seed1,seed2,seed3,seed4
-      integer(i8) :: kiss
-      integer :: i
-
-      logical :: big_endian
-
-      big_endian = (transfer(1_i8, 1) == 0)
-
-      do i = 1, size(ran_arr)
-         kiss = 69069_i8 * seed1(i) + 1327217885
-         seed1(i) = low_byte(kiss)
-         seed2(i) = m (m (m (seed2(i), 13), - 17), 5)
-         seed3(i) = 18000 * iand (seed3(i), 65535) + ishft (seed3(i), - 16)
-         seed4(i) = 30903 * iand (seed4(i), 65535) + ishft (seed4(i), - 16)
-         kiss = int(seed1(i), i8) + seed2(i) + ishft (seed3(i), 16) + seed4(i)
-         ran_arr(i) = low_byte(kiss)*2.328306e-10_r8 + 0.5_r8
-      end do
-    
-      contains
-
-        pure integer function m(k, n)
-          integer, intent(in) :: k
-          integer, intent(in) :: n
-
-          m = ieor (k, ishft (k, n) )
-
-        end function m
-
-        pure integer function low_byte(i)
-          integer(i8), intent(in) :: i
-
-          if (big_endian) then
-             low_byte = transfer(ishft(i,bit_size(1)),1)
-          else
-             low_byte = transfer(i,1)
-          end if
-
-        end function low_byte
-
-      end subroutine kissvec
 
       end module mcica_subcol_gen_lw
 

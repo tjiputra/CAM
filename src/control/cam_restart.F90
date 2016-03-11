@@ -219,7 +219,7 @@ end subroutine cam_restart_readnl
 
 !#######################################################################
 
-   subroutine cam_read_restart(cam_in, cam_out, dyn_in, dyn_out, pbuf2d, stop_ymd, stop_tod, NLFileName )
+   subroutine cam_read_restart(cam_in, cam_out, dyn_in, dyn_out, pbuf2d, stop_ymd, stop_tod)
 
 !----------------------------------------------------------------------- 
 ! 
@@ -257,7 +257,6 @@ end subroutine cam_restart_readnl
    type(dyn_import_t), intent(inout) :: dyn_in
    type(dyn_export_t), intent(inout) :: dyn_out
    type(physics_buffer_desc), pointer :: pbuf2d(:,:)
-   character(len=*),   intent(in)  :: NLFileName
    integer,            intent(IN)  :: stop_ymd       ! Stop date (YYYYMMDD)
    integer,            intent(IN)  :: stop_tod       ! Stop time of day (sec)
 !
@@ -306,7 +305,7 @@ end subroutine cam_restart_readnl
       !-----------------------------------------------------------------------
 
    call initcom ()
-   call read_restart_dynamics(File, dyn_in, dyn_out, NLFileName)   
+   call read_restart_dynamics(File, dyn_in, dyn_out)   
 
    call phys_grid_init
 

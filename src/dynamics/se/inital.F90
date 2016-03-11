@@ -11,7 +11,7 @@ public :: cam_initial
 contains
 !=========================================================================
 
-subroutine cam_initial(dyn_in, dyn_out, NLFileName)
+subroutine cam_initial(dyn_in, dyn_out)
 
    use dyn_comp,             only: dyn_init1, dyn_init2, dyn_import_t, dyn_export_t
    use phys_grid,            only: phys_grid_init
@@ -25,10 +25,9 @@ subroutine cam_initial(dyn_in, dyn_out, NLFileName)
 
    type(dyn_import_t), intent(out) :: dyn_in
    type(dyn_export_t), intent(out) :: dyn_out
-   character(len=*),   intent(in)  :: NLFileName
    !----------------------------------------------------------------------
 
-   call dyn_init1(initial_file_get_id(), NLFileName, dyn_in, dyn_out)
+   call dyn_init1(initial_file_get_id(), dyn_in, dyn_out)
 
    ! Define physics data structures
    if(par%masterproc  ) write(iulog,*) 'Running phys_grid_init()'

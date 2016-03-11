@@ -104,8 +104,6 @@
 <megan_factors_file>'atm/cam/chem/trop_mozart/emis/megan21_emis_factors_c20130304.nc'</megan_factors_file>
 <megan_mapped_emisfctrs>.false.</megan_mapped_emisfctrs>
 
-<dust_emis_fact> 0.250D0 </dust_emis_fact>
-
 <!-- QBO settings --> 
 <qbo_use_forcing>.false.</qbo_use_forcing>
 

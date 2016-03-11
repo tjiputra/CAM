@@ -34,7 +34,7 @@
  num_a4 -> H
  CL -> Cl, BR -> Br, OH, HO2
  N2p -> N2, O2p -> O2
- Np -> N, Op -> O, NOp -> NO, e, N2D -> N
+ Np -> N, Op -> O, NOp -> NO, e -> E, N2D -> N
  O2_1S -> O2, O2_1D -> O2, O1D -> O
  H2O
       End Solution

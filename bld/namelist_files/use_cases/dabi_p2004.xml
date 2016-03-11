@@ -26,7 +26,7 @@
 <eul_hdif_order>      2    </eul_hdif_order>
 <eul_hdif_kmnhdn>     1    </eul_hdif_kmnhdn>
 <eul_hdif_coef>       7.D5 </eul_hdif_coef>
-<dyn_spectral_kmxhdc> 0    </dyn_spectral_kmxhdc>
+<eul_kmxhdc>          0    </eul_kmxhdc>
 
 <!-- history output customization -->
 <empty_htapes>.true.</empty_htapes>

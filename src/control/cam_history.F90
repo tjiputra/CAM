@@ -122,8 +122,8 @@ module cam_history
 
   ! per tape sampling frequency (0=monthly avg)
 
-  integer :: i                        ! index for nhtfrq initialization
-  integer :: nhtfrq(ptapes) = (/0, (-24, i=2,ptapes)/)  ! history write frequency (0 = monthly)
+  integer :: idx                      ! index for nhtfrq initialization
+  integer :: nhtfrq(ptapes) = (/0, (-24, idx=2,ptapes)/)  ! history write frequency (0 = monthly)
   integer :: mfilt(ptapes) = 30       ! number of time samples per tape
   integer :: nfils(ptapes)            ! Array of no. of files on current h-file
   integer :: ndens(ptapes) = 2        ! packing density (double (1) or real (2))
@@ -137,11 +137,11 @@ module cam_history
 
   ! NB: This name must match the group name in namelist_definition.xml
   character(len=*), parameter   :: history_namelist = 'cam_history_nl'
-  character(len=max_string_len) :: hrestpath(ptapes) = (/(' ',i=1,ptapes)/) ! Full history restart pathnames
-  character(len=max_string_len) :: nfpath(ptapes) = (/(' ',i=1,ptapes)/) ! Array of first pathnames, for header
+  character(len=max_string_len) :: hrestpath(ptapes) = (/(' ',idx=1,ptapes)/) ! Full history restart pathnames
+  character(len=max_string_len) :: nfpath(ptapes) = (/(' ',idx=1,ptapes)/) ! Array of first pathnames, for header
   character(len=max_string_len) :: cpath(ptapes)                   ! Array of current pathnames
   character(len=max_string_len) :: nhfil(ptapes)                   ! Array of current file names
-  character(len=1)  :: avgflag_pertape(ptapes) = (/(' ',i=1,ptapes)/) ! per tape averaging flag
+  character(len=1)  :: avgflag_pertape(ptapes) = (/(' ',idx=1,ptapes)/) ! per tape averaging flag
   character(len=16)  :: logname             ! user name
   character(len=16)  :: host                ! host name
   character(len=8)   :: inithist = 'YEARLY' ! If set to '6-HOURLY, 'DAILY', 'MONTHLY' or
@@ -271,7 +271,7 @@ module cam_history
   ! (%c = caseid, $y = year, $m = month, $d = day, $s = seconds in day, %t = tape number)
   !
   character(len=max_string_len) :: rhfilename_spec = '%c.cam.rh%t.%y-%m-%d-%s.nc' ! history restart
-  character(len=max_string_len) :: hfilename_spec(ptapes) = (/ (' ', i=1, ptapes) /) ! filename specifyer
+  character(len=max_string_len) :: hfilename_spec(ptapes) = (/ (' ', idx=1, ptapes) /) ! filename specifyer
 
 
   interface addfld
@@ -441,6 +441,10 @@ CONTAINS
         enddim3  = tape(t)%hlist(f)%field%enddim3
         allocate(tape(t)%hlist(f)%hbuf(begdim1:enddim1,begdim2:enddim2,begdim3:enddim3))
         tape(t)%hlist(f)%hbuf = 0._r8
+        if (tape(t)%hlist(f)%avgflag .eq. 'S') then ! allocate the variance buffer for standard dev
+           allocate(tape(t)%hlist(f)%sbuf(begdim1:enddim1,begdim2:enddim2,begdim3:enddim3))
+           tape(t)%hlist(f)%sbuf = 0._r8
+        endif
         if(tape(t)%hlist(f)%field%flag_xyfill .or. (avgflag_pertape(t) .eq. 'L')) then
           allocate (tape(t)%hlist(f)%nacs(begdim1:enddim1,begdim3:enddim3))
         else
@@ -1837,6 +1841,9 @@ CONTAINS
         enddim3 = tape(t)%hlist(f)%field%enddim3
 
         allocate(tape(t)%hlist(f)%hbuf(begdim1:enddim1,begdim2:enddim2,begdim3:enddim3))
+        if (tape(t)%hlist(f)%avgflag .eq. 'S') then ! allocate the variance buffer for standard dev
+           allocate(tape(t)%hlist(f)%sbuf(begdim1:enddim1,begdim2:enddim2,begdim3:enddim3))
+        endif
 
         if (associated(tape(t)%hlist(f)%varid)) then
           deallocate(tape(t)%hlist(f)%varid)
@@ -1941,6 +1948,18 @@ CONTAINS
             call cam_grid_read_dist_array(tape(t)%File, fdecomp,              &
                  fdims(1:nfdims), dimlens(1:ndims), tape(t)%hlist(f)%hbuf(:,1,:), vdesc)
           end if
+
+          if ( associated(tape(t)%hlist(f)%sbuf) ) then
+             ! read in variance for standard deviation
+             ierr = pio_inq_varid(tape(t)%File, trim(fname_tmp)//'_var', vdesc)
+             if (nfdims > 2) then
+                call cam_grid_read_dist_array(tape(t)%File, fdecomp,              &
+                     fdims(1:nfdims), dimlens(1:ndims), tape(t)%hlist(f)%sbuf, vdesc)
+             else
+                call cam_grid_read_dist_array(tape(t)%File, fdecomp,              &
+                     fdims(1:nfdims), dimlens(1:ndims), tape(t)%hlist(f)%sbuf(:,1,:), vdesc)
+             end if
+          endif
 
           ierr = pio_inq_varid(tape(t)%File, trim(fname_tmp)//'_nacs', vdesc)
           call cam_pio_var_info(tape(t)%File, vdesc, nacsdimcnt, dimids, dimlens)
@@ -2128,6 +2147,8 @@ CONTAINS
       time_op(:) = 'minimum'
     case('L')
       time_op(:) = LT_DESC
+    case ('S')
+      time_op(:) = 'standard_deviation'
     case default
       call endrun(subname//': unknown avgflag = '//avgflag)
     end select
@@ -2308,6 +2329,7 @@ CONTAINS
       end if
       do ff=1,nflds(t)
         nullify(tape(t)%hlist(ff)%hbuf)
+        nullify(tape(t)%hlist(ff)%sbuf)
         nullify(tape(t)%hlist(ff)%nacs)
         nullify(tape(t)%hlist(ff)%varid)
       end do
@@ -2705,6 +2727,7 @@ end subroutine print_active_fldlst
 
   subroutine strip_null(str)
     character(len=*), intent(inout) :: str
+    integer :: i
     do i=1,len(str)
       if(ichar(str(i:i))==0) str(i:i)=' '
     end do
@@ -3011,7 +3034,7 @@ end subroutine print_active_fldlst
   !#######################################################################
 
   recursive subroutine outfld (fname, field, idim, c, avg_subcol_field)
-    use cam_history_buffers, only: hbuf_accum_inst, hbuf_accum_add,  &
+    use cam_history_buffers, only: hbuf_accum_inst, hbuf_accum_add, hbuf_accum_variance,  &
          hbuf_accum_add00z, hbuf_accum_max, hbuf_accum_min,          &
          hbuf_accum_addlcltime
     use cam_history_support, only: dim_index_2d
@@ -3072,6 +3095,7 @@ end subroutine print_active_fldlst
 
     type (active_entry), pointer :: otape(:) ! Local history_tape pointer
     real(r8),pointer      :: hbuf(:,:)     ! history buffer
+    real(r8),pointer      :: sbuf(:,:)     ! variance buffer
     integer, pointer      :: nacs(:)       ! accumulation counter
     integer               :: begdim2, enddim2, endi
     integer               :: phys_decomp
@@ -3110,7 +3134,9 @@ end subroutine print_active_fldlst
       avgflag = otape(t)%hlist(f)%avgflag
       nacs   => otape(t)%hlist(f)%nacs(:,c)
       hbuf => otape(t)%hlist(f)%hbuf(:,:,c)
-
+      if (associated(tape(t)%hlist(f)%sbuf)) then
+         sbuf => otape(t)%hlist(f)%sbuf(:,:,c)
+      endif
       dimind = otape(t)%hlist(f)%field%get_dims(c)
 
       ! See notes above about validity of avg_subcol_field
@@ -3190,10 +3216,14 @@ end subroutine print_active_fldlst
                flag_xyfill, fillvalue)
 
         case ('L')
-          call hbuf_accum_addlcltime(hbuf, field, nacs, dimind, pcols,   &
+          call hbuf_accum_addlcltime(hbuf, ufield, nacs, dimind, pcols,  & 
                flag_xyfill, fillvalue, c,                                &
                otape(t)%hlist(f)%field%decomp_type,                      &
                lcltod_start(t), lcltod_stop(t))
+
+        case ('S') ! Standard deviation
+          call hbuf_accum_variance(hbuf, sbuf, ufield, nacs, dimind, pcols,&
+               flag_xyfill, fillvalue)
 
         case default
           call endrun ('OUTFLD: invalid avgflag='//avgflag)
@@ -3228,6 +3258,10 @@ end subroutine print_active_fldlst
                flag_xyfill, fillvalue, c,                                &
                otape(t)%hlist(f)%field%decomp_type,                      &
                lcltod_start(t), lcltod_stop(t))
+
+        case ('S') ! Standard deviation
+          call hbuf_accum_variance(hbuf, sbuf, field, nacs, dimind, idim,&
+               flag_xyfill, fillvalue)
 
         case default
           call endrun ('OUTFLD: invalid avgflag='//avgflag)
@@ -4099,7 +4133,7 @@ end subroutine print_active_fldlst
         ! before outfld call.
         str = tape(t)%hlist(f)%time_op
         select case (str)
-        case ('mean', 'maximum', 'minimum' )
+        case ('mean', 'maximum', 'minimum', 'standard_deviation')
           if (len_trim(cell_methods) > 0) then
             cell_methods = trim(cell_methods)//' '//'time: '//str
           else
@@ -4132,6 +4166,16 @@ end subroutine print_active_fldlst
             call cam_pio_def_var(tape(t)%File, trim(fname_tmp), pio_int,      &
                  tape(t)%hlist(f)%nacs_varid)
           end if
+          ! for standard deviation
+          if (associated(tape(t)%hlist(f)%sbuf)) then
+             fname_tmp = strip_suffix(tape(t)%hlist(f)%field%name)
+             fname_tmp = trim(fname_tmp)//'_var'
+             if ( .not.associated(tape(t)%hlist(f)%sbuf_varid)) then
+                allocate(tape(t)%hlist(f)%sbuf_varid)
+             endif
+             call cam_pio_def_var(tape(t)%File, trim(fname_tmp), pio_double,      &
+                  dimids_tmp(1:fdims), tape(t)%hlist(f)%sbuf_varid)
+          endif
         end if
       end do ! Loop over output patches
     end do   ! Loop over fields
@@ -4231,6 +4275,8 @@ end subroutine print_active_fldlst
     integer     :: jb, je    ! beginning and ending indices of second dimension
     integer     :: begdim3, enddim3 ! Chunk or block bounds
     integer     :: k         ! level
+    integer     :: i, ii
+    real(r8) :: variance, tmpfill
 
     logical     :: flag_xyfill ! non-applicable xy points flagged with fillvalue
     character*1 :: avgflag     ! averaging flag
@@ -4278,6 +4324,22 @@ end subroutine print_active_fldlst
           end do
         end if
       end if
+      if (avgflag == 'S') then
+         ! standard deviation ...
+         ! from http://www.johndcook.com/blog/standard_deviation/
+         tmpfill = merge(tape(t)%hlist(f)%field%fillvalue,0._r8,flag_xyfill)
+         do k=jb,je
+            do i = ib,ie
+               ii = merge(i,1,flag_xyfill)
+               if (tape(t)%hlist(f)%nacs(ii,c) > 1) then
+                  variance = tape(t)%hlist(f)%sbuf(i,k,c)/(tape(t)%hlist(f)%nacs(ii,c)-1)
+                  tape(t)%hlist(f)%hbuf(i,k,c) = sqrt(variance)
+               else
+                  tape(t)%hlist(f)%hbuf(i,k,c) = tmpfill
+               endif
+            end do
+         end do
+      endif
     end do
 
     call t_stopf ('h_normalize')
@@ -4315,6 +4377,9 @@ end subroutine print_active_fldlst
     do c = begdim3, enddim3
       dimind = tape(t)%hlist(f)%field%get_dims(c)
       tape(t)%hlist(f)%hbuf(dimind%beg1:dimind%end1,dimind%beg2:dimind%end2,c)=0._r8
+      if (associated(tape(t)%hlist(f)%sbuf)) then ! zero out variance buffer for standard deviation
+         tape(t)%hlist(f)%sbuf(dimind%beg1:dimind%end1,dimind%beg2:dimind%end2,c)=0._r8
+      endif
     end do
     tape(t)%hlist(f)%nacs(:,:) = 0
 
@@ -4358,6 +4423,7 @@ end subroutine print_active_fldlst
     logical                          :: interpolate
     logical                          :: patch_output
     type(history_patch_t), pointer   :: patchptr
+    integer :: i
 
     interpolate = (interpolate_output(t) .and. (.not. restart))
     patch_output = (associated(tape(t)%patches) .and. (.not. restart))
@@ -4439,22 +4505,33 @@ end subroutine print_active_fldlst
         end if
       end if
     end do
-    !! NACS
+    !! write accumulation counter and variance to hist restart file
     if(restart) then
-      if (size(tape(t)%hlist(f)%nacs, 1) > 1) then
-        if (nadims > 2) then
-          adims(2) = adims(3)
-          nadims = 2
-        end if
-        call cam_grid_dimensions(fdecomp, fdims(1:2), nacsrank)
-        call cam_grid_write_dist_array(tape(t)%File, fdecomp, adims(1:nadims),&
-             fdims(1:nacsrank), tape(t)%hlist(f)%nacs, tape(t)%hlist(f)%nacs_varid)
-
-        else
+       if (associated(tape(t)%hlist(f)%sbuf) ) then
+           ! write variance data to restart file for standard deviation calc
+          if (nadims == 2) then
+           ! Special case for 2D field (no levels) due to sbuf structure
+             call cam_grid_write_dist_array(tape(t)%File, fdecomp, adims(1:nadims), &
+                  fdims(1:frank), tape(t)%hlist(f)%sbuf(:,1,:), tape(t)%hlist(f)%sbuf_varid)
+          else
+             call cam_grid_write_dist_array(tape(t)%File, fdecomp, adims,        &
+                  fdims(1:frank), tape(t)%hlist(f)%sbuf, tape(t)%hlist(f)%sbuf_varid)
+          endif
+       endif
+     !! NACS
+       if (size(tape(t)%hlist(f)%nacs, 1) > 1) then
+          if (nadims > 2) then
+             adims(2) = adims(3)
+             nadims = 2
+          end if
+          call cam_grid_dimensions(fdecomp, fdims(1:2), nacsrank)
+          call cam_grid_write_dist_array(tape(t)%File, fdecomp, adims(1:nadims), &
+               fdims(1:nacsrank), tape(t)%hlist(f)%nacs, tape(t)%hlist(f)%nacs_varid)
+       else
           ierr = pio_put_var(tape(t)%File, tape(t)%hlist(f)%nacs_varid,     &
                tape(t)%hlist(f)%nacs(:, tape(t)%hlist(f)%field%begdim3:tape(t)%hlist(f)%field%enddim3))
-        end if
-      end if
+       end if
+    end if
 
     return
   end subroutine dump_field

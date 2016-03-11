@@ -439,7 +439,7 @@ CONTAINS
 
   !#######################################################################
 
-  subroutine read_restart_dynamics (File, dyn_in, dyn_out, NLFileName)
+  subroutine read_restart_dynamics (File, dyn_in, dyn_out)
     use dyn_comp,        only: dyn_init, dyn_import_t, dyn_export_t
     use cam_pio_utils,   only: pio_subsystem
     use dyn_comp,        only: dyn_init
@@ -456,9 +456,7 @@ CONTAINS
     type(file_desc_t), intent(inout) :: File     ! PIO file handle
     type(dyn_import_t) :: dyn_in    ! not used by this dycore, included for compatibility
     type(dyn_export_t) :: dyn_out ! not used by this dycore, included for compatibility    
-    character(len=*), intent(in) :: NLFileName
 
-    !
     ! Local workspace
     !
 
@@ -474,7 +472,7 @@ CONTAINS
     integer(kind=pio_offset_kind) :: t
     integer, pointer :: ldof(:)
 
-    call dyn_init(file, NLFileName)
+    call dyn_init(file)
 
     call initialize_prognostics
     call slt_alloc()

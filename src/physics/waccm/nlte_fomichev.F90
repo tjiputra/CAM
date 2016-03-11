@@ -18,7 +18,8 @@ module nlte_fomichev
   public &
      nlte_fomichev_init, &
      nlte_fomichev_calc, &
-     nocooling
+     nocooling,          &
+     o3pcooling
 
 ! Private module data
 
@@ -1015,11 +1016,15 @@ module nlte_fomichev
        1.6539e+05_r8, 8.6958e+05_r8, 9.0836e+04_r8, 1.1753e+06_r8, 8.8077e+04_r8,      &
       -5.4751e+06_r8,-7.6386e+05_r8, 1.2589e+06_r8, 2.1098e+04_r8/
 
+      real(r8) :: o3pxfac(pver)      ! o3p cooling masking factors on WACCM vertical grids
+
 !================================================================================================
 contains
 !================================================================================================
 
   subroutine nlte_fomichev_init ( co2_mwi, n2_mwi, o1_mwi, o2_mwi, o3_mwi, no_mwi )
+     use interpolate_data, only : lininterp
+     use ref_pres,         only : pref_mid
 
 !     
 !     Original version from Ray Roble
@@ -1043,6 +1048,11 @@ contains
     real(r8), intent(in) :: n2_mwi                      ! N2 molecular weight
     real(r8), intent(in) :: no_mwi                      ! NO molecular weight
 
+    real(r8), parameter :: p0=5.e-5_r8 ! TIE-GCM reference pressure in Pa            
+    integer, parameter :: tgcmlevs = 29
+    real(r8) :: pz(tgcmlevs)           ! TIE-GCM pressure grids (single resolution,pz=-7...7,dpz=0.5 ), dimensionless 
+    real(r8) :: pp(tgcmlevs)           ! convert pz to Pascal  
+    real(r8) :: xfac0(tgcmlevs)        ! masking factors on TIE-GCM pressure grids
     integer :: k
 
 ! set molecular weights
@@ -1056,6 +1066,29 @@ contains
     ktop_co2cool = 1
     do k=1,pver
        if (pref_mid(k) < ptop_co2cool) ktop_co2cool = k
+    enddo
+
+    ! op3cooling masking factor  (from Kockarts and Peetermans [1981]
+    xfac0(1:3)=.01_r8
+    xfac0(4:10)=(/.05_r8,.1_r8,.2_r8,.4_r8,.55_r8,.7_r8,.75_r8/)
+    xfac0(11:tgcmlevs) = .8_r8
+
+    ! convert TIE-GCM pressure grid to Pascal
+
+    pz(1)=-7.0_r8
+    do k=2,tgcmlevs
+       pz(k)=pz(k-1)+0.5_r8
+    enddo
+    do k=1,tgcmlevs
+       pp(k)=p0*exp(-pz(k))
+    enddo
+    call lininterp( xfac0(tgcmlevs:1:-1), pp(tgcmlevs:1:-1), tgcmlevs, o3pxfac, pref_mid, pver )
+    do k=1,pver
+       if (pref_mid(k) > pp(1)) then
+          o3pxfac(k)=0._r8
+       else if (pref_mid(k) <= pp(tgcmlevs)) then
+          o3pxfac(k)=xfac0(tgcmlevs)
+       endif
     enddo
 
   end subroutine nlte_fomichev_init
@@ -2526,5 +2559,49 @@ real(r8) function a18lin (x,xn,yn,m,n)
 !
    end subroutine nocooling
 
+!==================================================================================================
+
+   subroutine o3pcooling( lchnk, ncol, t, o1mmr, o3pcool )
+     !
+     ! Adapted from TIE-GCM 
+     ! Original equation is from Bates [1951]
+     ! Masking factors are from Kockarts and Peetermans [1981]
+     !
+     
+     integer, intent(in) :: lchnk                 ! chunck number
+     integer, intent(in) :: ncol                  ! number of column in chunck
+
+     real(r8), intent(in) :: t(pcols,pver)        ! neutral gas temperature (K)
+     real(r8), intent(in) :: o1mmr(pcols,pver)    ! O (in mmr)
+
+     real(r8), intent(out) :: o3pcool(pcols,pver)  ! O(3p)-cooling (K/S)
+
+     ! Local space
+
+     integer  :: i,k
+     real(r8) :: invtemp(ncol,pver)
+     real(r8) :: work1(ncol,pver)             
+     real(r8) :: work2(ncol,pver)            
+     real(r8) :: anavfac
+
+     real(r8),parameter :: &
+          an(3) = (/0.835E-18_r8, 0.6_r8, 0.2_r8/), &  
+          bn(3) = (/228._r8,228._r8,325._r8/)      ! coefficients in Bates equation
+
+     invtemp(:ncol,:) = 1.0_r8/t(:ncol,:)
+     anavfac = anav/o1_mw
+
+     do k=1,pver
+        do i=1,ncol
+           work1(i,k) = an(1)*o3pxfac(k)*anavfac
+           work1(i,k) = work1(i,k)*o1mmr(i,k)*exp(-bn(1)*invtemp(i,k))
+           work2(i,k) = 1._r8 + an(2)*exp(-bn(2)*invtemp(i,k)) &
+                              + an(3)*exp(-bn(3)*invtemp(i,k))
+           o3pcool(i,k) = -work1(i,k)/work2(i,k)   ! erg/g/s
+           o3pcool(i,k) = o3pcool(i,k) * 1E-04_r8  ! convert units from erg/g/s to J/kg/s
+        enddo
+     enddo
+
+   end subroutine o3pcooling
 
 end module nlte_fomichev

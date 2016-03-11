@@ -14,7 +14,6 @@ contains
 
   subroutine chemini &
        ( euvac_file &
-       , euvacdat_file &
        , photon_file &
        , electron_file &
        , airpl_emis_file &
@@ -43,7 +42,6 @@ contains
        , tuv_xsect_file &
        , o2_xsect_file &
        , lght_no_prd_factor &
-       , chem_name &
        , pbuf2d &
        )
 
@@ -62,9 +60,6 @@ contains
     use mo_exp_sol,        only : exp_sol_inti
     use spmd_utils,        only : iam
     use mo_fstrat,         only : fstrat_inti
-    use m_types,           only : time_ramp
-    use cam_abortutils,    only : endrun
-    use pmgrid,            only : plev           
     use mo_sethet,         only : sethet_inti
     use mo_usrrxt,         only : usrrxt_inti
     use mo_extfrc,         only : extfrc_inti
@@ -95,7 +90,6 @@ contains
     implicit none
 
     character(len=*), intent(in) :: euvac_file
-    character(len=*), intent(in) :: euvacdat_file
     character(len=*), intent(in) :: photon_file
     character(len=*), intent(in) :: electron_file
 
@@ -126,9 +120,6 @@ contains
     integer,          intent(in) :: srf_emis_fixed_ymd
     integer,          intent(in) :: srf_emis_fixed_tod
 
-    character(len=*), intent(in) :: chem_name
-
-    integer :: ndx
     real(r8)          ::   f107
     real(r8)          ::   f107a
     type(physics_buffer_desc), pointer :: pbuf2d(:,:)
@@ -234,7 +225,7 @@ contains
     call spe_init()
 
     call photo_inti( xs_coef_file, xs_short_file, xs_long_file, rsf_file, &
-         euvacdat_file, photon_file, electron_file, &
+         photon_file, electron_file, &
          exo_coldens_file, tuv_xsect_file, o2_xsect_file, xactive_prates )
 
     if (masterproc) write(iulog,*) 'chemini: after photo_inti on node ',iam

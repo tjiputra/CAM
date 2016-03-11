@@ -5,14 +5,12 @@ module chemistry
 !---------------------------------------------------------------------------------
 
   use shr_kind_mod,     only : r8 => shr_kind_r8, shr_kind_cl
-  use ppgrid,           only : pcols, pver, pverp, begchunk, endchunk
+  use ppgrid,           only : pcols, pver, begchunk, endchunk
   use physconst,        only : gravit
-  use constituents,     only : pcnst, cnst_add, cnst_name, sflxnam, cnst_fixed_ubc, cnst_type
-  use chem_mods,        only : gas_pcnst, nfs
+  use constituents,     only : pcnst, cnst_add, cnst_name, cnst_fixed_ubc, cnst_type
+  use chem_mods,        only : gas_pcnst
   use cam_history,      only : fieldname_len
   use physics_types,    only : physics_state, physics_ptend, physics_ptend_init
-  use m_types,          only : time_ramp
-
   use spmd_utils,       only : masterproc
   use cam_logfile,      only : iulog
   use mo_gas_phase_chemdr, only : map2chm
@@ -73,7 +71,6 @@ module chemistry
   character(len=shr_kind_cl) :: xs_long_file = 'xs_long_file'
   character(len=shr_kind_cl) :: electron_file = 'electron_file'
   character(len=shr_kind_cl) :: euvac_file = ' '
-  character(len=shr_kind_cl) :: euvacdat_file = 'euvacdat_file'
 
   ! solar / geomag data
 
@@ -163,9 +160,8 @@ end function chem_is
 ! 
 !-----------------------------------------------------------------------
 
-    use ioFileMod,           only : getfil
     use mo_sim_dat,          only : set_sim_dat
-    use chem_mods,           only : gas_pcnst, adv_mass, inv_lst, nfs, fix_mass
+    use chem_mods,           only : gas_pcnst, adv_mass
     use mo_tracname,         only : solsym
     use mo_chem_utls,        only : get_spc_ndx
     use short_lived_species, only : slvd_index, short_lived_map=>map, register_short_lived_species
@@ -179,19 +175,15 @@ end function chem_is
 !-----------------------------------------------------------------------
 ! Local variables
 !-----------------------------------------------------------------------
-    integer  :: idx                                 ! Index for adding fields to pbuf physics buffer
     integer  :: m, n                                ! tracer index
     real(r8) :: qmin                                ! min value
     logical  :: ic_from_cam2                        ! wrk variable for initial cond input
     logical  :: has_fixed_ubc                       ! wrk variable for upper bndy cond
     logical  :: has_fixed_ubflx                     ! wrk variable for upper bndy flux
-    character(len=shr_kind_cl) :: locfn                     ! chemistry data filespec
     integer  :: ch4_ndx, n2o_ndx, o3_ndx 
     integer  :: cfc11_ndx, cfc12_ndx, o2_1s_ndx, o2_1d_ndx, o2_ndx
     integer  :: n_ndx, no_ndx, h_ndx, h2_ndx, o_ndx, e_ndx, np_ndx
     integer  :: op_ndx, o1d_ndx, n2d_ndx, nop_ndx, n2p_ndx, o2p_ndx
-    integer  :: cly_ndx,cl_ndx,clo_ndx,hocl_ndx,cl2_ndx,cl2o2_ndx,oclo_ndx,hcl_ndx,clono2_ndx
-    integer  :: bry_ndx,br_ndx,bro_ndx,hbr_ndx,brono2_ndx,brcl_ndx,hobr_ndx
     integer  :: hf_ndx, f_ndx
 
     character(len=128) :: lng_name                  ! variable long name
@@ -228,23 +220,6 @@ end function chem_is
     nop_ndx   = get_spc_ndx('NOp')
     h2o_ndx   = get_spc_ndx('H2O')
     o2p_ndx   = get_spc_ndx('O2p')
-
-    cly_ndx   = get_spc_ndx('CLY')
-    cl_ndx    = get_spc_ndx('CL')
-    clo_ndx   = get_spc_ndx('CLO')
-    hocl_ndx  = get_spc_ndx('HOCL')
-    cl2_ndx   = get_spc_ndx('CL2')
-    cl2o2_ndx = get_spc_ndx('CL2O2')
-    oclo_ndx  = get_spc_ndx('OCLO')
-    hcl_ndx   = get_spc_ndx('HCL')
-    clono2_ndx= get_spc_ndx('CLONO2')
-    bry_ndx   = get_spc_ndx('BRY')
-    br_ndx    = get_spc_ndx('BR')
-    bro_ndx   = get_spc_ndx('BRO')
-    hbr_ndx   = get_spc_ndx('HBR')
-    brono2_ndx= get_spc_ndx('BRONO2')
-    brcl_ndx  = get_spc_ndx('BRCL')
-    hobr_ndx  = get_spc_ndx('HOBR')
 
     f_ndx     = get_spc_ndx('F')
     hf_ndx    = get_spc_ndx('HF')
@@ -433,7 +408,7 @@ end function chem_is
     character(len=shr_kind_cl) :: spe_filenames_list  ! file that lists a series of spe files 
 
     namelist /chem_inparm/ chem_freq, airpl_emis_file, &
-         euvac_file, euvacdat_file, photon_file, electron_file, &
+         euvac_file, photon_file, electron_file, &
          depvel_file, xs_coef_file, xs_short_file, &
          exo_coldens_file, tuv_xsect_file, o2_xsect_file, &
          xs_long_file, rsf_file, &
@@ -568,7 +543,6 @@ end function chem_is
     call mpibcast (xactive_prates,    1,                               mpilog,  0, mpicom)
     call mpibcast (electron_file,     len(electron_file),              mpichar, 0, mpicom)
     call mpibcast (euvac_file,        len(euvac_file),                 mpichar, 0, mpicom)
-    call mpibcast (euvacdat_file,     len(euvacdat_file),              mpichar, 0, mpicom)
 
     ! solar / geomag data
 
@@ -786,9 +760,9 @@ end function chem_is_active
 !-----------------------------------------------------------------------
     use physics_buffer,      only : physics_buffer_desc, pbuf_get_index
     
-    use constituents,        only : cnst_get_ind, cnst_longname
+    use constituents,        only : cnst_get_ind
     use cam_history,         only : addfld, add_default, horiz_only, fieldname_len
-    use chem_mods,           only : gas_pcnst, nfs, inv_lst
+    use chem_mods,           only : gas_pcnst
     use mo_chemini,          only : chemini
     use mo_ghg_chem,         only : ghg_chem_init
     use mo_tracname,         only : solsym
@@ -816,7 +790,7 @@ end function chem_is_active
 !-----------------------------------------------------------------------
     integer :: m                                ! tracer indicies
     character(len=fieldname_len) :: spc_name
-    integer :: i, n, ii
+    integer :: n, ii
     logical :: history_aerosol 
     character(len=2)  :: unit_basename  ! Units 'kg' or '1' 
     logical :: history_budget                 ! output tendencies and state variables for CAM
@@ -913,7 +887,6 @@ end function chem_is_active
 !-----------------------------------------------------------------------
     call chemini &
        ( euvac_file &
-       , euvacdat_file &
        , photon_file &
        , electron_file &
        , airpl_emis_file &
@@ -942,7 +915,6 @@ end function chem_is_active
        , tuv_xsect_file &
        , o2_xsect_file &
        , lght_no_prd_factor &
-       , chem_name &
        , pbuf2d &
        )
 
@@ -1002,7 +974,6 @@ end function chem_is_active
     use cam_history,      only: outfld
     use mo_srf_emissions, only: set_srf_emissions
     use cam_cpl_indices,  only: index_x2a_Fall_flxvoc
-    use cam_cpl_indices,  only: index_x2a_Fall_flxdst1
     use fire_emissions,   only: fire_emissions_srf
 
     ! Arguments:
@@ -1079,7 +1050,7 @@ end function chem_is_active
 
     use chem_mods, only : inv_lst
 
-    use physconst,     only : mwdry, mwch4, mwn2o, mwf11, mwf12, mwh2o, mwo3
+    use physconst,     only : mwdry, mwch4, mwn2o, mwf11, mwf12
     use chem_surfvals, only : chem_surfvals_get
 
     implicit none
@@ -1146,8 +1117,6 @@ end function chem_is_active
     use mo_ghg_chem,       only : ghg_chem_timestep_init
 
     use mo_solar_parms,    only : solar_parms_timestep_init
-    use mo_jshort,         only : jshort_timestep_init
-    use mo_jlong,          only : jlong_timestep_init
     use mo_aurora,         only : aurora_timestep_init
     use spedata,           only : advance_spedata
     use mo_photo,          only : photo_timestep_init
@@ -1269,15 +1238,12 @@ end function chem_is_active
     use physics_buffer,      only : physics_buffer_desc, pbuf_get_field, pbuf_old_tim_idx
     use cam_history,         only : outfld
     use time_manager,        only : get_curr_calday
-    use chem_mods,           only : gas_pcnst
     use mo_gas_phase_chemdr, only : gas_phase_chemdr
-    
-    use spmd_utils,          only : iam
     use camsrfexch,          only : cam_in_t, cam_out_t     
     use perf_mod,            only : t_startf, t_stopf
     use tropopause,          only : tropopause_find, TROP_ALG_TWMO, TROP_ALG_HYBSTOB, TROP_ALG_CLIMATE
     use mo_drydep,           only : drydep_update
-    use mo_neu_wetdep,       only : neu_wetdep_tend, do_neu_wetdep
+    use mo_neu_wetdep,       only : neu_wetdep_tend
     use aerodep_flx,         only : aerodep_flx_prescribed
     
     implicit none
@@ -1385,7 +1351,7 @@ end function chem_is_active
                           chem_dt, state%ps, xactive_prates, &
                           fsds, cam_in%ts, cam_in%asdir, cam_in%ocnfrac, cam_in%icefrac, &
                           cam_out%precc, cam_out%precl, cam_in%snowhland, ghg_chem, state%latmapback, &
-                          chem_name, drydepflx, cam_in%cflx, cam_in%fireflx, cam_in%fireztop, ptend%q, pbuf)
+                          drydepflx, cam_in%cflx, cam_in%fireflx, cam_in%fireztop, ptend%q, pbuf)
 
     call t_stopf( 'chemdr' )
 

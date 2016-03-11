@@ -72,7 +72,7 @@
 <fcrit2                                    > 0.5       </fcrit2>
 
 <!-- FV dycore -->
-<fft_flt                                   > 0         </fft_flt>
+<fv_fft_flt                                > 0         </fv_fft_flt>
 
 </namelist_defaults>
 

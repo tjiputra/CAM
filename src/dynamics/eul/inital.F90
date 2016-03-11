@@ -11,7 +11,7 @@ public :: cam_initial
 contains
 !=========================================================================
 
-subroutine cam_initial(dyn_in, dyn_out, nlfilename)
+subroutine cam_initial(dyn_in, dyn_out)
 
    use dyn_comp,             only: dyn_import_t, dyn_export_t, dyn_init
    use prognostics,          only: initialize_prognostics
@@ -29,14 +29,13 @@ subroutine cam_initial(dyn_in, dyn_out, nlfilename)
    !  Arguments are not used in this dycore, included for compatibility
    type(dyn_import_t) :: dyn_in
    type(dyn_export_t) :: dyn_out
-   character(len=*), intent(in) :: nlfilename
    !-----------------------------------------------------------------------
 
    ! Initialize ghg surface values before default initial distributions
    ! are set in inidat.
    call chem_surfvals_init()
 
-   call dyn_init(initial_file_get_id(), nlfilename)
+   call dyn_init(initial_file_get_id())
 
    ! Initialize prognostics variables
    call initialize_prognostics

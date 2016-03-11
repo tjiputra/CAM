@@ -72,10 +72,6 @@ module clubb_intr
       ts_nudge = 86400._r8, &           ! Time scale for u/v nudging (not used)     [s]
       p0_clubb = 100000._r8
       
-  real(r8), parameter :: &
-      host_dx = 100000._r8, &           ! Host model deltax [m]
-      host_dy = 100000._r8              ! Host model deltay [m]
-      
   integer, parameter :: & 
     sclr_dim = 0                        ! Higher-order scalars, set to zero
 
@@ -732,6 +728,7 @@ end subroutine clubb_init_cnst
     call addfld ('DPDLFICE',         (/ 'lev' /),  'A', 'kg/kg/s',  'Detrained ice from deep convection')  
     call addfld ('DPDLFT',           (/ 'lev' /),  'A', 'K/s',      'T-tendency due to deep convective detrainment') 
     call addfld ('RELVAR',           (/ 'lev' /),  'A', '-',        'Relative cloud water variance')
+    call addfld ('CLUBB_GRID_SIZE',  horiz_only,   'A', 'm',        'Horizontal grid box size seen by CLUBB')
 
 
     call addfld ('CONCLD',           (/ 'lev' /),  'A', 'fraction', 'Convective cloud cover')
@@ -770,7 +767,7 @@ end subroutine clubb_init_cnst
        call add_default('UP2_CLUBB',        1, ' ')
        call add_default('VP2_CLUBB',        1, ' ')
     end if
-
+  
     if (history_clubb) then
 
        if (clubb_do_deep) then
@@ -1087,6 +1084,8 @@ end subroutine clubb_init_cnst
    real(r8) :: varmu(pcols)
    real(r8) :: varmu2, se_upper_a, se_upper_b, se_upper_diss
    real(r8) :: tw_upper_a, tw_upper_b, tw_upper_diss
+   real(r8) :: grid_dx(pcols), grid_dy(pcols)   ! CAM grid [m]
+   real(r8) :: host_dx, host_dy                 ! CAM grid [m]
    
    ! Variables below are needed to compute energy integrals for conservation
    real(r8) :: ke_a(pcols), ke_b(pcols), te_a(pcols), te_b(pcols)
@@ -1305,6 +1304,20 @@ end subroutine clubb_init_cnst
                            !  from moments since it has not been added yet 
    endif
 
+   ! Define the grid box size.  CLUBB needs this information to determine what
+   !  the maximum length scale should be.  This depends on the column for 
+   !  variable mesh grids and lat-lon grids
+   if (single_column) then
+     ! If single column specify grid box size to be something
+     !  similar to a GCM run
+     grid_dx(:) = 100000._r8
+     grid_dy(:) = 100000._r8
+   else
+     
+     call grid_size(state1, grid_dx, grid_dy)
+
+   endif
+
    if (micro_do_icesupersat) then
 
      ! -------------------------------------- !
@@ -1513,6 +1526,10 @@ end subroutine clubb_init_cnst
 
       !  Set the elevation of the surface
       sfc_elevation = state1%zi(i,pver+1)
+      
+      !  Set the grid size
+      host_dx = grid_dx(i)
+      host_dy = grid_dy(i)
 
       !  Compute thermodynamic stuff needed for CLUBB on thermo levels.  
       !  Inputs for the momentum levels are set below setup_clubb core
@@ -2428,6 +2445,7 @@ end subroutine clubb_init_cnst
    call outfld( 'QT',               qt_output,               pcols, lchnk )
    call outfld( 'SL',               sl_output,               pcols, lchnk )
    call outfld( 'CONCLD',           concld,                  pcols, lchnk )
+   call outfld( 'CLUBB_GRID_SIZE',        grid_dx,                 pcols, lchnk )
 
    !  Output CLUBB history here
    if (l_stats) then 
@@ -3416,6 +3434,40 @@ end function diag_ustar
     return
 
   end subroutine stats_avg
+
+  subroutine grid_size(state, grid_dx, grid_dy)
+  ! Determine the size of the grid for each of the columns in state
+
+  use ppgrid,          only: pcols
+  use phys_grid,       only: get_area_p
+  use shr_const_mod,   only: shr_const_pi
+  use physics_types,   only: physics_state
+
+   
+  type(physics_state), intent(in) :: state
+  real(r8), intent(out)           :: grid_dx(pcols), grid_dy(pcols)   ! CAM grid [m]
+
+  real(r8), parameter :: earth_ellipsoid1 = 111132.92_r8 ! first coefficient, meters per degree longitude at equator
+  real(r8), parameter :: earth_ellipsoid2 = 559.82_r8 ! second expansion coefficient for WGS84 ellipsoid
+  real(r8), parameter :: earth_ellipsoid3 = 1.175_r8 ! third expansion coefficient for WGS84 ellipsoid
+
+  real(r8) :: mpdeglat, column_area, degree
+  integer  :: i
+
+  ! determine the column area in radians
+  do i=1,state%ncol
+      column_area = get_area_p(state%lchnk,i)
+      degree = sqrt(column_area)*(180._r8/shr_const_pi)
+       
+      ! Now find meters per degree latitude
+      ! Below equation finds distance between two points on an ellipsoid, derived from expansion
+      !  taking into account ellipsoid using World Geodetic System (WGS84) reference 
+      mpdeglat = earth_ellipsoid1 - earth_ellipsoid2 * cos(2._r8*state%lat(i)) + earth_ellipsoid3 * cos(4._r8*state%lat(i))
+      grid_dx(i) = mpdeglat * degree
+      grid_dy(i) = grid_dx(i) ! Assume these are the same
+  enddo   
+
+  end subroutine grid_size     
 
 #endif
   

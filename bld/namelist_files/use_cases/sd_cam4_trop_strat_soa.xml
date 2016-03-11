@@ -14,8 +14,6 @@
 <met_max_rlx>0.10</met_max_rlx>
 <met_qflx_factor>0.84</met_qflx_factor>
 
-<dust_emis_fact>0.64D0</dust_emis_fact>
-
 <!-- turn on clm MEGAN VOC emis -->
 <megan_specifier>
   'ISOP = isoprene',

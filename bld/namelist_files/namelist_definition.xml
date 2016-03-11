@@ -146,22 +146,88 @@ Default: 3
 
 <!-- Dynamics: Finite Volume -->
 
-<entry id="ct_overlap" type="integer"  category="dyn_fv"
+<entry id="fv_nsplit" type="integer"  category="dyn_fv"
+       group="dyn_fv_inparm" valid_values="" >
+Number of dynamics timesteps per physics timestep. If zero, a best-estimate
+will be automatically calculated.
+Default: 0
+</entry>
+
+<entry id="fv_nspltrac" type="integer"  category="dyn_fv"
+       group="dyn_fv_inparm" valid_values="" >
+Number of tracer advection timesteps per physics timestep.
+Nsplit is partitioned into nspltrac and nsplit/nspltrac,
+with the latter being the number of dynamics timesteps per
+tracer timestep, possibly rounded upward; after initialization,
+the code quantity nsplit is redefined to be the number of
+dynamics timesteps per tracer timestep.
+Default: 0
+</entry>
+
+<entry id="fv_nspltvrm" type="integer"  category="dyn_fv"
+       group="dyn_fv_inparm" valid_values="" >
+Number of vertical re-mapping timesteps per physics timestep.
+Nspltrac is partitioned into nspltvrm and nspltrac/nspltvrm,
+with the latter being the number of tracer timesteps per
+re-mapping timestep, possibly rounded upward; after initialization,
+the code quantity nspltrac is redefined to be the number of
+tracer timesteps per re-mapping timestep.
+Default: 0
+</entry>
+
+<entry id="fv_iord" type="integer"  category="dyn_fv"
+       group="dyn_fv_inparm" valid_values="" >
+Order (mode) of X interpolation (1,..,6).
+East-West transport scheme.
+Default: 4
+</entry>
+
+<entry id="fv_jord" type="integer"  category="dyn_fv"
+       group="dyn_fv_inparm" valid_values="" >
+Order (mode) of Y interpolation (1,..,6).
+North-South transport scheme.
+Default: 4
+</entry>
+
+<entry id="fv_kord" type="integer"  category="dyn_fv"
+       group="dyn_fv_inparm" valid_values="" >
+Scheme to be used for vertical mapping.
+Default: 4
+</entry>
+
+<entry id="fv_conserve" type="logical"  category="dyn_fv"
+       group="dyn_fv_inparm" valid_values="" >
+Flag indicating whether the dynamics uses internal algorithm for energy
+conservation.
+Default: .false.
+</entry>
+
+<entry id="fv_filtcw" type="integer"  category="dyn_fv"
+       group="dyn_fv_inparm" valid_values="0,1" >
+Enables optional filter for intermediate c-grid winds, (courtesy of Bill Putman).
+Default: 0
+</entry>
+
+<entry id="fv_ct_overlap" type="integer"  category="dyn_fv"
        group="dyn_fv_inparm" valid_values="" >
 Overlapping of trac2d and cd_core subcycles.
 Default: 0
 </entry>
 
-<entry id="fft_flt" type="integer"  category="dyn_fv"
+<entry id="fv_trac_decomp" type="integer"  category="dyn_fv"
+       group="dyn_fv_inparm" valid_values="" >
+Size of tracer domain decomposition for trac2d.
+Default: 1
+</entry>
+
+<entry id="fv_fft_flt" type="integer"  category="dyn_fv"
        group="dyn_fv_inparm" valid_values="0,1" >
 1 for FFT filter always, 0 for combined algebraic/FFT filter.  The value 0
-is used for CAM3, otherwise it is using the value 1.  In the CAM3
-version of the model it was necessary to build with the CPP
-variable ALT_PFT defined to get the behavior now obtained by setting fft_flt=1.
+is used for CAM3, otherwise it is using the value 1.
 Default: set by build-namelist
 </entry>
 
-<entry id="div24del2flag" type="integer"  category="dyn_fv"
+<entry id="fv_div24del2flag" type="integer"  category="dyn_fv"
        group="dyn_fv_inparm" valid_values="2,4,42" >
 Chooses type of divergence damping and velocity diffusion.
 div24del2flag = 2 for ldiv2 (default),
@@ -176,17 +242,13 @@ ldel2: 2nd-order velocity-component damping targetted to top layers,
 Default: set by build-namelist
 </entry>
 
-<entry id="del2coef" type="real"  category="dyn_fv"
+<entry id="fv_del2coef" type="real"  category="dyn_fv"
        group="dyn_fv_inparm" valid_values="" >
 Chooses level of velocity diffusion.
 Default: 3.0e5
 </entry>
 
-<entry id="filtcw" type="integer"  category="dyn_fv"
-       group="dyn_fv_inparm" valid_values="0,1" >
-Enables optional filter for intermediate c-grid winds, (courtesy of Bill Putman).
-Default: 0
-</entry>
+<!-- MPI configuration for FV dycore -->
 
 <entry id="force_2d" type="integer"  category="dyn_fv"
        group="spmd_fv_inparm" valid_values="" >
@@ -397,26 +459,6 @@ Max number of tracers for simultaneous mod_comm irregular communications
 Default: 1
 </entry>
 
-<entry id="iord" type="integer"  category="dyn_fv"
-       group="dyn_fv_inparm" valid_values="" >
-Order (mode) of X interpolation (1,..,6).
-East-West transport scheme (used with Finite Volume dynamical core only).
-Default: 4
-</entry>
-
-<entry id="jord" type="integer"  category="dyn_fv"
-       group="dyn_fv_inparm" valid_values="" >
-Order (mode) of Y interpolation (1,..,6).
-North-South transport scheme (used with Finite Volume dynamical core only).
-Default: 4
-</entry>
-
-<entry id="kord" type="integer"  category="dyn_fv"
-       group="dyn_fv_inparm" valid_values="" >
-Scheme to be used for vertical mapping.
-Default: 4
-</entry>
-
 <entry id="modcomm_gatscat" type="integer"  category="dyn_fv"
        group="spmd_fv_inparm" valid_values="0,1,2" >
 For mod_comm gather/scatters, 0 for temporary contiguous buffers; 1 for mpi derived
@@ -461,42 +503,6 @@ of XY subdomains (npr_yz(3)*npr_yz(4)).
 Default: ntask,1,1,ntask where ntask is the number of MPI tasks.  This is a
 1D decomposition in latitude.
 </entry>
-
-<entry id="nsplit" type="integer"  category="dyn_fv"
-       group="dyn_fv_inparm" valid_values="" >
-Number of dynamics timesteps per physics timestep. If zero, a best-estimate
-will be automatically calculated.
-Default: 0
-</entry>
-
-<entry id="nspltrac" type="integer"  category="dyn_fv"
-       group="dyn_fv_inparm" valid_values="" >
-Number of tracer advection timesteps per physics timestep.
-Nsplit is partitioned into nspltrac and nsplit/nspltrac,
-with the latter being the number of dynamics timesteps per
-tracer timestep, possibly rounded upward; after initialization,
-the code quantity nsplit is redefined to be the number of
-dynamics timesteps per tracer timestep.
-Default: 0
-</entry>
-
-<entry id="nspltvrm" type="integer"  category="dyn_fv"
-       group="dyn_fv_inparm" valid_values="" >
-Number of vertical re-mapping timesteps per physics timestep.
-Nspltrac is partitioned into nspltvrm and nspltrac/nspltvrm,
-with the latter being the number of tracer timesteps per
-re-mapping timestep, possibly rounded upward; after initialization,
-the code quantity nspltrac is redefined to be the number of
-tracer timesteps per re-mapping timestep.
-Default: 0
-</entry>
-
-<entry id="trac_decomp" type="integer"  category="dyn_fv"
-       group="dyn_fv_inparm" valid_values="" >
-Size of tracer domain decomposition for trac2d.
-Default: 1
-</entry>
-
 
 <!-- Dynamics: Finite Volume: Offline -->
 
@@ -598,94 +604,124 @@ if true nudge meteorology surface fields TAUX, TAUY, SHFLX, QFLX rather than for
 Default: true
 </entry>
 
-<!-- Dynamics: Spectral -->
+<!-- Dynamics: Eulerian Spectral -->
 
-<entry id="eul_nsplit" type="integer"  category="dyn_spectral"
-       group="dyn_spectral_inparm" valid_values="" >
-Number of dynamics timesteps per physics timestep. If zero, a best-estimate
-will be automatically calculated.
-Default: 1
-</entry>
-
-<entry id="dyn_spectral_dif2" type="real"  category="dyn_spectral"
-       group="dyn_spectral_inparm" valid_values="" >
+<entry id="eul_dif2_coef" type="real"  category="dyn_eul"
+       group="dyn_eul_inparm" valid_values="" >
 del^2 horizontal diffusion coefficient.  This is used above the Nth order
-diffusion in EUL, and above the 4th order diffusion in SLD.
+diffusion.
 Default: set by build-namelist
 </entry>
 
-<entry id="eul_hdif_order" type="integer"  category="dyn_spectral"
-       group="dyn_spectral_inparm" valid_values="">
+<entry id="eul_hdif_order" type="integer"  category="dyn_eul"
+       group="dyn_eul_inparm" valid_values="">
 Order (N) of horizontal diffusion operator used below the sponge layers.
-N must be a positive multiple of 2.  Used in EUL only.
+N must be a positive multiple of 2.
 Default: 4
 </entry>
 
-<entry id="eul_hdif_kmnhdn" type="integer"  category="dyn_spectral"
-       group="dyn_spectral_inparm" valid_values="">
+<entry id="eul_hdif_kmnhdn" type="integer"  category="dyn_eul"
+       group="dyn_eul_inparm" valid_values="">
 The order N horizontal diffusion operator will be used in and below the
-layer specified by this variable.  Used in EUL only.
+layer specified by this variable.
 Default: 4
 </entry>
 
-<entry id="eul_hdif_coef" type="real"  category="dyn_spectral"
-       group="dyn_spectral_inparm" valid_values="">
-Nth order horizontal diffusion coefficient.  Used in EUL only.
+<entry id="eul_hdif_coef" type="real"  category="dyn_eul"
+       group="dyn_eul_inparm" valid_values="">
+Nth order horizontal diffusion coefficient.
 Default: set by build-namelist
 </entry>
 
-<entry id="dyn_spectral_dif4" type="real"  category="dyn_spectral"
-       group="dyn_spectral_inparm" valid_values="">
-del^4 horizontal diffusion coefficient used below the sponge layers.
-Used in SLD only.
-Default: set by build-namelist
-</entry>
-
-<entry id="dyn_spectral_divdampn" type="real"  category="dyn_spectral"
-       group="dyn_spectral_inparm" valid_values="">
+<entry id="eul_divdampn" type="real"  category="dyn_eul"
+       group="dyn_eul_inparm" valid_values="">
 Number of days (from timestep 0) to run divergence damper. Use only if spectral
 model becomes dynamicallly unstable during initialization. Suggested value:
 2. (Value must be &gt;= 0.)  Default: 0.
 </entry>
 
-<entry id="dyn_spectral_eps" type="real"  category="dyn_spectral"
-       group="dyn_spectral_inparm" valid_values="">
+<entry id="eul_tfilt_eps" type="real"  category="dyn_eul"
+       group="dyn_eul_inparm" valid_values="">
 Time filter coefficient.  Default: 0.06
 </entry>
 
-<entry id="dyn_spectral_kmxhdc" type="integer"  category="dyn_spectral"
-       group="dyn_spectral_inparm" valid_values="">
+<entry id="eul_kmxhdc" type="integer"  category="dyn_eul"
+       group="dyn_eul_inparm" valid_values="">
 Number of levels over which to apply Courant limiter, starting at top of
 model.
 Default: 5
 </entry>
 
-<entry id="dyn_allgather" type="integer"  category="dyn_spectral"
+<entry id="eul_nsplit" type="integer"  category="dyn_eul"
+       group="dyn_eul_inparm" valid_values="" >
+Number of dynamics timesteps per physics timestep. If zero, a best-estimate
+will be automatically calculated.
+Default: 1
+</entry>
+
+<!-- Dynamics: SLD Spectral -->
+
+<entry id="sld_dif2_coef" type="real"  category="dyn_sld"
+       group="dyn_sld_inparm" valid_values="" >
+del^2 horizontal diffusion coefficient.  This is used above the 4th order
+diffusion.
+Default: set by build-namelist
+</entry>
+
+<entry id="sld_dif4_coef" type="real"  category="dyn_sld"
+       group="dyn_sld_inparm" valid_values="">
+del^4 horizontal diffusion coefficient used below the sponge layers.
+Default: set by build-namelist
+</entry>
+
+<entry id="sld_divdampn" type="real"  category="dyn_sld"
+       group="dyn_sld_inparm" valid_values="">
+Number of days (from timestep 0) to run divergence damper. Use only if spectral
+model becomes dynamicallly unstable during initialization. Suggested value:
+2. (Value must be &gt;= 0.)  Default: 0.
+</entry>
+
+<entry id="sld_tfilt_eps" type="real"  category="dyn_sld"
+       group="dyn_sld_inparm" valid_values="">
+Time filter coefficient.  Default: 0.06
+</entry>
+
+<entry id="sld_kmxhdc" type="integer"  category="dyn_sld"
+       group="dyn_sld_inparm" valid_values="">
+Number of levels over which to apply Courant limiter, starting at top of
+model.
+Default: 5
+</entry>
+
+
+<!-- MPI configuration for global spectral dycores (EUL and SLD) -->
+
+<entry id="dyn_allgather" type="integer"  category="dyn_spectral_spmd"
        group="spmd_dyn_inparm" valid_values="">
 Spectral dynamics gather option.
 Default: 0
 </entry>
 
-<entry id="dyn_alltoall" type="integer"  category="dyn_spectral"
+<entry id="dyn_alltoall" type="integer"  category="dyn_spectral_spmd"
        group="spmd_dyn_inparm" valid_values="">
 Spectral dynamics transpose option.
 Default: 0
 </entry>
 
-<entry id="dyn_equi_by_col" type="logical"  category="dyn_spectral"
+<entry id="dyn_equi_by_col" type="logical"  category="dyn_spectral_spmd"
        group="spmd_dyn_inparm" valid_values="">
 Flag indicating whether to assign latitudes to equidistribute columns or
 latitudes. This only matters when using a reduced grid.
 Default: TRUE
 </entry>
 
-<entry id="dyn_npes" type="integer"  category="dyn_spectral"
+<entry id="dyn_npes" type="integer"  category="dyn_spectral_spmd"
        group="spmd_dyn_inparm" valid_values="">
 Number of processes assigned to dynamics (SE, EUL and SLD dycores).
 Default: Total number of processes assigned to job.
 </entry>
 
-<entry id="dyn_npes_stride" type="integer"  category="dyn_spectral"
+<entry id="dyn_npes_stride" type="integer"  category="dyn_spectral_spmd"
        group="spmd_dyn_inparm" valid_values="">
 Stride for dynamics processes (EUL and SLD dycores).
 E.g., if stride=2, assign every second process to the dynamics.
@@ -1055,7 +1091,7 @@ Default: none
 <!-- History and Initial Conditions Output -->
 
 <entry id="avgflag_pertape" type="char*1(10)"  category="history"
-       group="cam_history_nl" valid_values="A,B,I,X,M,L" >
+       group="cam_history_nl" valid_values="A,B,I,X,M,L,S" >
 Sets the averaging flag for all variables on a particular history file
 series. Valid values are:
 
@@ -1065,6 +1101,7 @@ series. Valid values are:
  M ==&gt; Minimum
  X ==&gt; Maximum
  L ==&gt; Local-time
+ S ==&gt; Standard deviation
 
 The default is to use the averaging flags for each variable that are set in
 the code via calls to subroutine addfld.
@@ -1154,6 +1191,7 @@ are:
  M ==&gt; Minimum
  X ==&gt; Maximum
  L ==&gt; Local-time
+ S ==&gt; Standard deviation
 
 Default:  set in code via the addfld and add_default subroutine calls.
 </entry>
@@ -3515,6 +3553,13 @@ as a time series
 Default: none
 </entry>
 
+<entry id="solar_euv_data_file" type="char*256" input_pathname="abs" category="solar"
+       group="solar_euv_nl" valid_values="" >
+Full pathname of dataset for file that contains the solar EUV data 
+as a time series
+Default: none
+</entry>
+
 <entry id="solar_data_type" type="char*8" category="solar"
        group="solar_inparm" valid_values="FIXED,SERIAL" >
 Type of time interpolation for data in <varname>solar_data_file</varname>.
@@ -3782,6 +3827,91 @@ Below-cloud solubility factor used in BULK aerosol wet removal
 Default: set by build-namelist.
 </entry>
 
+<entry id="aer_scav_coef" type="real(1000)" category="cam_chem"
+       group="aerosol_nl" valid_values="" >
+Scavenging coefficient used in BULK aerosol wet removal
+Default: set by build-namelist.
+</entry>
+
+<entry id="SO4_scav_coef" type="real(1000)" category="cam_chem"
+       group="camexp" valid_values="" >
+Scavenging coefficient used in the wet removal of SO4
+Default: set by build-namelist.
+</entry>
+
+<entry id="NH4_scav_coef" type="real(1000)" category="cam_chem"
+       group="camexp" valid_values="" >
+Scavenging coefficient used in the wet removal of NH4
+Default: set by build-namelist.
+</entry>
+
+<entry id="NH4NO3_scav_coef" type="real(1000)" category="cam_chem"
+       group="camexp" valid_values="" >
+       group="aerosol_nl" valid_values="" >
+Scavenging coefficient used in the wet removal of NH4NO3
+Default: set by build-namelist.
+</entry>
+
+<entry id="CB2_scav_coef" type="real(1000)" category="cam_chem"
+       group="camexp" valid_values="" >
+Scavenging coefficient used in the wet removal of CB2
+Default: set by build-namelist.
+</entry>
+
+<entry id="OC2_scav_coef" type="real(1000)" category="cam_chem"
+       group="camexp" valid_values="" >
+Scavenging coefficient used in the wet removal of OC2
+Default: set by build-namelist.
+</entry>
+
+<entry id="DST01_scav_coef" type="real(1000)" category="cam_chem"
+       group="camexp" valid_values="" >
+Scavenging coefficient used in the wet removal of DST01
+Default: set by build-namelist.
+</entry>
+
+<entry id="DST02_scav_coef" type="real(1000)" category="cam_chem"
+       group="camexp" valid_values="" >
+Scavenging coefficient used in the wet removal of DST02
+Default: set by build-namelist.
+</entry>
+
+<entry id="DST03_scav_coef" type="real(1000)" category="cam_chem"
+       group="camexp" valid_values="" >
+Scavenging coefficient used in the wet removal of DST03
+Default: set by build-namelist.
+</entry>
+
+<entry id="DST04_scav_coef" type="real(1000)" category="cam_chem"
+       group="camexp" valid_values="" >
+Scavenging coefficient used in the wet removal of DST04
+Default: set by build-namelist.
+</entry>
+
+<entry id="SSLT01_scav_coef" type="real(1000)" category="cam_chem"
+       group="camexp" valid_values="" >
+Scavenging coefficient used in the wet removal of SSLT01
+Default: set by build-namelist.
+</entry>
+
+<entry id="SSLT02_scav_coef" type="real(1000)" category="cam_chem"
+       group="camexp" valid_values="" >
+Scavenging coefficient used in the wet removal of SSLT02
+Default: set by build-namelist.
+</entry>
+
+<entry id="SSLT03_scav_coef" type="real(1000)" category="cam_chem"
+       group="camexp" valid_values="" >
+Scavenging coefficient used in the wet removal of SSLT03
+Default: set by build-namelist.
+</entry>
+
+<entry id="SSLT04_scav_coef" type="real(1000)" category="cam_chem"
+       group="camexp" valid_values="" >
+Scavenging coefficient used in the wet removal of SSLT04
+Default: set by build-namelist.
+</entry>
+
 <entry id="airpl_emis_file" type="char*256" input_pathname="abs" category="cam_chem"
        group="chem_inparm" valid_values="" >
 Full pathname of boundary dataset for airplane emissions.
@@ -3885,13 +4015,6 @@ Default: 0 seconds
 <entry id="euvac_file" type="char*256" input_pathname="abs" category="waccm"
        group="chem_inparm" valid_values="" >
 Full pathname of dataset for EUVAC solar EUV model (0.05-121nm).
-Default: set by build-namelist.
-</entry>
-
-<entry id="euvacdat_file" type="char*256" input_pathname="abs" category="waccm"
-       group="chem_inparm" valid_values="" >
-Full pathname of dataset for variables used to compute the solar flux in the EUV 
-wavelength regime.  Used to compute EUV photorates and heating from EUV photolysis.
 Default: set by build-namelist.
 </entry>
 

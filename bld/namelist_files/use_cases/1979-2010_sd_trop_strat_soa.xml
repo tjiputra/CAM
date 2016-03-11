@@ -91,8 +91,6 @@
 <megan_factors_file>'atm/cam/chem/trop_mozart/emis/megan21_emis_factors_c20130304.nc'</megan_factors_file>
 <megan_mapped_emisfctrs>.false.</megan_mapped_emisfctrs>
 
-<dust_emis_fact> 2.76D0 </dust_emis_fact>
-
 <!-- History -->
 <avgflag_pertape>'A', 'A', 'I', 'A', 'A', 'L', 'L' </avgflag_pertape>
 <nhtfrq>           0, -24,-240, -24, -24,  0,    0 </nhtfrq>
@@ -201,7 +199,7 @@
   'PS', 'PSL', 'U', 'V', 'T', 'Z3', 'PHIS', 'FSDS', 'OMEGA',
 </fincl4>
 <fincl5>
-  'MSKtem','PS','PSL','VTH2d','UV2d','UW2d','U2d','V2d','TH2d','W2d','PHIS'
+  'MSKtem','PS','PSL','VTHzm','UVzm','UWzm','Uzm','Vzm','THzm','Wzm','PHIS'
 </fincl5>
 <fincl6>
   'PS', 'SZA', 'Z3', 'T', 'U', 'V', 'OMEGA', 'O3', 'MASS', 'DO3CHM', 'DO3CHM_TRP', 'DO3CHM_LMS', 'O3_CHMP', 'O3_CHML',

@@ -17,8 +17,8 @@
 <ncdata dyn="fv"  hgrid="4x5"     >atm/waccm/ic/b.e12.B1850W5CN.4x5_70L.002.cam.i.0190-01-01-00000_c141105.nc</ncdata>
 
 <!-- dynamics sub-stepping -->
-<nspltrac>4</nspltrac>
-<nspltvrm>4</nspltvrm>
+<fv_nspltrac>4</fv_nspltrac>
+<fv_nspltvrm>4</fv_nspltvrm>
 
 <!-- turn off prescribed volcanic aerosol heating; use prognostic MAM in the stratosphere -->
 <strat_aero_feedback>.false.</strat_aero_feedback> 
@@ -110,12 +110,6 @@
   'OddOx_Prod_Tot = 2.0*jo2_a + 2.0*jo2_b'
 </rxn_rate_sums>
 
-<!-- Photolysis Inputs DEFAULTS okay for: rsf_file,xs_long_file,xs_short_file -->
-
-<!-- Extraterestrial Flux and MLT inputs DEFAULTS okay for:  -->
-<!-- efield_hflux_file, efield_lflux_file, efield_wei96_file -->
-<!-- electron_file,euvac_file,euvacdat_file,photon_file,neckel_file,woods_etf_file,xs_coef_file -->
-
 <solar_parms_file>atm/waccm/phot/wasolar_ave.nc</solar_parms_file>
 
 <!-- History Files -->
@@ -176,7 +170,7 @@
   'jo2_a', 'jo2_b', 'jo3_a',  'jo3_b', 'jhocl', 'jno3_b', 'jcl2o2',
   'SAD_SULFC', 'SAD_LNAT', 'SAD_ICE','AOA1','AOA2',
   'O2', 'CLDLIQ', 'CLDICE', 'ASDIR',
-  'VTH2d', 'WTH2d', 'UV2d', 'UW2d', 'TH', 'MSKtem'
+  'VTHzm', 'WTHzm', 'UVzm', 'UWzm', 'TH', 'MSKtem'
 </fincl2>
 
 <!-- Instantaneous every 10 days --> 
@@ -193,7 +187,7 @@
 </fincl4>
 <!-- Daily Average --> 
 <fincl5>
-  'MSKtem', 'PS', 'PSL', 'VTH2d', 'UV2d', 'UW2d', 'U2d', 'V2d', 'TH2d','W2d', 'PHIS'
+  'MSKtem', 'PS', 'PSL', 'VTHzm', 'UVzm', 'UWzm', 'Uzm', 'Vzm', 'THzm','Wzm', 'PHIS'
 </fincl5>
 
 <!-- sim_year used for CLM datasets and SSTs forcings -->

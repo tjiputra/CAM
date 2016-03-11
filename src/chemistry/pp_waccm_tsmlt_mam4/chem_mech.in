@@ -65,7 +65,7 @@
  ISOPO2 -> HOCH2COOCH3CHCH2, XO2 -> HOCH2COOCH3CHOHCHO, TOLO2 -> C7H9O5, 
  TERPO2 -> C10H17O3, 
  N2p -> N2, O2p -> O2,
- Np -> N, Op -> O, NOp -> NO, e, N2D -> N,
+ Np -> N, Op -> O, NOp -> NO, e -> E, N2D -> N,
  O2_1S -> O2, O2_1D -> O2, O1D -> O,
  H2O
       End Solution

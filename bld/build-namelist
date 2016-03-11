@@ -686,7 +686,7 @@ my $waccm_phys = $cfg->get('waccm_phys');
 my $carma = $cfg->get('carma');
 
 my $prog_species = $cfg->get('prog_species');
-my $prog_ghg1    = ($chem =~ "trop_mozart" or $chem =~ "trop_strat" or $chem =~ "ghg" or $chem =~ "_sc"or $prog_species =~ "GHG");
+my $prog_ghg1    = ($chem =~ "trop_mozart" or $chem =~ "trop_strat" or $chem =~ "ghg" or $chem =~ "_sc" or $prog_species =~ "GHG");
 my $prog_ghg2    = ($chem =~ "ghg" or $chem =~ "_sc" or $prog_species =~ "GHG");
 my $ghg_chem     = ($chem =~ "ghg" or $chem =~ "_sc");
 my $aero_chem    = ($chem =~ "aero" or $chem eq 'trop_mozart' or $chem eq 'trop_mozart_soa' or $chem =~ 'trop_strat' or $chem =~ 'tsmlt' or $chem eq 'trop_bam');
@@ -727,8 +727,9 @@ if ( ($chem ne 'none') or ( $prog_species ) ){
     my $chem_proc_src = $cfg->get('chem_proc_src');
     my $chem_src_dir = $cfg->get('chem_src_dir');
 
-    my ($gas_wetdep_list, $aer_wetdep_list, $aer_drydep_list, $aer_sol_facti, $aer_sol_factb, $gas_drydep_list) =
-        set_dep_lists( $cfgdir, $chem_proc_src, $chem_src_dir, $nl, $print );
+    my ( $gas_wetdep_list, $aer_wetdep_list, $aer_sol_facti, $aer_sol_factb, $aer_scav_coef, 
+         $aer_drydep_list, $gas_drydep_list ) =
+           set_dep_lists( $cfgdir, $chem_proc_src, $chem_src_dir, $nl, $print );
 
     if (length($gas_wetdep_list)>2){ 
       add_default($nl, 'gas_wetdep_method' );
@@ -751,6 +752,9 @@ if ( ($chem ne 'none') or ( $prog_species ) ){
             }
             if (!defined $nl->get_value('aer_sol_factb')) {
                 add_default($nl, 'aer_sol_factb', val=>$aer_sol_factb );
+            }
+            if (!defined $nl->get_value('aer_scav_coef')) {
+                add_default($nl, 'aer_scav_coef', val=>$aer_scav_coef );
             }
         }
     }
@@ -2715,7 +2719,7 @@ if ($chem =~ /waccm_mozart/ or $chem =~ /waccmx_mozart/ or $chem =~ /waccm_tsmlt
 
     # Datasets
     my @files = ('flbc_file', 'efield_lflux_file', 'efield_hflux_file', 'efield_wei96_file',
-                 'euvacdat_file', 'photon_file', 'electron_file',
+                 'photon_file', 'electron_file',
                  'euvac_file', 'solar_parms_file',  'sulf_file',
                  'depvel_lnd_file', 'clim_soilw_file', 'season_wes_file',
                  'xs_coef_file', 'xs_short_file','xs_long_file', 'rsf_file', 
@@ -3107,7 +3111,7 @@ add_default($nl, 'cldsed_ice_stokes_fac');
 
 # Dust emissions tuning factor
 # If dust is prognostic ==> supply the tuning factor
-if ($chem =~ /_mam/ or $chem =~ /_bam/ or $chem =~ /trop_/) {
+if ( length($nl->get_value('soil_erod_file'))>0 ) {
     # check whether turbulent mountain stress parameterization is on
     if ($nl->get_value('do_tms') =~ /$TRUE/io) {
         add_default($nl, 'dust_emis_fact', 'tms'=>'1');
@@ -3237,14 +3241,14 @@ if ((not $waccm_phys) and
 
 # FV dycore
 if ($dyn eq 'fv') {
-    add_default($nl, 'fft_flt');
-    add_default($nl, 'div24del2flag');
-    add_default($nl, 'del2coef');
-    add_default($nl, 'filtcw');
-    add_default($nl, 'nspltvrm');
+    add_default($nl, 'fv_fft_flt');
+    add_default($nl, 'fv_div24del2flag');
+    add_default($nl, 'fv_del2coef');
+    add_default($nl, 'fv_filtcw');
+    add_default($nl, 'fv_nspltvrm');
     if ($waccm_phys) {
-        add_default($nl, 'nsplit');
-        add_default($nl, 'nspltrac');
+        add_default($nl, 'fv_nsplit');
+        add_default($nl, 'fv_nspltrac');
     }
     # If the -ntasks argument has been set, then use it to set the default
     # FV decomposition unless the user has already set it.
@@ -3257,23 +3261,23 @@ if ($dyn eq 'fv') {
 
 # EUL dycore
 if ($dyn eq 'eul') {
-    add_default($nl, 'eul_nsplit');
+    add_default($nl, 'eul_dif2_coef');
     add_default($nl, 'eul_hdif_order');
     add_default($nl, 'eul_hdif_kmnhdn');
     add_default($nl, 'eul_hdif_coef');
+    add_default($nl, 'eul_divdampn');
+    add_default($nl, 'eul_tfilt_eps');
+    add_default($nl, 'eul_kmxhdc');
+    add_default($nl, 'eul_nsplit');
 }
 
 # SLD dycore
 if ($dyn eq 'sld') {
-    add_default($nl, 'dyn_spectral_dif4');
-}
-
-# EUL or SLD spectral dycore
-if ($dyn eq 'eul' or $dyn eq 'sld') {
-    add_default($nl, 'dyn_spectral_dif2');
-    add_default($nl, 'dyn_spectral_divdampn');
-    add_default($nl, 'dyn_spectral_eps');
-    add_default($nl, 'dyn_spectral_kmxhdc');
+    add_default($nl, 'sld_dif2_coef');
+    add_default($nl, 'sld_dif4_coef');
+    add_default($nl, 'sld_divdampn');
+    add_default($nl, 'sld_tfilt_eps');
+    add_default($nl, 'sld_kmxhdc');
 }
 
 # Single column model

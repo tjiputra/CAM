@@ -30,8 +30,6 @@
 </flbc_list>
 <flbc_type>SERIAL</flbc_type>
 
-<dust_emis_fact>0.18D0</dust_emis_fact>
-
 <!-- Surface emissions -->
 
 <megan_factors_file>atm/cam/chem/trop_mozart/emis/megan21_emis_factors_c20130304.nc</megan_factors_file>

@@ -8,11 +8,6 @@ module cam_grid_support
   use spmd_utils,          only: masterproc
   use cam_pio_utils,       only: cam_pio_handle_error
   use cam_map_utils,       only: cam_filemap_t
-!!XXgoldyXX:
-use spmd_utils, only: iam, npes, mpicom, mpi_integer, mpi_sum, mpi_max, mpi_min
-use shr_sys_mod, only: shr_sys_flush
-use cam_map_utils, only: goldy_debug
-!!XXgoldyXX:
 
   implicit none
   private
@@ -50,11 +45,6 @@ use cam_map_utils, only: goldy_debug
     procedure                 :: get_units      => horiz_coord_units
     procedure                 :: write_attr     => write_horiz_coord_attr
     procedure                 :: write_var      => write_horiz_coord_var
-!!XXgoldyXX: v remove this
-!    procedure, public :: get_value      => horiz_coord_value
-!    procedure, public :: find_index     => horiz_coord_find_index
-!    procedure, public :: map_pos        => horiz_coord_map_pos
-!!XXgoldyXX: ^ remove this
   end type horiz_coord_t
 
   !---------------------------------------------------------------------------
@@ -402,7 +392,7 @@ contains
 
     clen = this%dimsize
   end subroutine horiz_coord_len
-    
+
   subroutine horiz_coord_name(this, name)
     ! Dummy arguments
     class(horiz_coord_t), intent(in)    :: this
@@ -480,9 +470,6 @@ contains
     real(r8),              intent(in), optional        :: bnds(2,lbound:ubound)
     type(horiz_coord_t),               pointer         :: newcoord
 
-    ! Local variables
-    integer                                            :: i
-
     allocate(newcoord)
 
     newcoord%name      = trim(name)
@@ -511,21 +498,27 @@ contains
       call endrun("horiz_coord_create: unsupported units: '"//trim(units)//"'")
     end if
     allocate(newcoord%values(lbound:ubound))
-    newcoord%values(:) = values(:)
+    if (ubound >= lbound) then
+      newcoord%values(:) = values(:)
+    end if
 
     if (present(map)) then
       if (ANY(map < 0)) then
         call endrun("horiz_coord_create "//trim(name)//": map vals < 0")
       end if
       allocate(newcoord%map(ubound - lbound + 1))
-      newcoord%map(:) = map(:)
+      if (ubound >= lbound) then
+        newcoord%map(:) = map(:)
+      end if
     else
       nullify(newcoord%map)
     end if
 
     if (present(bnds)) then
       allocate(newcoord%bnds(2, lbound:ubound))
-      newcoord%bnds = bnds
+      if (ubound >= lbound) then
+        newcoord%bnds = bnds
+      end if
     else
       nullify(newcoord%bnds)
     end if
@@ -630,7 +623,6 @@ contains
     use shr_pio_mod,  only: shr_pio_getiosys
     !!XXgoldyXX: End of this part of the hack
 
-
     ! Dummy arguments
     class(horiz_coord_t),    intent(inout) :: this
     type(file_desc_t),       intent(inout) :: File ! PIO file Handle
@@ -717,7 +709,7 @@ contains
     character(len=*), intent(in)  :: gridname
     ! Local variables
     integer :: i
-    
+
     get_cam_grid_index_char = -1
     do i = 1, registeredhgrids
       if(trim(gridname) == trim(cam_grids(i)%name)) then
@@ -733,7 +725,7 @@ contains
     integer, intent(in) :: gridid
     ! Local variables
     integer :: i
-    
+
     get_cam_grid_index_int = -1
     do i = 1, registeredhgrids
       if(gridid == cam_grids(i)%id) then
@@ -859,7 +851,6 @@ contains
         cam_grids(registeredhgrids)%zonal_grid = .false.
       end if
       if (associated(cam_grids(registeredhgrids)%map)) then
-        write(errormsg, *) 
         call endrun(trim(subname)//": new grid map should not be associated")
       end if
       if (present(src_in)) then
@@ -1766,7 +1757,7 @@ contains
        call endrun('cam_grid_attr_1d_int: long_name too long')
     end if
     this%long_name = trim(long_name)
-    
+
     if (len_trim(dimname) > max_hcoordname_len) then
        call endrun('cam_grid_attr_1d_int: dimname too long')
     end if
@@ -1795,7 +1786,7 @@ contains
 !    call this%cam_grid_attr_init(trim(name), trim(long_name), next)
     this%name      = trim(name)
     this%long_name = trim(long_name)
-    
+
     this%dimname =  trim(dimname)
     this%dimsize =  dimsize
     this%values  => values
@@ -2976,7 +2967,7 @@ contains
         call endrun('CAM_GRID_FIND_DIMIDS: '//trim(this%name)//' dimension, '//trim(dimname2)//', does not exist on file')
       end if
     end if
-    
+
     ! Back to whatever error handling was running before this routine
     call pio_seterrorhandling(File, err_handling)
 

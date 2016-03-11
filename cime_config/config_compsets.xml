@@ -105,6 +105,10 @@
     <lname>2000_CAM5%CLB_CLM40%SP_CICE%PRES_DOCN%DOM_RTM_SGLC_SWAV</lname>
   </compset>
   <compset>
+    <alias>FC55CLUBB</alias>        
+    <lname>2000_CAM55%CLB_CLM45%SP_CICE%PRES_DOCN%DOM_RTM_SGLC_SWAV</lname>
+  </compset>
+  <compset>
     <alias>F1850C5PM</alias>       
     <lname>1850_CAM5%PM_CLM40%SP_CICE%PRES_DOCN%DOM_RTM_SGLC_SWAV</lname>
   </compset>

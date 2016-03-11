@@ -280,7 +280,7 @@ CONTAINS
 
        ! Initialize CAM, allocate cam_in and cam_out and determine 
        ! atm decomposition
-       ! for an initial run, cam_in and cam_out are allocated in cam_initial
+       ! for an initial run, cam_in and cam_out are allocated in cam_init
        ! for a restart/branch run, cam_in and cam_out are allocated in restart 
        !
        call cam_init(EClock, &

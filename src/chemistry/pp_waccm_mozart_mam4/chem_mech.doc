@@ -93,7 +93,7 @@
       ( 90)  Np                 (N)
       ( 91)  Op                 (O)
       ( 92)  NOp                (NO)
-      ( 93)  e               
+      ( 93)  e                  (E)
       ( 94)  N2D                (N)
       ( 95)  O2_1S              (O2)
       ( 96)  O2_1D              (O2)
@@ -555,14 +555,15 @@ Extraneous prod/loss species
  (11)   bc_a4   (dataset)
  (12)   num_a1   (dataset)
  (13)   num_a2   (dataset)
- (14)   Op
- (15)   O2p
- (16)   Np
- (17)   N2p
- (18)   N2D
- (19)   N
- (20)   e
- (21)   OH
+ (14)   num_a4   (dataset)
+ (15)   Op
+ (16)   O2p
+ (17)   Np
+ (18)   N2p
+ (19)   N2D
+ (20)   N
+ (21)   e
+ (22)   OH
   
   
  Equation Report

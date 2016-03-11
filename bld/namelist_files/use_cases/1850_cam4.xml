@@ -46,7 +46,7 @@
 <do_circulation_diags         >.false.</do_circulation_diags>
 <do_circulation_diags dyn="fv">.true.</do_circulation_diags>
 <fincl1         >'U'</fincl1>
-<fincl1 dyn="fv">'MSKtem','VTH2d','UV2d','UW2d','U2d','V2d','TH2d','W2d','UTGWORO'</fincl1>
+<fincl1 dyn="fv">'MSKtem','VTHzm','UVzm','UWzm','Uzm','Vzm','THzm','Wzm','UTGWORO'</fincl1>
 
 <!-- Daily avg fields present in all runs -->
 <fincl2>'TREFHTMN','TREFHTMX','TREFHT','PRECC','PRECL','PSL'</fincl2>

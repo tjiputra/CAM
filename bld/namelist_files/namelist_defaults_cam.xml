@@ -219,14 +219,14 @@
 <!-- Optics for CAM-RT -->
 <bam_sulf  rad="camrt">atm/cam/physprops/sulfate_camrt_c080918.nc</bam_sulf>
 <bam_SO4   rad="camrt">atm/cam/physprops/sulfate_camrt_c080918.nc</bam_SO4>
-<bam_dust1 rad="camrt">atm/cam/physprops/dust1_camrt_c080918.nc</bam_dust1>
-<bam_DST01 rad="camrt">atm/cam/physprops/dust1_camrt_c080918.nc</bam_DST01>
-<bam_dust2 rad="camrt">atm/cam/physprops/dust2_camrt_c080918.nc</bam_dust2>
-<bam_DST02 rad="camrt">atm/cam/physprops/dust2_camrt_c080918.nc</bam_DST02>
-<bam_dust3 rad="camrt">atm/cam/physprops/dust3_camrt_c080918.nc</bam_dust3>
-<bam_DST03 rad="camrt">atm/cam/physprops/dust3_camrt_c080918.nc</bam_DST03>
-<bam_dust4 rad="camrt">atm/cam/physprops/dust4_camrt_c080918.nc</bam_dust4>
-<bam_DST04 rad="camrt">atm/cam/physprops/dust4_camrt_c080918.nc</bam_DST04>
+<bam_dust1 rad="camrt">atm/cam/physprops/dust1_camrt_c120518.nc</bam_dust1>
+<bam_DST01 rad="camrt">atm/cam/physprops/dust1_camrt_c120518.nc</bam_DST01>
+<bam_dust2 rad="camrt">atm/cam/physprops/dust2_camrt_c120518.nc</bam_dust2>
+<bam_DST02 rad="camrt">atm/cam/physprops/dust2_camrt_c120518.nc</bam_DST02>
+<bam_dust3 rad="camrt">atm/cam/physprops/dust3_camrt_c120518.nc</bam_dust3>
+<bam_DST03 rad="camrt">atm/cam/physprops/dust3_camrt_c120518.nc</bam_DST03>
+<bam_dust4 rad="camrt">atm/cam/physprops/dust4_camrt_c120518.nc</bam_dust4>
+<bam_DST04 rad="camrt">atm/cam/physprops/dust4_camrt_c120518.nc</bam_DST04>
 <bam_bcar1 rad="camrt">atm/cam/physprops/bcpho_camrt_c080918.nc</bam_bcar1>
 <bam_CB1   rad="camrt">atm/cam/physprops/bcpho_camrt_c080918.nc</bam_CB1>
 <bam_bcar2 rad="camrt">atm/cam/physprops/bcphi_camrt_c080918.nc</bam_bcar2>
@@ -447,10 +447,9 @@
 <efield_wei96_file >atm/waccm/efld/wei96.cofcnts</efield_wei96_file>
 
 <!-- Waccm aurora and euv parameters -->
-<euvacdat_file  >atm/waccm/phot/euvac.dat</euvacdat_file>
-<photon_file                          >atm/waccm/phot/photon_c130710.dat</photon_file>
+<photon_file    >atm/waccm/phot/photon_c130710.dat</photon_file>
 <electron_file  >atm/waccm/phot/electron.dat</electron_file>
-<euvac_file     >atm/waccm/phot/euvac.nc</euvac_file>
+<euvac_file     >atm/waccm/phot/EUVAC_reference_c150702.nc</euvac_file>
 
 <!-- Waccm solar variability parameters -->
 <solar_parms_file               >atm/waccm/phot/wasolar_ave.nc</solar_parms_file>
@@ -720,7 +719,9 @@
 
 
 <!-- soil erodibility factors -->
-<soil_erod_file                  >atm/cam/dst/dst_source2x2_cam5.4_c150327.nc</soil_erod_file>
+<soil_erod_file              >atm/cam/dst/dst_source2x2_cam5.4_c150327.nc</soil_erod_file>
+<soil_erod_file phys="cam4"  >atm/cam/dst/dst_source2x2tuned-cam4-06132012.nc</soil_erod_file>
+<soil_erod_file phys="cam4" hgrid="0.9x1.25">atm/cam/dst/dst_source1x1tuned-cam4-06202012.nc</soil_erod_file>
 
 <!-- Turbulent Mountain Stress -->
 <do_tms                                                     > .false. </do_tms>
@@ -865,8 +866,7 @@
 <molec_diff_bot_press> 50.D0 </molec_diff_bot_press>
 
 <!-- dust emission tuning factor -->
-<dust_emis_fact                                                         >2.76D0</dust_emis_fact>
-<dust_emis_fact                                         chem="trop_bam"	>4.2D0 </dust_emis_fact>
+<dust_emis_fact                                                         >0.37D0</dust_emis_fact>
 <dust_emis_fact                            phys="cam5"                  >0.35D0</dust_emis_fact>
 <dust_emis_fact          hgrid="0.47x0.63" phys="cam5"                  >0.45D0</dust_emis_fact>
 <dust_emis_fact          hgrid="0.23x0.31" phys="cam5"                  >0.45D0</dust_emis_fact>
@@ -1161,43 +1161,45 @@
 <fcrit2              >1.0</fcrit2>
 
 <!-- FV dycore -->
-<fft_flt phys="cam3"  >0</fft_flt>
-<fft_flt              >1</fft_flt>
+<fv_fft_flt phys="cam3"  >0</fv_fft_flt>
+<fv_fft_flt              >1</fv_fft_flt>
 
-<div24del2flag                                > 2</div24del2flag>
-<div24del2flag                   phys="cam5"  > 4</div24del2flag>
-<div24del2flag                   phys="cam5.4"> 4</div24del2flag>
-<div24del2flag hgrid="0.23x0.31" phys="cam4"  >42</div24del2flag>
-<div24del2flag hgrid="0.47x0.63" phys="cam4"  >42</div24del2flag>
-<div24del2flag hgrid="0.23x0.31" phys="cam5"  >42</div24del2flag>
-<div24del2flag hgrid="0.47x0.63" phys="cam5"  >42</div24del2flag>
-<div24del2flag hgrid="0.23x0.31" phys="cam5.4">42</div24del2flag>
-<div24del2flag hgrid="0.47x0.63" phys="cam5.4">42</div24del2flag>
+<fv_div24del2flag                                > 2</fv_div24del2flag>
+<fv_div24del2flag                   phys="cam5"  > 4</fv_div24del2flag>
+<fv_div24del2flag                   phys="cam5.4"> 4</fv_div24del2flag>
+<fv_div24del2flag hgrid="0.23x0.31" phys="cam4"  >42</fv_div24del2flag>
+<fv_div24del2flag hgrid="0.47x0.63" phys="cam4"  >42</fv_div24del2flag>
+<fv_div24del2flag hgrid="0.23x0.31" phys="cam5"  >42</fv_div24del2flag>
+<fv_div24del2flag hgrid="0.47x0.63" phys="cam5"  >42</fv_div24del2flag>
+<fv_div24del2flag hgrid="0.23x0.31" phys="cam5.4">42</fv_div24del2flag>
+<fv_div24del2flag hgrid="0.47x0.63" phys="cam5.4">42</fv_div24del2flag>
 
-<nspltvrm                  >1</nspltvrm>
-<nspltvrm hgrid="0.9x1.25" >2</nspltvrm>
-<nspltvrm hgrid="0.47x0.63">2</nspltvrm>
-<nspltvrm hgrid="0.23x0.31">2</nspltvrm>
-<nspltvrm    waccm_phys="1">2</nspltvrm>
-<nspltrac    waccm_phys="1">2</nspltrac>
+<fv_nspltvrm                  >1</fv_nspltvrm>
+<fv_nspltvrm hgrid="0.9x1.25" >2</fv_nspltvrm>
+<fv_nspltvrm hgrid="0.47x0.63">2</fv_nspltvrm>
+<fv_nspltvrm hgrid="0.23x0.31">2</fv_nspltvrm>
+<fv_nspltvrm    waccm_phys="1">2</fv_nspltvrm>
 
-<nsplit                  waccm_phys="1">8</nsplit>
-<nsplit hgrid="0.9x1.25" waccm_phys="1">12</nsplit>
+<fv_nspltrac    waccm_phys="1">2</fv_nspltrac>
 
-<del2coef                >3.e+5</del2coef>
+<fv_nsplit                  waccm_phys="1"> 8</fv_nsplit>
+<fv_nsplit hgrid="0.9x1.25" waccm_phys="1">12</fv_nsplit>
 
-<filtcw                  >0</filtcw>
-<filtcw hgrid="0.23x0.31">1</filtcw>
+<fv_del2coef                >3.e+5</fv_del2coef>
 
-<!-- Spectral dycore parameters -->
-<eul_nsplit                  >  1 </eul_nsplit>
-<eul_nsplit  hgrid="512x1024"> 12 </eul_nsplit>
+<fv_filtcw                  >0</fv_filtcw>
+<fv_filtcw hgrid="0.23x0.31">1</fv_filtcw>
 
-<eul_hdif_order>4</eul_hdif_order>
+<!-- Eulerian spectral dycore parameters -->
 
-<eul_hdif_kmnhdn>4</eul_hdif_kmnhdn>
+<eul_dif2_coef                 > 2.5D5 </eul_dif2_coef>
+<eul_dif2_coef hgrid="8x16"    > 2.5D7 </eul_dif2_coef>
 
 <!-- The Eulerian hdif coef defaults are for 4th order diffusion -->
+<eul_hdif_order>                      4 </eul_hdif_order>
+
+<eul_hdif_kmnhdn>                     4 </eul_hdif_kmnhdn>
+
 <eul_hdif_coef                 > 1.0D18 </eul_hdif_coef>
 <eul_hdif_coef hgrid="32x64"   > 2.0D16 </eul_hdif_coef>
 <eul_hdif_coef hgrid="48x96"   > 2.0D16 </eul_hdif_coef>
@@ -1206,15 +1208,20 @@
 <eul_hdif_coef hgrid="256x512" > 1.5D14 </eul_hdif_coef>
 <eul_hdif_coef hgrid="512x1024"> 1.5D13 </eul_hdif_coef>
 
-<dyn_spectral_dif2 dyn="eul"                 > 2.5D5 </dyn_spectral_dif2>
-<dyn_spectral_dif2 dyn="eul" hgrid="8x16"    > 2.5D7 </dyn_spectral_dif2>
+<eul_divdampn>  0.0D0  </eul_divdampn>
+<eul_tfilt_eps> 0.06D0 </eul_tfilt_eps>
+<eul_kmxhdc>         5 </eul_kmxhdc>
 
-<dyn_spectral_dif2 dyn="sld"                 > 0.0D0 </dyn_spectral_dif2>
-<dyn_spectral_dif4 dyn="sld"                 > 0.0D0  </dyn_spectral_dif4>
+<eul_nsplit                  >  1 </eul_nsplit>
+<eul_nsplit  hgrid="512x1024"> 12 </eul_nsplit>
 
-<dyn_spectral_divdampn> 0.0D0  </dyn_spectral_divdampn>
-<dyn_spectral_eps     > 0.06D0 </dyn_spectral_eps>
-<dyn_spectral_kmxhdc  > 5      </dyn_spectral_kmxhdc>
+<!-- SLD spectral dycore parameters -->
+<sld_dif2_coef > 0.0D0  </sld_dif2_coef>
+<sld_dif4_coef > 0.0D0  </sld_dif4_coef>
+<sld_divdampn  > 0.0D0  </sld_divdampn>
+<sld_tfilt_eps > 0.06D0 </sld_tfilt_eps>
+<sld_kmxhdc    > 5      </sld_kmxhdc>
+
 
 <!-- iop dataset for SCAM mode -->
 <iopfile dyn="eul">atm/cam/scam/iop/ARM95_4scam.nc</iopfile>

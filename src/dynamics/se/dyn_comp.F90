@@ -86,7 +86,7 @@ CONTAINS
     use control_mod,    only: TRACERTRANSPORT_FLUXFORM_FVM, tracer_transport_type
     use control_mod,    only: TRACER_GRIDTYPE_GLL, TRACER_GRIDTYPE_FVM, tracer_grid_type
     use control_mod,    only: energy_fixer, hypervis_order, hypervis_subcycle
-    use control_mod,    only: hypervis_subcycle_q, integration, statefreq
+    use control_mod,    only: hypervis_subcycle_q, integration, statefreq, runtype
     use control_mod,    only: nu, nu_div, nu_p, nu_q, nu_top, qsplit, rsplit
     use control_mod,    only: vert_remap_q_alg, tstep_type, rk_stage_user
     use control_mod,    only: ftype, limiter_option, partmethod
@@ -98,11 +98,13 @@ CONTAINS
     use control_mod,    only: max_hypervis_courant
     use fvm_mod,        only: fvm_ideal_test, fvm_test_type
     use fvm_mod,        only: fvm_get_test_type
+    use cam_control_mod,only: initial_run
     use cam_abortutils, only: endrun
     use dimensions_mod, only: qsize, qsize_d, ntrac, ntrac_d, npsq, ne, npart
     use constituents,   only: pcnst
     use params_mod,     only: SFCURVE
     use parallel_mod,   only: par, initmp
+    use native_mapping, only: native_mapping_readnl
 !!XXgoldyXX: v For future CSLAM / physgrid commit
 !    use dp_grids,       only: fv_nphys, fv_nphys2, nphys_pts, write_phys_grid, phys_grid_file
 !!XXgoldyXX: ^ For future CSLAM / physgrid commit
@@ -388,6 +390,10 @@ CONTAINS
     statefreq            = se_statefreq
     tstep_type           = se_tstep_type
     vert_remap_q_alg     = se_vert_remap_q_alg
+
+    ! if restart or branch run
+    if (.not. initial_run) runtype = 1
+
 !!XXgoldyXX: v For future physgrid commit
 !    fv_nphys = se_fv_nphys
 !    if (fv_nphys > 0) then
@@ -459,9 +465,11 @@ CONTAINS
 !!XXgoldyXX: ^ For future physgrid commit
     end if
 
+    call native_mapping_readnl(NLFileName)
+
   end subroutine dyn_readnl
 
-  subroutine dyn_init1(fh, NLFileName, dyn_in, dyn_out)
+  subroutine dyn_init1(fh, dyn_in, dyn_out)
 
   ! Initialize the dynamical core
 
@@ -474,14 +482,14 @@ CONTAINS
     use dyn_grid,        only: set_horiz_grid_cnt_d
 
     use spmd_utils,      only: mpi_integer, mpicom, mpi_success
-    use native_mapping,  only: create_native_mapping_files, native_mapping_readnl
+    use native_mapping,  only: create_native_mapping_files
     use time_manager,    only: get_nstep, get_step_size
 
     use dimensions_mod,  only: globaluniquecols, nelem, nelemd, nelemdmax
     use parallel_mod,    only: par
     use prim_driver_mod, only: prim_init1
     use thread_mod,      only: nthreads
-    use control_mod,     only: runtype, qsplit, rsplit
+    use control_mod,     only: qsplit, rsplit
     use time_mod,        only: tstep, nsplit
     use cam_abortutils,  only: endrun
     use phys_control,    only: use_gw_front, use_gw_front_igw
@@ -490,7 +498,6 @@ CONTAINS
 
     ! PARAMETERS:
     type(file_desc_t),   intent(in)  :: fh       ! PIO file handle for initial or restart file
-    character(len=*),    intent(in)  :: NLFileName
     type (dyn_import_t), intent(OUT) :: dyn_in
     type (dyn_export_t), intent(OUT) :: dyn_out
 
@@ -517,12 +524,6 @@ CONTAINS
 
     ! Initialize dynamics grid
     call dyn_grid_init()
-
-    ! Read the SE specific part of the namelist
-    call dyn_readnl(NLFileName)
-
-    ! override the setting in the SE namelist, it's redundant anyway
-    if (.not. is_first_step()) runtype = 1
 
     ! Initialize hybrid coordinate arrays.
     call hycoef_init(fh)
@@ -593,7 +594,6 @@ CONTAINS
     !
     ! This subroutine creates mapping files using SE basis functions if requested
     !
-    call native_mapping_readnl(NLFileName)
     call create_native_mapping_files( par, elem,'native')
     call create_native_mapping_files( par, elem,'bilin')
 

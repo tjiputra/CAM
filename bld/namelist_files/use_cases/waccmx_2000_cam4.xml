@@ -19,7 +19,7 @@
 
 <!-- cam_inparm -->
 
-<nsplit>6</nsplit>
+<fv_nsplit>6</fv_nsplit>
 <dtime>300</dtime>
 
 <!-- cloud tuning factor -->
@@ -61,12 +61,6 @@
 <nox_emis_file>atm/cam/chem/1850-2000_emis/IPCC_emissions_houw_NOx_1850-2000_1.9x2.5.c090728.nc</nox_emis_file>
 <srf_emis_type>CYCLICAL</srf_emis_type>
 <srf_emis_cycle_yr>2000</srf_emis_cycle_yr>
-
-<!-- Photolysis Inputs DEFAULTS okay for: rsf_file,xs_long_file,xs_short_file -->
-
-<!-- Extraterestrial Flux and MLT inputs DEFAULTS okay for:  -->
-<!-- efield_hflux_file, efield_lflux_file, efield_wei96_file -->
-<!-- electron_file,euvac_file,euvacdat_file,photon_file,neckel_file,woods_etf_file,xs_coef_file -->
 
 <!-- Kp Ap indices -->
 <solar_parms_file>atm/waccm/phot/wa_smax_quiet_c120118.nc</solar_parms_file>
@@ -117,7 +111,7 @@
   'jo2_a', 'jo2_b', 'jo3_a',  'jo3_b', 'jhocl', 'jno3_b', 'jcl2o2',
   'SAD_SULFC', 'SAD_LNAT', 'SAD_ICE','AOA1','AOA2',
   'O2', 'CLDLIQ', 'CLDICE', 'ASDIR',
-  'VTH2d', 'WTH2d', 'UV2d', 'UW2d', 'TH', 'MSKtem',
+  'VTHzm', 'WTHzm', 'UVzm', 'UWzm', 'TH', 'MSKtem',
   'O2_1S', 'O2_1D',
   'Op', 'O2p', 'Np', 'NOp', 'N2p', 'e', 
   'UIONTEND', 'VIONTEND', 'UTGWSPEC', 'UTGWORO', 'VTGWSPEC', 'VTGWORO', 'TTGW', 
@@ -133,7 +127,7 @@
   'Np:B', 'N2p:B', 'Op:B', 'O2p:B', 'NOp:B', 'e:B', 'QRL_TOT:B',
   'QRS_TOT:B', 'QJOULE:B', 'jno3_a:B', 'jno3_b:B', 'jcl2o2:B', 'CL2O2:B', 'CLO:B',
   'BRO:B', 'NO3:B', 'DTCORE:B', 'DTV:B', 'TTGW:B','OMEGA:B', 
-  'MSKtem:B', 'PSL:B', 'PS:B', 'PHIS:B', 'U2d:B', 'V2d:B','W2d:B', 'TH2d:B', 'UV2d:B', 'UW2d:B', 'VTH2d:B'
+  'MSKtem:B', 'PSL:B', 'PS:B', 'PHIS:B', 'Uzm:B', 'Vzm:B','Wzm:B', 'THzm:B', 'UVzm:B', 'UWzm:B', 'VTHzm:B'
 </fincl3>
 
 <!-- sim_year used for CLM datasets and SSTs forcings -->

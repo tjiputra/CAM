@@ -1,24 +1,32 @@
 module dyn_comp
 !----------------------------------------------------------------------- 
 ! 
-! Dycore interface module for SLD
+! SLD dycore interface module
 !
 !-----------------------------------------------------------------------
 
-use shr_kind_mod, only: r8 => shr_kind_r8
-use constituents, only: pcnst, cnst_name, cnst_longname
-use constituents, only: tendnam, fixcnam, tottnam, hadvnam, vadvnam
-use ppgrid,       only: pver, pverp
-use pmgrid,       only: plev, plevp
-use hycoef,       only: hycoef_init
-use cam_history,  only: addfld, add_default, horiz_only
-use pio,          only: file_desc_t
+use shr_kind_mod,    only: r8 => shr_kind_r8
+use spmd_utils,      only: masterproc
+use ppgrid,          only: pver, pverp
+use pmgrid,          only: plev, plevp
+use constituents,    only: pcnst, cnst_name, cnst_longname
+use constituents,    only: tendnam, fixcnam, tottnam, hadvnam, vadvnam
+use hycoef,          only: hycoef_init
+use sld_control_mod, only: dif2, dif4, divdampn, eps, kmxhdc
+use cam_history,     only: addfld, add_default, horiz_only
+use pio,             only: file_desc_t
+use cam_abortutils,  only: endrun
+use cam_logfile,     only: iulog
 
+#if (defined SPMD)
+use spmd_dyn,        only: spmd_readnl, spmdinit_dyn
+#endif
 
 implicit none
 private
+save
 
-public :: dyn_init, dyn_import_t, dyn_export_t
+public :: dyn_readnl, dyn_init, dyn_import_t, dyn_export_t
 
 ! these structures are not used in this dycore, but are included
 ! for source code compatibility.  
@@ -30,23 +38,111 @@ type dyn_export_t
    integer :: placeholder
 end type dyn_export_t
 
-!#######################################################################
-CONTAINS
-!#######################################################################
+!=============================================================================================
+contains
+!=============================================================================================
 
-subroutine dyn_init(file, nlfilename)
+subroutine dyn_readnl(nlfile)
 
-   use spmd_utils,          only: masterproc
-   use sld_control_mod,     only: dyn_sld_readnl
-   use phys_control,        only: phys_getopts
+   ! Read SLD namelist group.
+
+   use namelist_utils,  only: find_group_name
+   use units,           only: getunit, freeunit
+   use spmd_utils,      only: mpicom, mstrid=>masterprocid, mpi_integer, mpi_real8
+
+   ! args
+   character(len=*), intent(in) :: nlfile  ! filepath for file containing namelist input
+    
+   ! local vars
+   integer :: unitn, ierr
+
+   real(r8) :: sld_dif2_coef          ! del2 horizontal diffusion coeff.
+   real(r8) :: sld_dif4_coef          ! del4 horizontal diffusion coeff.
+   real(r8) :: sld_divdampn      ! Number of days to invoke divergence damper
+   real(r8) :: sld_tfilt_eps           ! time filter coefficient. Defaults to 0.06.
+   integer  :: sld_kmxhdc        ! Number of levels to apply Courant limiter
+    
+   namelist /dyn_sld_inparm/ sld_dif2_coef, sld_dif4_coef, &
+      sld_divdampn, sld_tfilt_eps, sld_kmxhdc
+
+   character(len=*), parameter :: sub = 'dyn_readnl'
+   !--------------------------------------------------------------------------------------
+
+   if (masterproc) then
+      unitn = getunit()
+      open( unitn, file=trim(nlfile), status='old' )
+      call find_group_name(unitn, 'dyn_sld_inparm', status=ierr)
+      if (ierr == 0) then
+         read(unitn, dyn_sld_inparm, iostat=ierr)
+         if (ierr /= 0) then
+            call endrun(sub//': ERROR reading namelist')
+         end if
+      end if
+      close(unitn)
+      call freeunit(unitn)
+   end if
+
+   call mpi_bcast(sld_dif2_coef, 1, mpi_real8, mstrid, mpicom, ierr)
+   if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: sld_dif2_coef")
+
+   call mpi_bcast(sld_dif4_coef, 1, mpi_real8, mstrid, mpicom, ierr)
+   if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: sld_dif4_coef")
+
+   call mpi_bcast(sld_divdampn, 1, mpi_real8, mstrid, mpicom, ierr)
+   if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: sld_divdampn")
+
+   call mpi_bcast(sld_tfilt_eps, 1, mpi_real8, mstrid, mpicom, ierr)
+   if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: sld_tfilt_eps")
+
+   call mpi_bcast(sld_kmxhdc, 1, mpi_integer, mstrid, mpicom, ierr)
+   if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: sld_kmxhdc")
+
+   dif2     = sld_dif2_coef
+   dif4     = sld_dif4_coef
+   divdampn = sld_divdampn
+   eps      = sld_tfilt_eps
+   kmxhdc   = sld_kmxhdc
+
+   ! Write namelist variables to logfile
+   if (masterproc) then
+
+      write(iulog,*) 'SLD Dycore Parameters:'
+
+      if (divdampn > 0._r8) then
+         write(iulog,*) '  Divergence damper for spectral dycore invoked for days 0. to ',divdampn,' of this case'
+      elseif (divdampn < 0._r8) then
+         call endrun ('READ_NAMELIST: divdampn must be a positive number')
+      else
+         write(iulog,*) '  Divergence damper for spectral dycore NOT invoked'
+      endif
+
+      if (kmxhdc >= plev .or. kmxhdc < 0) then
+         call endrun ('DYN_SLD_READNL:  ERROR:  KMXHDC must be between 0 and plev-1')
+      end if
+
+      write(iulog,9108) eps, dif2, dif4, kmxhdc
+   end if
+
 #if (defined SPMD)
-   use spmd_dyn,            only: spmd_readnl,spmdinit_dyn
-#endif
+   call spmd_readnl(nlfile)
+#endif 
+
+9108 format('   Time filter coefficient (EPS)                 ',f10.3,/,&
+            '   DEL2 Horizontal diffusion coefficient (DIF2)  ',e10.3/, &
+            '   DEL4 Horizontal diffusion coefficient (DIF4)  ',e10.3/, &
+            '   Number of levels Courant limiter applied      ',i10)
+
+end subroutine dyn_readnl
+
+!=============================================================================================
+
+subroutine dyn_init(file)
+
+   use phys_control,        only: phys_getopts
    use dyn_grid,            only: define_cam_grids
 
    ! ARGUMENTS:
    type(file_desc_t), intent(in) :: file       ! PIO file handle for initial or restart file
-   character(len=*),  intent(in) :: nlfilename
 
    logical :: history_amwg       ! output for AMWG diagnostics
    ! Local workspace
@@ -54,10 +150,7 @@ subroutine dyn_init(file, nlfilename)
 
    call trunc()
 
-   call dyn_sld_readnl(nlfilename)
-
 #if (defined SPMD)
-   call spmd_readnl(nlfilename)
    call spmdinit_dyn()
 #endif 
 

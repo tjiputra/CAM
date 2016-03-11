@@ -84,8 +84,6 @@ CONTAINS
 
   subroutine atm_init_mct( EClock, cdata_a, x2a_a, a2x_a, NLFilename )
 
-   use spmd_utils,      only: mpicom, mstrid=>masterprocid, mpi_integer
-
     !-----------------------------------------------------------------------
     !
     ! Arguments
@@ -140,7 +138,6 @@ CONTAINS
     real(r8):: caldayp1         ! CAM calendar day for for next cam time step
 
     integer :: lbnum
-    integer :: ierr
 
     integer :: hdim1_d, hdim2_d ! dimensions of rectangular horizontal grid
                                 ! data structure, If 1D data structure, then
@@ -176,19 +173,16 @@ CONTAINS
 
        ! Redirect share output to cam log
        
-       inquire(file='atm_modelio.nml'//trim(inst_suffix), exist=exists)
-
        if (masterproc) then
+          inquire(file='atm_modelio.nml'//trim(inst_suffix), exist=exists)
           if (exists) then
              iulog = shr_file_getUnit()
              call shr_file_setIO('atm_modelio.nml'//trim(inst_suffix), iulog)
           endif
+
           write(iulog,*) "CAM atmosphere model initialization"
        endif
        
-       call mpi_bcast(iulog, 1, mpi_integer, mstrid, mpicom, ierr)
-       if (ierr /= 0) call endrun("atm_init_mct: FATAL: mpi_bcast: iulog")
-
        call shr_file_getLogUnit (shrlogunit)
        call shr_file_getLogLevel(shrloglev)
        call shr_file_setLogUnit (iulog)
@@ -209,7 +203,7 @@ CONTAINS
 
        ! Initialize CAM, allocate cam_in and cam_out and determine 
        ! atm decomposition (needed to initialize gsmap) 
-       ! for an initial run, cam_in and cam_out are allocated in cam_initial
+       ! for an initial run, cam_in and cam_out are allocated in cam_init
        ! for a restart/branch run, cam_in and cam_out are allocated in restart 
        !
        call cam_init(EClock, &

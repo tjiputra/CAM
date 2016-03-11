@@ -1,5 +1,5 @@
 &camexp
- start_ymd=20000101
+ start_ymd=20031028
  restart_option='nsteps'
  restart_n=3
  mfilt=1,1,1,1,1,1
@@ -8,4 +8,5 @@
  inithist='ENDOFRUN'
  pbuf_global_allocate=.false.
  waccmx_opt='ionosphere'
+ solar_euv_data_file = '$CSMDATA/atm/waccm/phot/2003_fism_daily_and_2003301flare_23_5minutes_c150626.nc'
  /

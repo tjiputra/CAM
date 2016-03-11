@@ -407,7 +407,7 @@ CONTAINS
     call pio_setframe(File, vdesc,int(-1,kind=pio_offset_kind))
   end subroutine get_restart_var
 
-  subroutine read_restart_dynamics(File, dyn_in, dyn_out, NLFileName)
+  subroutine read_restart_dynamics(File, dyn_in, dyn_out)
     use cam_pio_utils, only : pio_subsystem
 
     use pmgrid
@@ -418,8 +418,6 @@ CONTAINS
     type(file_desc_t) :: File
     type(dyn_export_t) :: dyn_out
     type(dyn_import_t) :: dyn_in
-
-    character(len=*), intent(in) :: NLFileName
 
     real(r8), allocatable :: tmp(:)
     integer ::  dims3d(3)
@@ -443,7 +441,7 @@ CONTAINS
     !
     dyn_state => get_dyn_state()
 
-    call dyn_init(file, dyn_state, dyn_in, dyn_out, NLFileName )
+    call dyn_init(file, dyn_state, dyn_in, dyn_out)
 
     dims3d(1)=(endlonxy-beglonxy+1)
     dims3d(2)=(endlatxy-beglatxy+1)

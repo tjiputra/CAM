@@ -13,8 +13,12 @@ use pmgrid,       only: plev, plevp
 use hycoef,       only: hycoef_init
 use cam_history,  only: addfld, add_default, horiz_only
 use phys_control, only: phys_getopts
-use eul_control_mod, only: dyn_eul_readnl, eul_nsplit
+
+use eul_control_mod, only: dif2, hdif_order, kmnhdn, hdif_coef, divdampn, eps, &
+                           kmxhdc, eul_nsplit
 use cam_logfile,  only: iulog
+use cam_abortutils,  only: endrun
+
 use pio,          only: file_desc_t
 
 #if (defined SPMD)
@@ -24,7 +28,7 @@ use spmd_dyn,     only: spmd_readnl, spmdinit_dyn
 implicit none
 private
 
-public :: dyn_init, dyn_import_t, dyn_export_t
+public :: dyn_readnl, dyn_init, dyn_import_t, dyn_export_t
 
 ! these structures are not used in this dycore, but are included
 ! for source code compatibility.  
@@ -36,17 +40,142 @@ type dyn_export_t
    integer :: placeholder
 end type dyn_export_t
 
-!#######################################################################
+!=============================================================================================
 CONTAINS
-!#######################################################################
+!=============================================================================================
 
-subroutine dyn_init(file, nlfilename)
+subroutine dyn_readnl(nlfile)
+
+   ! Read dynamics namelist group.
+   use namelist_utils,  only: find_group_name
+   use units,           only: getunit, freeunit
+   use spmd_utils,      only: mpicom, mstrid=>masterprocid, mpi_integer, mpi_real8
+
+   ! args
+   character(len=*), intent(in) :: nlfile  ! filepath for file containing namelist input
+    
+   ! local vars
+   integer :: unitn, ierr
+     
+   real(r8) :: eul_dif2_coef     ! del2 horizontal diffusion coeff.
+   integer  :: eul_hdif_order    ! Order of horizontal diffusion operator
+   integer  :: eul_hdif_kmnhdn   ! Nth order horizontal diffusion operator top level.
+   real(r8) :: eul_hdif_coef     ! Nth order horizontal diffusion coefficient.
+   real(r8) :: eul_divdampn      ! Number of days to invoke divergence damper
+   real(r8) :: eul_tfilt_eps     ! Time filter coefficient. Defaults to 0.06.
+   integer  :: eul_kmxhdc        ! Number of levels to apply Courant limiter
+    
+   namelist /dyn_eul_inparm/ eul_dif2_coef, eul_hdif_order, eul_hdif_kmnhdn, &
+      eul_hdif_coef, eul_divdampn, eul_tfilt_eps, eul_kmxhdc, eul_nsplit
+
+   character(len=*), parameter :: sub = 'dyn_readnl'
+   !-----------------------------------------------------------------------------
+
+   ! Read namelist 
+   if (masterproc) then
+      unitn = getunit()
+      open( unitn, file=trim(nlfile), status='old' )
+      call find_group_name(unitn, 'dyn_eul_inparm', status=ierr)
+      if (ierr == 0) then
+         read(unitn, dyn_eul_inparm, iostat=ierr)
+         if (ierr /= 0) then
+            call endrun(sub//': ERROR reading namelist')
+         end if
+      end if
+      close(unitn)
+      call freeunit(unitn)
+   end if
+
+   call mpi_bcast(eul_dif2_coef, 1, mpi_real8, mstrid, mpicom, ierr)
+   if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: eul_dif2_coef")
+
+   call mpi_bcast(eul_hdif_order, 1, mpi_integer, mstrid, mpicom, ierr)
+   if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: eul_hdif_order")
+
+   call mpi_bcast(eul_hdif_kmnhdn, 1, mpi_integer, mstrid, mpicom, ierr)
+   if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: eul_hdif_kmnhdn")
+
+   call mpi_bcast(eul_hdif_coef, 1, mpi_real8, mstrid, mpicom, ierr)
+   if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: eul_hdif_coef")
+
+   call mpi_bcast(eul_divdampn, 1, mpi_real8, mstrid, mpicom, ierr)
+   if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: eul_divdampn")
+
+   call mpi_bcast(eul_tfilt_eps, 1, mpi_real8, mstrid, mpicom, ierr)
+   if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: eul_tfilt_eps")
+
+   call mpi_bcast(eul_kmxhdc, 1, mpi_integer, mstrid, mpicom, ierr)
+   if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: eul_kmxhdc")
+
+   call mpi_bcast(eul_nsplit, 1, mpi_integer, mstrid, mpicom, ierr)
+   if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: eul_nsplit")
+
+   dif2       = eul_dif2_coef
+   hdif_order = eul_hdif_order
+   kmnhdn     = eul_hdif_kmnhdn
+   hdif_coef  = eul_hdif_coef
+   divdampn   = eul_divdampn
+   eps        = eul_tfilt_eps
+   kmxhdc     = eul_kmxhdc
+
+   ! Write namelist variables to logfile
+   if (masterproc) then
+
+      write(iulog,*) 'Eulerian Dycore Parameters:'
+
+
+      ! Order of diffusion
+      if (hdif_order < 2 .or. mod(hdif_order, 2) /= 0) then
+         write(iulog,*) sub//': Order of diffusion must be greater than 0 and multiple of 2'
+         write(iulog,*) 'hdif_order = ', hdif_order
+         call endrun(sub//': ERROR: invalid eul_hdif_order specified')
+      end if
+
+      if (divdampn > 0._r8) then
+         write(iulog,*) '  Divergence damper for spectral dycore invoked for days 0. to ',divdampn,' of this case'
+      elseif (divdampn < 0._r8) then
+         call endrun (sub//': divdampn must be non-negative')
+      else
+         write(iulog,*) '  Divergence damper for spectral dycore NOT invoked'
+      endif
+
+      if (kmxhdc >= plev .or. kmxhdc < 0) then
+         call endrun (sub//':  ERROR:  KMXHDC must be between 0 and plev-1')
+      end if
+
+      write(iulog,9108) eps, hdif_order, kmnhdn, hdif_coef, kmxhdc, eul_nsplit
+
+      if (kmnhdn > 1) then
+         write(iulog,9109) dif2
+      end if
+
+   end if
+
+#if (defined SPMD)
+   call spmd_readnl(nlfile)
+#endif 
+
+9108 format('   Time filter coefficient (EPS)                 ',f10.3,/,&
+            '   Horizontal diffusion order (N)                ',i10/, &
+            '   Top layer for Nth order horizontal diffusion  ',i10/, &
+            '   Nth order horizontal diffusion coefficient    ',e10.3/, &
+            '   Number of levels Courant limiter applied      ',i10/,   &
+            '   Dynamics Subcycling                           ',i10)
+
+9109 format('   DEL2 horizontal diffusion applied above Nth order diffusion',/,&
+            '   DEL2 Horizontal diffusion coefficient (DIF2)  ',e10.3)
+
+
+end subroutine dyn_readnl
+
+!=============================================================================================
+
+subroutine dyn_init(file)
    use dyn_grid,     only: define_cam_grids, initgrid
    use scamMod,      only: single_column
 
    ! ARGUMENTS:
    type(file_desc_t), intent(in) :: file       ! PIO file handle for initial or restart file
-   character(len=*),  intent(in) :: nlfilename
 
    ! Local workspace
    integer m                     ! Index
@@ -60,11 +189,7 @@ subroutine dyn_init(file, nlfilename)
 
    call trunc()
 
-   call dyn_eul_readnl(nlfilename)
-   if (masterproc) write(iulog,*) 'EUL subcycling - eul_nsplit = ', eul_nsplit
-
 #if (defined SPMD)
-   call spmd_readnl(nlfilename)
    call spmdinit_dyn()
 #endif 
 

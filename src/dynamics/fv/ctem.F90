@@ -1,17 +1,19 @@
 !-----------------------------------------------------------------------------
-! circulation diagnostics
+! circulation diagnostics -- terms of the Transformed Eulerian Mean (TEM) equation
 !-----------------------------------------------------------------------------
 module ctem
 
   use shr_kind_mod, only: r8 => shr_kind_r8
+  use spmd_utils,   only: masterproc
   use pmgrid,       only: plon, plev, plevp
   use cam_logfile,  only: iulog
   use cam_history,  only: addfld, outfld, add_default, horiz_only
+  use cam_abortutils, only: endrun
 
   implicit none
-
   private
   
+  public :: ctem_readnl
   public :: ctem_init
   public :: ctem_diags
   public :: do_circulation_diags
@@ -20,7 +22,6 @@ module ctem
   real(r8) :: iref_p(plevp)              ! interface reference pressure for vertical interpolation
   integer  :: ip_b                       ! level index where hybrid levels become purely pressure
   integer  :: zm_limit
-  logical  :: twod_output
 
   logical :: do_circulation_diags = .false.
 
@@ -31,8 +32,6 @@ contains
   subroutine ctem_diags( u3, v3, omga, pt, h2o, ps, pe, grid)
 
     use physconst, only              : zvir, cappa
-    use spmd_utils, only             : iam
-    use cam_abortutils, only         : endrun
     use dynamics_vars, only          : T_FVDYCORE_GRID
     use hycoef, only                 : ps0
     use interpolate_data, only       : vertinterp
@@ -89,16 +88,12 @@ contains
     real(r8) :: uvp(grid%ifirstxy:grid%ilastxy,plevp)        ! zonal deviation of vertical velocity
     real(r8) :: uwp(grid%ifirstxy:grid%ilastxy,plevp)        ! zonal deviation of pot. temperature
 
-    real(r8) :: dummy(plon,plevp)
-    real(r8) :: dum2(plon)
     real(r8) :: rdiv(plevp)
     
     integer  :: ip_gm1g(plon,grid%jfirstxy:grid%jlastxy)     ! contains level index-1 where blocked points begin
     integer  :: zm_cnt(plevp)                                ! counter
     integer  :: i,j,k
     integer  :: nlons
-    integer  :: astat
-    integer  :: t, dest, src
 
     logical  :: has_zm(plevp,grid%jfirstxy:grid%jlastxy)                   ! .true. the (z,y) point is a valid zonal mean 
     integer  :: ip_gm1(grid%ifirstxy:grid%ilastxy,grid%jfirstxy:grid%jlastxy) ! contains level index-1 where blocked points begin
@@ -176,13 +171,13 @@ lat_loop1 : &
 #ifdef CTEM_DIAGS
     write(iulog,*) '===================================================='
     do j = beglat,endlat
-       write(iulog,'(''iam,myidxy_x,myidxy_y,j = '',4i4)') iam,grid%myidxy_x,grid%myidxy_y,j
+       write(iulog,'(''iam,myidxy_x,myidxy_y,j = '',4i4)') grid%iam,grid%myidxy_x,grid%myidxy_y,j
        write(iulog,'(20i3)') ip_gm1(:,j)
     end do
     if( grid%myidxy_x == 0 ) then
        do j = beglat,endlat
           write(iulog,*) '===================================================='
-          write(iulog,'(''iam,myidxy_x,myidxy_y,j = '',4i4)') iam,grid%myidxy_x,grid%myidxy_y,j
+          write(iulog,'(''iam,myidxy_x,myidxy_y,j = '',4i4)') grid%iam,grid%myidxy_x,grid%myidxy_y,j
           write(iulog,'(20i3)') ip_gm1g(:,j)
        end do
        write(iulog,*) '===================================================='
@@ -213,7 +208,7 @@ lat_loop2 : &
 #ifdef CTEM_DIAGS
     if( grid%myidxy_y == 12 ) then
        write(iulog,*) '^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^'
-       write(iulog,'(''iam,myidxy_x,myidxy_y,j = '',4i4)') iam,grid%myidxy_x,grid%myidxy_y,beglat
+       write(iulog,'(''iam,myidxy_x,myidxy_y,j = '',4i4)') grid%iam,grid%myidxy_x,grid%myidxy_y,beglat
        write(iulog,*) 'has_zm'
        write(iulog,'(20l2)') has_zm(:,beglat)
        write(iulog,*) 'ip_gm1g'
@@ -253,7 +248,7 @@ lat_loop3 : &
 #ifdef CTEM_DIAGS
        if( j == endlat ) then
        write(iulog,*) '^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^'
-       write(iulog,'(''iam,myidxy_x,myidxy_y,j = '',4i4)') iam,grid%myidxy_x,grid%myidxy_y,j
+       write(iulog,'(''iam,myidxy_x,myidxy_y,j = '',4i4)') grid%iam,grid%myidxy_x,grid%myidxy_y,j
        write(iulog,*) 'iref_p'
        write(iulog,'(5g15.7)') iref_p(:)
        write(iulog,'(''pm(endlon,:,'',i2,'')'')') j
@@ -287,7 +282,7 @@ lat_loop3 : &
 #ifdef CTEM_DIAGS
        if( j == endlat .and. grid%myidxy_y == 12 ) then
           write(iulog,*) '$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$'
-          write(iulog,'(''iam,myidxy_x,myidxy_y,j = '',4i4)') iam,grid%myidxy_x,grid%myidxy_y,j
+          write(iulog,'(''iam,myidxy_x,myidxy_y,j = '',4i4)') grid%iam,grid%myidxy_x,grid%myidxy_y,j
           write(iulog,*) 'um after par_xsum'
           write(iulog,'(5g15.7)') um(:)
           write(iulog,*) '$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$'
@@ -376,7 +371,7 @@ lat_loop3 : &
        if( j == endlat .and. grid%myidxy_y == 12 ) then
           write(iulog,*) '#################################################'
           write(iulog,*) 'DIAGNOSTICS before par_xsum'
-          write(iulog,'(''iam,myidxy_x,myidxy_y,j = '',4i4)') iam,grid%myidxy_x,grid%myidxy_y,j
+          write(iulog,'(''iam,myidxy_x,myidxy_y,j = '',4i4)') grid%iam,grid%myidxy_x,grid%myidxy_y,j
           write(iulog,*) 'has_zm'
           write(iulog,*) has_zm(:,j)
           write(iulog,*) 'rdiv'
@@ -397,7 +392,7 @@ lat_loop3 : &
 #ifdef CTEM_DIAGS
        if( j == endlat .and. grid%myidxy_y == 12 ) then
           write(iulog,*) '#################################################'
-          write(iulog,'(''iam,myidxy_x,myidxy_y,j = '',4i4)') iam,grid%myidxy_x,grid%myidxy_y,j
+          write(iulog,'(''iam,myidxy_x,myidxy_y,j = '',4i4)') grid%iam,grid%myidxy_x,grid%myidxy_y,j
           write(iulog,*) 'uw after par_xsum'
           write(iulog,'(5g15.7)') uw(:,j)
           write(iulog,*) '#################################################'
@@ -427,103 +422,52 @@ lat_loop3 : &
     end do lat_loop3
 
 !-------------------------------------------------------------
-! Do the 2D output
+! Do the output
 !-------------------------------------------------------------
     latloop: do j = beglat,endlat
 
-       out2d: if( twod_output ) then
-          tmp2(:) = 0._r8
-          do i = beglon,endlon
-             if ( i <= plevp ) then
-                tmp2(i) = vth(i,j)
-             endif
-          enddo
-          call outfld( 'VTH2d', tmp2, nlons, j )
-
-          tmp2(:) = 0._r8
-          do i = beglon,endlon
-             if ( i <= plevp ) then
-                tmp2(i) = wth(i,j)
-             endif
-          enddo
-          call outfld( 'WTH2d', tmp2, nlons, j )
-
-          tmp2(:) = 0._r8
-          do i = beglon,endlon
-             if ( i <= plevp ) then
-                tmp2(i) = uv(i,j)
-             endif
-          enddo
-          call outfld( 'UV2d', tmp2, nlons, j )
-
-          tmp2(:) = 0._r8
-          do i = beglon,endlon
-             if ( i <= plevp ) then
-                tmp2(i) = uw(i,j)
-             endif
-          enddo
-          call outfld( 'UW2d', tmp2, nlons, j )
-
-          tmp2(:) = 0._r8
-          do i = beglon,endlon
-             if ( i <= plevp ) then
-                tmp2(i) = u2d(i,j)
-             endif
-          enddo
-          call outfld( 'U2d', tmp2, nlons, j )
-
-          tmp2(:) = 0._r8
-          do i = beglon,endlon
-             if ( i <= plevp ) then
-                tmp2(i) = v2d(i,j)
-             endif
-          enddo
-          call outfld( 'V2d', tmp2, nlons, j )
-
-          tmp2(:) = 0._r8
-          do i = beglon,endlon
-             if ( i <= plevp ) then
-                tmp2(i) = th2d(i,j)
-             endif
-          enddo
-          call outfld( 'TH2d', tmp2, nlons, j )
-
-          tmp2(:) = 0._r8
-          do i = beglon,endlon
-             if ( i <= plevp ) then
-                tmp2(i) = w2d(i,j)
-             endif
-          enddo
-          call outfld( 'W2d', tmp2, nlons, j )
-
-       end if out2d
-       
-       tmp2(beglon:endlon) = ip_gm1(beglon:endlon,j)
-       call outfld( 'MSKtem', tmp2, nlons, j  )
-
 !-------------------------------------------------------------
-! 3D output
+! zonal-mean output
 !-------------------------------------------------------------
        do k = 1,plevp
           tmp3(grid%ifirstxy,k) = vth(k,j)
        enddo
-       call outfld( 'VTH3d', tmp3(grid%ifirstxy:grid%ifirstxy,:), 1, j )
+       call outfld( 'VTHzm', tmp3(grid%ifirstxy,:), 1, j )
 
        do k = 1,plevp
           tmp3(grid%ifirstxy,k) = wth(k,j)
        enddo
-       call outfld( 'WTH3d', tmp3(grid%ifirstxy:grid%ifirstxy,:), 1, j )
+       call outfld( 'WTHzm', tmp3(grid%ifirstxy,:), 1, j )
 
        do k = 1,plevp
           tmp3(grid%ifirstxy,k) = uv(k,j)
        enddo
-       call outfld( 'UV3d', tmp3(grid%ifirstxy:grid%ifirstxy,:), 1, j )
+       call outfld( 'UVzm', tmp3(grid%ifirstxy,:), 1, j )
  
        do k = 1,plevp
           tmp3(grid%ifirstxy,k) = uw(k,j)
        enddo
-       call outfld( 'UW3d', tmp3(grid%ifirstxy:grid%ifirstxy,:), 1, j )
+       call outfld( 'UWzm', tmp3(grid%ifirstxy,:), 1, j )
+       do k = 1,plevp
+          tmp3(grid%ifirstxy,k) = u2d(k,j)
+       enddo
+       call outfld( 'Uzm', tmp3(grid%ifirstxy,:), 1, j )
+       do k = 1,plevp
+          tmp3(grid%ifirstxy,k) = v2d(k,j)
+       enddo
+       call outfld( 'Vzm', tmp3(grid%ifirstxy,:), 1, j )
+       do k = 1,plevp
+          tmp3(grid%ifirstxy,k) = w2d(k,j)
+       enddo
+       call outfld( 'Wzm', tmp3(grid%ifirstxy,:), 1, j )
+       do k = 1,plevp
+          tmp3(grid%ifirstxy,k) = th2d(k,j)
+       enddo
+       call outfld( 'THzm', tmp3(grid%ifirstxy,:), 1, j )
 
+!-------------------------------------------------------------
+! 3D output
+!-------------------------------------------------------------
        do k = 1,plevp
           do i = beglon,endlon
              tmp3(i,k) = thig(i,k,j)
@@ -531,35 +475,28 @@ lat_loop3 : &
        enddo
        call outfld( 'TH', tmp3, nlons, j )
 
+!-------------------------------------------------------------
+! horizontal output
+!-------------------------------------------------------------
+       tmp2(beglon:endlon) = ip_gm1(beglon:endlon,j)
+       call outfld( 'MSKtem', tmp2, nlons, j  )
+
     enddo latloop
 
   end subroutine ctem_diags
 
 !=================================================================================
 
-  subroutine ctem_init(nlfile)
+  subroutine ctem_init()
 
-  use spmd_utils, only : masterproc
   use hycoef, only     : hyai, hybi, ps0
-
-  implicit none
-
-  character(len=*), intent(in) :: nlfile  ! filepath for file containing namelist input
 
 !-------------------------------------------------------------
 !	... local variables
 !-------------------------------------------------------------
     integer :: k
 
-    call circ_diag_readnl(nlfile)
     if (.not.do_circulation_diags) return
-
-    twod_output = plon >= plevp
-    if( masterproc ) then
-       if( .not. twod_output ) then
-          write(iulog,*) 'At this resolution, no TEM diagnostic is provided in the seconday tapes.'
-       end if
-    end if
 
     rplon    = 1._r8/plon
     zm_limit = plon/3
@@ -586,36 +523,26 @@ lat_loop3 : &
 !-------------------------------------------------------------
 ! Initialize output buffer
 !-------------------------------------------------------------
-    call addfld ('VTH3d',(/ 'ilev' /),'A','MK/S','Meridional Heat Flux: 3D zon. mean', gridname='fv_centers_zonal' )
-    call addfld ('WTH3d',(/ 'ilev' /),'A','MK/S','Vertical Heat Flux: 3D zon. mean', gridname='fv_centers_zonal' )
-    call addfld ('UV3d', (/ 'ilev' /),'A','M2/S2',    &
-         'Meridional Flux of Zonal Momentum: 3D zon. mean', gridname='fv_centers_zonal' )
-    call addfld ('UW3d', (/ 'ilev' /),'A','M2/S2',    &
-         'Vertical Flux of Zonal Momentum: 3D zon. mean', gridname='fv_centers_zonal' )
-    if( twod_output ) then
-       call addfld ('VTH2d',horiz_only,'A','MK/S','Meridional Heat Flux: 2D prj of zon. mean - defined on ilev', &
-            gridname='fv_centers' )
-       call addfld ('WTH2d',horiz_only,'A','MK/S','Vertical Heat Flux: 2D prj of zon. mean - defined on ilev',   &
-            gridname='fv_centers' )
-       call addfld ('UV2d', horiz_only,'A','M2/S2', &
-            'Meridional Flux of Zonal Momentum: 2D prj of zon. mean - defined on ilev',gridname='fv_centers' )
-       call addfld ('UW2d', horiz_only,'A','M2/S2', &
-            'Vertical Flux of Zonal Momentum; 2D prj of zon. mean - defined on ilev',gridname='fv_centers' )
-       call addfld ('U2d',  horiz_only,'A','M/S','Zonal-Mean zonal wind - defined on ilev',gridname='fv_centers' )
-       call addfld ('V2d',  horiz_only,'A','M/S','Zonal-Mean meridional wind - defined on ilev',gridname='fv_centers' )
-       call addfld ('W2d',  horiz_only,'A','M/S','Zonal-Mean vertical wind - defined on ilev',gridname='fv_centers' )
-       call addfld ('TH2d', horiz_only,'A','K','Zonal-Mean potential temp - defined on ilev',gridname='fv_centers' )
-    end if
-    call addfld ('TH',    (/ 'ilev' /),'A','K','Potential Temperature', gridname='fv_centers' )
+    call addfld ('VTHzm',(/ 'ilev' /),'A','MK/S','Meridional Heat Flux: 3D zon. mean', gridname='fv_centers_zonal' )
+    call addfld ('WTHzm',(/ 'ilev' /),'A','MK/S','Vertical Heat Flux: 3D zon. mean', gridname='fv_centers_zonal' )
+    call addfld ('UVzm', (/ 'ilev' /),'A','M2/S2','Meridional Flux of Zonal Momentum: 3D zon. mean', gridname='fv_centers_zonal' )
+    call addfld ('UWzm', (/ 'ilev' /),'A','M2/S2','Vertical Flux of Zonal Momentum: 3D zon. mean', gridname='fv_centers_zonal' )
+
+    call addfld ('Uzm',  (/ 'ilev' /),'A','M/S','Zonal-Mean zonal wind - defined on ilev', gridname='fv_centers_zonal' )
+    call addfld ('Vzm',  (/ 'ilev' /),'A','M/S','Zonal-Mean meridional wind - defined on ilev', gridname='fv_centers_zonal' )
+    call addfld ('Wzm',  (/ 'ilev' /),'A','M/S','Zonal-Mean vertical wind - defined on ilev', gridname='fv_centers_zonal' )
+    call addfld ('THzm', (/ 'ilev' /),'A',  'K','Zonal-Mean potential temp - defined on ilev', gridname='fv_centers_zonal' )
+
+    call addfld ('TH',   (/ 'ilev' /),'A','K','Potential Temperature', gridname='fv_centers' )
     call addfld ('MSKtem',horiz_only,  'A','1','TEM mask', gridname='fv_centers' )
     
 !-------------------------------------------------------------
 ! primary tapes: 3D fields
 !-------------------------------------------------------------
-    call add_default ('VTH3d', 1, ' ')
-    call add_default ('WTH3d', 1, ' ')
-    call add_default ('UV3d' , 1, ' ')
-    call add_default ('UW3d' , 1, ' ')
+    call add_default ('VTHzm', 1, ' ')
+    call add_default ('WTHzm', 1, ' ')
+    call add_default ('UVzm' , 1, ' ')
+    call add_default ('UWzm' , 1, ' ')
     call add_default ('TH' , 1, ' ')
     call add_default ('MSKtem',1, ' ')
 
@@ -626,45 +553,39 @@ lat_loop3 : &
   end subroutine ctem_init
 
 !================================================================================
-  subroutine circ_diag_readnl(nlfile)
 
-    use spmd_utils,         only: masterproc
-    use namelist_utils,     only: find_group_name
-    use units,              only: getunit, freeunit
-    use mpishorthand
-    use cam_abortutils,     only: endrun
+subroutine ctem_readnl(nlfile)
 
-    implicit none
+   use namelist_utils,     only: find_group_name
+   use units,              only: getunit, freeunit
+   use spmd_utils,         only: mpicom, mstrid=>masterprocid, mpi_logical
 
-    character(len=*), intent(in) :: nlfile  ! filepath for file containing namelist input
+   character(len=*), intent(in) :: nlfile  ! filepath for file containing namelist input
+   
+   ! Local variables
+   integer :: unitn, ierr
+   character(len=*), parameter :: subname = 'circ_diag_readnl'
 
-    ! Local variables
-    integer :: unitn, ierr
-    character(len=*), parameter :: subname = 'circ_diag_readnl'
-
-
-    namelist /circ_diag_nl/ do_circulation_diags
+   namelist /circ_diag_nl/ do_circulation_diags
+   !-----------------------------------------------------------------------------
     
-    !-----------------------------------------------------------------------------
-    
-    if (masterproc) then
-       unitn = getunit()
-       open( unitn, file=trim(nlfile), status='old' )
-       call find_group_name(unitn, 'circ_diag_nl', status=ierr)
-       if (ierr == 0) then
-          read(unitn, circ_diag_nl, iostat=ierr)
-          if (ierr /= 0) then
-             call endrun(subname // ':: ERROR reading namelist')
-          end if
-       end if
-       close(unitn)
-       call freeunit(unitn)
-    end if
+   if (masterproc) then
+      unitn = getunit()
+      open( unitn, file=trim(nlfile), status='old' )
+      call find_group_name(unitn, 'circ_diag_nl', status=ierr)
+      if (ierr == 0) then
+         read(unitn, circ_diag_nl, iostat=ierr)
+         if (ierr /= 0) then
+            call endrun(subname // ':: ERROR reading namelist')
+         end if
+      end if
+      close(unitn)
+      call freeunit(unitn)
+   end if
 
-#ifdef SPMD
-    call mpibcast(do_circulation_diags, 1, mpilog,  0, mpicom)
-#endif
+   call mpi_bcast(do_circulation_diags, 1, mpi_logical, mstrid, mpicom, ierr)
+   if (ierr /= 0) call endrun(subname//": FATAL: mpi_bcast: do_circulation_diags")
 
-  endsubroutine circ_diag_readnl
+end subroutine ctem_readnl
 
 end module ctem

@@ -249,7 +249,7 @@
   'FSDSC', 'PRECT', 'CL2O2', 'BRO'
 </fincl4>
 <fincl5>
-  'MSKtem', 'PHIS', 'PS', 'PSL', 'VTH2d', 'UV2d', 'UW2d', 'U2d', 'V2d', 'TH2d', 'W2d'
+  'MSKtem', 'PHIS', 'PS', 'PSL', 'VTHzm', 'UVzm', 'UWzm', 'Uzm', 'Vzm', 'THzm', 'Wzm'
 </fincl5>
 
 <rxn_rate_sums>

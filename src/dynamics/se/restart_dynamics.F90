@@ -307,7 +307,7 @@ CONTAINS
   end function get_restart_decomp
 
 
-  subroutine read_restart_dynamics (File, dyn_in, dyn_out, NLFileName)
+  subroutine read_restart_dynamics (File, dyn_in, dyn_out)
     ! for restart and initial condition, timelevel == timelevel_dyn
     ! so we wont update this routine to use both  
     use dyn_comp, only : timelevel
@@ -331,7 +331,6 @@ CONTAINS
     type(File_desc_t), intent(inout) :: File
     type(dyn_import_t), intent(inout)  :: dyn_in
     type(dyn_export_t), intent(inout)  :: dyn_out
-    character(len=*), intent(in) :: NLFileName
 
     type(io_desc_t) :: iodesc2d, iodesc3d
     real(r8), allocatable :: var3d(:), var2d(:)
@@ -347,7 +346,7 @@ CONTAINS
 !    type(file_desc_t) :: ncid
 !    integer :: ncid
 
-    call dyn_init1(file, NLFileName, dyn_in, dyn_out)
+    call dyn_init1(file, dyn_in, dyn_out)
 
    if (iam .lt. par%nprocs) then
     elem=>dyn_in%elem

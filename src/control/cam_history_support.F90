@@ -158,9 +158,11 @@ module cam_history_support
 
     integer                   :: hwrt_prec   ! history output precision
     real(r8),         pointer :: hbuf(:,:,:) => NULL()
+    real(r8),         pointer :: sbuf(:,:,:) => NULL() ! for standard deviation
     type(var_desc_t), pointer :: varid(:)    => NULL() ! variable ids
     integer,          pointer :: nacs(:,:)   => NULL() ! accumulation counter
     type(var_desc_t), pointer :: nacs_varid  => NULL()
+    type(var_desc_t), pointer :: sbuf_varid  => NULL()
   end type hentry
 
   !---------------------------------------------------------------------------

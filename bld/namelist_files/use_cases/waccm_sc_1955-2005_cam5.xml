@@ -17,9 +17,9 @@
 <dust_emis_fact>0.22D0</dust_emis_fact>
 
 <!-- dynamical substepping -->
-<nsplit>12</nsplit>
-<nspltrac>6</nspltrac>
-<nspltvrm>6</nspltvrm>
+<fv_nsplit>12</fv_nsplit>
+<fv_nspltrac>6</fv_nspltrac>
+<fv_nspltvrm>6</fv_nspltvrm>
 
 <!--Species IC -->
 <ncdata dyn="fv"  hgrid="0.9x1.25" >atm/waccm/ic/f.e14.F55W5SC.f09_f09.001.cam.i.1988-01-01-00000.nc</ncdata>
@@ -52,12 +52,6 @@
 <!-- Gravity Wave settings -->
 <effgw_beres_dp>0.5D0</effgw_beres_dp>
 <frontgfc>5.25D-15</frontgfc>
-
-<!-- Photolysis Inputs DEFAULTS okay for: rsf_file,xs_long_file,xs_short_file -->
-
-<!-- Extraterestrial Flux and MLT inputs DEFAULTS okay for:  -->
-<!-- efield_hflux_file, efield_lflux_file, efield_wei96_file -->
-<!-- electron_file,euvac_file,euvacdat_file,photon_file,neckel_file,woods_etf_file,xs_coef_file -->
 
 <!-- Kp Ap indices -->
 <solar_parms_file>atm/waccm/solar/wasolar_c150720.nc</solar_parms_file>

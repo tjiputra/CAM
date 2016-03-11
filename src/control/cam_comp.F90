@@ -165,7 +165,7 @@ subroutine cam_init(EClock, &
    if (initial_run) then
 
       call cam_initfiles_open()
-      call cam_initial(dyn_in, dyn_out, NLFileName=filein)
+      call cam_initial(dyn_in, dyn_out)
 
       ! Allocate and setup surface exchange data
       call atm2hub_alloc(cam_out)
@@ -173,7 +173,7 @@ subroutine cam_init(EClock, &
 
    else
 
-      call cam_read_restart(cam_in, cam_out, dyn_in, dyn_out, pbuf2d, stop_ymd, stop_tod, NLFileName=filein )
+      call cam_read_restart(cam_in, cam_out, dyn_in, dyn_out, pbuf2d, stop_ymd, stop_tod)
 
 #if (defined BFB_CAM_SCAM_IOP)
       call initialize_iop_history()
