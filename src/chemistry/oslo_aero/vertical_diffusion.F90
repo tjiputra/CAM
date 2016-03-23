@@ -305,6 +305,9 @@ subroutine vertical_diffusion_init(pbuf2d)
 
     ! prog_modal_aero determines whether prognostic modal aerosols are present in the run.
     call phys_getopts(prog_modal_aero_out=prog_modal_aero)
+#ifdef OSLO_AERO
+    prog_modal_aero = .TRUE.
+#endif
     if (prog_modal_aero) then
 
        ! Get the constituent indices of the number and mass mixing ratios of the modal 

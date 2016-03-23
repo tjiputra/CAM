@@ -322,7 +322,14 @@ contains
        call addfld( depvel_name(m), horiz_only,  'A', 'cm/s',    'deposition velocity ' )
        call addfld( depflx_name(m), horiz_only,  'A', 'kg/m2/s', 'dry deposition flux ' )
        call addfld( dtchem_name(m), (/ 'lev' /), 'A', 'kg/s',    'net tendency from chem' )
-
+#if defined OSLO_AERO
+       !Needed for budget term of gases! Aerosols have their own budget terms
+       if(.NOT. isAerosol(n))then
+          if(history_aerosol)then
+             call add_default( depflx_name(m), 1, ' ')
+          end if
+       endif
+#endif
        wetdep_name_area(m)='WD_A_'//trim(spc_name)
        wetdep_name(m) = 'WD_'//trim(spc_name)
        wtrate_name(m) = 'WDR_'//trim(spc_name)

@@ -711,8 +711,10 @@ end subroutine aero_model_init
   !=============================================================================
   !=============================================================================
   subroutine aero_model_emissions( state, cam_in )
-    use seasalt_model, only: oslo_salt_emis_intr, seasalt_active
+    use seasalt_model, only: oslo_salt_emis_intr, seasalt_active, OMOceanSource
     use dust_model, only: oslo_dust_emis_intr, dust_active
+    use oslo_ocean_intr, only: oslo_dms_emis_intr
+    use aerosoldef, only: l_om_ni
     use physics_types, only: physics_state
 
     ! Arguments:
@@ -741,6 +743,12 @@ end subroutine aero_model_init
        call oslo_salt_emis_intr(state, cam_in)
 
     endif
+
+    !Add whatever OM ocean source was calculated in the seasalt module
+    cam_in%cflx(:ncol,l_om_ni) = cam_in%cflx(:ncol,l_om_ni) + OMOceanSource(:ncol)
+
+    !Pick up correct DMS emissions (replace values from file if requested)
+    call oslo_dms_emis_intr(state, cam_in)
 
   end subroutine aero_model_emissions
 

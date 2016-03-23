@@ -275,6 +275,10 @@
    <alias>NFPTAERO</alias>
    <lname>2000_CAM5%PTAERO_CLM40%SP_CICE%PRES_DOCN%DOM_RTM_SGLC_SWAV</lname>
   </compset>
+  <compset>
+   <alias>NFAMIPNUDGEPTAEROUPD1</alias>
+   <lname>2000_CAM5%NUDGEPTAEROUPD1_CLM45%SP_CICE%PRES_DOCN%DOM_RTM_SGLC_SWAV</lname>
+  </compset>
   <!-- FG compsets -->
 
   <compset>

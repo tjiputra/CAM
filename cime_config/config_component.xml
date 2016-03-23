@@ -80,6 +80,7 @@
       <value compset="%PORT"          >-offline_drv rad</value> 
 
       <value compset="_CAM5%PTAERO"   >-phys cam5 -chem trop_mam_oslo</value>             
+      <value compset="_CAM5%NUDGEPTAERO"   >-phys cam5 -chem trop_mam_oslo -offline_dyn</value>             
     </values>
     <group>build_component_cam</group>
     <file>env_build.xml</file>
@@ -176,6 +177,10 @@
       <value compset="AR95_CAM[45]"     >scam_arm95</value>
       <value compset="AR97_CAM[45]"     >scam_arm97</value>
       <value compset="PIPD_CAM5"        >1850-PD_cam5</value>
+      <value compset="_CAM5%NUDGEPTAERO" >2000_cam5_oslonudge</value>
+      <value compset="_CAM5%NUDGEPTAEROUPD1">cam5_nudge_ptaero_up1</value>
+      <value compset="_CAM5%NUDGEMAM3" >2000_cam5_oslonudge</value>
+      <value compset="_CAM5%PTAEROUPD1"  >cam5_ptaero_up1</value>
     </values>
     <group>run_component_cam</group>
     <file>env_run.xml</file>
@@ -283,7 +288,8 @@
     <desc compset="%PORT"			>CAM Parallel Offline Radiation Tool:</desc>
     <desc compset="_CAM.%L60"			>CAM 60 layers and full gravity wave spectrum:</desc>
 
-    <desc compset="_CAM5%PTAERO">cam 5 physics an Production tagged aerosols (OSLO_AERO)</desc>
+    <desc compset="_CAM5%PTAERO">cam 5 physics and Production tagged aerosols (OSLO_AERO)</desc>
+    <desc compset="_CAM5%NUDGEPTAEROUPD1">cam 5 physics and Production tagged aerosols (OSLO_AERO)</desc>
   </description>
 
   <help>
