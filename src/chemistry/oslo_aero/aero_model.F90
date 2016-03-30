@@ -549,7 +549,8 @@ end subroutine aero_model_init
     real(r8) :: del_soa_sv_gasprod(ncol,pver)
     real(r8) :: dvmrdt_sv1(ncol,pver,gas_pcnst)
     real(r8) :: dvmrcwdt_sv1(ncol,pver,gas_pcnst)
-    real(r8) :: mmr_tend(pcols, pver, gas_pcnst)
+    real(r8) :: mmr_tend_ncols(ncol, pver, gas_pcnst)
+    real(r8) :: mmr_tend_pcols(pcols, pver, gas_pcnst)
 
     integer  :: cond_vap_idx
     real(r8) ::  aqso4(nmodes_aq_chem,pcols)               ! aqueous phase chemistry
@@ -580,10 +581,10 @@ end subroutine aero_model_init
     enddo
 
 !  Get mass mixing ratios at start of time step
-   call vmr2mmr( vmr0, mmr_tend, mbar, ncol )
-   mmr_cond_vap_start_of_timestep(:ncol,:,COND_VAP_H2SO4) = mmr_tend(1:ncol,:,ndx_h2so4)
-   mmr_cond_vap_start_of_timestep(:ncol,:,COND_VAP_ORG_LV) = mmr_tend(1:ncol,:,ndx_soa_lv)
-   mmr_cond_vap_start_of_timestep(:ncol,:,COND_VAP_ORG_SV) = mmr_tend(1:ncol,:,ndx_soa_sv)
+   call vmr2mmr( vmr0, mmr_tend_ncols, mbar, ncol )
+   mmr_cond_vap_start_of_timestep(:ncol,:,COND_VAP_H2SO4) = mmr_tend_ncols(1:ncol,:,ndx_h2so4)
+   mmr_cond_vap_start_of_timestep(:ncol,:,COND_VAP_ORG_LV) = mmr_tend_ncols(1:ncol,:,ndx_soa_lv)
+   mmr_cond_vap_start_of_timestep(:ncol,:,COND_VAP_ORG_SV) = mmr_tend_ncols(1:ncol,:,ndx_soa_sv)
 !
 ! Aerosol processes ...
 !
@@ -663,7 +664,7 @@ end subroutine aero_model_init
     enddo
 
    !condensation
-   call vmr2mmr( vmr, mmr_tend, mbar, ncol )
+   call vmr2mmr( vmr, mmr_tend_ncols, mbar, ncol )
    do k = 1,pver
       mmr_cond_vap_gasprod(:ncol,k,COND_VAP_H2SO4) = adv_mass(ndx_h2so4) * (del_h2so4_gasprod(:ncol,k)+del_h2so4_aqchem(:ncol,k)) / mbar(:ncol,k)/delt
       mmr_cond_vap_gasprod(:ncol,k,COND_VAP_ORG_LV) = adv_mass(ndx_soa_lv) * del_soa_lv_gasprod(:ncol,k) / mbar(:ncol,k)/delt !cka
@@ -677,14 +678,16 @@ end subroutine aero_model_init
          mmr_cond_vap_gasprod(:ncol,:,cond_vap_idx) = 0.0_r8
       end where
    end do
-   mmr_tend(:ncol,:,ndx_h2so4) = mmr_cond_vap_start_of_timestep(:ncol,:,COND_VAP_H2SO4)
-   mmr_tend(:ncol,:,ndx_soa_lv) = mmr_cond_vap_start_of_timestep(:ncol,:,COND_VAP_ORG_LV)
-   mmr_tend(:ncol,:,ndx_soa_sv) = mmr_cond_vap_start_of_timestep(:ncol,:,COND_VAP_ORG_SV)
-  
+   mmr_tend_ncols(:ncol,:,ndx_h2so4) = mmr_cond_vap_start_of_timestep(:ncol,:,COND_VAP_H2SO4)
+   mmr_tend_ncols(:ncol,:,ndx_soa_lv) = mmr_cond_vap_start_of_timestep(:ncol,:,COND_VAP_ORG_LV)
+   mmr_tend_ncols(:ncol,:,ndx_soa_sv) = mmr_cond_vap_start_of_timestep(:ncol,:,COND_VAP_ORG_SV)
+
+   !Rest of microphysics have pcols dimension 
+   mmr_tend_pcols(:ncol,:,:) = mmr_tend_ncols(:ncol,:,:) 
    !Note use of "zm" here. In CAM5.3-implementation "zi" was used.. 
    !zm is passed through the generic interface, and it should not change much
    !to check if "zm" is below boundary layer height instead of zi
-   call condtend_sub( lchnk, mmr_tend, mmr_cond_vap_gasprod,tfld, pmid, &
+   call condtend_sub( lchnk, mmr_tend_pcols, mmr_cond_vap_gasprod,tfld, pmid, &
                      pdel, delt, ncol, pblh, zm, qh2o)  !cka
 
 
@@ -693,16 +696,19 @@ end subroutine aero_model_init
    ! temporary variable  (vmrcw) Coagulation between aerosol and cloud
    ! droplets moved to after vmrcw is moved into qqcw (in mmr spac)
 
-   call coagtend( mmr_tend, pmid, pdel, tfld, delt_inverse, ncol, lchnk) 
+   call coagtend( mmr_tend_pcols, pmid, pdel, tfld, delt_inverse, ncol, lchnk) 
 
    !Convert cloud water to mmr again ==> values in buffer
    call vmr2qqcw( lchnk, vmrcw, mbar, ncol, loffset, pbuf )
 
    !Call cloud coagulation routines (all in mass mixing ratios)
-   call clcoag( mmr_tend, pmid, pdel, tfld, cldnum ,cldfr, delt_inverse, ncol, lchnk,loffset,pbuf)
+   call clcoag( mmr_tend_pcols, pmid, pdel, tfld, cldnum ,cldfr, delt_inverse, ncol, lchnk,loffset,pbuf)
+
+   !Make sure mmr==> vmr is done correctly
+   mmr_tend_ncols(:ncol,:,:) = mmr_tend_pcols(:ncol,:,:)
 
    !Go back to volume mixing ratio for chemistry
-   call mmr2vmr( mmr_tend, vmr, mbar, ncol )
+   call mmr2vmr( mmr_tend_ncols, vmr, mbar, ncol )
 
     return
 
