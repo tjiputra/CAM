@@ -341,9 +341,9 @@ contains
 #if defined OSLO_AERO
        !Needed for budget term of gases! Aerosols have their own budget terms
        if(.NOT. isAerosol(n))then
-          if(history_aerosol)then
-             call add_default( wetdep_name_area(m), 1, ' ') 
-          end if
+         if(history_aerosol)then
+            call add_default( wetdep_name_area(m), 1, ' ') 
+         end if
        endif
 #endif
 
@@ -843,6 +843,7 @@ contains
     use phys_grid,    only : get_wght_all_p
 #else
     use phys_grid,    only : get_wght_all_p, get_area_all_p
+    use mo_neu_wetdep, only: do_neu_wetdep
 #endif
     implicit none
 
@@ -886,7 +887,9 @@ contains
        !
        call outfld( wetdep_name(m), wrk_wd(:ncol),               ncol, lchnk )
 #ifdef OSLO_AERO
-       call outfld( wetdep_name_area(m), wrk_wd(:ncol)/area(:ncol)  ,ncol, lchnk )
+       if( .NOT. do_neu_wetdep)then
+         call outfld( wetdep_name_area(m), wrk_wd(:ncol)/area(:ncol)  ,ncol, lchnk )
+       endif
 #endif
        call outfld( wtrate_name(m), het_rates(:ncol,:,m), ncol, lchnk )
 
