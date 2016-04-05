@@ -101,8 +101,6 @@
 <megan_factors_file>'atm/cam/chem/trop_mozart/emis/megan21_emis_factors_c20130304.nc'</megan_factors_file>
 <megan_mapped_emisfctrs>.false.</megan_mapped_emisfctrs>
 
-<dust_emis_fact>0.29</dust_emis_fact>
-
 <!-- History --> 
 <avgflag_pertape> 'A',  'I',  'A', 'A',  'A', 'A', 'I',  'I' </avgflag_pertape>
 <nhtfrq>            0, -240,  -24, -24,  -24, -24,  0,   -1  </nhtfrq>
@@ -222,7 +220,7 @@
   'PS', 'PHIS', 'PSL', 'U', 'V', 'T', 'Z3', 'PHIS', 'FRONTGF:I', 'FSDS', 'OMEGA', 'UTGWORO', 'UTGWSPEC', 'BUTGWSPEC'
 </fincl4>
 <fincl5>
-  'MSKtem','PHIS','PS','PSL','VTH2d','UV2d','UW2d','U2d','V2d','TH2d','W2d'
+  'MSKtem','PHIS','PS','PSL','VTHzm','UVzm','UWzm','Uzm','Vzm','THzm','Wzm'
 </fincl5>
 <fincl6>
   'PS', 'PHIS', 'SZA', 'Z3', 'TROP_Z', 'TROP_T', 'TROP_P', 'T', 'U', 'V', 'N2O', 'H2O', 'O3', 'HNO3_GAS', 'HCL_GAS',
@@ -266,7 +264,6 @@
 <cldfrc_rhminl>0.90D0</cldfrc_rhminl>
 <inithist>'YEARLY'</inithist>
 <aoa_read_from_ic_file>.true.</aoa_read_from_ic_file>
-<use_gw_front_igw>.true.</use_gw_front_igw>
  
 <do_circulation_diags>.true.</do_circulation_diags>
 <gas_wetdep_method>'NEU'</gas_wetdep_method>

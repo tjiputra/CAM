@@ -119,8 +119,8 @@ OPTIONS
                           test_tracers, test_tracers2].
                         Default: none.
      -chem <name>       Build CAM with specified prognostic chemistry package 
-                        [ waccm_mozart | waccmx_mozart | waccm_mozart_sulfur | waccm_mozart_mam3 | waccm_sc | 
-			  waccm_sc_mam3 | waccm_tsmlt | waccm_tsmlt_mam3 | waccm_tsmlt_sulfur |
+                        [ waccm_mozart | waccmx_mozart | waccm_mozart_sulfur | waccm_mozart_mam3 | waccm_mozart_mam4 | 
+			  waccm_sc |waccm_sc_mam3 | waccm_tsmlt | waccm_tsmlt_mam3 | waccm_tsmlt_mam4 | waccm_tsmlt_sulfur |
                           trop_mozart | trop_mozart_mam3 | trop_mozart_soa | trop_strat_soa | trop_ghg | trop_bam |
                           trop_mam3 | trop_mam4 | trop_mam7 | super_fast_llnl | super_fast_llnl_mam3 |
                           trop_strat_soa | trop_strat_mam3 | trop_strat_mam4_vbs | trop_strat_mam7 | none ].  Default: trop_mam3.
@@ -254,6 +254,10 @@ OPTIONS
      -nc_inc <dir>      Directory containing netCDF include files.
      -nc_lib <dir>      Directory containing netCDF library.
      -nc_mod <dir>      Directory containing netCDF module files.
+     -pio2              Switch to turn on building PIO2.  PIO2 is built as a separate library.
+                        Default: Use PIO1 and build as part of cam executable.
+     -pio2_install_dir <dir> Directory to install PIO2 libraries and include files.  If the libraries
+                             already exist then configure will use them in the build.
      -pnc_inc <dir>     Directory containing PnetCDF include files.
      -pnc_lib <dir>     Directory containing PnetCDF library.
      -target_os         Override the os setting for cross platform compilation [aix | darwin | dec_osf |
@@ -262,7 +266,7 @@ OPTIONS
                         perl \$OSNAME variable.
      -usr_src <dir1>[,<dir2>[,<dir3>[...]]]
                         Directories containing user source code.
-     -offline_drv <name> Specify offline unit driver [ rad | stub ]
+     -offline_drv <name> Specify offline unit driver [ aur | rad | stub ]
 EOF
 }
 
@@ -359,6 +363,8 @@ GetOptions(
     "pcols=s"                   => \$opts{'pcols'},
     "p|pergro"                  => \$opts{'pergro'},
     "phys=s"                    => \$opts{'phys'},
+    "pio2"                      => \$opts{'pio2'},
+    "pio2_install_dir=s"        => \$opts{'pio2_install_dir'},
     "pnc_inc=s"                 => \$opts{'pnc_inc'},
     "pnc_lib=s"                 => \$opts{'pnc_lib'},
     "prog_species=s"            => \$opts{'prog_species'},
@@ -818,7 +824,7 @@ if (defined $opts{'offline_drv'}) {
     $cfg_ref->set('offline_drv', $opts{'offline_drv'});
 }
 
-# WACCM only runs with FV dycore
+# WACCM only runs with FV or SE dycores
 if ( ($waccm_phys) and ($dyn_pkg ne 'fv') and ($dyn_pkg ne 'se') ) {
     die <<"EOF";
 ** ERROR: WACCM physics only runs with FV or Spectral Element as the dycore.
@@ -1719,6 +1725,24 @@ EOF
 #-----------------------------------------------------------------------------------------------
 
 #-----------------------------------------------------------------------------------------------
+# Check for GNU make in the user's path
+if ($print) { print "Looking for a valid GNU make... "; }
+my @makenames = qw(gmake gnumake make);
+if ($opts{'gmake'}) { unshift @makenames, $opts{'gmake'}; }
+my $gmake = get_gmake(@makenames);
+if ($gmake) {
+    if ($print) { print "using $gmake$eol"; }
+} else {
+    print "\n".
+          "** Cannot find a valid GNU make.  Tried:\n".
+          "@makenames\n";
+    die "The name of GNU make on your system can be specified to configure via\n".
+	"the -gmake option.  Make sure this\n".
+	"name is in your path (add the appropriate directory to your PATH\n".
+	"environment variable) or specify an absolute pathname.\n";
+}
+
+#-----------------------------------------------------------------------------------------------
 # Name of CAM executable.
 if (defined $opts{'cam_exe'}) {
     $cfg_ref->set('cam_exe', $opts{'cam_exe'});
@@ -2032,8 +2056,12 @@ $cfg_cppdefs .= $carma_cppdefs;
 if ($waccmx) { $cfg_cppdefs .= ' -DWACCMX'; }
 
 # PIO
+my $pio2_build = (defined $opts{'pio2'}) ? 1 : 0;
 if ($cam_build) {
-    $cfg_cppdefs .= " -D_USEBOX";
+    if (!$pio2_build) {
+        # Only needed for pio1
+        $cfg_cppdefs .= " -D_USEBOX";
+    }
 }
 
 # COSP simulator
@@ -2098,37 +2126,30 @@ if ($cam_build) {
     # If the location of the NetCDF libraries has not been specified, then
     # assume the compiler wrapper script is providing the information.
     # Otherwise we attempt to set the necessary link arguments in the
-    # nc_ldflags variable.  To deal with the case where nf-config is present
-    # but returns incorrect settings, one option is to *not* set nc_lib (so
-    # the code below does not try to invoke nf-config or nc-config)
-    # and just use the generic ldflags from the commandline.
+    # nc_ldflags variable using the nc-config utility.  We check that
+    # nc-config returns at least the netcdff and netcdf libraries, and
+    # if not then attempt using a generic setting.
 
     if ($nc_lib ne '') {
-	if (-f "$nc_lib/../bin/nf-config") {
-	    $nc_ldflags = `$nc_lib/../bin/nf-config --flibs`;
-	    chomp $nc_ldflags;
-	    if ($?) { 
-		print "Encountered error in nf-config --flibs call.\n";
-		$nc_ldflags = '';
-	    }
-	}
-	elsif (-f "$nc_lib/../bin/nc-config") {
-	    $nc_ldflags = `$nc_lib/../bin/nc-config --flibs`;
-	    chomp $nc_ldflags;
+	if (-f "$nc_lib/../bin/nc-config") {
+	    $nc_ldflags = `$nc_lib/../bin/nc-config --flibs --libs`;
+	    $nc_ldflags =~ s/\n/ /g; # replace newlines with spaces
 	    if ($?) {
-		print "Encountered error in nc-config --flibs call.\n";
+		if ($print >= 2) {print "INFO: error return from: nc-config --flibs --libs \n";}
 		$nc_ldflags = '';
 	    }
 	}
 
-	# If the nf-config or nc-config scripts were not found, or if they
-	# returned an error status, then try default link args.
-	unless ($nc_ldflags) {
-	    $nc_ldflags = "-L$nc_lib -lnetcdf -lnetcdff";
-	}
+	# If the nc-config script was not found, or if it returned an error
+	# status, or if they return a string that doesn't contain two
+	# library (-l) specifiers, then try default link args.
 
-	# Set rpath for shared libs.  First check whether the nf-config or
-	# nc-config script has already set an arg to be passed to the linker.
+	if ($nc_ldflags !~ m/-l.*-l/) {
+	    $nc_ldflags = "-L$nc_lib -lnetcdff -lnetcdf";
+        }
+        
+	# Set rpath for shared libs.  First check whether the nc-config script
+        # has already set an arg to be passed to the linker.
 	if ($nc_ldflags !~ m/-Wl/) {
 	    if ($fc_type eq 'nag') {
 		$nc_ldflags .= " -Wl,-Wl,,-rpath -Wl,-Wl,,$nc_lib";
@@ -2144,7 +2165,10 @@ if ($cam_build) {
     if ($nc_ldflags and $print>=2) { print "Link flags for netCDF library: $nc_ldflags$eol"; }
 
     # PIO Support
-    $cfg_cppdefs .= " -D_NETCDF  ";
+    if (!$pio2_build) {
+        # Only needed for pio1
+        $cfg_cppdefs .= " -D_NETCDF  ";
+    }
 }
 
 # NetCDF module files
@@ -2584,6 +2608,136 @@ EOF
     }
 }
 
+#-----------------------------------------------------------------------------------------------
+# PIO library.
+# Only build PIO as a separate library if doing a CAM standalone build with PIO2.
+# If -pio2_install_dir is specified, then check for existing libs and build
+# only if necessary.  Note that separate versions of the lib must be built
+# for parallel and serial use.
+
+if ($cam_build and $pio2_build) {
+
+    my $pio_build_dir   = "$cam_bld/pio_bld";
+    my $pio_install_dir = "$cam_bld/pio";
+    if (defined $opts{'pio2_install_dir'}) {
+        $pio_install_dir = $opts{'pio2_install_dir'};
+    }
+    elsif (defined $ENV{PIO2_INSTALL_DIR}) {
+        $pio_install_dir = $ENV{PIO2_INSTALL_DIR};
+    }
+
+    # strip a trailing slash
+    $pio_install_dir =~ s!/$!!;
+
+    # modify the name of the serial version so it can be made in the same
+    # directory as the parallel version
+    if ($spmd eq 'OFF') {
+        $pio_build_dir .= '-serial';
+	$pio_install_dir .= '-serial';
+    }
+    $cfg_ref->set('pio_build_dir',   $pio_build_dir);
+    $cfg_ref->set('pio_install_dir', $pio_install_dir);
+
+    my $ldflags = $cfg_ref->get('ldflags');
+    # prepend the pio libs.  The serial build which depends on the MCT mpi-serial
+    # lib needs to come after the pio libs to properly resolve mpi references.
+    $ldflags = " -L$pio_install_dir/lib -lpiof -lpioc $ldflags ";
+    $cfg_ref->set('ldflags', $ldflags);
+   
+    # Check whether the PIO libs already exist.
+    my $libs_exist = 0;
+    my $libs_expected = 2;
+    if (-f "$pio_install_dir/lib/libpioc.a" or 
+	-f "$pio_install_dir/lib/libpioc.so") {++$libs_exist;}
+    if (-f "$pio_install_dir/lib/libpiof.a" or 
+	-f "$pio_install_dir/lib/libpiof.so") {++$libs_exist;}
+
+    my $build_pio;
+    if ($libs_exist == 0) {
+	$build_pio = 1;
+    }
+    elsif ($libs_exist == $libs_expected) {
+	$build_pio = 0;
+    }
+    else {
+	die <<"EOF";
+** PIO build in $pio_install_dir is incomplete.  Remove the contents of
+   $pio_install_dir and run the CAM configure script again. **
+EOF
+    }
+
+    if ($build_pio) {
+
+        # The PIO configuration requires CMake.  Check return from --version just as a way
+        # to make sure it is found in user path.
+        if ($print) { print "Looking for a valid CMake... "; }
+        my $cmake_ver = get_cmake_version();
+        if ($cmake_ver) {
+            if ($print) { print "using cmake version $cmake_ver$eol"; }
+        } else {
+            print "\n** Cannot find a valid CMake.\n";
+            die "** CMake must be installed on your system and the cmake command in your PATH\n";
+        }
+
+	# If the build directory does not exist then create it.
+	if (! -d "$pio_build_dir") {
+	    mkdirp("$pio_build_dir") or
+		die "** Could not create the PIO build directory: $pio_build_dir\n";
+	}
+
+	# If the install directory does not exist then create it.
+	if (! -d "$pio_install_dir") {
+	    mkdirp("$pio_install_dir") or
+		die "** Could not create the PIO install directory: $pio_install_dir\n";
+	}
+
+        # Root directory for PIO source code
+        my $pio_src_dir = "$cam_root/cime/externals/pio2";
+
+        # Set compilers
+        my $compilers = "FC=$fc CC=$cc";
+
+        # Set options
+        my $opts;
+
+        my $nc_lib = $cfg_ref->get('nc_lib');
+        if ($nc_lib) {$opts .= "-DNetCDF_PATH=$nc_lib ";}
+       
+        $opts .= '-DCMAKE_VERBOSE_MAKEFILE=1 -DPIO_ENABLE_TIMING=OFF -DWITH_PNETCDF=OFF -DPIO_ENABLE_TESTS=OFF ';
+        
+        $opts .= "-DCMAKE_INSTALL_PREFIX=$pio_install_dir ";
+
+        # For serial runs the MPI library is supplied by MCT:
+        # If the mpi-serial library is already built then specifying MPISERIAL_PATH is
+        # sufficient since CMake will find what it needs by looking there.  But if the
+        # mpi-serial lib hasn't been built yet, then the MPISERIAL_C_* and MPISERIAL_Fortran_*
+        # options must be specified to tell CMake where the include and lib files will be
+        # found after the build is done.
+	if ($spmd eq 'OFF') {
+            my $mct_libdir = $cfg_ref->get('mct_libdir');
+            $opts .= "-DPIO_USE_MPISERIAL=TRUE ";
+            $opts .= "-DMPISERIAL_PATH=$mct_libdir/mpi-serial ";
+            $opts .= "-DMPISERIAL_C_INCLUDE_PATH=$mct_libdir/mpi-serial ";
+            $opts .= "-DMPISERIAL_C_LIBRARY=$mct_libdir/mpi-serial/libmpi-serial.a ";
+            $opts .= "-DMPISERIAL_Fortran_INCLUDE_PATH=$mct_libdir/mpi-serial ";
+            $opts .= "-DMPISERIAL_Fortran_LIBRARY=$mct_libdir/mpi-serial/libmpi-serial.a ";
+        }
+        
+        # Configure command
+	my $cfg_cmnd = "env $compilers cmake $opts $pio_src_dir >| pio_cmake_log 2>&1 ";
+
+
+	chdir $pio_build_dir   or die "FAILURE: cd to $pio_build_dir\n";
+	system($cfg_cmnd) == 0 or die "FAILURE: PIO configure: see $pio_build_dir/pio_cmake_log \n";
+        chdir $cam_bld         or die "FAILURE: cd to $cam_bld\n";
+
+	if ($print) {print "PIO configure is done.\n";}
+    }
+    else {
+	if ($print) {print "Using PIO libs in $pio_install_dir.\n";}
+    }
+}
+
 
 #-----------------------------------------------------------------------------------------------
 # Write configuration files ####################################################################
@@ -2637,23 +2791,6 @@ chdir( $test_dir ) || die <<"EOF";
 ** Trouble changing directory to $test_dir
 **
 EOF
-
-# check for GNU make in the user's path
-if ($print) { print "Looking for a valid GNU make... "; }
-my @makenames = qw(gmake gnumake make);
-if ($opts{'gmake'}) { unshift @makenames, $opts{'gmake'}; }
-my $gmake = get_gmake(@makenames);
-if ($gmake) {
-    if ($print) { print "using $gmake$eol"; }
-} else {
-    print "\n".
-          "** Cannot find a valid GNU make.  Tried:\n".
-          "@makenames\n";
-    die "The name of GNU make on your system can be specified to configure via\n".
-	"the -gmake option.  Make sure this\n".
-	"name is in your path (add the appropriate directory to your PATH\n".
-	"environment variable) or specify an absolute pathname.\n";
-}
 
 # The CAM Makefile requires a Filepath file.  To run the tests construct a Filepath file
 # that contains only the test directory.
@@ -2808,8 +2945,18 @@ sub write_filepath
 	print $fh "$camsrcdir/cam/src/physics/rrtmg/ext/rrtmg_lw\n";
 	print $fh "$camsrcdir/cam/src/physics/rrtmg/ext/rrtmg_sw\n";
     }
+    else {
+        # Until we implement a 'none' option use camrt as the default.
+	print $fh "$camsrcdir/cam/src/physics/camrt\n";
+    }
 
+
+    # This directory contains much of the code for physics packages,
+    # as well as the cam specific interface modules that may need to
+    # be overridden by modules from directories that occur earlier
+    # in the list of filepaths.
     print $fh "$camsrcdir/cam/src/physics/cam\n";
+
     if ($clubb_sgs eq '1') {
        print $fh "$camsrcdir/cam/src/physics/clubb\n";
        print $fh "$camsrcdir/cam/src/physics/silhs\n";
@@ -2838,7 +2985,9 @@ sub write_filepath
 
 	# These paths are only needed for CAM standalone builds
 
-	print $fh "$cam_root/cime/externals/pio/pio\n";
+        if (!$pio2_build) {
+            print $fh "$cam_root/cime/externals/pio1/pio\n";
+        }
 
 	unless ($esmf_libdir) { 
 	    print $fh "$cam_root/cime/share/esmf_wrf_timemgr\n";
@@ -2906,6 +3055,11 @@ sub write_filepath
         # Share utilities
 	print $fh "$cam_root/cime/share/csm_share/shr\n";
 	print $fh "$cam_root/cime/share/csm_share/include\n";
+	print $fh "$cam_root/cime/share/shr_RandNum/include\n";
+	print $fh "$cam_root/cime/share/shr_RandNum/src\n";
+	print $fh "$cam_root/cime/share/shr_RandNum/src/dsfmt_f03\n";
+	print $fh "$cam_root/cime/share/shr_RandNum/src/kissvec\n";
+	print $fh "$cam_root/cime/share/shr_RandNum/src/mt19937\n";
 
         # GPTL and timing code
 	print $fh "$cam_root/cime/externals/gptl\n";
@@ -2967,6 +3121,8 @@ sub write_makefile
     my $ldflags      = $cfg_ref->get('ldflags');
     my $cosp_libdir  = $cfg_ref->get('cosp_libdir');
     my $mct_libdir   = $cfg_ref->get('mct_libdir');
+    my $pio_build_dir   = $cfg_ref->get('pio_build_dir');
+    my $pio_install_dir = $cfg_ref->get('pio_install_dir');
 
     # map between local os names ($OSNAME) and names which are
     # used in the Makefile (return value from "uname -s" command).
@@ -2987,37 +3143,39 @@ sub write_makefile
     print $fh_out  <<"EOF";
 # Make macros for CAM.
 
-UNAMES       := $uname_map{$target_os}
-ROOTDIR      := $cam_root
-EXENAME      := $cam_exe
-MODEL_EXEDIR := $cam_exedir
-INC_NETCDF   := $nc_inc
-LIB_NETCDF   := $nc_lib
-NC_LDFLAGS   := $nc_ldflags
-MOD_NETCDF   := $nc_mod
-INC_PNETCDF  := $pnc_inc
-LIB_PNETCDF  := $pnc_lib
-INC_MPI      := $mpi_inc
-LIB_MPI      := $mpi_lib
-MPI_LIB_NAME := $mpi_lib_name
-LAPACK_LIBDIR:= $lapack_libdir
-ESMF_LIBDIR  := $esmf_libdir
-DEBUG        := $debug
-SPMD         := $spmd
-SMP          := $smp
-FC           := $fc
-FC_TYPE      := $fc_type
-CC           := $cc
-USER_LINKER  := $linker
-USER_CPPDEFS := $make_cppdefs
-USER_CFLAGS  := $cflags
-USER_FFLAGS  := $fflags
+UNAMES          := $uname_map{$target_os}
+ROOTDIR         := $cam_root
+EXENAME         := $cam_exe
+MODEL_EXEDIR    := $cam_exedir
+INC_NETCDF      := $nc_inc
+LIB_NETCDF      := $nc_lib
+NC_LDFLAGS      := $nc_ldflags
+MOD_NETCDF      := $nc_mod
+INC_PNETCDF     := $pnc_inc
+LIB_PNETCDF     := $pnc_lib
+INC_MPI         := $mpi_inc
+LIB_MPI         := $mpi_lib
+MPI_LIB_NAME    := $mpi_lib_name
+LAPACK_LIBDIR   := $lapack_libdir
+ESMF_LIBDIR     := $esmf_libdir
+DEBUG           := $debug
+SPMD            := $spmd
+SMP             := $smp
+FC              := $fc
+FC_TYPE         := $fc_type
+CC              := $cc
+USER_LINKER     := $linker
+USER_CPPDEFS    := $make_cppdefs
+USER_CFLAGS     := $cflags
+USER_FFLAGS     := $fflags
 F_OPTIMIZATION_OVERRIDE := $fopt
-USER_LDFLAGS := $ldflags
-COSP_LIBDIR  := $cosp_libdir
-MCT_LIBDIR   := $mct_libdir
-GPTL_SRCDIR  := $cam_root/cime/externals/gptl
-TIMING_SRCDIR := $cam_root/cime/share/timing
+USER_LDFLAGS    := $ldflags
+COSP_LIBDIR     := $cosp_libdir
+MCT_LIBDIR      := $mct_libdir
+PIO_BUILD_DIR   := $pio_build_dir
+PIO_INSTALL_DIR := $pio_install_dir
+GPTL_SRCDIR     := $cam_root/cime/externals/gptl
+TIMING_SRCDIR   := $cam_root/cime/share/timing
 
 EOF
 
@@ -3074,7 +3232,7 @@ sub write_config_h
     my ($file) = @_;
     my  $fh = new IO::File;
 
-    $fh->open(">$file") or die "** can't open config.h file for PIO and MCT: $file\n";
+    $fh->open(">$file") or die "** can't open config.h file for MCT: $file\n";
 
     print $fh <<"EOF";
 #ifdef FORTRAN_SAME
@@ -3310,6 +3468,17 @@ sub mkdirp {
 	unless (-d $path or mkdir($path, 0777)) { return 0; }
     }
     return 1;
+}
+
+#-------------------------------------------------------------------------------
+
+sub get_cmake_version {
+
+# Return CMake version.  Null string returned if cmake not found.
+
+    my $retval = `cmake --version 2>&1`;
+    $retval =~ /cmake version (\d+.*)/;  # use loose match for version string
+    return $1;
 }
 
 #-------------------------------------------------------------------------------

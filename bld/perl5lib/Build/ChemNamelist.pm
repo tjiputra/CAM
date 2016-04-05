@@ -25,7 +25,8 @@ sub set_dep_lists
 {
     my ( $cfgdir, $chem_proc_src, $chem_src_dir, $nl, $print_lvl ) = @_;
 
-    my ( $gas_wetdep_list, $aer_wetdep_list, $aer_drydep_list, $aer_sol_facti, $aer_sol_factb, $gas_drydep_list ) ;
+    my ( $gas_wetdep_list, $aer_wetdep_list, $aer_drydep_list, $aer_sol_facti, $aer_sol_factb, 
+         $aer_scav_coef, $gas_drydep_list ) ;
 
     my @species_list ;
     if ($chem_proc_src) {
@@ -55,35 +56,44 @@ sub set_dep_lists
 
     # set solubility factors for aerosols
     if (length($aer_wetdep_list)>2){ 
-	my @values = split(',', $aer_wetdep_list);
-	my $first = 1; my $pre = "";
-	foreach my $val (@values){
-	    $val =~ tr/'//d;
-	    my $sol_facti;
-	    my $sol_factb;
-	    if ($val =~ /DST/) {
-		$sol_facti = $nl->get_value('dust_sol_facti');
-		if (!defined $sol_facti) { $sol_facti = 0.15; }
-		$sol_factb = $nl->get_value('dust_sol_factb');
-		if (!defined $sol_factb) { $sol_factb = 0.15; }
-	    } elsif ($val =~ /SSLT/) {
-		$sol_facti = $nl->get_value('sslt_sol_facti');
-		if (!defined $sol_facti) { $sol_facti = 0.3; }
-		$sol_factb = $nl->get_value('sslt_sol_factb');
-		if (!defined $sol_factb) { $sol_factb = 0.3; }
-	    } else {
-		$sol_facti = $nl->get_value(${val}.'_sol_facti');
-		if (!defined $sol_facti) { $sol_facti = 0.3; }
-		$sol_factb = $nl->get_value(${val}.'_sol_factb');
-		if (!defined $sol_factb) { $sol_factb = 0.3; }
-	    }
-	    $aer_sol_facti .= $pre . $sol_facti ;
-	    $aer_sol_factb .= $pre . $sol_factb ;
-	    if ($first) { $pre = ","; $first = 0; }
-	}
+        my @values = split(',', $aer_wetdep_list);
+        my $first = 1; my $pre = "";
+        foreach my $val (@values){
+            $val =~ tr/'//d;
+            my $sol_facti;
+            my $sol_factb;
+            if ($val =~ /DST/) {
+                $sol_facti = $nl->get_value('dust_sol_facti');
+                if (!defined $sol_facti) { $sol_facti = 0.3; }
+                $sol_factb = $nl->get_value('dust_sol_factb');
+                if (!defined $sol_factb) { $sol_factb = 0.3; }
+            } elsif ($val =~ /SSLT/) {
+                $sol_facti = $nl->get_value('sslt_sol_facti');
+                if (!defined $sol_facti) { $sol_facti = 0.3; }
+                $sol_factb = $nl->get_value('sslt_sol_factb');
+                if (!defined $sol_factb) { $sol_factb = 0.3; }
+            } else {
+                $sol_facti = $nl->get_value(${val}.'_sol_facti');
+                if (!defined $sol_facti) { $sol_facti = 0.3; }
+                $sol_factb = $nl->get_value(${val}.'_sol_factb');
+                if (!defined $sol_factb) { $sol_factb = 0.3; }
+            }
+            $aer_sol_facti .= $pre . $sol_facti ;
+            $aer_sol_factb .= $pre . $sol_factb ;
+
+            my $scav_coef = $nl->get_value(${val}.'_scav_coef');
+            if (!defined $scav_coef) {
+                if ($val =~ /DST03/ or $val =~ /DST04/) { $scav_coef = 0.3; }
+                else { $scav_coef = 0.1; }
+            }
+            $aer_scav_coef .= $pre . $scav_coef ;
+
+            if ($first) { $pre = ","; $first = 0; }
+        }
     }
 
-    return (  $gas_wetdep_list, $aer_wetdep_list, $aer_drydep_list, $aer_sol_facti, $aer_sol_factb, $gas_drydep_list );
+    return ( $gas_wetdep_list, $aer_wetdep_list, $aer_sol_facti, $aer_sol_factb, $aer_scav_coef, 
+             $aer_drydep_list, $gas_drydep_list );
 }
 
 #-------------------------------------------------------------------------------

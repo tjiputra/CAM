@@ -27,7 +27,6 @@ module sst_data
   use shr_kind_mod, only: r8 => shr_kind_r8
   use shr_scam_mod, only: shr_scam_GetCloseLatLon
 
-  use rgrid,               only: nlon, fullgrid
   use pmgrid,              only: plon, plat
   use ppgrid,              only: pcols, begchunk, endchunk
   use phys_grid,           only: get_ncols_p, get_rlat_all_p, get_rlon_all_p,&
@@ -137,11 +136,9 @@ subroutine sstini(ncid_sst)
   integer latdimid              ! netcdf id for latitude variable
   integer latid                 ! netcdf id for latitude variable
   integer timeid                ! netcdf id for time variable
-  integer nlonid                ! netcdf id for nlon variable (rgrid)
   integer cnt3(3)               ! array of counts for each dimension
   integer strt3(3)              ! array of starting indices
   integer n                     ! indices
-  integer nlon_sst(plat)        ! number of lons per lat on bdy dataset
   integer j                     ! latitude index
   integer istat                 ! error return
   integer :: yr, mon, day       ! components of a date
@@ -224,35 +221,6 @@ subroutine sstini(ncid_sst)
      call endrun	
   endif
   ierr = pio_inq_dimlen( ncid_sst, timeid, timesiz   )
-
-  if (.not. single_column) then
-     !
-     ! Check to ensure reduced or not grid of dataset matches that of model
-     !
-     if (fullgrid) then
-        call pio_seterrorhandling(ncid_sst, pio_bcast_error)
-        ierr = pio_inq_varid (ncid_sst, 'nlon', nlonid)
-        call pio_seterrorhandling(ncid_sst, pio_internal_error)
-
-        if (ierr == PIO_NOERR) then
-           ierr = pio_get_var (ncid_sst, nlonid, nlon_sst)
-           do j=1,plat
-              if (nlon_sst(j) /= plon) then
-                 call endrun ('SSTINI: model grid does not match dataset grid')
-              end if
-           end do
-        end if
-     else
-        ierr = pio_inq_varid (ncid_sst, 'nlon', nlonid)
-        ierr = pio_get_var(ncid_sst, nlonid, nlon_sst)
-        do j=1,plat
-           if (nlon_sst(j) /= nlon(j)) then
-              call endrun ('SSTINI: model grid does not match dataset grid')
-           end if
-        end do
-     end if
-  endif
-     
   ierr = pio_inq_varid( ncid_sst, 'date', dateid   )
   ierr = pio_inq_varid( ncid_sst, 'datesec', secid   )
   ierr = pio_inq_varid( ncid_sst, 'lat', latid   )

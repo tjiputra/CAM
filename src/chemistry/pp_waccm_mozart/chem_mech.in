@@ -18,7 +18,7 @@
  H2402 ->CBrF2CBrF2, CHBR3 -> CHBr3, CH2BR2 -> CH2Br2
  COF2, COFCL -> COFCl, HF, F
  CO2, N2p -> N2, O2p -> O2
- Np -> N, Op -> O, NOp -> NO, e, N2D -> N, H2O
+ Np -> N, Op -> O, NOp -> NO, e -> E, N2D -> N, H2O
  NH_5 -> CO, NH_50 -> CO, NH_50W -> CO, AOA_NH -> CO, ST80_25 -> CO, CO_25 -> CO, CO_50 -> CO
  SO2t -> SO2, SF6, SF6em -> SF6, O3S -> O3
  E90 -> CO, E90_NH -> CO, E90_SH ->CO

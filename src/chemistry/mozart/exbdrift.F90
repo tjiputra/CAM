@@ -39,6 +39,7 @@
         nmlon, nmlat, &     ! dimension of mag. grid 
         dlatm, dlonm, &     ! grid spacing of mag. grid 
         ylatm, ylonm        ! magnetic longitudes,latitudes (deg) (0:nmlat),(0:nmlon)
+      use apex, only : apex_subsol, apex_magloctm
 
       implicit none
 
@@ -402,7 +403,7 @@
      elonp	 ! East longitude of geomagnetic dipole north pole (deg)
    use time_manager, only : get_curr_calday, get_curr_date
    use cam_history,  only: outfld
-   use cam_control_mod, only : magfield_fix_year
+   use mo_apex, only : geomag_year
 !-------------------------------------------------------------------------------
 !	... dummy arguments
 !-------------------------------------------------------------------------------
@@ -422,7 +423,7 @@
 ! valid at end of current timestep
 !-------------------------------------------------------------------------------
      call get_curr_date (iyear,imo,iday_m,tod)  ! year, time of day [sec]
-     iyear = magfield_fix_year
+     iyear = geomag_year
      iday  = get_curr_calday()                  ! day of year
 
 !    ut   = tod/3600._r8			! UT of day [hrs]
@@ -436,14 +437,14 @@
 !-------------------------------------------------------------------------------
 !  find subsolar geographic latitude and longitude 
 !-------------------------------------------------------------------------------
-     call subsol( iyear, iday, ihr, imn, sec, sbsllat, sbsllon )
+     call apex_subsol( iyear, iday, ihr, imn, sec, sbsllat, sbsllon )
 
 !-------------------------------------------------------------------------------
 !  computes magnetic local time   
 !-------------------------------------------------------------------------------
      do i = 1,ncol
        collonm = alonm(i,lchnk)*rtd   ! mag lons (deg)
-       call magloctm( collonm, sbsllat, sbsllon, colatp, elonp, mlt(i) )
+       call apex_magloctm( collonm, sbsllat, sbsllon, colatp, elonp, mlt(i) )
      end do
 
 !    call outfld('MLT     ', mlt, ncol, lchnk)

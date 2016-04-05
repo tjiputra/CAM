@@ -327,7 +327,9 @@ contains
     data_times = data_times - offset_time
 
     deallocate(lambda)
+    deallocate(dellam)
     deallocate(dates)
+    deallocate(datesecs)
 
     ! need to force data loading when the model starts at a time =/ 00:00:00.000
     ! -- may occur in restarts also
@@ -346,7 +348,7 @@ contains
     integer  :: year, month, day, sec
     integer  :: index, i, nt
     integer  :: offset(2), count(2)
-    logical  :: do_adv, read_data
+    logical  :: read_data
     real(r8) :: time, delt
     real(r8) :: data(nbins)
     integer  :: ierr

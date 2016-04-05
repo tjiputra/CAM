@@ -19,7 +19,6 @@ module spetru
   use pmgrid,       only: plon, plev, plat
   use pspect,       only: psp, pspt, ptrn, pmmax
   use comspe,       only: alp, nlen, nstart, dalp
-  use rgrid,        only: nlon, nmmax
   use commap,       only: w, xm
   use physconst,    only: rearth, ra
   use eul_control_mod, only: trig, ifax, pcray
@@ -118,7 +117,7 @@ subroutine spetru_phis  (phis, phis_hires, phisl, phism, phi_out)
       irow = lat
       if (lat.gt.plat/2) irow = plat - lat + 1
       call fft991(phis_tmp(1,lat),work,trig(1,irow),ifax(1,irow),1,plondfft, &
-                  nlon(lat),1,-1)
+                  plon,1,-1)
    end do                    ! lat=1,plat
 !
 ! Loop over latitude pairs
@@ -127,7 +126,7 @@ subroutine spetru_phis  (phis, phis_hires, phisl, phism, phi_out)
       latp = irow
       latm = plat - irow + 1
       zw = w(irow)*2._r8
-      do i=1,2*nmmax(irow)
+      do i=1,2*pmmax
 !
 ! Compute symmetric and antisymmetric components
 !
@@ -139,7 +138,7 @@ subroutine spetru_phis  (phis, phis_hires, phisl, phism, phi_out)
 !     
 ! Compute phi*mn
 !
-      do m=1,nmmax(irow)
+      do m=1,pmmax
          mr = nstart(m)
          do n=1,nlen(m),2
             zwalp = zw*alp(mr+n,irow)
@@ -193,7 +192,7 @@ subroutine spetru_phis  (phis, phis_hires, phisl, phism, phi_out)
 !
 ! Compute(phi*)m
 !
-      do m=1,nmmax(irow)
+      do m=1,pmmax
          mr = nstart(m)
          do n=1,nlen(m),2
             phialpr = phi(1,mr+n)*alp(mr+n,irow)
@@ -203,7 +202,7 @@ subroutine spetru_phis  (phis, phis_hires, phisl, phism, phi_out)
          end do
       end do
 
-      do m=1,nmmax(irow)
+      do m=1,pmmax
          mr = nstart(m)
          do n=2,nlen(m),2
             phialpr = phi(1,mr+n)*alp(mr+n,irow)
@@ -215,7 +214,7 @@ subroutine spetru_phis  (phis, phis_hires, phisl, phism, phi_out)
 !
 ! Recompute real fields from symmetric and antisymmetric parts
 !
-      do i=1,nlon(latm)+2
+      do i=1,plon+2
          tmp1 = phis_tmp(i,latm) + phis_tmp(i,latp)
          tmp2 = phis_tmp(i,latm) - phis_tmp(i,latp)
          phis_tmp(i,latm) = tmp1
@@ -237,7 +236,7 @@ subroutine spetru_phis  (phis, phis_hires, phisl, phism, phi_out)
 !
 ! Compute(phi*)m
 !
-         do m=1,nmmax(irow)
+         do m=1,pmmax
             mr = nstart(m)
             do n=1,nlen(m),2
                phialpr = phi(1,mr+n)*alp(mr+n,irow)
@@ -247,7 +246,7 @@ subroutine spetru_phis  (phis, phis_hires, phisl, phism, phi_out)
             end do
          end do
 
-         do m=1,nmmax(irow)
+         do m=1,pmmax
             mr = nstart(m)
             do n=2,nlen(m),2
                phialpr = phi(1,mr+n)*alp(mr+n,irow)
@@ -259,7 +258,7 @@ subroutine spetru_phis  (phis, phis_hires, phisl, phism, phi_out)
 !
 ! d(Phi)/d(lamda)
 !
-         do m=1,nmmax(irow)
+         do m=1,pmmax
             phisl_tmp(2*m-1,latm) = xm(m)*phisl_tmp(2*m-1,latm)
             phisl_tmp(2*m  ,latm) = xm(m)*phisl_tmp(2*m  ,latm)
             phisl_tmp(2*m-1,latp) = xm(m)*phisl_tmp(2*m-1,latp)
@@ -268,7 +267,7 @@ subroutine spetru_phis  (phis, phis_hires, phisl, phism, phi_out)
 !
 ! Recompute real fields from symmetric and antisymmetric parts
 !
-         do i=1,nlon(latm)+2
+         do i=1,plon+2
             tmp1 = phisl_tmp(i,latm) + phisl_tmp(i,latp)
             tmp2 = phisl_tmp(i,latm) - phisl_tmp(i,latp)
             phisl_tmp(i,latm) = tmp1
@@ -290,7 +289,7 @@ subroutine spetru_phis  (phis, phis_hires, phisl, phism, phi_out)
 !
 ! Compute(phi*)m
 !
-         do m=1,nmmax(irow)
+         do m=1,pmmax
             mr = nstart(m)
             do n=1,nlen(m),2
                phdalpr = phi(1,mr+n)*dalp(mr+n,irow)
@@ -300,7 +299,7 @@ subroutine spetru_phis  (phis, phis_hires, phisl, phism, phi_out)
             end do
          end do
 
-         do m=1,nmmax(irow)
+         do m=1,pmmax
             mr = nstart(m)
             do n=2,nlen(m),2
                phdalpr = phi(1,mr+n)*dalp(mr+n,irow)
@@ -312,7 +311,7 @@ subroutine spetru_phis  (phis, phis_hires, phisl, phism, phi_out)
 !
 ! Recompute real fields from symmetric and antisymmetric parts
 !
-         do i=1,nlon(latm)+2
+         do i=1,plon+2
             tmp1 = phism_tmp(i,latm) + phism_tmp(i,latp)
             tmp2 = phism_tmp(i,latm) - phism_tmp(i,latp)
             phism_tmp(i,latm) = tmp1
@@ -330,17 +329,17 @@ subroutine spetru_phis  (phis, phis_hires, phisl, phism, phi_out)
       if (lat.gt.plat/2) irow = plat - lat + 1
 
       call fft991(phis_tmp(1,lat),work,trig(1,irow),ifax(1,irow),1,plondfft, &
-                  nlon(lat),1,+1)
-      phis(:nlon(lat),lat) = phis_tmp(:nlon(lat),lat)
+                  plon,1,+1)
+      phis(:plon,lat) = phis_tmp(:plon,lat)
       if(present(phisl)) then
          call fft991 (phisl_tmp(1,lat),work     ,trig(1,irow),ifax(1,irow),1       , &
-                      plondfft       ,nlon(lat),1           ,+1      )
-         phisl(:nlon(lat),lat) = phisl_tmp(:nlon(lat),lat)
+                      plondfft       ,plon,1           ,+1      )
+         phisl(:plon,lat) = phisl_tmp(:plon,lat)
       end if
       if(present(phism)) then
          call fft991 (phism_tmp(1,lat),work     ,trig(1,irow),ifax(1,irow),1       , &
-                      plondfft       ,nlon(lat),1           ,+1      )
-         phism(:nlon(lat),lat) = phism_tmp(:nlon(lat),lat)
+                      plondfft       ,plon,1           ,+1      )
+         phism(:plon,lat) = phism_tmp(:plon,lat)
       end if
    enddo
    deallocate( phis_tmp )
@@ -427,14 +426,14 @@ subroutine spetru_ps(ps      ,dpsl    ,dpsm)
    do lat=1,plat
       irow = lat
       if (lat.gt.plat/2) irow = plat - lat + 1
-      do i=1,nlon(lat)
+      do i=1,plon
          log_ps(i,lat) = log(ps(i,lat))
       end do
 !
 ! Transform grid -> fourier
 !
       call fft991(log_ps(1,lat),work,trig(1,irow),ifax(1,irow),1,plondfft, &
-                  nlon(lat),1,-1)
+                  plon,1,-1)
 
    end do                    ! lat=1,plat
    allocate( dpsl_tmp(plondfft,plat) )
@@ -446,7 +445,7 @@ subroutine spetru_ps(ps      ,dpsl    ,dpsm)
       latp = irow
       latm = plat - irow + 1
       zw = w(irow)*2._r8
-      do i=1,2*nmmax(irow)
+      do i=1,2*pmmax
 !
 ! Compute symmetric and antisymmetric components
 !
@@ -459,7 +458,7 @@ subroutine spetru_ps(ps      ,dpsl    ,dpsm)
 !     
 ! Compute ln(p*)mn
 !
-      do m=1,nmmax(irow)
+      do m=1,pmmax
          mr = nstart(m)
          mc = 2*mr
          do n=1,nlen(m),2
@@ -500,7 +499,7 @@ subroutine spetru_ps(ps      ,dpsl    ,dpsm)
 !
 ! Compute(ln(p*),grad(ln(p*)))m
 !
-      do m=1,nmmax(irow)
+      do m=1,pmmax
          mr = nstart(m)
          mc = 2*mr
          do n=1,nlen(m),2
@@ -522,7 +521,7 @@ subroutine spetru_ps(ps      ,dpsl    ,dpsm)
          end do
       end do
 
-      do m=1,nmmax(irow)
+      do m=1,pmmax
          mr = nstart(m)
          mc = 2*mr
          do n=2,nlen(m),2
@@ -544,7 +543,7 @@ subroutine spetru_ps(ps      ,dpsl    ,dpsm)
          end do
       end do
 
-      do m=1,nmmax(irow)
+      do m=1,pmmax
          dpsl_tmp(2*m-1,latm) = xm(m)*dpsl_tmp(2*m-1,latm)
          dpsl_tmp(2*m  ,latm) = xm(m)*dpsl_tmp(2*m  ,latm)
          dpsl_tmp(2*m-1,latp) = xm(m)*dpsl_tmp(2*m-1,latp)
@@ -553,7 +552,7 @@ subroutine spetru_ps(ps      ,dpsl    ,dpsm)
 !
 ! Recompute real fields from symmetric and antisymmetric parts
 !
-      do i=1,nlon(latm)+2
+      do i=1,plon+2
 !
          tmp1 = log_ps(i,latm) + log_ps(i,latp)
          tmp2 = log_ps(i,latm) - log_ps(i,latp)
@@ -582,15 +581,15 @@ subroutine spetru_ps(ps      ,dpsl    ,dpsm)
       if (lat.gt.plat/2) irow = plat - lat + 1
 
       call fft991(log_ps(1,lat),work,trig(1,irow),ifax(1,irow),1,plondfft, &
-                  nlon(lat),1,+1)
+                  plon,1,+1)
       call fft991(dpsl_tmp(1,lat),work,trig(1,irow),ifax(1,irow),1,plondfft, &
-                  nlon(lat),1,+1)
+                  plon,1,+1)
       call fft991(dpsm_tmp(1,lat),work,trig(1,irow),ifax(1,irow),1,plondfft, &
-                  nlon(lat),1,+1)
+                  plon,1,+1)
 !
 ! Convert from ln(ps) to ps, copy temporaries to input arrays
 !
-      do i=1,nlon(lat)
+      do i=1,plon
          ps(i,lat) = exp(log_ps(i,lat))
          dpsl(i,lat) = dpsl_tmp(i,lat)
          dpsm(i,lat) = dpsm_tmp(i,lat)
@@ -671,9 +670,9 @@ subroutine spetru_3d_scalar(x3, dl, dm)
    do lat=1,plat
       irow = lat
       if (lat.gt.plat/2) irow = plat - lat + 1
-      x3_tmp(:nlon(lat),:,lat) = x3(:nlon(lat),:,lat)
+      x3_tmp(:plon,:,lat) = x3(:plon,:,lat)
       call fft991(x3_tmp(1,1,lat),work,trig(1,irow),ifax(1,irow),1,plondfft, &
-                  nlon(lat),plev,-1)
+                  plon,plev,-1)
    end do                    ! lat=1,plat
 !
 ! Loop over vertical levels
@@ -693,7 +692,7 @@ subroutine spetru_3d_scalar(x3, dl, dm)
 !
 ! Multi-level field: T
 !
-         do i=1,2*nmmax(irow)
+         do i=1,2*pmmax
             tmp1 = 0.5_r8*(x3_tmp(i,k,latm) - x3_tmp(i,k,latp))
             tmp2 = 0.5_r8*(x3_tmp(i,k,latm) + x3_tmp(i,k,latp))
             x3_tmp(i,k,latm) = tmp1
@@ -702,7 +701,7 @@ subroutine spetru_3d_scalar(x3, dl, dm)
 !     
 ! Compute tmn
 !
-         do m=1,nmmax(irow)
+         do m=1,pmmax
             mr = nstart(m)
             mc = 2*mr
             do n=1,nlen(m),2
@@ -714,7 +713,7 @@ subroutine spetru_3d_scalar(x3, dl, dm)
             end do
          end do
 
-         do m=1,nmmax(irow)
+         do m=1,pmmax
             mr = nstart(m)
             mc = 2*mr
             do n=2,nlen(m),2
@@ -738,7 +737,7 @@ subroutine spetru_3d_scalar(x3, dl, dm)
          x3_tmp(:,k,latm) = 0._r8
          x3_tmp(:,k,latp) = 0._r8
 
-         do m=1,nmmax(irow)
+         do m=1,pmmax
             mr = nstart(m)
             mc = 2*mr
             do n=1,nlen(m),2
@@ -751,7 +750,7 @@ subroutine spetru_3d_scalar(x3, dl, dm)
             end do
          end do
 
-         do m=1,nmmax(irow)
+         do m=1,pmmax
             mr = nstart(m)
             mc = 2*mr
             do n=2,nlen(m),2
@@ -766,7 +765,7 @@ subroutine spetru_3d_scalar(x3, dl, dm)
 !
 ! Recompute real fields from symmetric and antisymmetric parts
 !
-         do i=1,nlon(latm)+2
+         do i=1,plon+2
             tmp1 = x3_tmp(i,k,latm) + x3_tmp(i,k,latp)
             tmp2 = x3_tmp(i,k,latm) - x3_tmp(i,k,latp)
             x3_tmp(i,k,latm) = tmp1
@@ -784,7 +783,7 @@ subroutine spetru_3d_scalar(x3, dl, dm)
             dl_tmp(:,k,latm) = 0._r8
             dl_tmp(:,k,latp) = 0._r8
 
-            do m=1,nmmax(irow)
+            do m=1,pmmax
                mr = nstart(m)
                mc = 2*mr
                do n=1,nlen(m),2
@@ -797,7 +796,7 @@ subroutine spetru_3d_scalar(x3, dl, dm)
                end do
             end do
 
-            do m=1,nmmax(irow)
+            do m=1,pmmax
                mr = nstart(m)
                mc = 2*mr
                do n=2,nlen(m),2
@@ -812,7 +811,7 @@ subroutine spetru_3d_scalar(x3, dl, dm)
 !
 ! d(T)/d(lamda)
 !
-            do m=1,nmmax(irow)
+            do m=1,pmmax
                dl_tmp(2*m-1,k,latm) = xm(m)*dl_tmp(2*m-1,k,latm)
                dl_tmp(2*m  ,k,latm) = xm(m)*dl_tmp(2*m  ,k,latm)
                dl_tmp(2*m-1,k,latp) = xm(m)*dl_tmp(2*m-1,k,latp)
@@ -821,7 +820,7 @@ subroutine spetru_3d_scalar(x3, dl, dm)
 !
 ! Recompute real fields from symmetric and antisymmetric parts
 !
-            do i=1,nlon(latm)+2
+            do i=1,plon+2
                tmp1 = dl_tmp(i,k,latm) + dl_tmp(i,k,latp)
                tmp2 = dl_tmp(i,k,latm) - dl_tmp(i,k,latp)
                dl_tmp(i,k,latm) = tmp1
@@ -840,7 +839,7 @@ subroutine spetru_3d_scalar(x3, dl, dm)
             dm_tmp(:,k,latm) = 0._r8
             dm_tmp(:,k,latp) = 0._r8
 
-            do m=1,nmmax(irow)
+            do m=1,pmmax
                mr = nstart(m)
                mc = 2*mr
                do n=1,nlen(m),2
@@ -853,7 +852,7 @@ subroutine spetru_3d_scalar(x3, dl, dm)
                end do
             end do
 
-            do m=1,nmmax(irow)
+            do m=1,pmmax
                mr = nstart(m)
                mc = 2*mr
                do n=2,nlen(m),2
@@ -868,7 +867,7 @@ subroutine spetru_3d_scalar(x3, dl, dm)
 !
 ! Recompute real fields from symmetric and antisymmetric parts
 !
-            do i=1,nlon(latm)+2
+            do i=1,plon+2
                tmp1 = dm_tmp(i,k,latm) + dm_tmp(i,k,latp)
                tmp2 = dm_tmp(i,k,latm) - dm_tmp(i,k,latp)
                dm_tmp(i,k,latm) = tmp1
@@ -888,17 +887,17 @@ subroutine spetru_3d_scalar(x3, dl, dm)
       if (lat.gt.plat/2) irow = plat - lat + 1
 
       call fft991(x3_tmp(1,1,lat) ,work     ,trig(1,irow),ifax(1,irow),1       , &
-                  plondfft       ,nlon(lat),plev        ,+1)
-      x3(:nlon(lat),:,lat) = x3_tmp(:nlon(lat),:,lat)
+                  plondfft       ,plon,plev        ,+1)
+      x3(:plon,:,lat) = x3_tmp(:plon,:,lat)
       if(present(dl)) then
          call fft991(dl_tmp(1,1,lat) ,work     ,trig(1,irow),ifax(1,irow),1       , &
-                     plondfft       ,nlon(lat),plev        ,+1      )
-         dl(:nlon(lat),:,lat) = dl_tmp(:nlon(lat),:,lat)
+                     plondfft       ,plon,plev        ,+1      )
+         dl(:plon,:,lat) = dl_tmp(:plon,:,lat)
       end if
       if(present(dm)) then
          call fft991(dm_tmp(1,1,lat) ,work     ,trig(1,irow),ifax(1,irow),1       , &
-                     plondfft       ,nlon(lat),plev        ,+1      )
-         dm(:nlon(lat),:,lat) = dm_tmp(:nlon(lat),:,lat)
+                     plondfft       ,plon,plev        ,+1      )
+         dm(:plon,:,lat) = dm_tmp(:plon,:,lat)
       end if
    end do
    deallocate( x3_tmp )
@@ -994,7 +993,7 @@ subroutine spetru_uv(u3      ,v3      ,div     ,vort    )
       if (lat.gt.plat/2) irow = plat - lat + 1
       zsqcs = sqrt(cs(irow))
       do k=1,plev
-         do i=1,nlon(lat)
+         do i=1,plon
             u_cosphi(i,k,lat) = u3(i,k,lat)*zsqcs
             v_cosphi(i,k,lat) = v3(i,k,lat)*zsqcs
          end do
@@ -1005,9 +1004,9 @@ subroutine spetru_uv(u3      ,v3      ,div     ,vort    )
 ! 2nd transform: LN(PS).  3rd transform: surface geopotential
 !
       call fft991(u_cosphi(1,1,lat),work,trig(1,irow),ifax(1,irow),1,plondfft, &
-                  nlon(lat),plev,-1)
+                  plon,plev,-1)
       call fft991(v_cosphi(1,1,lat),work,trig(1,irow),ifax(1,irow),1,plondfft, &
-                  nlon(lat),plev,-1)
+                  plon,plev,-1)
 
    end do                    ! lat=1,plat
 !
@@ -1029,7 +1028,7 @@ subroutine spetru_uv(u3      ,v3      ,div     ,vort    )
          latm = plat - irow + 1
          zrcsj = ra/cs(irow)
          zw = w(irow)*2._r8
-         do i=1,2*nmmax(irow)
+         do i=1,2*pmmax
 
             tmp1 = 0.5_r8*(u_cosphi(i,k,latm) - u_cosphi(i,k,latp))
             tmp2 = 0.5_r8*(u_cosphi(i,k,latm) + u_cosphi(i,k,latp))
@@ -1045,7 +1044,7 @@ subroutine spetru_uv(u3      ,v3      ,div     ,vort    )
 !     
 ! Compute vzmn and dmn
 !
-         do m=1,nmmax(irow)
+         do m=1,pmmax
             mr = nstart(m)
             mc = 2*mr
             do n=1,nlen(m),2
@@ -1064,7 +1063,7 @@ subroutine spetru_uv(u3      ,v3      ,div     ,vort    )
             end do
          end do
 
-         do m=1,nmmax(irow)
+         do m=1,pmmax
             mr = nstart(m)
             mc = 2*mr
             do n=2,nlen(m),2
@@ -1093,7 +1092,7 @@ subroutine spetru_uv(u3      ,v3      ,div     ,vort    )
 !
 ! Compute(u,v,vz,d)m
 !
-         do m=1,nmmax(irow)
+         do m=1,pmmax
             mr = nstart(m)
             do n=1,nlen(m)
 !
@@ -1122,7 +1121,7 @@ subroutine spetru_uv(u3      ,v3      ,div     ,vort    )
             div_tmp(:,k,latp) = 0._r8
          end if
 
-         do m=1,nmmax(irow)
+         do m=1,pmmax
             mr = nstart(m)
             mc = 2*mr
             do n=1,nlen(m),2
@@ -1165,7 +1164,7 @@ subroutine spetru_uv(u3      ,v3      ,div     ,vort    )
             end do
          end do
 
-         do m=1,nmmax(irow)
+         do m=1,pmmax
             mr = nstart(m)
             mc = 2*mr
             do n=2,nlen(m),2
@@ -1216,7 +1215,7 @@ subroutine spetru_uv(u3      ,v3      ,div     ,vort    )
 !
 ! Recompute real fields from symmetric and antisymmetric parts
 !
-         do i=1,nlon(latm)+2
+         do i=1,plon+2
             tmp1 = u_cosphi(i,k,latm) + u_cosphi(i,k,latp)
             tmp2 = u_cosphi(i,k,latm) - u_cosphi(i,k,latp)
             u_cosphi(i,k,latm) = tmp1
@@ -1253,25 +1252,25 @@ subroutine spetru_uv(u3      ,v3      ,div     ,vort    )
       if (lat.gt.plat/2) irow = plat - lat + 1
 
       call fft991(u_cosphi(1,1,lat),work,trig(1,irow),ifax(1,irow),1,plondfft, &
-                  nlon(lat),plev,+1)
+                  plon,plev,+1)
       call fft991(v_cosphi(1,1,lat),work,trig(1,irow),ifax(1,irow),1,plondfft, &
-                  nlon(lat),plev,+1)
+                  plon,plev,+1)
       if(present(vort)) then
          call fft991(vort_tmp(1,1,lat),work,trig(1,irow),ifax(1,irow),1, &
-                     plondfft,nlon(lat),plev,+1)
-         vort(:nlon(lat),:,lat) = vort_tmp(:nlon(lat),:,lat)
+                     plondfft,plon,plev,+1)
+         vort(:plon,:,lat) = vort_tmp(:plon,:,lat)
       end if
       if(present(div)) then
          call fft991(div_tmp(1,1,lat),work,trig(1,irow),ifax(1,irow),1,plondfft, &
-                     nlon(lat),plev,+1)
-         div(:nlon(lat),:,lat) = div_tmp(:nlon(lat),:,lat)
+                     plon,plev,+1)
+         div(:plon,:,lat) = div_tmp(:plon,:,lat)
       end if
 !
 ! Convert U,V to u,v
 !
       zsqcs = sqrt(cs(irow))
       do k=1,plev
-         do i=1,nlon(lat)
+         do i=1,plon
             u3(i,k,lat) = u_cosphi(i,k,lat)/zsqcs
             v3(i,k,lat) = v_cosphi(i,k,lat)/zsqcs
          end do

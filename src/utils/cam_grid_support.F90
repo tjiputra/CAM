@@ -8,11 +8,6 @@ module cam_grid_support
   use spmd_utils,          only: masterproc
   use cam_pio_utils,       only: cam_pio_handle_error
   use cam_map_utils,       only: cam_filemap_t
-!!XXgoldyXX:
-use spmd_utils, only: iam, npes, mpicom, mpi_integer, mpi_sum, mpi_max, mpi_min
-use shr_sys_mod, only: shr_sys_flush
-use cam_map_utils, only: goldy_debug
-!!XXgoldyXX:
 
   implicit none
   private
@@ -37,7 +32,9 @@ use cam_map_utils, only: goldy_debug
     real(r8),         pointer :: values(:) => NULL() ! dim values (local if map)
     integer(iMap),    pointer :: map(:) => NULL()  ! map (dof) for dist. coord
     logical                   :: latitude          ! .false. means longitude
+    real(r8),         pointer :: bnds(:,:) => NULL() ! bounds, if present
     type(var_desc_t), pointer :: vardesc => NULL() ! If we are to write coord
+    type(var_desc_t), pointer :: bndsvdesc => NULL() ! If we are to write bounds
   contains
     procedure                 :: get_coord_len  => horiz_coord_len
     procedure                 :: num_elem       => horiz_coord_num_elem
@@ -48,11 +45,6 @@ use cam_map_utils, only: goldy_debug
     procedure                 :: get_units      => horiz_coord_units
     procedure                 :: write_attr     => write_horiz_coord_attr
     procedure                 :: write_var      => write_horiz_coord_var
-!!XXgoldyXX: v remove this
-!    procedure, public :: get_value      => horiz_coord_value
-!    procedure, public :: find_index     => horiz_coord_find_index
-!    procedure, public :: map_pos        => horiz_coord_map_pos
-!!XXgoldyXX: ^ remove this
   end type horiz_coord_t
 
   !---------------------------------------------------------------------------
@@ -166,12 +158,14 @@ use cam_map_utils, only: goldy_debug
     logical                            :: unstructured  ! Is this needed?
     logical                            :: block_indexed ! .false. for lon/lat
     logical                            :: attrs_defined = .false.
+    logical                            :: zonal_grid    = .false.
     type(cam_filemap_t),       pointer :: map => null() ! global dim map (dof)
     type(cam_grid_attr_ptr_t), pointer :: attributes => NULL()
   contains
     procedure :: print_cam_grid
     procedure :: is_unstructured        => cam_grid_unstructured
     procedure :: is_block_indexed       => cam_grid_block_indexed
+    procedure :: is_zonal_grid          => cam_grid_zonal_grid
     procedure :: coord_lengths          => cam_grid_get_dims
     procedure :: coord_names            => cam_grid_coord_names
     procedure :: dim_names              => cam_grid_dim_names
@@ -311,7 +305,9 @@ use cam_map_utils, only: goldy_debug
   public     :: cam_grid_get_coord_names, cam_grid_get_dim_names
   public     :: cam_grid_has_blocksize, cam_grid_get_block_count
   public     :: cam_grid_get_latvals,   cam_grid_get_lonvals
+  public     :: cam_grid_get_coords
   public     :: cam_grid_is_unstructured, cam_grid_is_block_indexed
+  public     :: cam_grid_is_zonal
   ! Functions for dealing with patch masks
   public     :: cam_grid_compute_patch
 
@@ -396,7 +392,7 @@ contains
 
     clen = this%dimsize
   end subroutine horiz_coord_len
-    
+
   subroutine horiz_coord_name(this, name)
     ! Dummy arguments
     class(horiz_coord_t), intent(in)    :: this
@@ -458,7 +454,7 @@ contains
   end subroutine horiz_coord_units
 
   function horiz_coord_create(name, dimname, dimsize, long_name, units,       &
-       lbound, ubound, values, map) result(newcoord)
+       lbound, ubound, values, map, bnds) result(newcoord)
 
     ! Dummy arguments
     character(len=*),      intent(in)                  :: name
@@ -471,10 +467,8 @@ contains
     integer,               intent(in)                  :: ubound
     real(r8),              intent(in)                  :: values(lbound:ubound)
     integer(iMap),         intent(in), optional        :: map(ubound-lbound+1)
+    real(r8),              intent(in), optional        :: bnds(2,lbound:ubound)
     type(horiz_coord_t),               pointer         :: newcoord
-
-    ! Local variables
-    integer                                            :: i
 
     allocate(newcoord)
 
@@ -504,16 +498,29 @@ contains
       call endrun("horiz_coord_create: unsupported units: '"//trim(units)//"'")
     end if
     allocate(newcoord%values(lbound:ubound))
-    newcoord%values(:) = values(:)
+    if (ubound >= lbound) then
+      newcoord%values(:) = values(:)
+    end if
 
     if (present(map)) then
       if (ANY(map < 0)) then
         call endrun("horiz_coord_create "//trim(name)//": map vals < 0")
       end if
       allocate(newcoord%map(ubound - lbound + 1))
-      newcoord%map(:) = map(:)
+      if (ubound >= lbound) then
+        newcoord%map(:) = map(:)
+      end if
     else
       nullify(newcoord%map)
+    end if
+
+    if (present(bnds)) then
+      allocate(newcoord%bnds(2, lbound:ubound))
+      if (ubound >= lbound) then
+        newcoord%bnds = bnds
+      end if
+    else
+      nullify(newcoord%bnds)
     end if
 
   end function horiz_coord_create
@@ -541,6 +548,7 @@ contains
     type(var_desc_t)                    :: vardesc
     character(len=max_hcoordname_len)   :: dimname
     integer                             :: dimid        ! PIO dimension ID
+    integer                             :: bnds_dimid   ! PIO dim ID for bounds
     integer                             :: err_handling
     integer                             :: ierr
 
@@ -568,6 +576,22 @@ contains
       ! units
       ierr=pio_put_att(File, this%vardesc, 'units', trim(this%units))
       call cam_pio_handle_error(ierr, 'Error writing "units" attr in write_horiz_coord_attr')
+      ! Take care of bounds if they exist
+      if (associated(this%bnds)) then
+        allocate(this%bndsvdesc)
+        ierr=pio_put_att(File, this%vardesc, 'bounds', trim(this%name)//'_bnds')
+        call cam_pio_handle_error(ierr, 'Error writing "'//trim(this%name)//'_bnds" attr in write_horiz_coord_attr')
+        call cam_pio_def_dim(File, 'nbnd', 2, bnds_dimid, existOK=.true.)
+        call cam_pio_def_var(File, trim(this%name)//'_bnds', pio_double,      &
+             (/ bnds_dimid, dimid /), this%bndsvdesc, existOK=.false.)
+        call cam_pio_handle_error(ierr, 'Error defining "'//trim(this%name)//'bnds" in write_horiz_coord_attr')
+        ! long_name
+        ierr=pio_put_att(File, this%bndsvdesc, 'long_name', trim(this%name)//' bounds')
+        call cam_pio_handle_error(ierr, 'Error writing bounds "long_name" attr in write_horiz_coord_attr')
+        ! units
+        ierr=pio_put_att(File, this%bndsvdesc, 'units', trim(this%units))
+        call cam_pio_handle_error(ierr, 'Error writing bounds "units" attr in write_horiz_coord_attr')
+      end if ! There are bounds for this coordinate
     end if ! We define the variable
 
     if (present(dimid_out)) then
@@ -598,7 +622,6 @@ contains
     use cam_instance, only: atm_id
     use shr_pio_mod,  only: shr_pio_getiosys
     !!XXgoldyXX: End of this part of the hack
-
 
     ! Dummy arguments
     class(horiz_coord_t),    intent(inout) :: this
@@ -638,11 +661,23 @@ contains
         call pio_write_darray(File, this%vardesc, iodesc, this%values,        &
              ierr, -900._r8)
         call pio_freedecomp(File, iodesc)
+        ! Take care of bounds if they exist
+        if (associated(this%bnds) .and. associated(this%bndsvdesc)) then
+          call pio_initdecomp(piosys, pio_double, (/2, this%dimsize/),        &
+               this%map, iodesc)
+          call pio_write_darray(File, this%bndsvdesc, iodesc, this%bnds,      &
+               ierr, -900._r8)
+          call pio_freedecomp(File, iodesc)
+        end if
 #endif
         !!XXgoldyXX: End of this part of the hack
       else
         ! This is a local variable, pio_put_var should work fine
         ierr = pio_put_var(File, this%vardesc, this%values)
+        ! Take care of bounds if they exist
+        if (associated(this%bnds) .and. associated(this%bndsvdesc)) then
+          ierr = pio_put_var(File, this%bndsvdesc, this%bnds)
+        end if
       end if
       write(errormsg, *) 'Error writing variable values for ',trim(this%name),&
            ' in write_horiz_coord_var'
@@ -654,6 +689,11 @@ contains
       ! We are done with this variable descriptor, reset for next file
       deallocate(this%vardesc)
       nullify(this%vardesc)
+      ! Same with the bounds descriptor
+      if (associated(this%bndsvdesc)) then
+        deallocate(this%bndsvdesc)
+        nullify(this%bndsvdesc)
+      end if
     end if ! Do we write the variable?
 
   end subroutine write_horiz_coord_var
@@ -669,7 +709,7 @@ contains
     character(len=*), intent(in)  :: gridname
     ! Local variables
     integer :: i
-    
+
     get_cam_grid_index_char = -1
     do i = 1, registeredhgrids
       if(trim(gridname) == trim(cam_grids(i)%name)) then
@@ -685,7 +725,7 @@ contains
     integer, intent(in) :: gridid
     ! Local variables
     integer :: i
-    
+
     get_cam_grid_index_int = -1
     do i = 1, registeredhgrids
       if(gridid == cam_grids(i)%id) then
@@ -740,7 +780,7 @@ contains
   end function num_cam_grid_attrs
 
   subroutine cam_grid_register(name, id, lat_coord, lon_coord, map,           &
-       unstruct, block_indexed, src_in, dest_in)
+       unstruct, block_indexed, zonal_grid, src_in, dest_in)
     ! Dummy arguments
     character(len=*),             intent(in) :: name
     integer,                      intent(in) :: id
@@ -749,6 +789,7 @@ contains
     integer(iMap),       pointer, intent(in) :: map(:,:)
     logical,  optional,           intent(in) :: unstruct
     logical,  optional,           intent(in) :: block_indexed
+    logical,  optional,           intent(in) :: zonal_grid
     integer,  optional,           intent(in) :: src_in(2)
     integer,  optional,           intent(in) :: dest_in(2)
 
@@ -799,8 +840,17 @@ contains
       else
         cam_grids(registeredhgrids)%block_indexed = cam_grids(registeredhgrids)%unstructured
       end if
+      if (present(zonal_grid)) then
+        ! Check the size of the longitude coordinate
+        call lon_coord%get_coord_len(i)
+        if (i /= 1) then
+          call endrun(subname//': lon_coord is not of size 1 for a zonal grid')
+        end if
+        cam_grids(registeredhgrids)%zonal_grid = zonal_grid
+      else
+        cam_grids(registeredhgrids)%zonal_grid = .false.
+      end if
       if (associated(cam_grids(registeredhgrids)%map)) then
-        write(errormsg, *) 
         call endrun(trim(subname)//": new grid map should not be associated")
       end if
       if (present(src_in)) then
@@ -833,12 +883,13 @@ contains
     type(cam_grid_attr_ptr_t),   pointer      :: attrPtr
     class(cam_grid_attribute_t), pointer      :: attr
     if (masterproc) then
-      write(iulog, '(3a,i4,4a,2(a,l2))') 'Grid: ', trim(this%name),           &
+      write(iulog, '(3a,i4,4a,3(a,l2))') 'Grid: ', trim(this%name),           &
            ', ID = ', this%id,                                                &
-           ', lat coord = ', trim(this%lat_coord%name),                       &
-           ', lon coord = ', trim(this%lon_coord%name),                       &
-           ', unstruct = ', this%unstructured,                                &
-           ', block_ind = ', this%block_indexed
+           ', lat coord  = ', trim(this%lat_coord%name),                      &
+           ', lon coord  = ', trim(this%lon_coord%name),                      &
+           ', unstruct   = ', this%unstructured,                              &
+           ', block_ind  = ', this%block_indexed,                             &
+           ', zonal_grid = ', this%zonal_grid
       attrPtr => this%attributes
       do while (associated(attrPtr))
 !!XXgoldyXX: Is this not working in PGI?
@@ -1389,24 +1440,35 @@ contains
 
   end subroutine cam_grid_get_array_bounds
 
-  subroutine cam_grid_get_coord_names(id, name1, name2)
+  !---------------------------------------------------------------------------
+  !
+  !  cam_grid_get_coord_names: Return the names of the grid axes
+  !
+  !---------------------------------------------------------------------------
+  subroutine cam_grid_get_coord_names(id, lon_name, lat_name)
 
     ! Dummy arguments
     integer,                  intent(in)    :: id
-    character(len=*),         intent(out)   :: name1
-    character(len=*),         intent(out)   :: name2
+    character(len=*),         intent(out)   :: lon_name
+    character(len=*),         intent(out)   :: lat_name
 
     ! Local variables
     integer                                 :: gridid
     gridid = get_cam_grid_index(id)
     if (gridid > 0) then
-      call cam_grids(gridid)%coord_names(name1, name2)
+      call cam_grids(gridid)%coord_names(lon_name, lat_name)
     else
       call endrun('cam_grid_get_coord_names: Bad grid ID')
     end if
 
   end subroutine cam_grid_get_coord_names
 
+  !---------------------------------------------------------------------------
+  !
+  !  cam_grid_get_dim_names: Return the names of the grid axes dimensions.
+  !        Note that these may be the same
+  !
+  !---------------------------------------------------------------------------
   subroutine cam_grid_get_dim_names(id, name1, name2)
 
     ! Dummy arguments
@@ -1505,6 +1567,35 @@ contains
     end if
   end function cam_grid_get_lonvals
 
+  ! Find the longitude and latitude of a range of map entries
+  ! beg and end are the range of the first source index. blk is a block or chunk index
+  subroutine cam_grid_get_coords(id, beg, end, blk, lon, lat)
+
+    ! Dummy arguments
+    integer,               intent(in)    :: id
+    integer,               intent(in)    :: beg
+    integer,               intent(in)    :: end
+    integer,               intent(in)    :: blk
+    real(r8),              intent(inout) :: lon(:)
+    real(r8),              intent(inout) :: lat(:)
+
+    ! Local variables
+    integer                              :: gridid
+    integer                              :: i
+    gridid = get_cam_grid_index(id)
+    if (gridid > 0) then
+      do i = beg, end
+        if (cam_grids(gridid)%is_unstructured()) then
+          call endrun('cam_grid_get_coords: Not implemented')
+        else
+          call endrun('cam_grid_get_coords: Not implemented')
+        end if
+      end do
+    else
+      call endrun('cam_grid_get_coords: Bad grid ID')
+    end if
+  end subroutine cam_grid_get_coords
+
   logical function cam_grid_is_unstructured(id) result(unstruct)
 
     ! Dummy arguments
@@ -1534,6 +1625,21 @@ contains
       call endrun('s: Bad grid ID')
     end if
   end function cam_grid_is_block_indexed
+
+  logical function cam_grid_is_zonal(id) result(zonal)
+
+    ! Dummy arguments
+    integer,                  intent(in) :: id
+
+    ! Local variables
+    integer                              :: gridid
+    gridid = get_cam_grid_index(id)
+    if (gridid > 0) then
+      zonal = cam_grids(gridid)%is_zonal_grid()
+    else
+      call endrun('s: Bad grid ID')
+    end if
+  end function cam_grid_is_zonal
 
   ! Compute or update a grid patch mask
   subroutine cam_grid_compute_patch(id, patch, lonl, lonu, latl, latu)
@@ -1651,7 +1757,7 @@ contains
        call endrun('cam_grid_attr_1d_int: long_name too long')
     end if
     this%long_name = trim(long_name)
-    
+
     if (len_trim(dimname) > max_hcoordname_len) then
        call endrun('cam_grid_attr_1d_int: dimname too long')
     end if
@@ -1680,7 +1786,7 @@ contains
 !    call this%cam_grid_attr_init(trim(name), trim(long_name), next)
     this%name      = trim(name)
     this%long_name = trim(long_name)
-    
+
     this%dimname =  trim(dimname)
     this%dimsize =  dimsize
     this%values  => values
@@ -2406,6 +2512,12 @@ contains
     cam_grid_block_indexed = this%block_indexed
   end function cam_grid_block_indexed
 
+  logical function cam_grid_zonal_grid(this)
+    class(cam_grid_t)                         :: this
+
+    cam_grid_zonal_grid = this%zonal_grid
+  end function cam_grid_zonal_grid
+
   logical function cam_grid_unstructured(this)
     class(cam_grid_t)                         :: this
 
@@ -2439,14 +2551,14 @@ contains
   !  cam_grid_coord_names: Return the names of the grid axes
   !
   !---------------------------------------------------------------------------
-  subroutine cam_grid_coord_names(this, name1, name2)
+  subroutine cam_grid_coord_names(this, lon_name, lat_name)
     ! Dummy arguments
     class(cam_grid_t)                :: this
-    character(len=*),  intent(out)   :: name1
-    character(len=*),  intent(out)   :: name2
+    character(len=*),  intent(out)   :: lon_name
+    character(len=*),  intent(out)   :: lat_name
 
-    call this%lon_coord%get_coord_name(name1)
-    call this%lat_coord%get_coord_name(name2)
+    call this%lon_coord%get_coord_name(lon_name)
+    call this%lat_coord%get_coord_name(lat_name)
 
   end subroutine cam_grid_coord_names
 
@@ -2855,7 +2967,7 @@ contains
         call endrun('CAM_GRID_FIND_DIMIDS: '//trim(this%name)//' dimension, '//trim(dimname2)//', does not exist on file')
       end if
     end if
-    
+
     ! Back to whatever error handling was running before this routine
     call pio_seterrorhandling(File, err_handling)
 

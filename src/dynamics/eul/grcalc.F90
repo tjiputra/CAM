@@ -47,7 +47,6 @@ subroutine grcalcs (irow    ,ztodt   ,grts    ,grths   ,grds    ,&
    use pmgrid
    use pspect
    use comspe
-   use rgrid
    use commap
    use physconst, only: ez, ra
    use eul_control_mod
@@ -286,7 +285,6 @@ subroutine grcalca (irow    ,ztodt   ,grta    ,grtha   ,grda    ,&
    use pmgrid
    use pspect
    use comspe
-   use rgrid
    use commap
    use physconst, only: ra
    use eul_control_mod
@@ -470,7 +468,6 @@ subroutine prepGRcalc(tmpSPEcoef)
   use pmgrid
   use pspect
   use comspe
-  use rgrid
   use commap
   use physconst, only: ra
   use eul_control_mod,    only: hdiftq, hdifzd

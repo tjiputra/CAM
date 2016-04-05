@@ -9,7 +9,8 @@ module native_mapping
   use cam_logfile,       only : iulog
   use shr_kind_mod,      only : r8 => shr_kind_r8, shr_kind_cl
   use cam_abortutils,    only : endrun
-  use spmd_utils,        only : iam, masterproc, mpi_character, mpi_logical, mpi_integer, mpi_max, mpicom
+  use spmd_utils,        only : iam, masterproc, mpi_character, mpi_logical, mpi_integer, mpi_max, &
+                                mpicom, mstrid=>masterprocid
 
   implicit none
   private
@@ -19,56 +20,66 @@ module native_mapping
   character(len=shr_kind_cl) :: native_mapping_outgrids(maxoutgrids)
   logical :: do_native_mapping
   
+!=============================================================================================
 contains
+!=============================================================================================
 
-  subroutine native_mapping_readnl(NLFileName)
-    use units, only : getunit, freeunit
-    use namelist_utils, only : find_group_name
+subroutine native_mapping_readnl(NLFileName)
 
-    character(len=*), intent(in) :: NLFileName
-    character(len=shr_kind_cl) :: mappingfile, fname
+   use units,          only : getunit, freeunit
+   use namelist_utils, only : find_group_name
 
-    namelist /native_mapping/  native_mapping_outgrids
-    integer :: nf, unitn, ierr
-    logical :: exist
+   character(len=*), intent(in) :: NLFileName
 
-    do_native_mapping=.false.
+   character(len=shr_kind_cl) :: mappingfile, fname
 
-    do nf=1,maxoutgrids
-       native_mapping_outgrids(nf)=''
-    enddo
+   namelist /native_mapping/  native_mapping_outgrids
+   integer :: nf, unitn, ierr
+   logical :: exist
+   character(len=*), parameter ::  sub="native_mapping_readnl"
+   !-----------------------------------------------------------------------------
 
-    if(masterproc) then
-       exist=.true.
-       write(iulog,*) 'Check for native_mapping namelist in ',trim(nlfilename)
-       unitn = getunit()
-       open( unitn, file=trim(nlfilename), status='old' )       
+   do_native_mapping=.false.
 
-       call find_group_name(unitn, 'native_mapping', status=ierr)
-       if(ierr/=0) then
-          write(iulog,*) 'No native_mapping namelist found'
-          exist=.false.
-       end if
-       if(exist) then
-          read(unitn, native_mapping, iostat=ierr)
-          if(ierr/=0) then
-             call endrun('namelist read returns an error condition for native_mapping')
-          end if
-          close(unitn)
-          call freeunit(unitn)
-          if(len_trim(native_mapping_outgrids(1))==0) exist=.false.
-       end if
-    end if
-#ifdef SPMD
-    call mpibcast(exist, 1, mpi_logical, 0, mpicom)
-#endif
-    if(.not. exist) return
-#ifdef SPMD
-    call mpibcast(native_mapping_outgrids, maxoutgrids*shr_kind_cl, mpi_character, 0, mpicom)
-#endif
-    do_native_mapping=.true.
-  end subroutine native_mapping_readnl
+   do nf=1,maxoutgrids
+      native_mapping_outgrids(nf)=''
+   enddo
 
+   if(masterproc) then
+      exist=.true.
+      write(iulog,*) sub//': Check for native_mapping namelist in ',trim(nlfilename)
+      unitn = getunit()
+      open( unitn, file=trim(nlfilename), status='old' )       
+
+      call find_group_name(unitn, 'native_mapping', status=ierr)
+      if(ierr/=0) then
+         write(iulog,*) sub//': No native_mapping namelist found'
+         exist=.false.
+      end if
+      if(exist) then
+         read(unitn, native_mapping, iostat=ierr)
+         if(ierr/=0) then
+            call endrun(sub//': namelist read returns an error condition for native_mapping')
+         end if
+         close(unitn)
+         call freeunit(unitn)
+         if(len_trim(native_mapping_outgrids(1))==0) exist=.false.
+      end if
+   end if
+
+   call mpi_bcast(exist, 1, mpi_logical, mstrid, mpicom, ierr)
+   if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: exist")
+
+   if(.not. exist) return
+
+   call mpi_bcast(native_mapping_outgrids, maxoutgrids*shr_kind_cl, mpi_character, mstrid, mpicom, ierr)
+   if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: native_mapping_outgrids")
+
+   do_native_mapping=.true.
+
+end subroutine native_mapping_readnl
+
+!=============================================================================================
 
 
   subroutine create_native_mapping_files(par, elem, maptype)

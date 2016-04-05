@@ -4,7 +4,6 @@ module dp_coupling
 ! !MODULE: dp_coupling --- dynamics-physics coupling module
 !
    use shr_kind_mod,      only: r8 => shr_kind_r8
-   use rgrid,             only: nlon
    use ppgrid,            only: pcols, pver, pverp
    use phys_grid
    

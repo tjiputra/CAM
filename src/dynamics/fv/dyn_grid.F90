@@ -1,20 +1,20 @@
 module dyn_grid
-!----------------------------------------------------------------------- 
-! 
+!-----------------------------------------------------------------------
+!
 ! Purpose: Definition of dynamics computational grid.
 !
 ! Method: Variables are private; interface routines used to extract
 !         information for use in user code. Global column index range
-!         defined using full (unreduced) grid. 
-! 
+!         defined using full (unreduced) grid.
+!
 ! Entry points:
-!      get_block_bounds_d       get first and last indices in global 
+!      get_block_bounds_d       get first and last indices in global
 !                               block ordering
 !      get_block_gcol_d         get column indices for given block
 !      get_block_gcol_cnt_d     get number of columns in given block
 !      get_block_lvl_cnt_d      get number of vertical levels in column
 !      get_block_levels_d       get vertical levels in column
-!      get_gcol_block_d         get global block indices and local columns 
+!      get_gcol_block_d         get global block indices and local columns
 !                               index for given global column index
 !      get_gcol_block_cnt_d     get number of blocks containing data
 !                               from a given global column index
@@ -22,14 +22,14 @@ module dyn_grid
 !      get_horiz_grid_d         get horizontal grid coordinates
 !      get_horiz_grid_dim_d     get horizontal dimensions of dynamics grid
 !      dyn_grid_get_pref        get reference pressures for the dynamics grid
-!      dyn_grid_get_elem_coords get coordinates of a specified element (latitude) 
+!      dyn_grid_get_elem_coords get coordinates of a specified element (latitude)
 !                               of the dynamics grid (lat slice of the block)
 !      dyn_grid_find_gcols      finds nearest column for given lat/lon
-!      dyn_grid_get_colndx      get global lat and lon coordinate and MPI process indices 
+!      dyn_grid_get_colndx      get global lat and lon coordinate and MPI process indices
 !                               corresponding to a specified global column index
 !
 ! Author: John Drake and Patrick Worley
-! 
+!
 !-----------------------------------------------------------------------
    use shr_kind_mod,     only: r8 => shr_kind_r8
    use pmgrid,           only: plev
@@ -51,6 +51,7 @@ module dyn_grid
   integer, parameter, public :: dyn_stagger_decomp = 102 !Backward compatibility
   integer, parameter, public :: dyn_ustag_decomp   = 102
   integer, parameter, public :: dyn_vstag_decomp   = 103
+  integer, parameter, public :: dyn_zonal_decomp   = 104
 
 contains
 
@@ -60,12 +61,10 @@ contains
     use shr_kind_mod,   only: r8 => shr_kind_r8
     use physconst,      only: pi, rair
     use pmgrid
-    use pspect
     use commap,         only: w, clat, clon, w_staggered, clat
     use commap,         only: clat_staggered, clon, latdeg, londeg
     use commap,         only: latdeg_st, londeg_st
     use cam_abortutils, only: endrun
-    use rgrid,          only: fullgrid
     use spmd_utils,     only: masterproc
     use cam_logfile,    only: iulog
     implicit none
@@ -75,12 +74,12 @@ contains
     ! !DESCRIPTION:
     !
     !   Initialize Model commons.
-    ! 
+    !
     ! !REVISION HISTORY:
     !
     !   92.06.01      Bath          Creation from CCM1
     !   96.02.01      Buja          Modifications
-    !   01.01.19      Lin           incorporated Rasch's bug fix for the 
+    !   01.01.19      Lin           incorporated Rasch's bug fix for the
     !                               "Gaussian" weights
     !   02.04.04      Sawyer        Removed comspe
     !
@@ -162,10 +161,7 @@ contains
       write(iulog,*) 'INITCOM 2: weights do not sum to 2. sum=',sum
       call endrun
     end if
-    !
-    ! Determine whether full or reduced grid
-    !
-    fullgrid = .true.
+
     if (masterproc) write(iulog,*) 'Number of longitudes per latitude = ', plon
     !
     ! Longitude array
@@ -197,7 +193,7 @@ contains
     lcnt=(endlatxy-beglatxy+1)*nlev*(endlonxy-beglonxy+1)
     allocate(ldof(lcnt))
     lcnt=0
-    ldof(:)=0	
+    ldof(:)=0
     do k=1,nlev
       do j=beglatxy,endlatxy
         do i=beglonxy, endlonxy
@@ -207,7 +203,7 @@ contains
           else if(hdim2_d>1) then
             if(fileorder.eq.'xyz') then
               ldof(lcnt)=i+(j-(plat-hdim2_d+1))*hdim1_d+(k-1)*hdim1_d*hdim2_d
-            else 
+            else
               ldof(lcnt)=i+(j-(plat-hdim2_d+1))*hdim1_d*nlev+(k-1)*hdim1_d
             end if
           else  ! lon, lev decomp used for history nacs
@@ -225,15 +221,15 @@ contains
 !
   subroutine get_block_bounds_d(block_first,block_last)
 
-!----------------------------------------------------------------------- 
-! 
-!                          
+!-----------------------------------------------------------------------
+!
+!
 ! Purpose: Return first and last indices used in global block ordering
-! 
-! Method: 
-! 
+!
+! Method:
+!
 ! Author: Patrick Worley
-! 
+!
 !-----------------------------------------------------------------------
     use pmgrid, only: plat, spmd_on, nprxy_x, nprxy_y
 
@@ -259,15 +255,15 @@ contains
 !
   subroutine get_block_gcol_d(blockid,size,cdex)
 
-!----------------------------------------------------------------------- 
-! 
-!                          
+!-----------------------------------------------------------------------
+!
+!
 ! Purpose: Return list of dynamics column indices in given block
-! 
-! Method: 
-! 
+!
+! Method:
+!
 ! Author: Patrick Worley
-! 
+!
 !-----------------------------------------------------------------------
     use pmgrid,   only: spmd_on, plon, nprxy_x
     use spmd_utils, only: iam
@@ -330,15 +326,15 @@ contains
 !
   integer function get_block_gcol_cnt_d(blockid)
 
-!----------------------------------------------------------------------- 
-! 
-!                          
+!-----------------------------------------------------------------------
+!
+!
 ! Purpose: Return number of dynamics columns in indicated block
-! 
-! Method: 
-! 
+!
+! Method:
+!
 ! Author: Patrick Worley
-! 
+!
 !-----------------------------------------------------------------------
     use pmgrid, only: spmd_on, nprxy_x, plon
 #if ( defined SPMD )
@@ -449,16 +445,16 @@ contains
 !
   subroutine get_gcol_block_d(gcol,cnt,blockid,bcid,localblockid)
 
-!----------------------------------------------------------------------- 
-! 
-!                          
+!-----------------------------------------------------------------------
+!
+!
 ! Purpose: Return global block index and local column index
 !          for global column index
-! 
-! Method: 
-! 
+!
+! Method:
+!
 ! Author: Patrick Worley
-! 
+!
 !-----------------------------------------------------------------------
     use pmgrid, only: plon, spmd_on, nprxy_x, nprxy_y
 #if ( defined SPMD )
@@ -544,12 +540,12 @@ contains
     use commap,     only: clat
     integer, intent(in) :: gcid(:)
     real(r8), intent(out) :: lat(:)
-    integer :: k, glen, ilat 
+    integer :: k, glen, ilat
 
     glen = size(gcid)
 
     do k=1,glen
-      ilat = (gcid(k)-1)/plon + 1 
+      ilat = (gcid(k)-1)/plon + 1
       lat(k) = CLAT(ilat)
     end do
 
@@ -577,16 +573,16 @@ contains
 !
   integer function get_gcol_block_cnt_d(gcol)
 
-!----------------------------------------------------------------------- 
-! 
-!                          
+!-----------------------------------------------------------------------
+!
+!
 ! Purpose: Return number of blocks contain data for the vertical column
 !          with the given global column index
-! 
-! Method: 
-! 
+!
+! Method:
+!
 ! Author: Patrick Worley
-! 
+!
 !-----------------------------------------------------------------------
 
     implicit none
@@ -604,15 +600,15 @@ contains
 !
   integer function get_block_owner_d(blockid)
 
-!----------------------------------------------------------------------- 
-! 
-!                          
+!-----------------------------------------------------------------------
+!
+!
 ! Purpose: Return id of processor that "owns" the indicated block
-! 
-! Method: 
-! 
+!
+! Method:
+!
 ! Author: Patrick Worley
-! 
+!
 !-----------------------------------------------------------------------
     use pmgrid, only: spmd_on
 #if ( defined SPMD )
@@ -643,17 +639,17 @@ contains
 !
   subroutine get_horiz_grid_dim_d(hdim1_d,hdim2_d)
 
-!----------------------------------------------------------------------- 
-! 
-!                          
+!-----------------------------------------------------------------------
+!
+!
 ! Purpose: Returns declared horizontal dimensions of computational grid.
 !          Note that global column ordering is assumed to be compatible
 !          with the first dimension major ordering of the 2D array.
-! 
-! Method: 
-! 
+!
+! Method:
+!
 ! Author: Patrick Worley
-! 
+!
 !-----------------------------------------------------------------------
     use pmgrid,     only: plat, plon
 
@@ -675,17 +671,17 @@ contains
   subroutine get_horiz_grid_d(size,clat_d_out,clon_d_out, &
        area_d_out, wght_d_out, lat_d_out, lon_d_out)
 
-!----------------------------------------------------------------------- 
-! 
-!                          
+!-----------------------------------------------------------------------
+!
+!
 ! Purpose: Return latitude and longitude (in radians), column surface
 !          area (in radians squared) and surface integration weights
 !          for global column indices that will be passed to/from physics
-! 
-! Method: 
-! 
+!
+! Method:
+!
 ! Author: Patrick Worley
-! 
+!
 !-----------------------------------------------------------------------
     use pmgrid,     only: plat, plon
     use commap,     only: clat, clon, latdeg, londeg, w
@@ -698,7 +694,7 @@ contains
     real(r8), intent(out), optional :: clat_d_out(size) ! column latitudes
     real(r8), intent(out), optional :: clon_d_out(size) ! column longitudes
 
-    real(r8), intent(out), optional :: area_d_out(size) ! column surface 
+    real(r8), intent(out), optional :: area_d_out(size) ! column surface
                                                         !  area
     real(r8), intent(out), optional :: wght_d_out(size) ! column integration
                                                         !  weight
@@ -773,8 +769,8 @@ contains
       n = 0
       do j = 1,plat
 
-        ! First, determine vertices of each grid point. 
-        ! Verticies are ordered as follows: 
+        ! First, determine vertices of each grid point.
+        ! Verticies are ordered as follows:
         ! ns_vert: 1=lower left, 2 = upper left
         ! ew_vert: 1=lower left, 2 = lower right
 
@@ -934,7 +930,7 @@ contains
         ival = plev
      else if(name.eq.'plevp') then
         ival = plevp
-     else	
+     else
         ival = -1
      end if
      return
@@ -961,7 +957,7 @@ subroutine dyn_grid_get_pref(pref_edge, pref_mid, num_pr_lev)
       pref_mid(k)  = hypm(k)
    end do
    pref_edge(plev+1) = hypi(plev+1)
-   
+
    num_pr_lev = nprlev
 
 end subroutine dyn_grid_get_pref
@@ -969,10 +965,10 @@ end subroutine dyn_grid_get_pref
 !#######################################################################
 
 !-------------------------------------------------------------------------------
-! This returns the lat/lon information (and corresponding MPI task numbers (owners)) 
+! This returns the lat/lon information (and corresponding MPI task numbers (owners))
 ! of the global model grid columns nearest to the input satellite coordinate (lat,lon)
 !-------------------------------------------------------------------------------
-subroutine dyn_grid_find_gcols( lat, lon, nclosest, owners, indx, jndx, rlat, rlon, idyn_dists ) 
+subroutine dyn_grid_find_gcols( lat, lon, nclosest, owners, indx, jndx, rlat, rlon, idyn_dists )
   use spmd_utils,     only: iam
   use shr_const_mod,  only: SHR_CONST_PI, SHR_CONST_REARTH
   use pmgrid,         only: plon, plat
@@ -1019,12 +1015,12 @@ subroutine dyn_grid_find_gcols( lat, lon, nclosest, owners, indx, jndx, rlat, rl
      dist = acos(sin(latr) * sin(clat_d(i)) + cos(latr) * cos(clat_d(i)) * cos(clon_d(i) - lonr)) * SHR_CONST_REARTH
      do j = nclosest, 1, -1
         if (dist < distmin(j)) then
-           
+
            if (j < nclosest) then
               distmin(j+1) = distmin(j)
               igcol(j+1)    = igcol(j)
            end if
-           
+
            distmin(j) = dist
            igcol(j)    = i
         else
@@ -1042,20 +1038,20 @@ subroutine dyn_grid_find_gcols( lat, lon, nclosest, owners, indx, jndx, rlat, rl
      if ( iam==owners(i) ) then
         ! get global lat and lon coordinate indices from global column index
         ! -- plon is global number of longitude grid points
-        jndx(i) = (igcol(i)-1)/plon + 1 
+        jndx(i) = (igcol(i)-1)/plon + 1
         indx(i) = igcol(i) - (jndx(i)-1)*plon
      else
         jndx(i) = -1
         indx(i) = -1
      endif
-     
+
      if ( present(rlat) ) rlat(i) = clat_d(igcol(i)) * rad2deg
      if ( present(rlon) ) rlon(i) = clon_d(igcol(i)) * rad2deg
-     
+
      if (present(idyn_dists)) then
         idyn_dists(i) = distmin(i)
      end if
-     
+
   end do
 
   deallocate( clat_d )
@@ -1066,7 +1062,7 @@ subroutine dyn_grid_find_gcols( lat, lon, nclosest, owners, indx, jndx, rlat, rl
 end subroutine dyn_grid_find_gcols
 
 !#######################################################################
-subroutine dyn_grid_get_colndx( igcol, nclosest, owners, indx, jndx ) 
+subroutine dyn_grid_get_colndx( igcol, nclosest, owners, indx, jndx )
   use spmd_utils, only: iam
   use pmgrid,     only: plon
 
@@ -1087,7 +1083,7 @@ subroutine dyn_grid_get_colndx( igcol, nclosest, owners, indx, jndx )
      if ( iam==owners(i) ) then
         ! get global lat and lon coordinate indices from global column index
         ! -- plon is global number of longitude grid points
-        jndx(i) = (igcol(i)-1)/plon + 1 
+        jndx(i) = (igcol(i)-1)/plon + 1
         indx(i) = igcol(i) - (jndx(i)-1)*plon
      else
         jndx(i) = -1
@@ -1099,9 +1095,9 @@ subroutine dyn_grid_get_colndx( igcol, nclosest, owners, indx, jndx )
 end subroutine dyn_grid_get_colndx
 !#######################################################################
 
-! this returns coordinates of a latitude slice of the block corresponding 
-! to latitude index latndx 
- 
+! this returns coordinates of a latitude slice of the block corresponding
+! to latitude index latndx
+
 subroutine dyn_grid_get_elem_coords( latndx, rlon, rlat, cdex )
   use commap, only : clat, clon
   use pmgrid, only : beglonxy, endlonxy
@@ -1133,9 +1129,10 @@ end subroutine dyn_grid_get_elem_coords
 !#######################################################################
 
 subroutine define_cam_grids()
-  use pspect,           only: ptrm
-  use pmgrid,           only: plon, plat, beglonxy, endlonxy, beglatxy, endlatxy
-  use spmd_utils,       only: iam
+
+  use pmgrid,           only: plon, beglonxy, endlonxy, nprxy_x
+  use pmgrid,           only: plat, beglatxy, endlatxy
+  use spmd_utils,       only: iam, npes
 #ifdef SPMD
   use spmd_dyn,         only: npes_xy
 #endif
@@ -1143,20 +1140,24 @@ subroutine define_cam_grids()
   use commap,           only: w_staggered, w
   use cam_grid_support, only: horiz_coord_t, horiz_coord_create, iMap
   use cam_grid_support, only: cam_grid_register, cam_grid_attribute_register
+  use cam_grid_support, only: cam_grid_attribute_copy
 
   integer                      :: i, j, ind
   type(horiz_coord_t), pointer :: lat_coord
   type(horiz_coord_t), pointer :: lon_coord
   type(horiz_coord_t), pointer :: slat_coord
   type(horiz_coord_t), pointer :: slon_coord
+  type(horiz_coord_t), pointer :: zlon_coord
   integer(iMap),       pointer :: coord_map(:)
   integer(iMap),       pointer :: grid_map(:,:)
+  real(r8)                     :: zlon_bnds(2,1)
   real(r8), allocatable        :: latvals(:)
   real(r8),            pointer :: rattval(:)
   integer,             pointer :: iattval(:)
 #ifndef SPMD
   integer, parameter           :: npes_xy = 1
 #endif
+  logical                      :: is_lon_distributed
 
   ! Note: not using get_horiz_grid_dim_d or get_horiz_grid_d since those
  !       are deprecated ('cause I said so' -- goldy)
@@ -1165,10 +1166,32 @@ subroutine define_cam_grids()
   nullify(lon_coord)
   nullify(slat_coord)
   nullify(slon_coord)
+  nullify(zlon_coord)
   nullify(coord_map)
   nullify(grid_map)
   nullify(rattval)
   nullify(iattval)
+
+  if (iam >= npes_xy) then
+    ! NB: On inactive PEs, beglonxy should be one and endlonxy should be zero
+    if (beglonxy /= 1) then
+      call endrun("DEFINE_CAM_GRIDS: Bad beglonxy")
+    end if
+    if (endlonxy /= 0) then
+      call endrun("DEFINE_CAM_GRIDS: Bad endlonxy")
+    end if
+    ! NB: On inactive PEs, beglatxy should be one and endlatxy should be zero
+    if (beglatxy /= 1) then
+      call endrun("DEFINE_CAM_GRIDS: Bad beglatxy")
+    end if
+    if (endlatxy /= 0) then
+      call endrun("DEFINE_CAM_GRIDS: Bad endlatxy")
+    end if
+  end if
+
+  ! Figure out if lon and slon are distributed dimensions
+  is_lon_distributed = (nprxy_x > 1)
+
   ! Grid for cell centers
   ! Make a map
   allocate(grid_map(4, ((endlonxy - beglonxy + 1) * (endlatxy - beglatxy + 1))))
@@ -1184,24 +1207,28 @@ subroutine define_cam_grids()
   end do
   ! Cell-centered latitude coordinate
   allocate(coord_map(endlatxy - beglatxy + 1))
-  coord_map = (/ (i, i = beglatxy, endlatxy) /)
+  if (endlatxy >= beglatxy) then
+    coord_map = (/ (i, i = beglatxy, endlatxy) /)
+  end if
   lat_coord => horiz_coord_create('lat', '', plat, 'latitude',                &
        'degrees_north', beglatxy, endlatxy, latdeg(beglatxy:endlatxy),        &
        map=coord_map)
   nullify(coord_map)
+
   ! Cell-centered longitude coordinate
-  if ((beglonxy == 1) .and. (endlonxy == plon)) then
-    ! Assume this is not a distributed dimension
-    lon_coord => horiz_coord_create('lon', '', plon, 'longitude',             &
-         'degrees_east', beglonxy, endlonxy, londeg(beglonxy:endlonxy,1))
-  else
+  if (is_lon_distributed) then
     allocate(coord_map(endlonxy - beglonxy + 1))
-    coord_map = (/ (i, i = beglonxy, endlonxy) /)
+    if (endlonxy >= beglonxy) then
+      coord_map = (/ (i, i = beglonxy, endlonxy) /)
+    end if
     lon_coord => horiz_coord_create('lon', '', plon, 'longitude',             &
          'degrees_east', beglonxy, endlonxy, londeg(beglonxy:endlonxy,1),     &
          map=coord_map)
     deallocate(coord_map)
     nullify(coord_map)
+  else
+    lon_coord => horiz_coord_create('lon', '', plon, 'longitude',             &
+         'degrees_east', beglonxy, endlonxy, londeg(beglonxy:endlonxy,1))
   end if
   ! Cell-centered grid
   call cam_grid_register('fv_centers', dyn_decomp, lat_coord, lon_coord,      &
@@ -1231,33 +1258,33 @@ subroutine define_cam_grids()
 
   ! Staggered latitudes 'skip' the first one so they are 'off by one'
   ! This means we always must have a coordinate map
+  allocate(coord_map(endlatxy - beglatxy + 1))
+  ! NB: coord_map(1) == 0 when beglat == 1, that element is not output
+  do i = 1, size(coord_map)
+    coord_map(i) = i + beglatxy - 2
+  end do
   if (iam .lt. npes_xy) then
-    allocate(coord_map(endlatxy - beglatxy + 1))
-    ! NB: coord_map(1) == 0 when beglat == 1, that element is not output
-    do i = 1, size(coord_map)
-      coord_map(i) = i + beglatxy - 2
-    end do
+    allocate(latvals(beglatxy:endlatxy))
+    if (beglatxy == 1) then
+      latvals(1) = 0
+      latvals(2:endlatxy) = latdeg_st(1:endlatxy-1)
+    else
+      i = beglatxy - 1 ! Stupid NAG 'error'
+      latvals(beglatxy:endlatxy) = latdeg_st(i:endlatxy-1)
+    end if
   else
-    allocate(coord_map(0))
+    allocate(latvals(0))
   end if
-  allocate(latvals(beglatxy:endlatxy))
-  if (beglatxy == 1) then
-    latvals(1) = 0
-    latvals(2:endlatxy) = latdeg_st(1:endlatxy-1)
-  else
-    i = beglatxy - 1 ! Stupid NAG 'error'
-    latvals(beglatxy:endlatxy) = latdeg_st(i:endlatxy-1)
-  end if
-  slat_coord => horiz_coord_create('slat', '', (plat - 1),                  &
-       'staggered latitude', 'degrees_north', beglatxy, endlatxy, latvals,  &
+  slat_coord => horiz_coord_create('slat', '', (plat - 1),                    &
+       'staggered latitude', 'degrees_north', beglatxy, endlatxy, latvals,    &
        map=coord_map)
   deallocate(coord_map)
   nullify(coord_map)
+  deallocate(latvals)
 
   call cam_grid_register('fv_u_stagger', dyn_ustag_decomp, slat_coord,        &
        lon_coord, grid_map, unstruct=.false.)
   nullify(grid_map) ! Belongs to the grid
-  deallocate(latvals)
 
   ! Staggered grid for V_S
   ! Make a map (need to do this because lat indices are distributed)
@@ -1273,23 +1300,51 @@ subroutine define_cam_grids()
     end do
   end do
   ! Staggered longitude coordinate
-  if ((beglonxy == 1) .and. (endlonxy == plon)) then
-    ! Assume this is not a distributed dimension
-    slon_coord => horiz_coord_create('slon', '', plon, 'staggered longitude', &
-         'degrees_east', beglonxy, endlonxy, londeg_st(beglonxy:endlonxy,1))
-  else
+  if (is_lon_distributed) then
     allocate(coord_map(endlonxy - beglonxy + 1))
-    coord_map = (/ (i, i = beglonxy, endlonxy) /)
+    if (endlonxy >= beglonxy) then
+      coord_map = (/ (i, i = beglonxy, endlonxy) /)
+    end if
     slon_coord => horiz_coord_create('slon', '', plon, 'staggered longitude', &
          'degrees_east', beglonxy, endlonxy, londeg_st(beglonxy:endlonxy,1),  &
          map=coord_map)
     deallocate(coord_map)
     nullify(coord_map)
+  else
+    slon_coord => horiz_coord_create('slon', '', plon, 'staggered longitude', &
+         'degrees_east', beglonxy, endlonxy, londeg_st(beglonxy:endlonxy,1))
   end if
   call cam_grid_register('fv_v_stagger', dyn_vstag_decomp, lat_coord,         &
        slon_coord, grid_map, unstruct=.false.)
   call cam_grid_attribute_register('fv_v_stagger', 'w_stag',                  &
        'staggered latitude weights', 'lat', w_staggered)
+  nullify(grid_map) ! Belongs to the grid
+
+  ! Zonal mean grid
+  ! Make a map
+  allocate(grid_map(4, (endlatxy - beglatxy + 1)))
+  ind = 0
+  do i = beglatxy, endlatxy
+    ind = ind + 1
+    grid_map(1, ind) = 1
+    grid_map(2, ind) = i
+    grid_map(3, ind) = 1
+    grid_map(4, ind) = i
+  end do
+  ! We need a special, size-one "longigude" coordinate
+  ! NB: This is never a distributed coordinate so calc even on inactive PEs
+  zlon_bnds(1,1) = minval(londeg)
+  zlon_bnds(2,1) = maxval(londeg)
+  allocate(latvals(1)) ! Really for a longitude
+  latvals(1) = 0._r8
+  zlon_coord => horiz_coord_create('zlon', '', 1, 'longitude',                &
+       'degrees_east', 1, 1, latvals(1:1), bnds=zlon_bnds)
+  deallocate(latvals)
+  ! Zonal mean grid
+  call cam_grid_register('fv_centers_zonal', dyn_zonal_decomp, lat_coord,     &
+       zlon_coord, grid_map, unstruct=.false., zonal_grid=.true.)
+  ! Make sure 'gw' attribute shows up even if all variables are zonal mean
+  call cam_grid_attribute_copy('fv_centers', 'fv_centers_zonal', 'gw')
   nullify(grid_map) ! Belongs to the grid
 
 end subroutine define_cam_grids

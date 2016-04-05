@@ -18,7 +18,6 @@ module cam_history
   !   read_restart_history
   !   outfld
   !   wshist
-  !   initialize_iop_history
   !-----------------------------------------------------------------------
 
    use shr_kind_mod,    only: r8 => shr_kind_r8, r4 => shr_kind_r4
@@ -103,7 +102,7 @@ module cam_history
   !
   !   The size of these parameters should match the assignments in restart_vars_setnames and restart_dims_setnames below
   !   
-  integer, parameter :: restartvarcnt              = 37
+  integer, parameter :: restartvarcnt              = 38
   integer, parameter :: restartdimcnt              = 10
   type(rvar_id)      :: restartvars(restartvarcnt)
   type(rdim_id)      :: restartdims(restartdimcnt)
@@ -123,8 +122,8 @@ module cam_history
 
   ! per tape sampling frequency (0=monthly avg)
 
-  integer :: i                        ! index for nhtfrq initialization
-  integer :: nhtfrq(ptapes) = (/0, (-24, i=2,ptapes)/)  ! history write frequency (0 = monthly)
+  integer :: idx                      ! index for nhtfrq initialization
+  integer :: nhtfrq(ptapes) = (/0, (-24, idx=2,ptapes)/)  ! history write frequency (0 = monthly)
   integer :: mfilt(ptapes) = 30       ! number of time samples per tape
   integer :: nfils(ptapes)            ! Array of no. of files on current h-file
   integer :: ndens(ptapes) = 2        ! packing density (double (1) or real (2))
@@ -138,11 +137,11 @@ module cam_history
 
   ! NB: This name must match the group name in namelist_definition.xml
   character(len=*), parameter   :: history_namelist = 'cam_history_nl'
-  character(len=max_string_len) :: hrestpath(ptapes) = (/(' ',i=1,ptapes)/) ! Full history restart pathnames
-  character(len=max_string_len) :: nfpath(ptapes) = (/(' ',i=1,ptapes)/) ! Array of first pathnames, for header
+  character(len=max_string_len) :: hrestpath(ptapes) = (/(' ',idx=1,ptapes)/) ! Full history restart pathnames
+  character(len=max_string_len) :: nfpath(ptapes) = (/(' ',idx=1,ptapes)/) ! Array of first pathnames, for header
   character(len=max_string_len) :: cpath(ptapes)                   ! Array of current pathnames
   character(len=max_string_len) :: nhfil(ptapes)                   ! Array of current file names
-  character(len=1)  :: avgflag_pertape(ptapes) = (/(' ',i=1,ptapes)/) ! per tape averaging flag
+  character(len=1)  :: avgflag_pertape(ptapes) = (/(' ',idx=1,ptapes)/) ! per tape averaging flag
   character(len=16)  :: logname             ! user name
   character(len=16)  :: host                ! host name
   character(len=8)   :: inithist = 'YEARLY' ! If set to '6-HOURLY, 'DAILY', 'MONTHLY' or
@@ -272,7 +271,7 @@ module cam_history
   ! (%c = caseid, $y = year, $m = month, $d = day, $s = seconds in day, %t = tape number)
   !
   character(len=max_string_len) :: rhfilename_spec = '%c.cam.rh%t.%y-%m-%d-%s.nc' ! history restart
-  character(len=max_string_len) :: hfilename_spec(ptapes) = (/ (' ', i=1, ptapes) /) ! filename specifyer
+  character(len=max_string_len) :: hfilename_spec(ptapes) = (/ (' ', idx=1, ptapes) /) ! filename specifyer
 
 
   interface addfld
@@ -280,20 +279,15 @@ module cam_history
     module procedure addfld_nd
   end interface
 
-  ! needed by history_default
-  public :: init_masterlinkedlist
-
-  ! Needed by runtime_opts
-  public :: hfilename_spec, mfilt, fincl, nhtfrq, avgflag_pertape
   ! Needed by cam_diagnostics
   public :: inithist_all
 
   integer :: lcltod_start(ptapes) ! start time of day for local time averaging (sec)
   integer :: lcltod_stop(ptapes)  ! stop time of day for local time averaging, stop > start is wrap around (sec)
 
-  ! Needed by stepon
+  ! Needed by stepon and cam_restart
   public :: hstwr
-  public :: nfils
+  public :: nfils, mfilt
 
   ! Functions
   public :: history_readnl            ! Namelist reader for CAM history
@@ -317,14 +311,6 @@ module cam_history
 
 CONTAINS
 
-  subroutine init_masterlinkedlist()
-
-    nullify(masterlinkedlist)
-    nullify(tape)
-
-  end subroutine init_masterlinkedlist
-
-
   subroutine intht ()
     !
     !----------------------------------------------------------------------- 
@@ -342,13 +328,12 @@ CONTAINS
     ! Author: CCM Core Group
     ! 
     !-----------------------------------------------------------------------
-    use ioFileMod
-    use shr_sys_mod,     only: shr_sys_getenv
-    use time_manager,    only: get_prev_time, get_curr_time
-    use cam_control_mod, only: restart_run, branch_run
-    use sat_hist,        only: sat_hist_init
+    use shr_sys_mod,      only: shr_sys_getenv
+    use time_manager,     only: get_prev_time, get_curr_time
+    use cam_control_mod,  only: restart_run, branch_run
+    use sat_hist,         only: sat_hist_init
 #if (defined SPMD)
-    use spmd_utils,     only: mpichar, mpicom, masterprocid, mpicom, mpi_character
+    use spmd_utils,       only: mpicom, masterprocid, mpicom, mpi_character
 #endif
     !
     !-----------------------------------------------------------------------
@@ -456,6 +441,10 @@ CONTAINS
         enddim3  = tape(t)%hlist(f)%field%enddim3
         allocate(tape(t)%hlist(f)%hbuf(begdim1:enddim1,begdim2:enddim2,begdim3:enddim3))
         tape(t)%hlist(f)%hbuf = 0._r8
+        if (tape(t)%hlist(f)%avgflag .eq. 'S') then ! allocate the variance buffer for standard dev
+           allocate(tape(t)%hlist(f)%sbuf(begdim1:enddim1,begdim2:enddim2,begdim3:enddim3))
+           tape(t)%hlist(f)%sbuf = 0._r8
+        endif
         if(tape(t)%hlist(f)%field%flag_xyfill .or. (avgflag_pertape(t) .eq. 'L')) then
           allocate (tape(t)%hlist(f)%nacs(begdim1:enddim1,begdim3:enddim3))
         else
@@ -482,6 +471,7 @@ CONTAINS
     use spmd_utils,     only: mpi_integer, mpi_logical, mpi_character
     use shr_string_mod, only: shr_string_toUpper
     use time_manager,   only: get_step_size
+    use sat_hist,       only: sat_hist_readnl
 
     ! Dummy argument
     character(len=*), intent(in)   :: nlfile  ! filepath of namelist input file
@@ -744,7 +734,7 @@ CONTAINS
         end if
         ! Enforce no interpolation for IC files
         if (is_initfile(t) .and. interpolate_output(t)) then
-          write(iulog, *) 'WARNING: Interpolated output not supported for a satellite history file, ignored'
+          write(iulog, *) 'WARNING: Interpolated output not supported for an initial data (IC) history file, ignored'
           interpolate_output(t) = .false.
         end if
       end do
@@ -769,7 +759,6 @@ CONTAINS
       end if
     end if
 
-#ifdef SPMD
     ! Broadcast namelist variables
     call mpi_bcast(ndens, ptapes, mpi_integer, masterprocid, mpicom, ierr)
     call mpi_bcast(nhtfrq, ptapes, mpi_integer, masterprocid, mpicom, ierr)
@@ -794,7 +783,6 @@ CONTAINS
     call mpi_bcast(interpolate_gridtype, t, mpi_integer, masterprocid, mpicom, ierr)
     call mpi_bcast(interpolate_type, t, mpi_integer, masterprocid, mpicom, ierr)
     call mpi_bcast(interpolate_output, ptapes, mpi_logical, masterprocid, mpicom, ierr)
-#endif
 
     ! Setup the interpolate_info structures
     do t = 1, size(interpolate_info)
@@ -804,7 +792,12 @@ CONTAINS
       interpolate_info(t)%interp_nlon = interpolate_nlon(t)
     end do
 
+    ! separate namelist reader for the satellite history file
+    call sat_hist_readnl(nlfile, hfilename_spec, mfilt, fincl, nhtfrq, avgflag_pertape)
+
   end subroutine history_readnl
+
+!==================================================================================================
 
   subroutine set_field_dimensions(field)
     use cam_history_support, only: hist_coord_size
@@ -859,7 +852,7 @@ CONTAINS
     use interp_mod, only: setup_history_interpolation
 
     ! Local variables
-    integer :: hf, f, ii, ff
+    integer :: hf, f, ff
     logical :: interp_ok
     character(len=max_fieldname_len) :: mname
     character(len=max_fieldname_len) :: zname
@@ -1051,6 +1044,14 @@ CONTAINS
 
     rvindex = rvindex + 1
     restartvars(rvindex)%name = 'sampling_seq'
+    restartvars(rvindex)%type = pio_char
+    restartvars(rvindex)%ndims = 3
+    restartvars(rvindex)%dims(1) = max_chars_dim_ind
+    restartvars(rvindex)%dims(2) = maxnflds_dim_ind
+    restartvars(rvindex)%dims(3) = ptapes_dim_ind
+
+    rvindex = rvindex + 1
+    restartvars(rvindex)%name = 'cell_methods'
     restartvars(rvindex)%type = pio_char
     restartvars(rvindex)%ndims = 3
     restartvars(rvindex)%dims(1) = max_chars_dim_ind
@@ -1298,6 +1299,7 @@ CONTAINS
     type(var_desc_t), pointer ::  numlev_desc
     type(var_desc_t), pointer ::  avgflag_desc
     type(var_desc_t), pointer ::  sseq_desc
+    type(var_desc_t), pointer ::  cm_desc
     type(var_desc_t), pointer ::  longname_desc
     type(var_desc_t), pointer ::  units_desc
     type(var_desc_t), pointer ::  hwrt_prec_desc
@@ -1416,6 +1418,7 @@ CONTAINS
     hwrt_prec_desc => restartvar_getdesc('hwrt_prec')
 
     sseq_desc => restartvar_getdesc('sampling_seq')
+    cm_desc => restartvar_getdesc('cell_methods')
     longname_desc => restartvar_getdesc('long_name')
     units_desc => restartvar_getdesc('units')
     avgflag_desc => restartvar_getdesc('avgflag')
@@ -1454,6 +1457,7 @@ CONTAINS
 
         ierr = pio_put_var(File, hwrt_prec_desc,start,tape(t)%hlist(f)%hwrt_prec)
         ierr = pio_put_var(File, sseq_desc,startc,tape(t)%hlist(f)%field%sampling_seq)
+        ierr = pio_put_var(File, cm_desc,startc,tape(t)%hlist(f)%field%cell_methods)
         ierr = pio_put_var(File, longname_desc,startc,tape(t)%hlist(f)%field%long_name)
         ierr = pio_put_var(File, units_desc,startc,tape(t)%hlist(f)%field%units)
         ierr = pio_put_var(File, avgflag_desc,start, tape(t)%hlist(f)%avgflag)
@@ -1565,6 +1569,7 @@ CONTAINS
     type(var_desc_t)                 :: units_desc
     type(var_desc_t)                 :: avgflag_desc
     type(var_desc_t)                 :: sseq_desc
+    type(var_desc_t)                 :: cm_desc
     type(var_desc_t)                 :: fillval_desc
     type(var_desc_t)                 :: meridional_complement_desc
     type(var_desc_t)                 :: zonal_complement_desc
@@ -1754,6 +1759,7 @@ CONTAINS
     ierr = pio_inq_varid(File, 'long_name', longname_desc)
     ierr = pio_inq_varid(File, 'units', units_desc)
     ierr = pio_inq_varid(File, 'sampling_seq', sseq_desc)
+    ierr = pio_inq_varid(File, 'cell_methods', cm_desc)
 
     ierr = pio_inq_varid(File, 'fillvalue', fillval_desc)
     ierr = pio_inq_varid(File, 'meridional_complement', meridional_complement_desc)
@@ -1789,6 +1795,9 @@ CONTAINS
         tape(t)%hlist(f)%field%sampling_seq(1:max_chars) = ' '
         ierr = pio_get_var(File,sseq_desc, (/1,f,t/), tape(t)%hlist(f)%field%sampling_seq)
         call strip_null(tape(t)%hlist(f)%field%sampling_seq)
+        tape(t)%hlist(f)%field%cell_methods(1:max_chars) = ' '
+        ierr = pio_get_var(File,cm_desc, (/1,f,t/), tape(t)%hlist(f)%field%cell_methods)
+        call strip_null(tape(t)%hlist(f)%field%cell_methods)
         if(xyfill(f,t) ==1) then
           tape(t)%hlist(f)%field%flag_xyfill=.true.
         else
@@ -1832,6 +1841,9 @@ CONTAINS
         enddim3 = tape(t)%hlist(f)%field%enddim3
 
         allocate(tape(t)%hlist(f)%hbuf(begdim1:enddim1,begdim2:enddim2,begdim3:enddim3))
+        if (tape(t)%hlist(f)%avgflag .eq. 'S') then ! allocate the variance buffer for standard dev
+           allocate(tape(t)%hlist(f)%sbuf(begdim1:enddim1,begdim2:enddim2,begdim3:enddim3))
+        endif
 
         if (associated(tape(t)%hlist(f)%varid)) then
           deallocate(tape(t)%hlist(f)%varid)
@@ -1936,6 +1948,18 @@ CONTAINS
             call cam_grid_read_dist_array(tape(t)%File, fdecomp,              &
                  fdims(1:nfdims), dimlens(1:ndims), tape(t)%hlist(f)%hbuf(:,1,:), vdesc)
           end if
+
+          if ( associated(tape(t)%hlist(f)%sbuf) ) then
+             ! read in variance for standard deviation
+             ierr = pio_inq_varid(tape(t)%File, trim(fname_tmp)//'_var', vdesc)
+             if (nfdims > 2) then
+                call cam_grid_read_dist_array(tape(t)%File, fdecomp,              &
+                     fdims(1:nfdims), dimlens(1:ndims), tape(t)%hlist(f)%sbuf, vdesc)
+             else
+                call cam_grid_read_dist_array(tape(t)%File, fdecomp,              &
+                     fdims(1:nfdims), dimlens(1:ndims), tape(t)%hlist(f)%sbuf(:,1,:), vdesc)
+             end if
+          endif
 
           ierr = pio_inq_varid(tape(t)%File, trim(fname_tmp)//'_nacs', vdesc)
           call cam_pio_var_info(tape(t)%File, vdesc, nacsdimcnt, dimids, dimlens)
@@ -2123,6 +2147,8 @@ CONTAINS
       time_op(:) = 'minimum'
     case('L')
       time_op(:) = LT_DESC
+    case ('S')
+      time_op(:) = 'standard_deviation'
     case default
       call endrun(subname//': unknown avgflag = '//avgflag)
     end select
@@ -2147,7 +2173,6 @@ CONTAINS
     !
     integer t, f                   ! tape, field indices
     integer ff                     ! index into include, exclude and fprec list
-    integer num_patches            ! number of column areas
     character(len=fieldname_len) :: name ! field name portion of fincl (i.e. no avgflag separator)
     character(len=max_fieldname_len) :: mastername ! name from masterlist field
     character(len=max_chars) :: errormsg ! error output field
@@ -2304,6 +2329,7 @@ CONTAINS
       end if
       do ff=1,nflds(t)
         nullify(tape(t)%hlist(ff)%hbuf)
+        nullify(tape(t)%hlist(ff)%sbuf)
         nullify(tape(t)%hlist(ff)%nacs)
         nullify(tape(t)%hlist(ff)%varid)
       end do
@@ -2490,6 +2516,7 @@ end subroutine print_active_fldlst
 !#########################################################################################
 
   subroutine inifld (t, listentry, avgflag, prec_wrt)
+    use cam_grid_support, only: cam_grid_is_zonal
     !
     !----------------------------------------------------------------------- 
     ! 
@@ -2506,12 +2533,12 @@ end subroutine print_active_fldlst
     !
     ! Arguments
     !
-    integer, intent(in) :: t            ! history tape index
+    integer, intent(in)          :: t         ! history tape index
 
-    type(master_entry), pointer :: listentry
+    type(master_entry), pointer  :: listentry
 
-    character*1, intent(in) :: avgflag  ! averaging flag
-    character*1, intent(in) :: prec_wrt ! history output precision flag
+    character(len=1), intent(in) :: avgflag   ! averaging flag
+    character(len=1), intent(in) :: prec_wrt  ! history output precision flag
     !
     ! Local workspace
     !
@@ -2524,7 +2551,6 @@ end subroutine print_active_fldlst
     if (htapes_defined) then
       call endrun ('INIFLD: Attempt to add field '//listentry%field%name//' after history files set')
     end if
-
 
     nflds(t) = nflds(t) + 1
     n = nflds(t)
@@ -2569,6 +2595,15 @@ end subroutine print_active_fldlst
     else
       tape(t)%hlist(n)%avgflag = avgflag
       call AvgflagToString(avgflag, tape(t)%hlist(n)%time_op)
+    end if
+
+    ! Some things can't be done with zonal fields
+    if (cam_grid_is_zonal(listentry%field%decomp_type)) then
+      if (tape(t)%hlist(n)%avgflag == 'L') then
+        call endrun("Cannot perform local time processing on zonal data ("//trim(listentry%field%name)//")")
+      else if (is_satfile(t)) then
+        call endrun("Zonal data not valid for satellite history ("//trim(listentry%field%name)//")")
+      end if
     end if
 
 #ifdef HDEBUG
@@ -2692,6 +2727,7 @@ end subroutine print_active_fldlst
 
   subroutine strip_null(str)
     character(len=*), intent(inout) :: str
+    integer :: i
     do i=1,len(str)
       if(ichar(str(i:i))==0) str(i:i)=' '
     end do
@@ -2998,7 +3034,7 @@ end subroutine print_active_fldlst
   !#######################################################################
 
   recursive subroutine outfld (fname, field, idim, c, avg_subcol_field)
-    use cam_history_buffers, only: hbuf_accum_inst, hbuf_accum_add,  &
+    use cam_history_buffers, only: hbuf_accum_inst, hbuf_accum_add, hbuf_accum_variance,  &
          hbuf_accum_add00z, hbuf_accum_max, hbuf_accum_min,          &
          hbuf_accum_addlcltime
     use cam_history_support, only: dim_index_2d
@@ -3059,6 +3095,7 @@ end subroutine print_active_fldlst
 
     type (active_entry), pointer :: otape(:) ! Local history_tape pointer
     real(r8),pointer      :: hbuf(:,:)     ! history buffer
+    real(r8),pointer      :: sbuf(:,:)     ! variance buffer
     integer, pointer      :: nacs(:)       ! accumulation counter
     integer               :: begdim2, enddim2, endi
     integer               :: phys_decomp
@@ -3097,7 +3134,9 @@ end subroutine print_active_fldlst
       avgflag = otape(t)%hlist(f)%avgflag
       nacs   => otape(t)%hlist(f)%nacs(:,c)
       hbuf => otape(t)%hlist(f)%hbuf(:,:,c)
-
+      if (associated(tape(t)%hlist(f)%sbuf)) then
+         sbuf => otape(t)%hlist(f)%sbuf(:,:,c)
+      endif
       dimind = otape(t)%hlist(f)%field%get_dims(c)
 
       ! See notes above about validity of avg_subcol_field
@@ -3177,10 +3216,14 @@ end subroutine print_active_fldlst
                flag_xyfill, fillvalue)
 
         case ('L')
-          call hbuf_accum_addlcltime(hbuf, field, nacs, dimind, pcols,   &
+          call hbuf_accum_addlcltime(hbuf, ufield, nacs, dimind, pcols,  & 
                flag_xyfill, fillvalue, c,                                &
                otape(t)%hlist(f)%field%decomp_type,                      &
                lcltod_start(t), lcltod_stop(t))
+
+        case ('S') ! Standard deviation
+          call hbuf_accum_variance(hbuf, sbuf, ufield, nacs, dimind, pcols,&
+               flag_xyfill, fillvalue)
 
         case default
           call endrun ('OUTFLD: invalid avgflag='//avgflag)
@@ -3215,6 +3258,10 @@ end subroutine print_active_fldlst
                flag_xyfill, fillvalue, c,                                &
                otape(t)%hlist(f)%field%decomp_type,                      &
                lcltod_start(t), lcltod_stop(t))
+
+        case ('S') ! Standard deviation
+          call hbuf_accum_variance(hbuf, sbuf, field, nacs, dimind, idim,&
+               flag_xyfill, fillvalue)
 
         case default
           call endrun ('OUTFLD: invalid avgflag='//avgflag)
@@ -3630,6 +3677,7 @@ end subroutine print_active_fldlst
     character(len=max_chars) :: str       ! character temporary 
     character(len=max_chars) :: fname_tmp ! local copy of field name
     character(len=max_chars) :: calendar  ! Calendar type
+    character(len=max_chars) :: cell_methods ! For cell_methods attribute
     character(len=16)        :: time_per_freq
     character(len=128)       :: errormsg
 
@@ -3731,7 +3779,7 @@ end subroutine print_active_fldlst
 
       ! Define the unlimited time dim
       call cam_pio_def_dim(tape(t)%File, 'time', pio_unlimited, timdim)
-      call cam_pio_def_dim(tape(t)%File, 'nbnd', 2, bnddim)
+      call cam_pio_def_dim(tape(t)%File, 'nbnd', 2, bnddim, existOK=.true.)
       call cam_pio_def_dim(tape(t)%File, 'chars', 8, chardim)
     end if   ! is satfile
 
@@ -4072,13 +4120,31 @@ end subroutine print_active_fldlst
         !
         ! Assign field attributes defining valid levels and averaging info
         !
+        cell_methods = ''
+        if (len_trim(tape(t)%hlist(f)%field%cell_methods) > 0) then
+          if (len_trim(cell_methods) > 0) then
+            cell_methods = trim(cell_methods)//' '//trim(tape(t)%hlist(f)%field%cell_methods)
+          else
+            cell_methods = trim(cell_methods)//trim(tape(t)%hlist(f)%field%cell_methods)
+          end if
+        end if
+        ! Time cell methods is after field method because time averaging is
+        ! applied later (just before output) than field method which is applied
+        ! before outfld call.
         str = tape(t)%hlist(f)%time_op
         select case (str)
-        case ('mean', 'maximum', 'minimum' )
-          ierr = pio_put_att(tape(t)%File, varid, 'cell_methods', 'time: '//str)
+        case ('mean', 'maximum', 'minimum', 'standard_deviation')
+          if (len_trim(cell_methods) > 0) then
+            cell_methods = trim(cell_methods)//' '//'time: '//str
+          else
+            cell_methods = trim(cell_methods)//'time: '//str
+          end if
+        end select
+        if (len_trim(cell_methods) > 0) then
+          ierr = pio_put_att(tape(t)%File, varid, 'cell_methods', trim(cell_methods))
           call cam_pio_handle_error(ierr,                                     &
                'h_define: cannot define cell_methods for '//trim(fname_tmp))
-        end select
+        end if
         if (patch_output) then
           ierr = pio_put_att(tape(t)%File, varid, 'basename',                 &
                tape(t)%hlist(f)%field%name)
@@ -4100,6 +4166,16 @@ end subroutine print_active_fldlst
             call cam_pio_def_var(tape(t)%File, trim(fname_tmp), pio_int,      &
                  tape(t)%hlist(f)%nacs_varid)
           end if
+          ! for standard deviation
+          if (associated(tape(t)%hlist(f)%sbuf)) then
+             fname_tmp = strip_suffix(tape(t)%hlist(f)%field%name)
+             fname_tmp = trim(fname_tmp)//'_var'
+             if ( .not.associated(tape(t)%hlist(f)%sbuf_varid)) then
+                allocate(tape(t)%hlist(f)%sbuf_varid)
+             endif
+             call cam_pio_def_var(tape(t)%File, trim(fname_tmp), pio_double,      &
+                  dimids_tmp(1:fdims), tape(t)%hlist(f)%sbuf_varid)
+          endif
         end if
       end do ! Loop over output patches
     end do   ! Loop over fields
@@ -4199,6 +4275,8 @@ end subroutine print_active_fldlst
     integer     :: jb, je    ! beginning and ending indices of second dimension
     integer     :: begdim3, enddim3 ! Chunk or block bounds
     integer     :: k         ! level
+    integer     :: i, ii
+    real(r8) :: variance, tmpfill
 
     logical     :: flag_xyfill ! non-applicable xy points flagged with fillvalue
     character*1 :: avgflag     ! averaging flag
@@ -4246,6 +4324,22 @@ end subroutine print_active_fldlst
           end do
         end if
       end if
+      if (avgflag == 'S') then
+         ! standard deviation ...
+         ! from http://www.johndcook.com/blog/standard_deviation/
+         tmpfill = merge(tape(t)%hlist(f)%field%fillvalue,0._r8,flag_xyfill)
+         do k=jb,je
+            do i = ib,ie
+               ii = merge(i,1,flag_xyfill)
+               if (tape(t)%hlist(f)%nacs(ii,c) > 1) then
+                  variance = tape(t)%hlist(f)%sbuf(i,k,c)/(tape(t)%hlist(f)%nacs(ii,c)-1)
+                  tape(t)%hlist(f)%hbuf(i,k,c) = sqrt(variance)
+               else
+                  tape(t)%hlist(f)%hbuf(i,k,c) = tmpfill
+               endif
+            end do
+         end do
+      endif
     end do
 
     call t_stopf ('h_normalize')
@@ -4283,6 +4377,9 @@ end subroutine print_active_fldlst
     do c = begdim3, enddim3
       dimind = tape(t)%hlist(f)%field%get_dims(c)
       tape(t)%hlist(f)%hbuf(dimind%beg1:dimind%end1,dimind%beg2:dimind%end2,c)=0._r8
+      if (associated(tape(t)%hlist(f)%sbuf)) then ! zero out variance buffer for standard deviation
+         tape(t)%hlist(f)%sbuf(dimind%beg1:dimind%end1,dimind%beg2:dimind%end2,c)=0._r8
+      endif
     end do
     tape(t)%hlist(f)%nacs(:,:) = 0
 
@@ -4326,6 +4423,7 @@ end subroutine print_active_fldlst
     logical                          :: interpolate
     logical                          :: patch_output
     type(history_patch_t), pointer   :: patchptr
+    integer :: i
 
     interpolate = (interpolate_output(t) .and. (.not. restart))
     patch_output = (associated(tape(t)%patches) .and. (.not. restart))
@@ -4407,22 +4505,33 @@ end subroutine print_active_fldlst
         end if
       end if
     end do
-    !! NACS
+    !! write accumulation counter and variance to hist restart file
     if(restart) then
-      if (size(tape(t)%hlist(f)%nacs, 1) > 1) then
-        if (nadims > 2) then
-          adims(2) = adims(3)
-          nadims = 2
-        end if
-        call cam_grid_dimensions(fdecomp, fdims(1:2), nacsrank)
-        call cam_grid_write_dist_array(tape(t)%File, fdecomp, adims(1:nadims),&
-             fdims(1:nacsrank), tape(t)%hlist(f)%nacs, tape(t)%hlist(f)%nacs_varid)
-
-        else
+       if (associated(tape(t)%hlist(f)%sbuf) ) then
+           ! write variance data to restart file for standard deviation calc
+          if (nadims == 2) then
+           ! Special case for 2D field (no levels) due to sbuf structure
+             call cam_grid_write_dist_array(tape(t)%File, fdecomp, adims(1:nadims), &
+                  fdims(1:frank), tape(t)%hlist(f)%sbuf(:,1,:), tape(t)%hlist(f)%sbuf_varid)
+          else
+             call cam_grid_write_dist_array(tape(t)%File, fdecomp, adims,        &
+                  fdims(1:frank), tape(t)%hlist(f)%sbuf, tape(t)%hlist(f)%sbuf_varid)
+          endif
+       endif
+     !! NACS
+       if (size(tape(t)%hlist(f)%nacs, 1) > 1) then
+          if (nadims > 2) then
+             adims(2) = adims(3)
+             nadims = 2
+          end if
+          call cam_grid_dimensions(fdecomp, fdims(1:2), nacsrank)
+          call cam_grid_write_dist_array(tape(t)%File, fdecomp, adims(1:nadims), &
+               fdims(1:nacsrank), tape(t)%hlist(f)%nacs, tape(t)%hlist(f)%nacs_varid)
+       else
           ierr = pio_put_var(tape(t)%File, tape(t)%hlist(f)%nacs_varid,     &
                tape(t)%hlist(f)%nacs(:, tape(t)%hlist(f)%field%begdim3:tape(t)%hlist(f)%field%enddim3))
-        end if
-      end if
+       end if
+    end if
 
     return
   end subroutine dump_field
@@ -4814,7 +4923,8 @@ end subroutine print_active_fldlst
     ! 
     !-----------------------------------------------------------------------
     use cam_history_support, only: fillvalue, hist_coord_find_levels
-    use cam_grid_support,    only: cam_grid_id
+    use cam_grid_support,    only: cam_grid_id, cam_grid_is_zonal
+    use cam_grid_support,    only: cam_grid_get_coord_names
 
     !
     ! Arguments
@@ -4837,6 +4947,7 @@ end subroutine print_active_fldlst
     ! Local workspace
     !
     character(len=max_fieldname_len) :: fname_tmp ! local copy of fname
+    character(len=max_fieldname_len) :: coord_name ! for cell_methods
     character(len=128)               :: errormsg
     type(master_entry), pointer      :: listentry
 
@@ -4909,6 +5020,14 @@ end subroutine print_active_fldlst
       listentry%field%sampling_seq = sampling_seq
     else
       listentry%field%sampling_seq = ' '
+    end if
+    ! Indicate if some field pre-processing occurred (e.g., zonal mean)
+    if (cam_grid_is_zonal(listentry%field%decomp_type)) then
+      call cam_grid_get_coord_names(listentry%field%decomp_type, coord_name, errormsg)
+      ! Zonal method currently hardcoded to 'mean'.
+      listentry%field%cell_methods = trim(coord_name)//': mean'
+    else
+      listentry%field%cell_methods = ''
     end if
     !
     ! Whether to apply xy fillvalue: default is false
@@ -5149,7 +5268,6 @@ end subroutine print_active_fldlst
     !
     use pio, only : pio_file_is_open
     use shr_kind_mod,  only: r8 => shr_kind_r8
-    use pspect
     use ioFileMod
     use time_manager,  only: get_nstep, get_curr_date, get_curr_time
     use cam_pio_utils, only: cam_pio_openfile, cam_pio_closefile
@@ -5164,7 +5282,6 @@ end subroutine print_active_fldlst
     ! Local workspace
     !
     integer  :: nstep            ! current timestep number
-    integer  :: ncdate           ! current date in integer format [yyyymmdd]
     integer  :: ncsec            ! time of day relative to current date [secs]
     integer  :: ndcur            ! days component of current time
     integer  :: nscur            ! seconds component of current time
@@ -5183,7 +5300,6 @@ end subroutine print_active_fldlst
 
     nstep = get_nstep()
     call get_curr_date(yr, mon, day, ncsec)
-    ncdate = yr*10000 + mon*100 + day
     call get_curr_time(ndcur, nscur)
     !
     !-----------------------------------------------------------------------

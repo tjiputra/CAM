@@ -217,6 +217,7 @@ contains
     WTMOL_AIR = mwdry 
     WTMOL_H2O = mwh2o 
     R_AIR = RGAS / WTMOL_AIR
+    CP = cpair * 1.e7_r8 / 1000._r8
     RKAPPA = R_AIR / CP
 
     ! Setup the lun for output.

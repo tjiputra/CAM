@@ -66,7 +66,9 @@ contains
     ! --------------------------------
     use prim_state_mod, only : prim_printstate_init
     ! --------------------------------
+#ifndef CAM
     use namelist_mod, only : readnl
+#endif
     ! --------------------------------
     use mesh_mod, only : MeshUseMeshFile
     ! --------------------------------

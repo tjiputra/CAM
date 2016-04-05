@@ -51,12 +51,6 @@
 <qbo_forcing_file>atm/waccm/qbo/qbocoefficients_c091230.nc'</qbo_forcing_file>
 <qbo_use_forcing>.true.</qbo_use_forcing>
 
-<!-- Photolysis Inputs DEFAULTS okay for: rsf_file,xs_long_file,xs_short_file -->
-
-<!-- Extraterestrial Flux and MLT inputs DEFAULTS okay for:  -->
-<!-- efield_hflux_file, efield_lflux_file, efield_wei96_file -->
-<!-- electron_file,euvac_file,euvacdat_file,photon_file,neckel_file,woods_etf_file,xs_coef_file -->
-
 <!-- Kp Ap indices -->
 <solar_parms_file>atm/waccm/solar/wasolar_1948-2140_daily_c120306.nc</solar_parms_file>
 

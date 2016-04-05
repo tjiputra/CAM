@@ -179,6 +179,7 @@ CONTAINS
              iulog = shr_file_getUnit()
              call shr_file_setIO('atm_modelio.nml'//trim(inst_suffix), iulog)
           endif
+
           write(iulog,*) "CAM atmosphere model initialization"
        endif
        
@@ -202,7 +203,7 @@ CONTAINS
 
        ! Initialize CAM, allocate cam_in and cam_out and determine 
        ! atm decomposition (needed to initialize gsmap) 
-       ! for an initial run, cam_in and cam_out are allocated in cam_initial
+       ! for an initial run, cam_in and cam_out are allocated in cam_init
        ! for a restart/branch run, cam_in and cam_out are allocated in restart 
        !
        call cam_init(EClock, &

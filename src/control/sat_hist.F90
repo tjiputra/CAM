@@ -1,24 +1,23 @@
 !-------------------------------------------------------------------------------
 ! Outputs history field columns as specified by a satellite track data file
 !
-! Created by Francis Vitt -- 17 Sep 2010
 !-------------------------------------------------------------------------------
 module sat_hist
 
   use perf_mod,            only: t_startf, t_stopf
   use shr_kind_mod,        only: r8 => shr_kind_r8
   use cam_logfile,         only: iulog
-  use ppgrid,              only: pcols, pver, begchunk, endchunk
+  use ppgrid,              only: pcols, pver, pverp, begchunk, endchunk
   use cam_history_support, only: fieldname_lenp2, max_string_len, ptapes
   use spmd_utils,          only: masterproc, iam
   use cam_abortutils,      only: endrun
 
   use pio,                 only: file_desc_t, iosystem_desc_t, var_desc_t, io_desc_t
-  use pio,                 only: pio_openfile, pio_redef, pio_enddef, pio_inq_dimid, pio_inq_varid
+  use pio,                 only: pio_inq_dimid, pio_inq_varid
   use pio,                 only: pio_seterrorhandling, pio_def_var
   use pio,                 only: pio_inq_dimlen, pio_get_att, pio_put_att, pio_get_var, pio_put_var, pio_write_darray
-  use pio,                 only: pio_real, pio_int, pio_double
-  use pio,                 only: PIO_WRITE,PIO_NOWRITE, PIO_NOERR, PIO_BCAST_ERROR, PIO_INTERNAL_ERROR, PIO_Rearr_box, PIO_GLOBAL
+  use pio,                 only: pio_real, pio_double
+  use pio,                 only: PIO_NOWRITE, PIO_NOERR, PIO_BCAST_ERROR, PIO_INTERNAL_ERROR, PIO_GLOBAL
   use spmd_utils,          only: mpicom
 #ifdef SPMD
   use mpishorthand,        only: mpichar, mpiint
@@ -82,6 +81,14 @@ module sat_hist
   logical, parameter :: debug = .false.
 
   real(r8), parameter :: rad2deg = 180._r8/pi            ! degrees per radian
+
+  logical :: flds_scanned = .false.
+  logical :: has_phys_srf_flds = .false.
+  logical :: has_phys_lev_flds = .false.
+  logical :: has_phys_ilev_flds = .false.
+  logical :: has_dyn_srf_flds = .false.
+  logical :: has_dyn_lev_flds = .false.
+  logical :: has_dyn_ilev_flds = .false.
 
 contains
   
@@ -190,14 +197,13 @@ contains
   subroutine sat_hist_init
     use cam_pio_utils, only: cam_pio_openfile
     use ioFileMod,     only: getfil
-    use spmd_utils,    only: npes
     use time_manager,  only: get_step_size
     use string_utils,  only: to_lower, GLC
 
     implicit none
 
     character(len=max_string_len)  :: locfn       ! Local filename
-    integer :: ierr, dimid, i
+    integer :: ierr, dimid
 
     character(len=128) :: date_format
 
@@ -403,11 +409,9 @@ contains
     ierr=pio_put_att (outfile, PIO_GLOBAL, 'satellite_track_file', sathist_track_infile)
   end subroutine sat_hist_define
 
-
 !-------------------------------------------------------------------------------
   subroutine sat_hist_write( tape , nflds, nfils)
 
-    use ppgrid,   only : pcols, begchunk, endchunk
     use phys_grid, only: phys_decomp
     use dyn_grid,  only: dyn_decomp
     use cam_history_support, only : active_entry
@@ -417,7 +421,7 @@ contains
     integer, intent(in) :: nflds
     integer, intent(inout) :: nfils
 
-    integer :: t, f, i, ncols, nocols    
+    integer :: ncols, nocols    
     integer :: ierr
 
     integer, allocatable :: col_ndxs(:)
@@ -431,8 +435,6 @@ contains
     real(r8),allocatable :: phs_dists(:)
 
     integer :: coldim
-
-    integer :: io_type
     logical :: has_dyn_flds
 
     if (.not.has_sat_hist) return
@@ -457,13 +459,8 @@ contains
     allocate( mlons(nocols) )
     allocate( phs_dists(nocols) )
 
-    has_dyn_flds = .false.
-    dyn_flds_loop: do f=1,nflds
-       if ( tape%hlist(f)%field%decomp_type == dyn_decomp ) then
-          has_dyn_flds = .true.
-          exit dyn_flds_loop
-       endif
-    enddo dyn_flds_loop
+    call scan_flds( tape, nflds )
+    has_dyn_flds = has_dyn_srf_flds .or. has_dyn_lev_flds .or. has_dyn_ilev_flds
 
     call get_indices( obs_lats, obs_lons, ncols, nocols, has_dyn_flds, col_ndxs, chk_ndxs, &
          fdyn_ndxs, ldyn_ndxs, phs_owners, dyn_owners, mlats, mlons, phs_dists )
@@ -471,6 +468,7 @@ contains
     if ( .not. pio_file_is_open(tape%File) ) then
        call endrun('sat file not open')
     endif
+
 
     ierr = pio_inq_dimid(tape%File,'ncol',coldim )
     
@@ -480,15 +478,35 @@ contains
 
     call write_record_coord( tape, mlats(:), mlons(:), phs_dists(:), ncols, nfils )
 
-    do f=1,nflds
-       select case (tape%hlist(f)%field%decomp_type)
-       case (phys_decomp)
-          call dump_columns(tape%File, tape%hlist(f), nocols, nfils, col_ndxs(:), chk_ndxs(:), phs_owners(:) )
-       case (dyn_decomp)
-          call dump_columns(tape%File, tape%hlist(f), nocols, nfils, fdyn_ndxs(:), ldyn_ndxs(:), dyn_owners(:) )
-       end select
+   ! dump columns of 2D fields
+    if (has_phys_srf_flds) then
+       call dump_columns( tape%File, tape%hlist, nflds, nocols, 1, nfils, &
+                          col_ndxs, chk_ndxs, phs_owners, phys_decomp )
+    endif
+    if (has_dyn_srf_flds) then
+       call dump_columns( tape%File, tape%hlist, nflds, nocols, 1, nfils, &
+                          fdyn_ndxs, ldyn_ndxs, dyn_owners, dyn_decomp )
+    endif
 
-    enddo
+   ! dump columns of 3D fields defined on mid pres levels
+    if (has_phys_lev_flds) then
+       call dump_columns( tape%File, tape%hlist, nflds, nocols, pver, nfils, &
+                          col_ndxs, chk_ndxs, phs_owners, phys_decomp )
+    endif
+    if (has_dyn_lev_flds) then
+       call dump_columns( tape%File, tape%hlist, nflds, nocols, pver, nfils, &
+                          fdyn_ndxs, ldyn_ndxs, dyn_owners, dyn_decomp )
+    endif
+
+   ! dump columns of 3D fields defined on interface pres levels
+    if (has_phys_ilev_flds) then
+       call dump_columns( tape%File, tape%hlist, nflds, nocols, pverp, nfils, &
+                          col_ndxs, chk_ndxs, phs_owners, phys_decomp )
+    endif
+    if (has_dyn_ilev_flds) then
+       call dump_columns( tape%File, tape%hlist, nflds, nocols, pverp, nfils, &
+                          fdyn_ndxs, ldyn_ndxs, dyn_owners, dyn_decomp )
+    endif
 
     deallocate( col_ndxs, chk_ndxs, fdyn_ndxs, ldyn_ndxs, phs_owners, dyn_owners )
     deallocate( mlons, mlats, phs_dists )
@@ -501,94 +519,201 @@ contains
   end subroutine sat_hist_write
 
 !-------------------------------------------------------------------------------
-  subroutine dump_columns( File, hitem, ncols, nfils, fdims, ldims, owners  )
-    use cam_history_support,  only: field_info, hentry, hist_coords, fillvalue
-    use pio,            only: pio_initdecomp, pio_freedecomp, pio_setframe, pio_offset_kind, pio_iam_iotask, pio_setdebuglevel
+  subroutine dump_columns( File, hitems, nflds, ncols, nlevs, nfils, fdims, ldims, owners, decomp )
+    use cam_history_support, only: field_info, hentry, fillvalue
+    use pio,                 only: pio_setframe, pio_offset_kind
 
     type(File_desc_t),intent(inout)  :: File
-    type(hentry),     intent(in), target     :: hitem
+    type(hentry),     intent(in), target :: hitems(:)
+    integer,          intent(in)     :: nflds
     integer,          intent(in)     :: ncols
+    integer,          intent(in)     :: nlevs
     integer,          intent(in)     :: nfils
     integer,          intent(in)     :: fdims(:)
     integer,          intent(in)     :: ldims(:)
     integer,          intent(in)     :: owners(:)
+    integer,          intent(in)     :: decomp
+
 
     type(field_info), pointer :: field
     type(var_desc_t) :: vardesc
     type(iosystem_desc_t), pointer :: sat_iosystem
-    type(io_desc_t) :: iodesc
-    integer :: t, ierr, ndims
-    integer, allocatable :: dimlens(:)
+    integer :: ierr
 
+    type(io_desc_t), pointer :: iodesc
     real(r8), allocatable :: buf(:)
-    integer,  allocatable :: dof(:)
-    integer :: i,k, cnt
+    integer :: i,k,f, cnt
 
     call t_startf ('sat_hist::dump_columns')
 
     sat_iosystem => File%iosystem
-    field => hitem%field
-    vardesc = hitem%varid(1)
 
-    ndims=1
-    if(associated(field%mdims)) then
-       ndims = size(field%mdims) + 1
-    else if(field%numlev>1) then
-       ndims=2
-    end if
-    allocate(dimlens(max(1,ndims)))
-    dimlens(ndims) = ncols
-    if(ndims>1) then
-       do i=1,ndims-1
-          dimlens(i)=hist_coords(field%mdims(i))%dimsize
-       enddo
-    else if(field%numlev>1) then
-       dimlens(1) = field%numlev
-    end if
-   
     cnt = 0
 
     do i = 1,ncols
-       do k = 1,field%numlev
+       do k = 1,nlevs
           if ( iam == owners(i) ) then
              cnt = cnt+1
           endif
        enddo
     enddo
-    allocate( buf( cnt))
-    allocate( dof( cnt))
-    cnt = 0
-    buf = fillvalue
-    dof = 0
-    do i = 1,ncols
-       do k = 1,field%numlev
-          if ( iam == owners(i) ) then
-             cnt = cnt+1
-             buf(cnt) = hitem%hbuf( fdims(i), k, ldims(i) )
-             dof(cnt) = k + (i-1)*field%numlev 
-          endif
-       enddo
+    allocate( buf(cnt) )
+
+    iodesc => create_iodesc( File, ncols, nlevs, owners )
+
+    do f = 1,nflds
+       field => hitems(f)%field
+
+       if (field%numlev==nlevs .and. field%decomp_type==decomp) then
+          vardesc = hitems(f)%varid(1)
+
+          cnt = 0
+          buf = fillvalue
+          do i = 1,ncols
+             do k = 1,nlevs
+                if ( iam == owners(i) ) then
+                   cnt = cnt+1
+                   buf(cnt) = hitems(f)%hbuf( fdims(i), k, ldims(i) )
+                endif
+             enddo
+          enddo
+
+          call pio_setframe(File, vardesc, int(nfils,kind=pio_offset_kind)) ! sets varsesc -- correct offset
+          call pio_write_darray(File, vardesc, iodesc, buf, ierr, fillval=fillvalue)
+       endif
+
     enddo
 
-    call pio_setframe(File,vardesc, int(-1,kind=pio_offset_kind))
-    call pio_initdecomp(sat_iosystem, pio_double, dimlens, dof, iodesc )
-    call pio_setframe(File,vardesc, int(nfils,kind=pio_offset_kind))
-    call pio_write_darray(File, vardesc, iodesc, buf, ierr, fillval=fillvalue)
-
-    call pio_freedecomp(sat_iosystem, iodesc)
+    call destroy_iodesc( File, iodesc )
 
     deallocate( buf )
-    deallocate( dof )
-    deallocate( dimlens )
 
     call t_stopf ('sat_hist::dump_columns')
 
   end subroutine dump_columns
 
 !-------------------------------------------------------------------------------
+! creates an iodesc object
+!-------------------------------------------------------------------------------
+  function create_iodesc( File, ncols, nlevs, owners ) result(iodesc)
+    use pio, only: pio_initdecomp, PIO_REARR_SUBSET
+
+    ! args
+    type(File_desc_t),intent(inout) :: File
+    integer,          intent(in)    :: ncols
+    integer,          intent(in)    :: nlevs
+    integer,          intent(in)    :: owners(:)
+
+    ! returned pointer
+    type(io_desc_t), pointer :: iodesc
+
+    ! local vars
+    integer :: i,k, cnt
+    integer,  allocatable :: dof(:)
+    integer,  allocatable :: dimlens(:)
+    integer :: ndims
+  
+    if (nlevs >1) then
+       ndims = 2
+    else
+       ndims = 1
+    endif
+    allocate (dimlens(ndims))
+    dimlens(:) = ncols
+    if (nlevs >1) then
+       dimlens(1) = nlevs
+    endif
+
+    cnt = 0
+
+    do i = 1,ncols
+       do k = 1,nlevs
+          if ( iam == owners(i) ) then
+             cnt = cnt+1
+          endif
+       enddo
+    enddo
+    allocate(dof(cnt))
+    dof = 0
+    cnt = 0
+    do i = 1,ncols
+       do k = 1,nlevs
+          if ( iam == owners(i) ) then
+             cnt = cnt+1
+             dof(cnt) = k + (i-1)*nlevs 
+          endif
+       enddo
+    enddo
+
+    allocate(iodesc)
+    call pio_initdecomp(File%iosystem, pio_double, dimlens, dof, iodesc, rearr=PIO_REARR_SUBSET ) 
+
+    deallocate( dof )
+    deallocate( dimlens )
+
+  end function create_iodesc
+
+!-------------------------------------------------------------------------------
+! cleans up iodesc obj
+!-------------------------------------------------------------------------------
+  subroutine destroy_iodesc( File, iodesc )
+    use pio, only:  pio_freedecomp
+
+    type(File_desc_t),intent(inout)  :: File
+    type(io_desc_t),  pointer :: iodesc
+
+    call pio_freedecomp(File, iodesc)
+    deallocate(iodesc)
+  end subroutine destroy_iodesc
+
+!-------------------------------------------------------------------------------
+! scan the fields for possible different decompositions 
+!-------------------------------------------------------------------------------
+  subroutine scan_flds( tape, nflds )
+    use cam_history_support, only : active_entry
+    use phys_grid, only: phys_decomp
+    use dyn_grid,  only: dyn_decomp
+
+    type(active_entry), intent(in) :: tape
+    integer, intent(in) :: nflds
+
+    integer :: f
+
+    if (flds_scanned) return
+
+    do f = 1,nflds
+       if ( tape%hlist(f)%field%decomp_type == phys_decomp ) then
+          if ( tape%hlist(f)%field%numlev == 1 ) then
+             has_phys_srf_flds = .true.
+          elseif ( tape%hlist(f)%field%numlev == pver ) then
+             has_phys_lev_flds = .true.
+          elseif ( tape%hlist(f)%field%numlev == pverp ) then
+             has_phys_ilev_flds = .true.
+          else
+             call endrun('sat_hist::scan_flds numlev error : '//tape%hlist(f)%field%name)
+          endif
+       elseif ( tape%hlist(f)%field%decomp_type == dyn_decomp ) then
+          if ( tape%hlist(f)%field%numlev == 1 ) then
+             has_dyn_srf_flds = .true.
+          elseif ( tape%hlist(f)%field%numlev == pver ) then
+             has_dyn_lev_flds = .true.
+          elseif ( tape%hlist(f)%field%numlev == pverp ) then
+             has_dyn_ilev_flds = .true.
+          else
+             call endrun('sat_hist::scan_flds numlev error : '//tape%hlist(f)%field%name)
+          endif
+       else
+          call endrun('sat_hist::scan_flds decomp_type error : '//tape%hlist(f)%field%name)
+       endif
+    enddo
+
+    flds_scanned = .true.
+  end subroutine scan_flds
+  
+!-------------------------------------------------------------------------------
 !-------------------------------------------------------------------------------
   subroutine read_next_position( ncols )
-    use time_manager, only: get_curr_date, get_prev_date
+    use time_manager, only: get_curr_date
     use time_manager, only: set_time_float_from_date
    
     implicit none
@@ -660,7 +785,7 @@ contains
 !-------------------------------------------------------------------------------
   subroutine write_record_coord( tape, mod_lats, mod_lons, mod_dists, ncols, nfils )
 
-    use time_manager,  only: get_nstep, get_curr_date, get_curr_time
+    use time_manager, only: get_curr_date, get_curr_time
     use cam_history_support, only : active_entry
     implicit none
     type(active_entry), intent(inout) :: tape
@@ -669,11 +794,10 @@ contains
     real(r8), intent(in) :: mod_lats(ncols * sathist_nclosest)
     real(r8), intent(in) :: mod_lons(ncols * sathist_nclosest)
     real(r8), intent(in) :: mod_dists(ncols * sathist_nclosest)
-    integer,  intent(in) ::  nfils
+    integer,  intent(in) :: nfils
 
-    integer :: t, ierr, i
+    integer :: ierr, i
     integer :: yr, mon, day      ! year, month, and day components of a date
-    integer :: nstep             ! current timestep number
     integer :: ncdate            ! current date in integer format [yyyymmdd]
     integer :: ncsec             ! current time of day [seconds]
     integer :: ndcur             ! day component of current time
@@ -686,7 +810,6 @@ contains
 
     call t_startf ('sat_hist::write_record_coord')
 
-    nstep = get_nstep()
     call get_curr_date(yr, mon, day, ncsec)
     ncdate = yr*10000 + mon*100 + day
     call get_curr_time(ndcur, nscur)
@@ -767,7 +890,6 @@ contains
        fdyn_ndxs, ldyn_ndxs, phs_owners, dyn_owners, mlats, mlons, phs_dists )
 
     use dyn_grid, only : dyn_grid_get_colndx
-    use phys_grid, only: get_rlat_p, get_rlon_p
 
     integer,  intent(in)  :: ncols
     real(r8), intent(in)  :: lats(ncols)

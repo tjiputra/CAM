@@ -51,8 +51,9 @@ module aero_model
 
   integer :: fracis_idx = 0
 
-  real(r8) :: aer_sol_facti(pcnst) ! = nan ! in-cloud solubility factor
-  real(r8) :: aer_sol_factb(pcnst) ! = nan ! below-cloud solubility factor
+  real(r8) :: aer_sol_facti(pcnst) ! in-cloud solubility factor
+  real(r8) :: aer_sol_factb(pcnst) ! below-cloud solubility factor
+  real(r8) :: aer_scav_coef(pcnst)
 
 contains
 
@@ -76,10 +77,11 @@ contains
     character(len=16) :: aer_drydep_list(pcnst) = ' '
 
     namelist /aerosol_nl/ aer_wetdep_list, aer_drydep_list
-    namelist /aerosol_nl/ aer_sol_facti, aer_sol_factb
+    namelist /aerosol_nl/ aer_sol_facti, aer_sol_factb, aer_scav_coef
     !-----------------------------------------------------------------------------
     aer_sol_facti = nan
     aer_sol_factb = nan
+    aer_scav_coef = nan
 
     ! Read namelist
     if (masterproc) then
@@ -102,6 +104,7 @@ contains
     call mpibcast(aer_drydep_list, len(aer_drydep_list(1))*pcnst, mpichar, 0, mpicom)
     call mpibcast(aer_sol_facti, pcnst, mpir8, 0, mpicom)
     call mpibcast(aer_sol_factb, pcnst, mpir8, 0, mpicom)
+    call mpibcast(aer_scav_coef, pcnst, mpir8, 0, mpicom)
 #endif
 
     wetdep_list = aer_wetdep_list
@@ -613,7 +616,7 @@ contains
        sol_factb = aer_sol_factb(m)
        sol_facti = aer_sol_facti(m)
 
-       scavcoef(:ncol,:)=0.1_r8
+       scavcoef(:ncol,:) = aer_scav_coef(m)
 
        call wetdepa_v1( state%t, state%pmid, state%q(:,:,1), state%pdel, &
             dep_inputs%cldt, dep_inputs%cldcu, dep_inputs%cmfdqr, &

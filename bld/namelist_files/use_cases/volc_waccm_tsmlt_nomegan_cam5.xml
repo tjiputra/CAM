@@ -5,6 +5,7 @@
 <start_ymd>19850101</start_ymd>
 
 <!--Species IC -->
+<ncdata dyn="fv"  hgrid="0.9x1.25">atm/waccm/ic/f.e14.FWTC5L45CCMIR1.f09_f09.cam5_4.CLUBB.03.cam.i.1987-01-05-00000_c151002.nc</ncdata>
 <ncdata dyn="fv"  hgrid="1.9x2.5" >atm/waccm/ic/b1850.waccm-mam3_1.9x2.5_L70.cam2.i.0156-01-01.c120523.nc</ncdata>
 <ncdata dyn="fv"  hgrid="4x5"     >atm/waccm/ic/f2000.waccm-mam3_4x5_L70.cam2.i.0017-01-01.c121113.nc</ncdata>
 
@@ -59,7 +60,7 @@
   'pom_a1 -> $INPUTDATA_ROOT/atm/cam/chem/trop_mozart_aero/emis/RCP60_mam3_pom_elev_1850-2300_c20150128.nc',
   'so4_a1 -> $INPUTDATA_ROOT/atm/cam/chem/trop_mozart_aero/emis/RCP60_mam3_so4_a1_elev_1850-2300_c20150128.nc',
   'so4_a2 -> $INPUTDATA_ROOT/atm/cam/chem/trop_mozart_aero/emis/RCP60_mam3_so4_a2_elev_1850-2300_c20150128.nc',
-  'SO2    -> $INPUTDATA_ROOT/atm/cam/chem/stratvolc/StratVolcSO2Emis1990-2014SchmidtV1.1_Pin10Tg_2deg_c150818.nc'
+  'SO2    -> $INPUTDATA_ROOT/atm/cam/chem/stratvolc/GlobalVolcSO2Emis1850-2015_VEI_Pin10Tg_2deg_c151111.nc'
 </ext_frc_specifier>
 <ext_frc_specifier hgrid="0.9x1.25">
   'NO2 -> $INPUTDATA_ROOT/atm/cam/chem/emis/ccmi_1960-2008/CCMI_emissions_aircraft_NO2_1850-2100_1.9x2.5_c130314.nc',
@@ -70,7 +71,7 @@
   'pom_a1 -> $INPUTDATA_ROOT/atm/cam/chem/trop_mozart_aero/emis/RCP60_mam3_pom_elev_1850-2300_c20150128.nc',
   'so4_a1 -> $INPUTDATA_ROOT/atm/cam/chem/trop_mozart_aero/emis/RCP60_mam3_so4_a1_elev_1850-2300_c20150128.nc',
   'so4_a2 -> $INPUTDATA_ROOT/atm/cam/chem/trop_mozart_aero/emis/RCP60_mam3_so4_a2_elev_1850-2300_c20150128.nc',
-  'SO2    -> $INPUTDATA_ROOT/atm/cam/chem/stratvolc/StratVolcSO2Emis1990-2014SchmidtV1.1_Pin10Tg_1deg_c150828.nc'
+  'SO2    -> $INPUTDATA_ROOT/atm/cam/chem/stratvolc/GlobalVolcSO2Emis1850-2015_VEI_Pin10Tg_1deg_c151111.nc'
 </ext_frc_specifier>
 <ext_frc_type>INTERP_MISSING_MONTHS</ext_frc_type>
 
@@ -109,12 +110,6 @@
   'so4_a2   -> $INPUTDATA_ROOT/atm/cam/chem/trop_mozart_aero/emis/RCP60_mam3_so4_a2_surf_1850-2300_c20150128.nc'
 </srf_emis_specifier>
 <srf_emis_type>INTERP_MISSING_MONTHS</srf_emis_type>
-
-<!-- Photolysis Inputs DEFAULTS okay for: rsf_file,xs_long_file,xs_short_file -->
-
-<!-- Extraterestrial Flux and MLT inputs DEFAULTS okay for:  -->
-<!-- efield_hflux_file, efield_lflux_file, efield_wei96_file -->
-<!-- electron_file,euvac_file,euvacdat_file,photon_file,neckel_file,woods_etf_file,xs_coef_file -->
 
 <!-- History Files -->
 
@@ -174,7 +169,7 @@
   'jo2_a', 'jo2_b', 'jo3_a',  'jo3_b', 'jhocl', 'jno3_b', 'jcl2o2',
   'SAD_SULFC', 'SAD_LNAT', 'SAD_ICE','AOA1','AOA2',
   'O2', 'CLDLIQ', 'CLDICE', 'ASDIR',
-  'VTH2d', 'WTH2d', 'UV2d', 'UW2d', 'TH', 'MSKtem'
+  'VTHzm', 'WTHzm', 'UVzm', 'UWzm', 'TH', 'MSKtem'
 </fincl2>
 
 <!-- Instantaneous every 10 days --> 
@@ -191,7 +186,7 @@
 </fincl4>
 <!-- Daily Average --> 
 <fincl5>
-  'MSKtem', 'PHIS', 'PS', 'PSL', 'VTH2d', 'UV2d', 'UW2d', 'U2d', 'V2d', 'TH2d', 'W2d'
+  'MSKtem', 'PHIS', 'PS', 'PSL', 'VTHzm', 'UVzm', 'UWzm', 'Uzm', 'Vzm', 'THzm', 'Wzm'
 </fincl5>
 
 <rxn_rate_sums>
@@ -214,6 +209,5 @@
 <inithist>'YEARLY'</inithist>
 <aoa_read_from_ic_file>.true.</aoa_read_from_ic_file>
 <cldfrc_rhminl>0.89D0</cldfrc_rhminl>
-<use_gw_front_igw>.true.</use_gw_front_igw>
 
 </namelist_defaults>

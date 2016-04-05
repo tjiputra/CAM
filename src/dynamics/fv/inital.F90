@@ -11,7 +11,7 @@ public cam_initial
 contains
 !=========================================================================
 
-subroutine cam_initial( dyn_in, dyn_out, NLFileName )
+subroutine cam_initial(dyn_in, dyn_out)
 
    use dyn_comp,             only : dyn_import_t, dyn_export_t, dyn_init
    use phys_grid,            only : phys_grid_init
@@ -25,7 +25,6 @@ subroutine cam_initial( dyn_in, dyn_out, NLFileName )
    ! Arguments
    type(dyn_import_t), intent(out) :: dyn_in
    type(dyn_export_t), intent(out) :: dyn_out
-   character(len=*),   intent(in)  :: NLFileName
 
    ! LOCAL VARIABLES:
    type (T_FVDYCORE_STATE), pointer :: dyn_state
@@ -38,7 +37,7 @@ subroutine cam_initial( dyn_in, dyn_out, NLFileName )
    !      by define_cam_grids to define coords and grids).
    call initcom
 
-   call dyn_init(initial_file_get_id(), dyn_state, dyn_in, dyn_out, NLFileName )
+   call dyn_init(initial_file_get_id(), dyn_state, dyn_in, dyn_out)
 
    ! Define physics data structures
    call phys_grid_init

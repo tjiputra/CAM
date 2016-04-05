@@ -10,12 +10,10 @@ subroutine initcom
    use shr_kind_mod,      only: r8 => shr_kind_r8
    use physconst,         only: pi, rair
    use pmgrid
-   use pspect
    use commap,            only: w, clat, clon, w_staggered, clat
    use commap,            only: clat_staggered, clon, latdeg, londeg
    use commap,            only: latdeg_st, londeg_st
    use cam_abortutils,    only: endrun
-   use rgrid,             only: fullgrid
    use spmd_utils,        only: masterproc
    use cam_logfile,       only: iulog
    implicit none
@@ -112,10 +110,7 @@ subroutine initcom
       write(iulog,*) 'INITCOM 2: weights do not sum to 2. sum=',sum
       call endrun
    end if
-!
-! Determine whether full or reduced grid
-!
-   fullgrid = .true.
+
    if (masterproc) write(iulog,*) 'Number of longitudes per latitude = ', plon
 !
 ! Longitude array
@@ -131,12 +126,6 @@ subroutine initcom
          londeg_st(i,lat) = (i-D1_5)*D360_0/splon
       end do
    end do
-!
-! Set flag indicating dynamics grid is now defined.
-! NOTE: this ASSUMES initcom is called after spmdinit.  The setting of nlon done here completes
-! the definition of the dynamics grid.
-!
-   return
-!EOC
+
 end subroutine initcom
 !-----------------------------------------------------------------------

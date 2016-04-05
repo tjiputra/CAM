@@ -182,7 +182,6 @@ contains
 !--------------------------------------------------------------------------
 
     use string_utils,    only : to_upper
-    use mo_apex,         only : apexmag
 
     implicit none
 
@@ -193,9 +192,6 @@ contains
     integer :: ierr
 
     if (.not. spe_run) return
-
-    ! initialize geo-magnetic coordinate module ...
-    call apexmag()
 
     curr_filename = spedata_file
     next_filename = ''

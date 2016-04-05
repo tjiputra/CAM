@@ -43,14 +43,12 @@ module pmgrid
 #endif
    integer, parameter :: numbnd = 0          ! no.of latitudes passed N and S of forecast lat
 
-!
    integer :: beglat     ! beg. index for latitudes owned by a given proc
    integer :: endlat     ! end. index for latitudes owned by a given proc
    integer :: beglatex   ! extended grid beglat
    integer :: endlatex   ! extended grid endlat
    integer :: numlats    ! number of latitudes owned by a given proc
-   logical :: dyndecomp_set = .false. ! flag indicates dynamics grid has been set
-!
+
 #if ( ! defined SPMD )
    parameter (beglat   = 1)
    parameter (endlat   = plat)

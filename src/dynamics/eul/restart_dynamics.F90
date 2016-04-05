@@ -380,7 +380,7 @@ subroutine init_restart_dynamics(File, dyn_out)
 
   !#######################################################################
 
-  subroutine read_restart_dynamics (File, dyn_in, dyn_out, NLFileName)
+  subroutine read_restart_dynamics (File, dyn_in, dyn_out)
     use dyn_comp, only : dyn_init, dyn_import_t, dyn_export_t
     use cam_pio_utils, only : pio_subsystem
 
@@ -401,7 +401,6 @@ subroutine init_restart_dynamics(File, dyn_out)
     type(file_desc_t), intent(inout) :: File     ! PIO file handle
     type(dyn_import_t) :: dyn_in    ! not used by this dycore, included for compatibility
     type(dyn_export_t) :: dyn_out ! not used by this dycore, included for compatibility
-    character(len=*), intent(in) :: NLFileName
     !
     ! Local workspace
     !
@@ -417,7 +416,7 @@ subroutine init_restart_dynamics(File, dyn_out)
     integer :: ndims, timelevels, i, s2d, s3d, s4d
     type(var_desc_t), pointer :: vdesc
 
-    call dyn_init(file, nlfilename)
+    call dyn_init(file)
 
     call initialize_prognostics
 	

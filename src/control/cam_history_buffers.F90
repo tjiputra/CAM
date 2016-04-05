@@ -111,6 +111,85 @@ contains
   end subroutine hbuf_accum_add
 
   !#######################################################################
+  subroutine hbuf_accum_variance (hbuf, sbuf, field, nacs, dimind, idim, flag_xyfill, fillvalue)
+    !
+    !-----------------------------------------------------------------------
+    !
+    ! Purpose: accumulate a running variance for standard deviations
+    !
+    !  The method of computing variance is from http://www.johndcook.com/blog/standard_deviation/
+    !  and
+    !  1962 paper by B. P. Welford and is presented in Donald Knuth's Art of 
+    !  Computer Programming, Vol 2, page 232, 3rd edition. 
+    !-----------------------------------------------------------------------
+    !
+    real(r8), pointer :: hbuf(:,:)    ! 2-D history buffer
+    real(r8), pointer :: sbuf(:,:)    ! 2-D history buffer
+    integer,  pointer :: nacs(:)      ! accumulation counter
+    integer,  intent(in) :: idim           ! Longitude dimension of field array
+    logical,  intent(in) :: flag_xyfill    ! non-applicable xy points flagged with fillvalue
+    real(r8), intent(in) :: field(idim,*)  ! real*8 array
+    type (dim_index_2d), intent(in ) :: dimind  ! 2-D dimension index
+    real(r8), intent(in) :: fillvalue
+    !
+    ! Local indices
+    !
+    integer :: ieu, jeu  ! number of elements in each dimension
+    integer :: i,k       ! indices
+    real(r8) :: tmp
+
+    call dimind%dim_sizes(ieu, jeu)
+
+    if (flag_xyfill) then
+
+       !
+       ! Ensure input field has fillvalue defined invariant in the z-direction, then increment nacs
+       !
+       call check_accum (field, idim, ieu, jeu, fillvalue)
+       do i=1,ieu
+          if (field(i,1) /= fillvalue) then
+             nacs(i) = nacs(i) + 1
+          end if
+       end do
+
+       do k=1,jeu
+          do i=1,ieu
+             if (field(i,k) /= fillvalue) then
+                if (nacs(i)==1) then
+                   hbuf(i,k) = field(i,k)
+                   sbuf(i,k) = 0._r8
+                else
+                   tmp = hbuf(i,k)
+                   hbuf(i,k) = hbuf(i,k) + (field(i,k)-hbuf(i,k))/nacs(i)
+                   sbuf(i,k) = sbuf(i,k) + (field(i,k)-hbuf(i,k))*(field(i,k)-tmp)
+                endif
+             end if
+          end do
+       end do
+
+    else
+
+       ! increment counter before variance calculation
+       nacs(1) = nacs(1) + 1
+
+       do k=1,jeu
+          do i=1,ieu
+             if (nacs(1)==1) then
+                hbuf(i,k) = field(i,k)
+                sbuf(i,k) = 0._r8
+             else
+                tmp = hbuf(i,k)
+                hbuf(i,k) = hbuf(i,k) + (field(i,k)-hbuf(i,k))/nacs(1)
+                sbuf(i,k) = sbuf(i,k) + (field(i,k)-hbuf(i,k))*(field(i,k)-tmp)
+             endif
+          end do
+       end do
+
+    end if
+
+  end subroutine hbuf_accum_variance
+
+  !#######################################################################
 
   subroutine hbuf_accum_add00z (buf8, field, nacs, dimind, idim, flag_xyfill, fillvalue)
     !

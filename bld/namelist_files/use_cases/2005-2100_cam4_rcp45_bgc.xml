@@ -37,7 +37,7 @@
 </fincl1>
 <fincl1 dyn="fv">
   'cb_ozone_c', 'cb_sulf_c',
-  'MSKtem','VTH2d','UV2d','UW2d','U2d','V2d','TH2d','W2d','UTGWORO'
+  'MSKtem','VTHzm','UVzm','UWzm','Uzm','Vzm','THzm','Wzm','UTGWORO'
 </fincl1>
 
 <!-- sim_year used for CLM datasets -->

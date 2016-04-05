@@ -115,17 +115,14 @@ contains
 
    ! local vars
     integer :: i, m, idst
-    real(r8), parameter :: soil_erod_threshold = 0.001_r8
     real(r8), parameter :: dust_emis_sclfctr(dust_nbin) &
-         = (/ 0.038_r8/0.032456_r8, 0.11_r8/0.174216_r8, 0.17_r8/0.4085517_r8, 0.67_r8/0.384811_r8 /)
+         = (/ 0.011_r8/0.032456_r8, 0.087_r8/0.174216_r8, 0.277_r8/0.4085517_r8, 0.625_r8/0.384811_r8 /)
 
     ! set dust emissions
 
     col_loop: do i =1,ncol
 
        soil_erod(i) = soil_erodibility( i, lchnk )
-
-       if( soil_erod(i) .lt. soil_erod_threshold ) soil_erod(i) = 0._r8
 
        ! adjust emissions based on soil erosion 
        do m = 1,dust_nbin

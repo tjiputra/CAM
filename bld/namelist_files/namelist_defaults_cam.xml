@@ -150,6 +150,7 @@
 <ncdata dyn="se" hgrid="ne30np4"  nlev="26"             ic_ymd="101" >atm/cam/inic/homme/cami_0000-01-01_ne30np4_L26_c100108.nc</ncdata>
 <ncdata dyn="se" hgrid="ne30np4"  nlev="26"             ic_ymd="901" >atm/cam/inic/homme/cami_0000-09-01_ne30np4_L26_c040422.nc</ncdata>
 <ncdata dyn="se" hgrid="ne30np4"  nlev="30"             ic_ymd="101" >atm/cam/inic/homme/cami-mam3_0000-01-01_ne30np4_L30_c130424.nc</ncdata>
+<ncdata dyn="se" hgrid="ne30np4"  nlev="32"             ic_ymd="101" >atm/cam/inic/homme/cami_ne30p4_L32_c160128.nc</ncdata>
 <ncdata dyn="se" hgrid="ne60np4"  nlev="30"             ic_ymd="101" >atm/cam/inic/homme/cami-mam3_0000-01-ne60np4_L30_c090306.nc</ncdata>
 <ncdata dyn="se" hgrid="ne120np4" nlev="26"             ic_ymd="901" >atm/cam/inic/homme/cami_0000-09-01_ne120np4_L26_c061106.nc</ncdata>
 <ncdata dyn="se" hgrid="ne120np4" nlev="26"             ic_ymd="101" >atm/cam/inic/homme/cami_0000-01-01_ne120np4_L26_c110304.nc</ncdata>
@@ -171,6 +172,9 @@
 <ncdata dyn="se" hgrid="ne30np4"  nlev="30"  ocn="aquaplanet" ic_ymd="101" >atm/cam/inic/homme/cami_0000-01-01_ne30np4_L30_ape_c111020.nc</ncdata>
 <ncdata dyn="se" hgrid="ne120np4" nlev="30"  ocn="aquaplanet" ic_ymd="101" >atm/cam/inic/homme/cami_0003-01-01_ne120np4_L30_ape_c140519.nc</ncdata>
 
+<ncdata dyn="se" hgrid="ne5np4"   nlev="66">atm/waccm/ic/wa3_ne5np4_1950_spinup.cam2.i.1960-01-01-00000_c150810.nc</ncdata>
+<ncdata dyn="se" hgrid="ne30np4"  nlev="70">atm/waccm/ic/waccm5_1850_ne30np4_L70_0001-01-11-00000_c151217.nc</ncdata>
+
 <!-- Topography -->
 <bnd_topo hgrid="256x512" >atm/cam/topo/topo-from-cami_0000-01-01_256x512_L26_c030918.nc</bnd_topo>
 <bnd_topo hgrid="128x256" >atm/cam/topo/USGS-gtopo30_128x256_c050520.nc</bnd_topo>
@@ -182,8 +186,8 @@
 <bnd_topo hgrid="0.23x0.31" >atm/cam/topo/USGS_gtopo30_0.23x0.31_remap_c061107.nc</bnd_topo>
 <bnd_topo hgrid="0.47x0.63" >atm/cam/topo/USGS_gtopo30_0.47x0.63_remap_c061106.nc</bnd_topo>
 <bnd_topo hgrid="0.5x0.625" >atm/cam/topo/topo-from-cami_0000-10-01_0.5x0.625_L26_c031204.nc</bnd_topo>
-<bnd_topo hgrid="0.9x1.25"  >atm/cam/topo/fv0.9x1.25-default-PHIS-new-SGH-SGH30.nc</bnd_topo>
-<bnd_topo hgrid="1.9x2.5"   >atm/cam/topo/consistent-topo-fv1.9x2.5_c130424.nc</bnd_topo>
+<bnd_topo hgrid="0.9x1.25"  >atm/cam/topo/fv_0.9x1.25-gmted2010_modis-cam_fv_smooth-intermediate_ncube3000-no_anisoSGH_c151029.nc</bnd_topo>
+<bnd_topo hgrid="1.9x2.5"   >atm/cam/topo/fv_1.9x2.5-gmted2010_modis-cam_fv_smooth-intermediate_ncube3000-no_anisoSGH_c151210.nc</bnd_topo>
 <bnd_topo hgrid="2.5x3.33"  >atm/cam/topo/USGS-gtopo30_2.5x3.33_remap_c100204.nc</bnd_topo>
 <bnd_topo hgrid="4x5"       >atm/cam/topo/USGS-gtopo30_4x5_remap_c050520.nc</bnd_topo>
 <bnd_topo hgrid="10x15"     >atm/cam/topo/USGS-gtopo30_10x15_remap_c050520.nc</bnd_topo>
@@ -215,14 +219,14 @@
 <!-- Optics for CAM-RT -->
 <bam_sulf  rad="camrt">atm/cam/physprops/sulfate_camrt_c080918.nc</bam_sulf>
 <bam_SO4   rad="camrt">atm/cam/physprops/sulfate_camrt_c080918.nc</bam_SO4>
-<bam_dust1 rad="camrt">atm/cam/physprops/dust1_camrt_c080918.nc</bam_dust1>
-<bam_DST01 rad="camrt">atm/cam/physprops/dust1_camrt_c080918.nc</bam_DST01>
-<bam_dust2 rad="camrt">atm/cam/physprops/dust2_camrt_c080918.nc</bam_dust2>
-<bam_DST02 rad="camrt">atm/cam/physprops/dust2_camrt_c080918.nc</bam_DST02>
-<bam_dust3 rad="camrt">atm/cam/physprops/dust3_camrt_c080918.nc</bam_dust3>
-<bam_DST03 rad="camrt">atm/cam/physprops/dust3_camrt_c080918.nc</bam_DST03>
-<bam_dust4 rad="camrt">atm/cam/physprops/dust4_camrt_c080918.nc</bam_dust4>
-<bam_DST04 rad="camrt">atm/cam/physprops/dust4_camrt_c080918.nc</bam_DST04>
+<bam_dust1 rad="camrt">atm/cam/physprops/dust1_camrt_c120518.nc</bam_dust1>
+<bam_DST01 rad="camrt">atm/cam/physprops/dust1_camrt_c120518.nc</bam_DST01>
+<bam_dust2 rad="camrt">atm/cam/physprops/dust2_camrt_c120518.nc</bam_dust2>
+<bam_DST02 rad="camrt">atm/cam/physprops/dust2_camrt_c120518.nc</bam_DST02>
+<bam_dust3 rad="camrt">atm/cam/physprops/dust3_camrt_c120518.nc</bam_dust3>
+<bam_DST03 rad="camrt">atm/cam/physprops/dust3_camrt_c120518.nc</bam_DST03>
+<bam_dust4 rad="camrt">atm/cam/physprops/dust4_camrt_c120518.nc</bam_dust4>
+<bam_DST04 rad="camrt">atm/cam/physprops/dust4_camrt_c120518.nc</bam_DST04>
 <bam_bcar1 rad="camrt">atm/cam/physprops/bcpho_camrt_c080918.nc</bam_bcar1>
 <bam_CB1   rad="camrt">atm/cam/physprops/bcpho_camrt_c080918.nc</bam_CB1>
 <bam_bcar2 rad="camrt">atm/cam/physprops/bcphi_camrt_c080918.nc</bam_bcar2>
@@ -454,10 +458,9 @@
 <efield_wei96_file >atm/waccm/efld/wei96.cofcnts</efield_wei96_file>
 
 <!-- Waccm aurora and euv parameters -->
-<euvacdat_file  >atm/waccm/phot/euvac.dat</euvacdat_file>
-<photon_file                          >atm/waccm/phot/photon_c130710.dat</photon_file>
+<photon_file    >atm/waccm/phot/photon_c130710.dat</photon_file>
 <electron_file  >atm/waccm/phot/electron.dat</electron_file>
-<euvac_file     >atm/waccm/phot/euvac.nc</euvac_file>
+<euvac_file     >atm/waccm/phot/EUVAC_reference_c150702.nc</euvac_file>
 
 <!-- Waccm solar variability parameters -->
 <solar_parms_file               >atm/waccm/phot/wasolar_ave.nc</solar_parms_file>
@@ -490,9 +493,19 @@
 <!-- Experimental setting for gravity waves from shallow convection. -->
 <effgw_beres_sh>0.03D0</effgw_beres_sh>
 
-<!-- Beres scheme gravity wave files -->
+<!-- gravity wave options -->
 <gw_drag_file>atm/waccm/gw/newmfspectra40_dc25.nc</gw_drag_file>
 <gw_drag_file_sh>atm/waccm/gw/mfspectra_shallow_c140530.nc</gw_drag_file_sh>
+<gw_prndl                               >0.25d0 </gw_prndl>
+<gw_prndl                 waccm_phys="1">0.5d0  </gw_prndl>
+<gw_oro_south_fac                       >1.d0   </gw_oro_south_fac>
+<gw_oro_south_fac         waccm_phys="1">2.d0   </gw_oro_south_fac>
+<gw_lndscl_sgh                          >.true. </gw_lndscl_sgh>
+<gw_lndscl_sgh            waccm_phys="1">.false.</gw_lndscl_sgh>
+<gw_limit_tau_without_eff               >.false.</gw_limit_tau_without_eff>
+<gw_limit_tau_without_eff waccm_phys="1">.true. </gw_limit_tau_without_eff>
+<gw_apply_tndmax                        >.true. </gw_apply_tndmax>
+<gw_apply_tndmax          waccm_phys="1">.false.</gw_apply_tndmax>
 
 <!-- Waccm-x runtime option -->
 <waccmx_opt           >off</waccmx_opt>
@@ -736,7 +749,9 @@
 
 
 <!-- soil erodibility factors -->
-<soil_erod_file                  >atm/cam/dst/dst_source2x2_cam5.4_c150327.nc</soil_erod_file>
+<soil_erod_file              >atm/cam/dst/dst_source2x2_cam5.4_c150327.nc</soil_erod_file>
+<soil_erod_file phys="cam4"  >atm/cam/dst/dst_source2x2tuned-cam4-06132012.nc</soil_erod_file>
+<soil_erod_file phys="cam4" hgrid="0.9x1.25">atm/cam/dst/dst_source1x1tuned-cam4-06202012.nc</soil_erod_file>
 
 <!-- Turbulent Mountain Stress -->
 <do_tms                                                     > .false. </do_tms>
@@ -803,7 +818,7 @@
 <micro_mg_num_steps   microphys="mg2">                                 2          </micro_mg_num_steps>
 <micro_mg_num_steps   microphys="mg2" clubb_sgs="1">                   1          </micro_mg_num_steps>
 <micro_mg_dcs         microphys="mg2">                                 250.D-6    </micro_mg_dcs>
-<micro_mg_dcs         microphys="mg2" clubb_sgs="1">                   160.D-6    </micro_mg_dcs>
+<micro_mg_dcs         microphys="mg2" clubb_sgs="1">                   140.D-6    </micro_mg_dcs>
 <micro_mg_dcs         microphys="mg2" clubb_sgs="1" clubb_do_deep="1"> 195.D-6    </micro_mg_dcs>
 
 <micro_mg_precip_frac_method                  >  max_overlap </micro_mg_precip_frac_method>
@@ -813,6 +828,7 @@
 <micro_mg_berg_eff_factor   clubb_sgs="1"  >  0.1D0    </micro_mg_berg_eff_factor>
 
 <micro_do_icesupersat> .false. </micro_do_icesupersat>
+<micro_do_icesupersat clubb_sgs="1"> .false. </micro_do_icesupersat> 
 
 <cld_macmic_num_steps>                               1 </cld_macmic_num_steps>
 <cld_macmic_num_steps microphys="mg2" clubb_sgs="1"> 6 </cld_macmic_num_steps>
@@ -880,8 +896,7 @@
 <molec_diff_bot_press> 50.D0 </molec_diff_bot_press>
 
 <!-- dust emission tuning factor -->
-<dust_emis_fact                                                         >2.76D0</dust_emis_fact>
-<dust_emis_fact                                         chem="trop_bam"	>4.2D0 </dust_emis_fact>
+<dust_emis_fact                                                         >0.37D0</dust_emis_fact>
 <dust_emis_fact                            phys="cam5"                  >0.35D0</dust_emis_fact>
 <dust_emis_fact          hgrid="0.47x0.63" phys="cam5"                  >0.45D0</dust_emis_fact>
 <dust_emis_fact          hgrid="0.23x0.31" phys="cam5"                  >0.45D0</dust_emis_fact>
@@ -892,7 +907,7 @@
 <dust_emis_fact dyn="se"                   phys="cam5"                    >0.55D0</dust_emis_fact>
 <dust_emis_fact dyn="fv"                   phys="cam5"   clubb_sgs="1"    >0.22D0</dust_emis_fact>
 <dust_emis_fact dyn="se"                   phys="cam5.4"                  >0.55D0</dust_emis_fact>
-<dust_emis_fact dyn="fv"                   phys="cam5.4" clubb_sgs="1"    >0.22D0</dust_emis_fact>
+<dust_emis_fact dyn="fv"                   phys="cam5.4" clubb_sgs="1"    >0.60D0</dust_emis_fact>
 
 <!-- seasalt emission tuning factor -->
 <!-- Note that ver="strat" when modal_accum_coarse_exch=.true. -->
@@ -1176,40 +1191,45 @@
 <fcrit2              >1.0</fcrit2>
 
 <!-- FV dycore -->
-<fft_flt phys="cam3"  >0</fft_flt>
-<fft_flt              >1</fft_flt>
+<fv_fft_flt phys="cam3"  >0</fv_fft_flt>
+<fv_fft_flt              >1</fv_fft_flt>
 
-<div24del2flag                                > 2</div24del2flag>
-<div24del2flag                   phys="cam5"  > 4</div24del2flag>
-<div24del2flag                   phys="cam5.4"> 4</div24del2flag>
-<div24del2flag hgrid="0.23x0.31" phys="cam4"  >42</div24del2flag>
-<div24del2flag hgrid="0.47x0.63" phys="cam4"  >42</div24del2flag>
-<div24del2flag hgrid="0.23x0.31" phys="cam5"  >42</div24del2flag>
-<div24del2flag hgrid="0.47x0.63" phys="cam5"  >42</div24del2flag>
-<div24del2flag hgrid="0.23x0.31" phys="cam5.4">42</div24del2flag>
-<div24del2flag hgrid="0.47x0.63" phys="cam5.4">42</div24del2flag>
+<fv_div24del2flag                                > 2</fv_div24del2flag>
+<fv_div24del2flag                   phys="cam5"  > 4</fv_div24del2flag>
+<fv_div24del2flag                   phys="cam5.4"> 4</fv_div24del2flag>
+<fv_div24del2flag hgrid="0.23x0.31" phys="cam4"  >42</fv_div24del2flag>
+<fv_div24del2flag hgrid="0.47x0.63" phys="cam4"  >42</fv_div24del2flag>
+<fv_div24del2flag hgrid="0.23x0.31" phys="cam5"  >42</fv_div24del2flag>
+<fv_div24del2flag hgrid="0.47x0.63" phys="cam5"  >42</fv_div24del2flag>
+<fv_div24del2flag hgrid="0.23x0.31" phys="cam5.4">42</fv_div24del2flag>
+<fv_div24del2flag hgrid="0.47x0.63" phys="cam5.4">42</fv_div24del2flag>
 
-<nspltvrm                  >1</nspltvrm>
-<nspltvrm hgrid="0.9x1.25" >2</nspltvrm>
-<nspltvrm hgrid="0.47x0.63">2</nspltvrm>
-<nspltvrm hgrid="0.23x0.31">2</nspltvrm>
-<nspltvrm    waccm_phys="1">2</nspltvrm>
-<nspltrac    waccm_phys="1">2</nspltrac>
+<fv_nspltvrm                  >1</fv_nspltvrm>
+<fv_nspltvrm hgrid="0.9x1.25" >2</fv_nspltvrm>
+<fv_nspltvrm hgrid="0.47x0.63">2</fv_nspltvrm>
+<fv_nspltvrm hgrid="0.23x0.31">2</fv_nspltvrm>
+<fv_nspltvrm    waccm_phys="1">2</fv_nspltvrm>
 
-<nsplit      waccm_phys="1">8</nsplit>
+<fv_nspltrac    waccm_phys="1">2</fv_nspltrac>
 
-<del2coef                >3.e+5</del2coef>
+<fv_nsplit                  waccm_phys="1"> 8</fv_nsplit>
+<fv_nsplit hgrid="0.9x1.25" waccm_phys="1">12</fv_nsplit>
 
-<filtcw                  >0</filtcw>
-<filtcw hgrid="0.23x0.31">1</filtcw>
+<fv_del2coef                >3.e+5</fv_del2coef>
 
-<!-- Spectral dycore parameters -->
-<eul_nsplit                  >  1 </eul_nsplit>
-<eul_nsplit  hgrid="512x1024"> 12 </eul_nsplit>
+<fv_filtcw                  >0</fv_filtcw>
+<fv_filtcw hgrid="0.23x0.31">1</fv_filtcw>
 
-<eul_hdif_order>4</eul_hdif_order>
+<!-- Eulerian spectral dycore parameters -->
+
+<eul_dif2_coef                 > 2.5D5 </eul_dif2_coef>
+<eul_dif2_coef hgrid="8x16"    > 2.5D7 </eul_dif2_coef>
 
 <!-- The Eulerian hdif coef defaults are for 4th order diffusion -->
+<eul_hdif_order>                      4 </eul_hdif_order>
+
+<eul_hdif_kmnhdn>                     4 </eul_hdif_kmnhdn>
+
 <eul_hdif_coef                 > 1.0D18 </eul_hdif_coef>
 <eul_hdif_coef hgrid="32x64"   > 2.0D16 </eul_hdif_coef>
 <eul_hdif_coef hgrid="48x96"   > 2.0D16 </eul_hdif_coef>
@@ -1218,15 +1238,20 @@
 <eul_hdif_coef hgrid="256x512" > 1.5D14 </eul_hdif_coef>
 <eul_hdif_coef hgrid="512x1024"> 1.5D13 </eul_hdif_coef>
 
-<dyn_spectral_dif2 dyn="eul"                 > 2.5D5 </dyn_spectral_dif2>
-<dyn_spectral_dif2 dyn="eul" hgrid="8x16"    > 2.5D7 </dyn_spectral_dif2>
+<eul_divdampn>  0.0D0  </eul_divdampn>
+<eul_tfilt_eps> 0.06D0 </eul_tfilt_eps>
+<eul_kmxhdc>         5 </eul_kmxhdc>
 
-<dyn_spectral_dif2 dyn="sld"                 > 0.0D0 </dyn_spectral_dif2>
-<dyn_spectral_dif4 dyn="sld"                 > 0.0D0  </dyn_spectral_dif4>
+<eul_nsplit                  >  1 </eul_nsplit>
+<eul_nsplit  hgrid="512x1024"> 12 </eul_nsplit>
 
-<dyn_spectral_divdampn> 0.0D0  </dyn_spectral_divdampn>
-<dyn_spectral_eps     > 0.06D0 </dyn_spectral_eps>
-<dyn_spectral_kmxhdc  > 5      </dyn_spectral_kmxhdc>
+<!-- SLD spectral dycore parameters -->
+<sld_dif2_coef > 0.0D0  </sld_dif2_coef>
+<sld_dif4_coef > 0.0D0  </sld_dif4_coef>
+<sld_divdampn  > 0.0D0  </sld_divdampn>
+<sld_tfilt_eps > 0.06D0 </sld_tfilt_eps>
+<sld_kmxhdc    > 5      </sld_kmxhdc>
+
 
 <!-- iop dataset for SCAM mode -->
 <iopfile dyn="eul">atm/cam/scam/iop/ARM95_4scam.nc</iopfile>
@@ -1254,66 +1279,36 @@
 <!-- Defaults for SE                                                    -->
 <!-- ================================================================== -->
 
-<se_partmethod> 4 </se_partmethod>
-<se_topology> "cube" </se_topology>
-<statefreq> 480 </statefreq>
-<integration> "explicit" </integration>
+<se_fine_ne refined_mesh="1" hypervis_type="scalar" > 120 </se_fine_ne>
 
-<nu_top> 2.5e5 </nu_top>
-<nu_top hgrid="ne240np4"> 1.0e5 </nu_top>
+<se_ftype> 0 </se_ftype>
 
-<nu>                   1.0e15 </nu>
-<nu hgrid="ne11np4" >  2.0e16 </nu>
-<nu hgrid="ne16np4" >  7.0e15 </nu>
-<nu hgrid="ne30np4" >  1.0e15 </nu>
-<nu hgrid="ne60np4" >  1.0e14 </nu>
-<nu hgrid="ne120np4">  1.0e13 </nu>
-<nu hgrid="ne240np4">  1.1e12 </nu>
+<se_hypervis_order> 2 </se_hypervis_order>
 
-<!-- This will set nu_q to nu internally. -->
-<nu_q> -1.0 </nu_q>
+<se_hypervis_power> 0.0 </se_hypervis_power>
 
-<nu_p>                   1.0e15 </nu_p>
-<nu_p hgrid="ne11np4" >  2.0e16 </nu_p>
-<nu_p hgrid="ne16np4" >  7.0e15 </nu_p>
-<nu_p hgrid="ne30np4" >  1.0e15 </nu_p>
-<nu_p hgrid="ne60np4" >  1.0e14 </nu_p>
-<nu_p hgrid="ne120np4">  1.0e13 </nu_p>
-<nu_p hgrid="ne240np4">  1.1e12 </nu_p>
+<se_hypervis_scaling refined_mesh="1" hypervis_type="tensor" > 3.2 </se_hypervis_scaling>
 
+<se_hypervis_subcycle>                   3 </se_hypervis_subcycle>
+<se_hypervis_subcycle hgrid="ne11np4" >  3 </se_hypervis_subcycle>
+<se_hypervis_subcycle hgrid="ne16np4" >  3 </se_hypervis_subcycle>
+<se_hypervis_subcycle hgrid="ne30np4" >  3 </se_hypervis_subcycle>
+<se_hypervis_subcycle hgrid="ne60np4" >  4 </se_hypervis_subcycle>
+<se_hypervis_subcycle hgrid="ne120np4">  4 </se_hypervis_subcycle>
+<se_hypervis_subcycle hgrid="ne240np4">  4 </se_hypervis_subcycle>
+<se_hypervis_subcycle dyn="se" waccm_phys="1">  1 </se_hypervis_subcycle>
 
-<nu_div>                   2.5e15 </nu_div>
-<nu_div hgrid="ne11np4" >  5.0e16 </nu_div>
-<nu_div hgrid="ne16np4" > 15.5e15 </nu_div>
-<nu_div hgrid="ne30np4" >  2.5e15 </nu_div>
-<nu_div hgrid="ne60np4" >  2.5e14 </nu_div>
-<nu_div hgrid="ne120np4">  2.5e13 </nu_div>
-<nu_div hgrid="ne240np4">  2.5e12 </nu_div>
+<se_hypervis_subcycle_q> 1 </se_hypervis_subcycle_q>
 
-<hypervis_order >     2 </hypervis_order>
+<se_limiter_option> 8 </se_limiter_option>
 
-<hypervis_subcycle>                   3 </hypervis_subcycle>
-<hypervis_subcycle hgrid="ne11np4" >  3 </hypervis_subcycle>
-<hypervis_subcycle hgrid="ne16np4" >  3 </hypervis_subcycle>
-<hypervis_subcycle hgrid="ne30np4" >  3 </hypervis_subcycle>
-<hypervis_subcycle hgrid="ne60np4" >  4 </hypervis_subcycle>
-<hypervis_subcycle hgrid="ne120np4">  4 </hypervis_subcycle>
-<hypervis_subcycle hgrid="ne240np4">  4 </hypervis_subcycle>
-<hypervis_subcycle dyn="se" waccm_phys="1">  1 </hypervis_subcycle>
+<se_max_hypervis_courant > 1.0e99 </se_max_hypervis_courant>
+<se_max_hypervis_courant refined_mesh="1" hypervis_type="scalar" > 1.9 </se_max_hypervis_courant>
 
-<hypervis_subcycle_q> 1 </hypervis_subcycle_q>
+<se_mesh_file > none </se_mesh_file>
 
-<tstep_type > 5 </tstep_type>
-
-<qsplit > 1 </qsplit>
-
-<rsplit >                  3 </rsplit>
-<rsplit hgrid="ne11np4" >  2 </rsplit>
-<rsplit hgrid="ne16np4" >  3 </rsplit>
-<rsplit hgrid="ne30np4" >  3 </rsplit>
-<rsplit hgrid="ne60np4" >  3 </rsplit>
-<rsplit hgrid="ne120np4">  3 </rsplit>
-<rsplit hgrid="ne240np4">  3 </rsplit>
+<!-- This will set se_npes to CAM PE count internally. -->
+<se_npes> 0 </se_npes>
 
 <se_nsplit>                   2 </se_nsplit>
 <se_nsplit hgrid="ne11np4" >  1 </se_nsplit>
@@ -1323,6 +1318,7 @@
 <se_nsplit hgrid="ne120np4">  4 </se_nsplit>
 <se_nsplit hgrid="ne240np4">  5 </se_nsplit>
 
+<se_nsplit hgrid="ne5np4"   waccm_phys="1">  5 </se_nsplit>
 <se_nsplit hgrid="ne11np4"  waccm_phys="1">  5 </se_nsplit>
 <se_nsplit hgrid="ne16np4"  waccm_phys="1">  5 </se_nsplit>
 <se_nsplit hgrid="ne30np4"  waccm_phys="1">  10 </se_nsplit>
@@ -1330,18 +1326,65 @@
 <se_nsplit hgrid="ne120np4" waccm_phys="1">  20 </se_nsplit>
 <se_nsplit hgrid="ne240np4" waccm_phys="1">  25 </se_nsplit>
 
+<se_nu>                   1.0e15 </se_nu>
+<se_nu hgrid="ne5np4"  >  5.0e17 </se_nu>
+<se_nu hgrid="ne11np4" >  2.0e16 </se_nu>
+<se_nu hgrid="ne16np4" >  7.0e15 </se_nu>
+<se_nu hgrid="ne30np4" >  1.0e15 </se_nu>
+<se_nu hgrid="ne60np4" >  1.0e14 </se_nu>
+<se_nu hgrid="ne120np4">  1.0e13 </se_nu>
+<se_nu hgrid="ne240np4">  1.1e12 </se_nu>
+<se_nu                  refined_mesh="1" hypervis_type="tensor" > 8.0e-8 </se_nu>
+<se_nu                  refined_mesh="1" hypervis_type="scalar" > 1.0000e13 </se_nu>
 
-<se_ftype> 0 </se_ftype>
+<se_nu_div>                   2.5e15 </se_nu_div>
+<se_nu_div hgrid="ne5np4" >  12.5e17 </se_nu_div>
+<se_nu_div hgrid="ne11np4" >  5.0e16 </se_nu_div>
+<se_nu_div hgrid="ne16np4" > 15.5e15 </se_nu_div>
+<se_nu_div hgrid="ne30np4" >  2.5e15 </se_nu_div>
+<se_nu_div hgrid="ne60np4" >  2.5e14 </se_nu_div>
+<se_nu_div hgrid="ne120np4">  2.5e13 </se_nu_div>
+<se_nu_div hgrid="ne240np4">  2.5e12 </se_nu_div>
+<se_nu_div                  refined_mesh="1" hypervis_type="tensor" > 20.0e-8 </se_nu_div>
+<se_nu_div                  refined_mesh="1" hypervis_type="scalar" > 2.5000e13 </se_nu_div>
 
-<se_phys_tscale> 0 </se_phys_tscale>
-<se_limiter_option> 8 </se_limiter_option>
-<vert_remap_q_alg> 1 </vert_remap_q_alg>
+<!-- This will set se_nu_q to se_nu internally. -->
+<se_nu_q> -1.0 </se_nu_q>
 
-<interpolate_analysis> .false. </interpolate_analysis>
-<interp_nlon> 0 </interp_nlon>
-<interp_nlat> 0 </interp_nlat>
-<interp_type> 1 </interp_type>
-<interp_gridtype> 1 </interp_gridtype>
+<se_nu_p>                   1.0e15 </se_nu_p>
+<se_nu_p hgrid="ne5np4"  >  5.0e17 </se_nu_p>
+<se_nu_p hgrid="ne11np4" >  2.0e16 </se_nu_p>
+<se_nu_p hgrid="ne16np4" >  7.0e15 </se_nu_p>
+<se_nu_p hgrid="ne30np4" >  1.0e15 </se_nu_p>
+<se_nu_p hgrid="ne60np4" >  1.0e14 </se_nu_p>
+<se_nu_p hgrid="ne120np4">  1.0e13 </se_nu_p>
+<se_nu_p hgrid="ne240np4">  1.1e12 </se_nu_p>
+<se_nu_p                  refined_mesh="1" hypervis_type="tensor" > 8.0e-8 </se_nu_p>
+<se_nu_p                  refined_mesh="1" hypervis_type="scalar" > 1.00e13 </se_nu_p>
+
+<se_nu_top> 2.5e5 </se_nu_top>
+<se_nu_top hgrid="ne240np4"> 1.0e5 </se_nu_top>
+
+<se_partmethod> 4 </se_partmethod>
+
+<se_qsplit > 1 </se_qsplit>
+
+<se_refined_mesh > .false. </se_refined_mesh>
+
+<se_rsplit >                  3 </se_rsplit>
+<se_rsplit hgrid="ne5np4"  >  2 </se_rsplit>
+<se_rsplit hgrid="ne11np4" >  2 </se_rsplit>
+<se_rsplit hgrid="ne16np4" >  3 </se_rsplit>
+<se_rsplit hgrid="ne30np4" >  3 </se_rsplit>
+<se_rsplit hgrid="ne60np4" >  3 </se_rsplit>
+<se_rsplit hgrid="ne120np4">  3 </se_rsplit>
+<se_rsplit hgrid="ne240np4">  3 </se_rsplit>
+
+<se_statefreq> 480 </se_statefreq>
+
+<se_tstep_type > 5 </se_tstep_type>
+
+<se_vert_remap_q_alg> 1 </se_vert_remap_q_alg>
 
 <!-- ================================================================== -->
 <!-- Defaults for driver namelist seq_infodata_inparm                   -->

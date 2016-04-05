@@ -124,6 +124,7 @@ module cam_history_support
     character(len=max_chars) :: sampling_seq ! sampling sequence - if not every timestep, how often field is sampled
     ! (i.e., how often "outfld" is called):  every other; only during LW/SW
     ! radiation calcs; etc.
+    character(len=max_chars) :: cell_methods ! optional cell_methods attribute
   contains
     procedure :: get_shape   => field_info_get_shape
     procedure :: get_bounds  => field_info_get_bounds
@@ -157,9 +158,11 @@ module cam_history_support
 
     integer                   :: hwrt_prec   ! history output precision
     real(r8),         pointer :: hbuf(:,:,:) => NULL()
+    real(r8),         pointer :: sbuf(:,:,:) => NULL() ! for standard deviation
     type(var_desc_t), pointer :: varid(:)    => NULL() ! variable ids
     integer,          pointer :: nacs(:,:)   => NULL() ! accumulation counter
     type(var_desc_t), pointer :: nacs_varid  => NULL()
+    type(var_desc_t), pointer :: sbuf_varid  => NULL()
   end type hentry
 
   !---------------------------------------------------------------------------
@@ -949,6 +952,7 @@ integer :: slen
     f_out%long_name = f_in%long_name                 ! long name
     f_out%units = f_in%units                         ! units
     f_out%sampling_seq =  f_in%sampling_seq          ! sampling sequence - if not every timestep, how often field is sampled
+    f_out%cell_methods = f_in%cell_methods
 
     if(associated(f_in%mdims)) then
       f_out%mdims=>f_in%mdims

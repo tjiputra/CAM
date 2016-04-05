@@ -8,7 +8,6 @@ module mo_gas_phase_chemdr
   use chem_mods,        only : rxt_tag_cnt, rxt_tag_lst, rxt_tag_map, extcnt
   use dust_model,       only : dust_names, ndust => dust_nbin
   use ppgrid,           only : pcols, pver
-  use spmd_utils,       only : iam
   use phys_control,     only : phys_getopts
   use carma_flags_mod,  only : carma_hetchem_feedback
 
@@ -49,20 +48,18 @@ module mo_gas_phase_chemdr
   logical :: pm25_srf_diag_soa
 
   logical :: convproc_do_aer
+  integer :: ele_temp_ndx, ion_temp_ndx
 
 contains
 
   subroutine gas_phase_chemdr_inti()
 
-    use mo_chem_utls,      only : get_spc_ndx, get_extfrc_ndx, get_inv_ndx, get_rxt_ndx
+    use mo_chem_utls,      only : get_spc_ndx, get_extfrc_ndx, get_rxt_ndx
     use cam_history,       only : addfld,horiz_only
-    use cam_abortutils,    only : endrun
     use mo_chm_diags,      only : chm_diags_inti
-    use mo_tracname,       only : solsym
     use constituents,      only : cnst_get_ind
     use physics_buffer,    only : pbuf_get_index
     use rate_diags,        only : rate_diags_init
-    use rad_constituents,  only : rad_cnst_get_info
 
     implicit none
 
@@ -211,6 +208,9 @@ contains
     sad_pbf_ndx= pbuf_get_index('VOLC_SAD',errcode=err) ! prescribed  strat aerosols (volcanic)
     if (.not.sad_pbf_ndx>0) sad_pbf_ndx = pbuf_get_index('SADSULF',errcode=err) ! CARMA's version of strat aerosols
 
+    ele_temp_ndx = pbuf_get_index('ElecTemp',errcode=err)! electron temperature index 
+    ion_temp_ndx = pbuf_get_index('IonTemp',errcode=err) ! ion temperature index
+
     ! diagnostics for stratospheric heterogeneous reactions
     call addfld( 'GAMMA_HET1', (/ 'lev' /), 'I', '1', 'Reaction Probability' )
     call addfld( 'GAMMA_HET2', (/ 'lev' /), 'I', '1', 'Reaction Probability' )
@@ -233,7 +233,7 @@ contains
                               delt, ps, xactive_prates, &
                               fsds, ts, asdir, ocnfrac, icefrac, &
                               precc, precl, snowhland, ghg_chem, latmapback, &
-                              chem_name, drydepflx, cflx, fire_sflx, fire_ztop, qtend, pbuf)
+                              drydepflx, cflx, fire_sflx, fire_ztop, qtend, pbuf)
 
     !-----------------------------------------------------------------------
     !     ... Chem_solver advances the volumetric mixing ratio
@@ -254,7 +254,6 @@ contains
     use mo_setinv,         only : setinv
     use mo_negtrc,         only : negtrc
     use mo_sulf,           only : sulf_interp
-    use mo_lightning,      only : prod_no
     use mo_setext,         only : setext
     use fire_emissions,    only : fire_emissions_vrt
     use mo_sethet,         only : sethet
@@ -281,7 +280,7 @@ contains
     use short_lived_species,only: set_short_lived_species,get_short_lived_species
     use mo_chm_diags,      only : chm_diags, het_diags
     use perf_mod,          only : t_startf, t_stopf
-    use mo_neu_wetdep,     only : do_neu_wetdep
+    use gas_wetdep_opts,   only : gas_wetdep_method
     use physics_buffer,    only : physics_buffer_desc, pbuf_get_field, pbuf_old_tim_idx
     use infnan,            only : nan, assignment(=)
     use rate_diags,        only : rate_diags_calc
@@ -298,6 +297,7 @@ contains
     use aero_model,        only : aero_model_gasaerexch
 
     use aero_model,        only : aero_model_strat_surfarea
+    use time_manager,      only : is_first_step
 
     implicit none
 
@@ -311,7 +311,7 @@ contains
     real(r8),       intent(in)    :: calday                         ! day of year
     real(r8),       intent(in)    :: ps(pcols)                      ! surface pressure
     real(r8),       intent(in)    :: phis(pcols)                    ! surface geopotential
-    real(r8),       intent(in)    :: tfld(pcols,pver)               ! midpoint temperature (K)
+    real(r8),target,intent(in)    :: tfld(pcols,pver)               ! midpoint temperature (K)
     real(r8),       intent(in)    :: pmid(pcols,pver)               ! midpoint pressures (Pa)
     real(r8),       intent(in)    :: pdel(pcols,pver)               ! pressure delta about midpoints (Pa)
     real(r8),       intent(in)    :: ufld(pcols,pver)               ! zonal velocity (m/s)
@@ -335,9 +335,7 @@ contains
     real(r8),       intent(in)    :: snowhland(pcols)               !
     logical,        intent(in)    :: ghg_chem 
     integer,        intent(in)    :: latmapback(pcols)
-    character(len=*), intent(in)  :: chem_name
-    integer,         intent(in) ::  troplev(pcols)
-
+    integer,        intent(in)    :: troplev(pcols)
     real(r8),       intent(inout) :: qtend(pcols,pver,pcnst)        ! species tendencies (kg/kg/s)
     real(r8),       intent(inout) :: cflx(pcols,pcnst)              ! constituent surface flux (kg/m^2/s)
     real(r8),       intent(out)   :: drydepflx(pcols,pcnst)         ! dry deposition flux (kg/m^2/s)
@@ -356,6 +354,7 @@ contains
     real(r8),       pointer    :: cldfr(:,:)
     real(r8),       pointer    :: cldtop(:)
 
+    integer      ::  tropchemlev(pcols)       ! trop/strat reaction separation vertical index
     integer      ::  i, k, m, n
     integer      ::  tim_ndx
     real(r8)     ::  delt_inverse
@@ -394,8 +393,7 @@ contains
     real(r8) :: satv(ncol,pver)                            ! wrk array for relative humidity
     real(r8) :: satq(ncol,pver)                            ! wrk array for relative humidity
 
-    integer                   :: j,wd_index
-    real(r8), dimension(ncol) :: noy_wk, sox_wk, nhx_wk
+    integer                   :: j
     integer                   ::  ltrop_sol(pcols)         ! tropopause vertical index used in chem solvers
     real(r8), pointer         ::  strato_sad(:,:)          ! stratospheric sad (1/cm)
 
@@ -410,9 +408,6 @@ contains
     real(r8) :: prect(pcols)
     real(r8) :: sflx(pcols,gas_pcnst)
     real(r8) :: dust_vmr(ncol,pver,ndust)
-    real(r8) :: noy(ncol,pver)
-    real(r8) :: sox(ncol,pver)
-    real(r8) :: nhx(ncol,pver)
     real(r8) :: dt_diag(pcols,8)               ! od diagnostics
     real(r8) :: fracday(pcols)                 ! fraction of day
     real(r8) :: o2mmr(ncol,pver)               ! o2 concentration (kg/kg)
@@ -457,6 +452,17 @@ contains
         gprob_hocl_hcl, &
         gprob_hobr_hcl, &
         wtper
+
+    real(r8), pointer :: ele_temp_fld(:,:) ! electron temperature pointer
+    real(r8), pointer :: ion_temp_fld(:,:) ! ion temperature pointer
+
+    if ( ele_temp_ndx>0 .and. ion_temp_ndx>0 .and. .not.is_first_step()) then
+       call pbuf_get_field(pbuf, ele_temp_ndx, ele_temp_fld)
+       call pbuf_get_field(pbuf, ion_temp_ndx, ion_temp_fld)
+    else
+       ele_temp_fld => tfld
+       ion_temp_fld => tfld
+    endif
 
     ! initialize to NaN to hopefully catch user defined rxts that go unset
     reaction_rates(:,:,:) = nan
@@ -525,6 +531,17 @@ contains
     !-----------------------------------------------------------------------      
     call mmr2vmr( mmr(:ncol,:,:), vmr(:ncol,:,:), mbar(:ncol,:), ncol )
 
+    ! Set vertical level separating tropospheric and stratospheric reactions
+    ! at tropopause, with minimum pressure of 300 hPa poleward of 50 latitude
+    do i = 1,ncol
+       tropchemlev(i)=troplev(i)
+       if ( abs( dlats(i) ) > 50._r8 ) then
+          do while (pmid(i,tropchemlev(i)) < 30000._r8)
+             tropchemlev(i) = tropchemlev(i) +1
+          end do
+       end if
+    end do
+    
 !
 ! CCMI
 !
@@ -587,7 +604,7 @@ contains
        strato_sad(:,:) = 0._r8
 
        ! Prognostic modal stratospheric sulfate: compute dry strato_sad
-       call aero_model_strat_surfarea( ncol, mmr, pmid, tfld, troplev, pbuf, strato_sad )
+       call aero_model_strat_surfarea( ncol, mmr, pmid, tfld, tropchemlev, pbuf, strato_sad )
 
     endif
 
@@ -698,7 +715,7 @@ contains
     !-----------------------------------------------------------------
     do k = 1, pver
        do i = 1, ncol
-          zero_aerosols = k < troplev(i)
+          zero_aerosols = k <= tropchemlev(i)
           if ( abs( dlats(i) ) > 50._r8 ) then
              zero_aerosols = pmid(i,k) < 30000._r8
           endif
@@ -722,9 +739,9 @@ contains
     
     cwat(:ncol,:pver) = cldw(:ncol,:pver)
 
-    call usrrxt( reaction_rates, tfld, tfld, tfld, invariants, h2ovmr, ps, &
+    call usrrxt( reaction_rates, tfld, ion_temp_fld, ele_temp_fld, invariants, h2ovmr, ps, &
                  pmid, invariants(:,:,indexm), sulfate, mmr, relhum, strato_sad, &
-                 troplev, dlats, ncol, sad_total, cwat, mbar, pbuf )
+                 tropchemlev, dlats, ncol, sad_total, cwat, mbar, pbuf )
 
     call outfld( 'SAD_TROP', sad_total(:ncol,:), ncol, lchnk )
 
@@ -831,15 +848,15 @@ contains
     !-----------------------------------------------------------------------
     !        ... Form the washout rates
     !-----------------------------------------------------------------------      
-    if ( do_neu_wetdep ) then
-      het_rates = 0._r8
-    else
-      call sethet( het_rates, pmid, zmid, phis, tfld, &
-                   cmfdqr, prain, nevapr, delt, invariants(:,:,indexm), &
-                   vmr, ncol, lchnk )
+    if ( gas_wetdep_method=='MOZ' ) then
+       call sethet( het_rates, pmid, zmid, phis, tfld, &
+                    cmfdqr, prain, nevapr, delt, invariants(:,:,indexm), &
+                    vmr, ncol, lchnk )
        if (.not. convproc_do_aer) then
           call het_diags( het_rates(:ncol,:,:), mmr(:ncol,:,:), pdel(:ncol,:), lchnk, ncol )
        endif
+    else
+       het_rates = 0._r8
     end if
 !
 ! CCMI
@@ -1070,7 +1087,7 @@ contains
 
     call chm_diags( lchnk, ncol, vmr(:ncol,:,:), mmr_new(:ncol,:,:), &
                     reaction_rates(:ncol,:,:), invariants(:ncol,:,:), depvel(:ncol,:),  sflx(:ncol,:), &
-                    mmr_tend(:ncol,:,:), pdel(:ncol,:), pmid(:ncol,:), troplev(:ncol), pbuf  )
+                    mmr_tend(:ncol,:,:), pdel(:ncol,:), pmid(:ncol,:), troplev(:ncol) )
 
     call rate_diags_calc( reaction_rates(:,:,:), vmr(:,:,:), invariants(:,:,indexm), ncol, lchnk )
 !

@@ -81,7 +81,6 @@ contains
     character(len=*), intent(in) :: infile
     type(drv_input_data_t), intent(out) :: indata
 
-    character(len=cl) :: filen
     integer :: id, ierr
     integer :: hdim1_d,hdim2_d, nlons
     integer :: dtime
@@ -94,7 +93,7 @@ contains
     !
     call cam_pio_openfile( indata%piofile, infile, PIO_NOCLOBBER)
 
-    if(masterproc) write(iulog,*) sub // 'opened: ',trim(filen)
+    if(masterproc) write(iulog,*) sub // 'opened: ',trim(infile)
 
     !
     ! check horizontal grid ...

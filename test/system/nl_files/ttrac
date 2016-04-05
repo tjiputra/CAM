@@ -6,5 +6,5 @@
  nhtfrq=3,3,3,3,3,3
  start_tod=82800 
  start_ymd=1231 
- dyn_spectral_divdampn=1
+ eul_divdampn=1.
  /

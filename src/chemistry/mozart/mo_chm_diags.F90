@@ -5,11 +5,13 @@ module mo_chm_diags
   use mo_tracname,  only : solsym
   use chem_mods,    only : rxntot, nfs, gas_pcnst, indexm, adv_mass
   use ppgrid,       only : pver
-  use mo_constants, only : pi, rgrav, rearth
+  use mo_constants, only : rgrav, rearth
   use mo_chem_utls, only : get_rxt_ndx, get_spc_ndx
   use cam_history,  only : fieldname_len
   use mo_jeuv,      only : neuv
+  use gas_wetdep_opts,only : gas_wetdep_method
 
+  implicit none
   private
 
   public :: chm_diags_inti
@@ -60,12 +62,9 @@ contains
     use constituents, only : cnst_get_ind, cnst_longname
     use phys_control, only: phys_getopts
 
-    implicit none
-
-    integer :: i, j, k, m, n
+    integer :: j, k, m, n
     character(len=16) :: jname, spc_name, attr
     character(len=2)  :: jchar
-    character(len=64) :: lname
     character(len=2)  :: unit_basename  ! Units 'kg' or '1' 
 
     integer :: id_pan, id_onit, id_mpan, id_isopno3, id_onitr, id_nh4no3
@@ -310,12 +309,14 @@ contains
        call addfld( depflx_name(m), horiz_only,  'A', 'kg/m2/s', 'dry deposition flux ' )
        call addfld( dtchem_name(m), (/ 'lev' /), 'A', 'kg/s',    'net tendency from chem' )
 
-       wetdep_name(m) = 'WD_'//trim(spc_name)
-       wtrate_name(m) = 'WDR_'//trim(spc_name)
+       if (gas_wetdep_method=='MOZ') then
+          wetdep_name(m) = 'WD_'//trim(spc_name)
+          wtrate_name(m) = 'WDR_'//trim(spc_name)
 
-       call addfld( wetdep_name(m), horiz_only,  'A', 'kg/s', spc_name//' wet deposition' )
-       call addfld( wtrate_name(m), (/ 'lev' /), 'A',   '/s', spc_name//' wet deposition rate' )
-       
+          call addfld( wetdep_name(m), horiz_only,  'A', 'kg/s', spc_name//' wet deposition' )
+          call addfld( wtrate_name(m), (/ 'lev' /), 'A',   '/s', spc_name//' wet deposition rate' )
+       endif
+
        if (spc_name(1:3) == 'num') then
           unit_basename = ' 1'
        else
@@ -345,34 +346,28 @@ contains
     call addfld( 'MASS', (/ 'lev' /), 'A', 'kg', 'mass of grid box' )
     call addfld( 'AREA', horiz_only,  'A', 'm2', 'area of grid box' )
 
-    call addfld( 'WD_NOY', horiz_only, 'A', 'kg/s', 'NOy wet deposition' )
     call addfld( 'DF_NOY', horiz_only, 'I', 'kg/m2/s', 'NOy dry deposition flux ' )
-
-    call addfld( 'WD_SOX', horiz_only, 'A', 'kg/s', 'SOx wet deposition' )
     call addfld( 'DF_SOX', horiz_only, 'I', 'kg/m2/s', 'SOx dry deposition flux ' )
-
-    call addfld( 'WD_NHX', horiz_only, 'A', 'kg/s', 'NHx wet deposition' )
     call addfld( 'DF_NHX', horiz_only, 'I', 'kg/m2/s', 'NHx dry deposition flux ' )
+    if (gas_wetdep_method=='MOZ') then
+       call addfld( 'WD_NOY', horiz_only, 'A', 'kg/s', 'NOy wet deposition' )
+       call addfld( 'WD_SOX', horiz_only, 'A', 'kg/s', 'SOx wet deposition' )
+       call addfld( 'WD_NHX', horiz_only, 'A', 'kg/s', 'NHx wet deposition' )
+    endif
 
   end subroutine chm_diags_inti
 
-  subroutine chm_diags( lchnk, ncol, vmr, mmr, rxt_rates, invariants, depvel, depflx, mmr_tend, pdel, pmid, ltrop, pbuf )
+  subroutine chm_diags( lchnk, ncol, vmr, mmr, rxt_rates, invariants, depvel, depflx, mmr_tend, pdel, pmid, ltrop )
     !--------------------------------------------------------------------
     !	... utility routine to output chemistry diagnostic variables
     !--------------------------------------------------------------------
     
     use cam_history,  only : outfld
-    use constituents, only : pcnst
-    use constituents, only : cnst_get_ind
-    use phys_grid,    only : get_area_all_p, pcols
-    use physics_buffer, only : physics_buffer_desc
+    use phys_grid,    only : get_area_all_p
 !
 ! CCMI
 !
     use cam_history_support, only : fillvalue
-!
-    
-    implicit none
 
     !--------------------------------------------------------------------
     !	... dummy arguments
@@ -390,13 +385,10 @@ contains
     real(r8), intent(in)  :: pmid(ncol,pver)
     integer,  intent(in)  :: ltrop(ncol)
 
-    type(physics_buffer_desc), pointer :: pbuf(:)
-
     !--------------------------------------------------------------------
     !	... local variables
     !--------------------------------------------------------------------
-    integer     :: i,j,k, m, n
-    integer :: plat
+    integer     :: i, k, m
     real(r8)    :: wrk(ncol,pver)
     !      real(r8)    :: tmp(ncol,pver)
     !      real(r8)    :: m(ncol,pver)
@@ -409,7 +401,6 @@ contains
 
     real(r8) :: area(ncol), mass(ncol,pver)
     real(r8) :: wgt
-    character(len=16) :: spc_name
 
     !--------------------------------------------------------------------
     !	... "diagnostic" groups
@@ -695,7 +686,6 @@ contains
 
     use cam_history,  only : outfld
     use phys_grid,    only : get_wght_all_p
-    implicit none
 
     integer,  intent(in)  :: lchnk
     integer,  intent(in)  :: ncol
@@ -704,8 +694,7 @@ contains
     real(r8), intent(in)  :: pdel(ncol,pver)
 
     real(r8), dimension(ncol) :: noy_wk, sox_wk, nhx_wk, wrk_wd
-    integer :: m, k, j
-    integer :: plat
+    integer :: m, k
     real(r8) :: wght(ncol)
     !
     ! output integrated wet deposition field
@@ -727,28 +716,29 @@ contains
        !
        wrk_wd(:ncol) = wrk_wd(:ncol) * rgrav * wght(:ncol) * rearth**2
        !
+       if (gas_wetdep_method=='MOZ') then
+          call outfld( wetdep_name(m), wrk_wd(:ncol),               ncol, lchnk )
+          call outfld( wtrate_name(m), het_rates(:ncol,:,m), ncol, lchnk )
 
-       call outfld( wetdep_name(m), wrk_wd(:ncol),               ncol, lchnk )
-       call outfld( wtrate_name(m), het_rates(:ncol,:,m), ncol, lchnk )
-
-       if ( any(noy_species == m ) ) then
-          noy_wk(:ncol) = noy_wk(:ncol) + wrk_wd(:ncol)*N_molwgt/adv_mass(m)
+          if ( any(noy_species == m ) ) then
+             noy_wk(:ncol) = noy_wk(:ncol) + wrk_wd(:ncol)*N_molwgt/adv_mass(m)
+          endif
+          if ( m == id_n2o5 ) then  ! 2 NOy molecules in N2O5
+             noy_wk(:ncol) = noy_wk(:ncol) + wrk_wd(:ncol)*N_molwgt/adv_mass(m)
+          endif
+          if ( any(sox_species == m ) ) then
+             sox_wk(:ncol) = sox_wk(:ncol) + wrk_wd(:ncol)*S_molwgt/adv_mass(m)
+          endif
+          if ( any(nhx_species == m ) ) then
+             nhx_wk(:ncol) = nhx_wk(:ncol) + wrk_wd(:ncol)*N_molwgt/adv_mass(m)
+          endif
        endif
-       if ( m == id_n2o5 ) then  ! 2 NOy molecules in N2O5
-          noy_wk(:ncol) = noy_wk(:ncol) + wrk_wd(:ncol)*N_molwgt/adv_mass(m)
-       endif
-       if ( any(sox_species == m ) ) then
-          sox_wk(:ncol) = sox_wk(:ncol) + wrk_wd(:ncol)*S_molwgt/adv_mass(m)
-       endif
-       if ( any(nhx_species == m ) ) then
-          nhx_wk(:ncol) = nhx_wk(:ncol) + wrk_wd(:ncol)*N_molwgt/adv_mass(m)
-       endif
-
     end do
-    
-    call outfld( 'WD_NOY', noy_wk(:ncol), ncol, lchnk )
-    call outfld( 'WD_SOX', sox_wk(:ncol), ncol, lchnk )
-    call outfld( 'WD_NHX', nhx_wk(:ncol), ncol, lchnk )
+    if (gas_wetdep_method=='MOZ') then
+       call outfld( 'WD_NOY', noy_wk(:ncol), ncol, lchnk )
+       call outfld( 'WD_SOX', sox_wk(:ncol), ncol, lchnk )
+       call outfld( 'WD_NHX', nhx_wk(:ncol), ncol, lchnk )
+    endif
 
   end subroutine het_diags
 

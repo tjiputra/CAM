@@ -26,10 +26,9 @@ subroutine initcom
     !
     !-----------------------------------------------------------------------
     use shr_kind_mod,    only: r8 => shr_kind_r8
-    use pmgrid,          only: plat
+    use pmgrid,          only: plon, plat
     use pspect
     use comspe
-    use rgrid,           only: nlon, beglatpair, wnummax, nmmax, fullgrid
     use scanslt,         only: nlonex, platd, j1
     use gauaw_mod,       only: gauaw
     use commap,          only: sq, rsq, slat, w, cs, href, ecref, clat, clon, &
@@ -100,21 +99,15 @@ subroutine initcom
       latdeg(1) = clat(1)*45._r8/atan(1._r8)
       clon(1,1)   = 4.0_r8*atan(1._r8)*mod((scmlon+360._r8),360._r8)/180._r8
       londeg(1,1) = mod((scmlon+360._r8),360._r8)
-      !
-      ! SCAM not yet able to handle reduced grid.
-      !
-      if (.not. fullgrid) then
-        call endrun ('INITCOM: SCAM not yet configured to handle reduced grid')
-      end if
     else
       !
       ! Longitude array
       !
       pi = 4.0_r8*atan(1.0_r8)
       do lat=1,plat
-        do i=1,nlon(lat)
-          londeg(i,lat) = (i-1)*360._r8/nlon(lat)
-          clon(i,lat)   = (i-1)*2.0_r8*pi/nlon(lat)
+        do i=1,plon
+          londeg(i,lat) = (i-1)*360._r8/plon
+          clon(i,lat)   = (i-1)*2.0_r8*pi/plon
         end do
       end do
     endif

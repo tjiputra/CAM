@@ -10,7 +10,7 @@ module carma_constants_mod
 
   use carma_precision_mod
   use shr_const_mod,       only: SHR_CONST_TKTRIP, SHR_CONST_RHOICE, SHR_CONST_CDAY
-  use physconst,           only: p_pi=>pi, avogad, boltz, r_universal, cpair, rhoh2o, latvap, latice
+  use physconst,           only: p_pi=>pi, avogad, boltz, r_universal, rhoh2o, latvap, latice
   use radconstants,        only: nswbands, nlwbands
   use cam_history_support, only: fillvalue
 
@@ -63,9 +63,6 @@ module carma_constants_mod
   !! Define number of seconds per the planet's day [ s / d ]
   real(kind=f), parameter :: SCDAY = SHR_CONST_CDAY
    
-  !! Define specific heat at constant pres of dry air [ cm^2 / s^2 / deg_K ]
-  real(kind=f), parameter :: CP = cpair * 1e7_f / 1000._f
-
   !! Define mass density of liquid water [ g / cm^3 ]
   real(kind=f), parameter :: RHO_W = rhoh2o / 1000._f
   
@@ -145,6 +142,9 @@ module carma_constants_mod
   !! Define gas constant for dry air [ erg / deg_K / mole ]
   real(kind=f)            :: R_AIR
   
+  !! Define specific heat at constant pres of dry air [ cm^2 / s^2 / deg_K ]
+  real(kind=f)            :: CP
+
   !! Define ratio of gas constant for dry air and specific heat
   real(kind=f)            :: RKAPPA
   

@@ -41,12 +41,6 @@
 <prescribed_strataero_type>SERIAL</prescribed_strataero_type>
 <prescribed_strataero_file>CESM_1949_2100_sad_V2_c130627.nc</prescribed_strataero_file>
 
-<!-- Photolysis Inputs DEFAULTS okay for: rsf_file,xs_long_file,xs_short_file -->
-
-<!-- Extraterestrial Flux and MLT inputs DEFAULTS okay for:  -->
-<!-- efield_hflux_file, efield_lflux_file, efield_wei96_file -->
-<!-- electron_file,euvac_file,euvacdat_file,photon_file,neckel_file,woods_etf_file,xs_coef_file -->
-
 <solar_parms_file>atm/waccm/phot/wasolar_c081203.nc</solar_parms_file>
 <solar_photons_file>atm/waccm/solar/photon_fluxes_1950-2007.c090217.nc</solar_photons_file>
 
@@ -98,7 +92,7 @@
   'jo2_a', 'jo2_b', 'jo3_a',  'jo3_b', 'jhocl', 'jno3_b', 'jcl2o2',
   'SAD_SULFC', 'SAD_LNAT', 'SAD_ICE','AOA1','AOA2',
   'O2', 'CLDLIQ', 'CLDICE', 'ASDIR',
-  'VTH2d', 'WTH2d', 'UV2d', 'UW2d', 'TH', 'MSKtem'
+  'VTHzm', 'WTHzm', 'UVzm', 'UWzm', 'TH', 'MSKtem'
 </fincl2>
 
 <!-- Instantaneous every 10 days --> 
@@ -115,7 +109,7 @@
 </fincl4>
 <!-- Daily Average --> 
 <fincl5>
-  'MSKtem', 'PS', 'PSL', 'VTH2d', 'UV2d', 'UW2d', 'U2d', 'V2d', 'TH2d','W2d', 'PHIS'
+  'MSKtem', 'PS', 'PSL', 'VTHzm', 'UVzm', 'UWzm', 'Uzm', 'Vzm', 'THzm','Wzm', 'PHIS'
 </fincl5>
 
 </namelist_defaults>

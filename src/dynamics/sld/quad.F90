@@ -18,7 +18,6 @@ subroutine quad(lm      ,grlps1  ,grlps2  ,grt1    ,grq1    , &
   use pmgrid
   use pspect
   use comspe
-  use rgrid
   use commap
   use physconst, only: rearth
   use spmd_utils, only : iam
@@ -92,7 +91,7 @@ subroutine quad(lm      ,grlps1  ,grlps2  ,grt1    ,grq1    , &
   do n = 1,2*nlen(m)
      alps(mc+n) = 0._r8
   end do
-  do j=beglatpair(m),plat/2
+  do j= 1, plat/2
      do n=1,nlen(m),2
         ir = mc + 2*n - 1
         ii = ir + 1
@@ -120,7 +119,7 @@ subroutine quad(lm      ,grlps1  ,grlps2  ,grt1    ,grq1    , &
         d (mc+n,k) = 0._r8
         vz(mc+n,k) = 0._r8
      end do
-     do j=beglatpair(m),plat/2
+     do j= 1, plat/2
         do n=1,nlen(m),2
            zwdalp = ztdtrw(j)*dalp(mr+n,j)
            zwalp  = zw(j)    *alp (mr+n,j)
@@ -136,7 +135,7 @@ subroutine quad(lm      ,grlps1  ,grlps2  ,grt1    ,grq1    , &
            vz(ii,k) = vz(ii,k) + grz1 (2*lm  ,k,j)*zwalp + grfu2(2*lm  ,k,j)*zwdalp
         end do
      end do
-     do j=beglatpair(m),plat/2
+     do j= 1, plat/2
         do n = 2,nlen(m),2
            zwdalp = ztdtrw(j)*dalp(mr+n,j)
            zwalp  = zw(j)    *alp (mr+n,j)

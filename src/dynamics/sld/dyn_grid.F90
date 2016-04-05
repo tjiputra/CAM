@@ -387,7 +387,6 @@ contains
 ! 
 !-----------------------------------------------------------------------
    use pmgrid,        only: plat, plon
-   use rgrid,         only: nlon
    use commap,        only: clat, clon, londeg, latdeg, w
    use physconst,      only: pi,spval
    implicit none
@@ -416,7 +415,7 @@ contains
        if(size == ngcols_d) then
           n = 0
           do j = 1,plat
-             do i = 1,nlon(j)
+             do i = 1, plon
                 n = n + 1
                 clon_d_out(n) = clon(i,j)
              enddo
@@ -433,7 +432,7 @@ contains
        if(size == ngcols_d) then
           n = 0
           do j = 1,plat
-             do i = 1,nlon(j)
+             do i = 1, plon
                 n = n + 1
                 clat_d_out(n) = clat(j)
              enddo
@@ -449,14 +448,14 @@ contains
     if ( ( present(wght_d_out) ) ) then
 
        if(size==plat) then
-          wght_d_out(:) = (0.5_r8*w(:)/nlon(:))* (4.0_r8*pi)
+          wght_d_out(:) = (0.5_r8*w(:)/plon)* (4.0_r8*pi)
        else if(size == ngcols_d) then
 
           n = 0
           do j = 1,plat
-             do i = 1,nlon(j)
+             do i = 1, plon
                 n = n + 1
-                wght_d_out(n) = ( 0.5_r8*w(j)/nlon(j) ) * (4.0_r8*pi)
+                wght_d_out(n) = ( 0.5_r8*w(j)/plon ) * (4.0_r8*pi)
              enddo
           enddo
        end if
@@ -478,25 +477,25 @@ contains
           ! Latitude vertices
           ns_vert(:,:) = spval
           if (j .eq. 1) then
-             ns_vert(1,:nlon(1)) = -90.0_r8
+             ns_vert(1,:plon) = -90.0_r8
           else
-             ns_vert(1,:nlon(j)) = (latdeg(j) + latdeg(j-1) )*0.5_r8
+             ns_vert(1,:plon) = (latdeg(j) + latdeg(j-1) )*0.5_r8
           endif
           
           if (j .eq. plat) then
-             ns_vert(2,:nlon(plat)) =  90.0_r8
+             ns_vert(2,:plon) =  90.0_r8
           else
-             ns_vert(2,:nlon(j)) = (latdeg(j) + latdeg(j+1) )*0.5_r8
+             ns_vert(2,:plon) = (latdeg(j) + latdeg(j+1) )*0.5_r8
           endif
 
           ! Longitude vertices
           ew_vert(:,:) = spval
-          ew_vert(1,1)          = (londeg(1,j) - 360.0_r8 + londeg(nlon(j),j))*0.5_r8
-          ew_vert(1,2:nlon(j))  = (londeg(1:nlon(j)-1,j)+ londeg(2:nlon(j),j))*0.5_r8
-          ew_vert(2,:nlon(j)-1) = ew_vert(1,2:nlon(j))
-          ew_vert(2,nlon(j))    = (londeg(nlon(j),j) + (360.0_r8 + londeg(1,j)))*0.5_r8
+          ew_vert(1,1)       = (londeg(1,j) - 360.0_r8 + londeg(plon,j))*0.5_r8
+          ew_vert(1,2:plon)  = (londeg(1:plon-1,j)+ londeg(2:plon,j))*0.5_r8
+          ew_vert(2,:plon-1) = ew_vert(1,2:plon)
+          ew_vert(2,plon)    = (londeg(plon,j) + (360.0_r8 + londeg(1,j)))*0.5_r8
           
-          do i = 1,nlon(j)
+          do i = 1, plon
              n = n + 1
              del_phi = sin( ns_vert(2,i)*degtorad ) - sin( ns_vert(1,i)*degtorad )
              del_theta = ( ew_vert(2,i) - ew_vert(1,i) )*degtorad
@@ -509,7 +508,7 @@ contains
        if(size == ngcols_d) then
           n = 0
           do j = 1,plat
-             do i = 1,nlon(j)
+             do i = 1, plon
                 n = n + 1
                 lon_d_out(n) = londeg(i,j)
              end do
@@ -526,7 +525,7 @@ contains
        if(size == ngcols_d) then
           n = 0
           do j = 1,plat
-             do i = 1,nlon(j)
+             do i = 1, plon
                 n = n + 1
                 lat_d_out(n) = latdeg(j)
              end do

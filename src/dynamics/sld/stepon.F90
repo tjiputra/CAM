@@ -62,7 +62,6 @@ subroutine stepon_init(dyn_in, dyn_out)
 ! Stepon initialization, primarily dynamics initialization.
 !
 !-----------------------------------------------------------------------
-   use rgrid,          only: nlon
    use commap,         only: clat
    use time_manager,   only: is_first_step
    use scanslt,        only: slt_initial
@@ -83,17 +82,17 @@ subroutine stepon_init(dyn_in, dyn_out)
 
    if (is_first_step()) then
       do lat=beglat,endlat
-         do i=1,nlon(lat)
+         do i=1, plon
             coslat(i) = cos(clat(lat))
             rcoslat(i) = 1._r8/coslat(i)
          end do
          !     
          ! Set current time pressure arrays for model levels etc.
          !
-         call plevs0(nlon(lat), plon, plev, ps(1,lat,n3), pint, pmid, pdel)
+         call plevs0(plon, plon, plev, ps(1,lat,n3), pint, pmid, pdel)
          !
          do k=1,plev
-            do i=1,nlon(lat)
+            do i=1, plon
                rpmid(i,k) = 1._r8/pmid(i,k)
             end do
          end do
@@ -102,7 +101,7 @@ subroutine stepon_init(dyn_in, dyn_out)
          !
          call omcalc (rcoslat, div(1,1,lat,n3), u3(1,1,lat,n3), v3(1,1,lat,n3), dpsl(1,lat), &
                       dpsm(1,lat), pmid, pdel, rpmid, pint(1,plevp), &
-                      omga(1,1,lat), nlon(lat))
+                      omga(1,1,lat), plon)
       end do
    end if
 

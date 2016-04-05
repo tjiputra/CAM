@@ -144,7 +144,6 @@ subroutine scanslt_initial( adv_state, etamid, gravit_in, detam, cwava )
 !----------------------------------------------------------------------- 
    use commap,       only: clat
    use prognostics,  only: ps, n3
-   use rgrid,        only: nlon
    use time_manager, only: is_first_step
    use hycoef,       only: hyam, hybm, hyai, hybi, ps0
    use eul_control_mod, only : pdela
@@ -184,7 +183,7 @@ subroutine scanslt_initial( adv_state, etamid, gravit_in, detam, cwava )
 !
    if (single_column) then
       lat = beglat
-      call plevs0(nlon(lat), plon, plev, ps(1,lat,n3), pint, pmid, pdel)
+      call plevs0(plon, plon, plev, ps(1,lat,n3), pint, pmid, pdel)
       etamid(:) = pmid(lat,:)
       etaint(:) = pint(lat,:)
       if ( any(etamid == 0.0_r8) ) call endrun('etamid == 0')
@@ -211,10 +210,10 @@ subroutine scanslt_initial( adv_state, etamid, gravit_in, detam, cwava )
 !
 ! Set current time pressure arrays for model levels etc.
 !
-         call plevs0(nlon(lat), plon, plev, ps(1,lat,n3), pint, pmid, pdel)
+         call plevs0(plon, plon, plev, ps(1,lat,n3), pint, pmid, pdel)
 
          do k=1,plev
-            do i=1,nlon(lat)
+            do i=1,plon
                if (single_column) then
                   sigmp(i,k,lat) = pmid(i,k)
                else
@@ -260,7 +259,6 @@ subroutine scanslt_run(adv_state, ztodt   ,etadot   ,detam, etamid, cwava )
 ! Reviewed:          D. Williamson, P. Rasch,  March 1996
 !
 !-----------------------------------------------------------------------
-   use rgrid,       only: nlon
    use physconst,   only: ra
    use prognostics, only: hadv
    use time_manager, only: get_nstep
@@ -398,7 +396,7 @@ subroutine scanslt_run(adv_state, ztodt   ,etadot   ,detam, etamid, cwava )
                   phi     ,dphi    ,etamid  ,etaint  ,detam   , &
                   detai   ,lbasdy  ,lbasdz  ,lbassd  ,lbasiy  , &
                   kdpmpf  ,kdpmph  ,lammp(1,1,lat), phimp(1,1,lat), sigmp(1,1,lat), &
-                  qfcst(1,1,1,lat) ,adv_state, nlon(lat), hadv, nlonex  )
+                  qfcst(1,1,1,lat) ,adv_state, plon, hadv, nlonex  )
    end do
    call t_stopf ('sltb1')
 !
@@ -491,7 +489,6 @@ subroutine da_coupling( cwava, adv_state )
 !----------------------------------------------------------------------- 
    use prognostics, only: u3, v3, qminus, n3m1, ps, n3m2, q3, pdeld
    use commap,      only: w
-   use rgrid,       only: nlon
    use qmassa,      only: qmassarun
 
 !
@@ -526,7 +523,7 @@ subroutine da_coupling( cwava, adv_state )
 !
 ! Only pdel is needed inside SLT.  pint and pmid are not.
 !
-      call plevs0 (nlon(lat),plon,plev,ps(1,lat,n3m2), pint, pmid, pdel)
+      call plevs0 (plon,plon,plev,ps(1,lat,n3m2), pint, pmid, pdel)
 !
 ! Calculate mass of moisture in field being advected by slt. (hw1lat)
 !
@@ -534,7 +531,7 @@ subroutine da_coupling( cwava, adv_state )
 !  q3     is plon,plev,pcnst,beglat:endlat,ptimelevs
 !  qminus is plon,plev,pcnst,beglat:endlat
       call qmassarun (cwava(lat),w(irow) ,qminus(1,1,1,lat),pdel    , &
-                   hw1lat(1,lat),nlon(lat), q3(1,1,1,lat,n3m2), lat, pdeld(:,:,lat,n3m2 ))
+                   hw1lat(1,lat),plon, q3(1,1,1,lat,n3m2), lat, pdeld(:,:,lat,n3m2 ))
    end do
 
 #ifdef OUTER_OMP
@@ -636,7 +633,6 @@ subroutine grdini(pmap    ,etamid  ,etaint  ,gravit  ,dlam    , &
 ! Reviewed:          D. Williamson, P. Rasch, March 1996
 !
 !-----------------------------------------------------------------------
-   use rgrid,      only: nlon
    use vrtmap_mod, only: vrtmap
 !------------------------------Parameters-------------------------------
 !
@@ -790,7 +786,7 @@ if (single_column) then
    cwava = 1._r8
 else
    do j=1,plat
-      cwava(j) = 1._r8/(nlon(j)*gravit)
+      cwava(j) = 1._r8/(plon*gravit)
    end do
 endif
 !

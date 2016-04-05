@@ -64,17 +64,19 @@ contains
 
 
     temp_node => List%first
-    ! Find the end of the list
-    do while(associated(temp_node%next))
-       temp_node => temp_node%next
-    enddo
+    if (associated(temp_node)) then
+      ! Find the end of the list
+      do while(associated(temp_node%next))
+        temp_node => temp_node%next
+      enddo
 
-    temp_node => temp_node%prev
-    !Now step back and deallocate all entries  
-    do while(associated(temp_node))
-       deallocate(temp_node%next)
-       temp_node => temp_node%prev
-    enddo
+      temp_node => temp_node%prev
+      !Now step back and deallocate all entries  
+      do while(associated(temp_node))
+        deallocate(temp_node%next)
+        temp_node => temp_node%prev
+      enddo
+    end if
 
   end subroutine LLFree
 

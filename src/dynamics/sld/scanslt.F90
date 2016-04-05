@@ -282,7 +282,6 @@ subroutine slt_initial( detam, cwava, etamid, adv_state )
 !-----------------------------------------------------------------------
   use pmgrid,       only: plev, plevp
   use commap,       only: t0, clat
-  use rgrid,        only: nlon
   use physconst,    only: cappa, gravit
   use prognostics,  only: u3, v3, n3, div, dpsl, dpsm, ps, ed1
   use time_manager, only: is_first_step
@@ -350,18 +349,18 @@ subroutine slt_initial( detam, cwava, etamid, adv_state )
    end do
    if (is_first_step()) then
       do lat=beglat,endlat
-         do i=1,nlon(lat)
+         do i=1, plon
             coslat(i) = cos(clat(lat))
             rcoslat(i) = 1._r8/coslat(i)
          end do
 !    
 ! Set current time pressure arrays for model levels etc.
 !
-         call plevs0(nlon(lat), plon, plev, ps(1,lat,n3), pint, pmid, pdel)
+         call plevs0(plon, plon, plev, ps(1,lat,n3), pint, pmid, pdel)
 !
 ! Compute appropriate (1/ps)etadot(dp/deta)
 !
-         call etadt0 (lat, nlon(lat), &
+         call etadt0 (lat, plon, &
                       rcoslat ,div(1,1,lat,n3), u3(1,1,lat,n3), v3(1,1,lat,n3), dpsl(1,lat), &
                       dpsm(1,lat), pdel, ps(1,lat,n3), ed1(1,1,lat))
       end do
@@ -398,7 +397,6 @@ subroutine slt_run( ztodt   ,detam   ,cwava   ,etamid  ,          &
   use pmgrid,       only: plat, plon
   use comspe,       only: maxm
   use constituents, only: pcnst
-  use rgrid,        only: nlon
   use prognostics,  only: parrsld, tarrsld, u3, v3, etadot, n3
 
 #if ( defined SPMD )
@@ -522,7 +520,7 @@ subroutine slt_run( ztodt   ,detam   ,cwava   ,etamid  ,          &
                       detam   ,etamid   ,grfu    ,grfv       ,       &
                       tarrsld ,parrsld  ,u3(1,1,lat,n3)      ,       &
                       v3(1,1,lat,n3)    ,etadot(1,1,lat)     ,       &
-                      nlon(lat)         ,nlon_fft_in         ,       &
+                      plon              ,nlon_fft_in         ,       &
                       fftbuf_in(1,1,1,lat), adv_state )
   end do                    ! end lat-loop
   call t_stopf ('scanslt_bft')
@@ -648,7 +646,6 @@ subroutine da_coupling ( adv_state, cwava, lnpssld, prhssld )
 !-----------------------------------------------------------------------
    use prognostics,  only: u3, v3, t3, q3, etadot, n3, n3m1, ps
    use time_manager, only: is_first_step
-   use rgrid,        only: nlon
    use commap,       only: w
    use qmassa,      only: qmassarun
 
@@ -667,7 +664,7 @@ subroutine da_coupling ( adv_state, cwava, lnpssld, prhssld )
       do j = beglat, endlat
          jcen = j1 - 1 + j
          do k = 1, plevp
-            do i = 1, nlon(j)
+            do i = 1, plon
                icen = i1 + i - 1
                adv_state%etadot(icen,k,jcen) = etadot(i,k,j)
             end do
@@ -684,7 +681,7 @@ subroutine da_coupling ( adv_state, cwava, lnpssld, prhssld )
       end if
 
       do k = 1, plev
-         do i = 1, nlon(j)
+         do i = 1, plon
             icen = i1 + i - 1
             adv_state%u3(icen,k,jcen)      = u3(i,k,j,n3m1)
             adv_state%v3(icen,k,jcen)      = v3(i,k,j,n3m1)
@@ -696,14 +693,14 @@ subroutine da_coupling ( adv_state, cwava, lnpssld, prhssld )
 !
 ! Calculate mass of moisture in field being advected by slt.
 !
-      call plevs0(nlon(j), plon, plev, ps(1,j,n3), pint    ,pmid    ,pdel)
+      call plevs0(plon, plon, plev, ps(1,j,n3), pint    ,pmid    ,pdel)
       call qmassarun(cwava(j)   , w(irow) , q3(1,1,1,j,n3), pdel    ,&
-                  hw1lat(1,j), nlon(j),  q3(1,1,1,j,n3m1), j)
+                  hw1lat(1,j), plon,  q3(1,1,1,j,n3m1), j)
 !
 ! The modified etadot @n3m1 will be used later for trajectory calculation in SCANSLT
 !
       do k = 1, plevp
-         do i = 1, nlon(j)
+         do i = 1, plon
             icen = i1 + i - 1
             adv_state%etadot(icen,k,jcen) = 2._r8*etadot(i,k,j) - &
                                             adv_state%etadot(icen,k,jcen)
@@ -715,7 +712,7 @@ subroutine da_coupling ( adv_state, cwava, lnpssld, prhssld )
       do j = beglat, endlat
          jcen = j1 - 1 + j
          do k = 1, plev
-            do i = 1, nlon(j)
+            do i = 1, plon
                icen = i1 + i - 1
                adv_state%q3(icen,k,jcen,c) = q3(i,k,c,j,n3)
             end do
@@ -737,7 +734,6 @@ subroutine slt_run_setup( adv_state )
 !
 !-----------------------------------------------------------------------
    use prognostics,  only: u3, v3, n3, n3m1, etadot
-   use rgrid,        only: nlon
    use time_manager, only: is_first_restart_step
    type(advection_state), intent(inout) :: adv_state
 
@@ -751,7 +747,7 @@ subroutine slt_run_setup( adv_state )
    do j = beglat, endlat
       jcen = j1 - 1 + j
       do k = 1, plev
-         do i = 1, nlon(j)
+         do i = 1, plon
             icen = i1 + i - 1
             adv_state%u3sld(icen,k,jcen) = 2._r8*u3(i,k,j,n3) - u3(i,k,j,n3m1)
             adv_state%v3sld(icen,k,jcen) = 2._r8*v3(i,k,j,n3) - v3(i,k,j,n3m1)
@@ -763,7 +759,7 @@ subroutine slt_run_setup( adv_state )
       do j = beglat, endlat
          jcen = j1 - 1 + j
          do k = 1, plevp
-            do i = 1, nlon(j)
+            do i = 1, plon
                icen = i1 + i - 1
                adv_state%etadot(icen,k,jcen) = etadot(i,k,j)
             end do
@@ -785,7 +781,6 @@ subroutine ad_coupling ( adv_state )
 !
 !-----------------------------------------------------------------------
    use prognostics,  only: u3, v3, t3, q3, n3, n3m1, etadot
-   use rgrid,        only: nlon
    type(advection_state), intent(inout) :: adv_state
 
    integer :: i, j, k, c, icen, jcen
@@ -794,7 +789,7 @@ subroutine ad_coupling ( adv_state )
    do j = beglat, endlat
       jcen = j1 - 1 + j
       do k = 1, plev
-         do i = 1, nlon(j)
+         do i = 1, plon
             icen = i1 + i - 1
             u3(i,k,j,n3m1) = adv_state%u3(icen,k,jcen)
             v3(i,k,j,n3m1) = adv_state%v3(icen,k,jcen)
@@ -802,7 +797,7 @@ subroutine ad_coupling ( adv_state )
          end do
       end do
       do k = 1, plevp
-         do i = 1, nlon(j)
+         do i = 1, plon
             icen = i1 + i - 1
             adv_state%etadot(icen,k,jcen) = etadot(i,k,j)
          end do
@@ -813,7 +808,7 @@ subroutine ad_coupling ( adv_state )
       do j = beglat, endlat
          jcen = j1 - 1 + j
          do k = 1, plev
-            do i = 1, nlon(j)
+            do i = 1, plon
                icen = i1 + i - 1
                q3(i,k,c,j,n3) = adv_state%q3(icen,k,jcen,c)
             end do
@@ -845,7 +840,6 @@ subroutine scanslt_bft (ztodt   ,lat     ,dtr     ,iter    ,detam   , &
 !
 !-----------------------------------------------------------------------
 
-  use rgrid,       only: nmmax
   use pspect,      only: pmmax
   use commap,      only: w, clat, t0
   use physconst,   only: cappa, ra
@@ -1277,7 +1271,6 @@ subroutine scanslt_fft (nlon_fft,nlon_fft2,fftbuf,fftbuf2)
 !-----------------------------------------------------------------------
 
   use pmgrid,      only: plon, plat
-  use rgrid,       only: nlon
 #if (defined SPMD)
    use mpishorthand, only: mpicom
    use comspe
@@ -1325,9 +1318,9 @@ subroutine scanslt_fft (nlon_fft,nlon_fft2,fftbuf,fftbuf2)
    ntr = 4*plev + 1
 !$OMP PARALLEL DO PRIVATE (LAT,WORK)
    do lat=beglat,endlat
-      fftbuf(nlon(lat)+1:nlon_fft,:,:,lat) = 0.0_r8
+      fftbuf(plon+1:nlon_fft,:,:,lat) = 0.0_r8
       call fft991(fftbuf(1,1,1,lat)     ,work    ,trig(1,lat),ifax(1,lat),inc     ,&
-                  nlon_fft ,nlon(lat)   ,ntr     ,isign   )
+                  nlon_fft , plon   ,ntr     ,isign   )
    enddo
 !
 #if ( defined SPMD )
@@ -1367,7 +1360,6 @@ subroutine scanslt_aft (irow    ,nlon_fft,fftbufs ,fftbufn , &
    use comspe, only: numm, maxm
 #else
    use comspe, only: maxm
-   use rgrid, only: nmmax
 #endif
 
 
@@ -1408,7 +1400,7 @@ subroutine scanslt_aft (irow    ,nlon_fft,fftbufs ,fftbufn , &
 #if (defined SPMD)
    mlength = numm(iam)
 #else
-   mlength = nmmax(irow)
+   mlength = pmmax
 #endif
   do k = 1,plev
      do i = 1,2*mlength
@@ -1445,7 +1437,6 @@ subroutine slt_final( adv_state )
 ! slt finalization
 !
 !-----------------------------------------------------------------------
-  use rgrid,        only: nlon
   use spmd_utils,   only: masterproc, npes
 #if ( defined SPMD )
   use mpishorthand, only: mpicom, mpir8
@@ -1495,7 +1486,7 @@ subroutine slt_final( adv_state )
       end do
       lsum = 0
       do lat = 1,plat
-         lsum = lsum + nlon(lat)
+         lsum = lsum + plon
       end do
 
       vflag = .false.
@@ -1880,7 +1871,6 @@ subroutine grdini(pmap    ,etamid  ,etaint  ,gravit  ,dlam    , &
 ! Author:  J. Olson
 !
 !-----------------------------------------------------------------------
-  use rgrid,      only: nlon
   use vrtmap_mod, only: vrtmap
 !------------------------------Arguments--------------------------------
 !
@@ -1971,7 +1961,7 @@ subroutine grdini(pmap    ,etamid  ,etaint  ,gravit  ,dlam    , &
 ! Compute tracer integral constant
 !
   do j=1,plat
-     cwava(j) = 1._r8/(nlon(j)*gravit)
+     cwava(j) = 1._r8/(plon*gravit)
   end do
 !
 ! Initialize cutoff latitude (poleward of which local geodesic

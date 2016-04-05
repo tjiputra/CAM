@@ -452,15 +452,18 @@ contains
 
   end subroutine cam_pio_check_var
 
-  subroutine init_pio_subsystem(nlfilename)
+  subroutine init_pio_subsystem()
     use shr_pio_mod,   only: shr_pio_getiosys, shr_pio_getiotype
     use cam_instance, only: atm_id
 
-    ! Dummy argument
-    character(len=*) nlfilename
-
     pio_subsystem => shr_pio_getiosys(atm_id)
     pio_iotype =  shr_pio_getiotype(atm_id)
+
+    if (masterproc) then
+       write(iulog,*)' '
+       write(iulog,*)'Initialize PIO subsystem:'
+       write(iulog,*)'  iotype  = ', pio_iotype
+    end if
 
   end subroutine init_pio_subsystem
 

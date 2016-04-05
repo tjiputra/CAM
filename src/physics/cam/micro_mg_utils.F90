@@ -1188,26 +1188,26 @@ subroutine accrete_cloud_water_rain(microp_uniform, qric, qcic, &
 
   integer :: i
 
-  do i=1,mgncol 
+  if (.not. microp_uniform) then
+    pra_coef(:) = accre_enhan * var_coef(relvar(:), 1.15_r8)
+  else
+    pra_coef(:) = 1._r8
+  end if
 
-     if (.not. microp_uniform) then
-        pra_coef(:) = accre_enhan * var_coef(relvar(:), 1.15_r8)
-     else
-        pra_coef(:) = 1._r8
-     end if
+  do i=1,mgncol
 
-     if (qric(i) >= qsmall .and. qcic(i) >= qsmall) then
+    if (qric(i) >= qsmall .and. qcic(i) >= qsmall) then
 
-        ! include sub-grid distribution of cloud water
-        pra(i) = pra_coef(i) * 67._r8*(qcic(i)*qric(i))**1.15_r8
+      ! include sub-grid distribution of cloud water
+      pra(i) = pra_coef(i) * 67._r8*(qcic(i)*qric(i))**1.15_r8
 
-        npra(i) = pra(i)*ncic(i)/qcic(i)
+      npra(i) = pra(i)*ncic(i)/qcic(i)
 
-     else
-        pra(i) = 0._r8
-        npra(i) = 0._r8
-     end if
-  enddo
+    else
+      pra(i) = 0._r8
+      npra(i) = 0._r8
+    end if
+  end do
 end subroutine accrete_cloud_water_rain
 
 ! Self-collection of rain drops
@@ -1351,7 +1351,7 @@ subroutine evaporate_sublimate_precip(t, rho, dv, mu, sc, q, qvl, qvi, &
         dum(i) = lcldm(i)
      end if
   enddo
-  do i=1,mgncol 
+  do i=1,mgncol
   ! only calculate if there is some precip fraction > cloud fraction
 
      if (precip_frac(i) > dum(i)) then

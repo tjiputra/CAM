@@ -54,6 +54,13 @@ chdir "$CASEROOT/Buildconf/camconf";
 # Invoke cam configure - output will go in $CASEROOT/Buildconf/camconf
 #--------------------------------------------------------------------
 
+# level information for CAM is part of the atm grid name - and must be stripped out
+my $nlev=''; 
+if ($ATM_GRID =~ /(.+)z(\d+)/) {
+    $ATM_GRID = $1;
+    $nlev="-nlev $2";
+}
+
 # The following translation is hard-wired for backwards compatibility
 # to support the differences between how the scripts specify the land grid
 # and how it is specified internally
@@ -84,12 +91,7 @@ if ($BUILD_COMPLETE eq 'FALSE') {
     if ("$CAM_CONFIG_OPTS" =~ /.*cosp.*/) {
 	$CAM_LIB_DIRS = "-cosp_libdir $EXEROOT/atm/obj/cosp";
     }
-    # level information for CAM is part of the atm grid name - and must be stripped out
-    my $nlev=""; 
-    if ($ATM_GRID =~ /(.+)(L)(.+)/) {
-	$ATM_GRID = $1;
-	$nlev="-nlev $3";
-    }
+
     $sysmod = "$SRCROOT/components/cam/bld/configure -s -fc_type $COMPILER -ccsm_seq -ice none " .
               " -ocn $ocn -comp_intf $comp $scm -spmd $spmd -smp $smp -dyn $CAM_DYCORE "          .
               " -res $ATM_GRID $nlev $CAM_LIB_DIRS $CAM_CONFIG_OPTS"                              ;

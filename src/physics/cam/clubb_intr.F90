@@ -61,7 +61,7 @@ module clubb_intr
       grid_type    = 3, &               ! The 2 option specifies stretched thermodynamic levels
       hydromet_dim = 0                  ! The hydromet array in SAM-CLUBB is currently 0 elements
    
-  real(r8), dimension(0) :: &
+  real(r8), parameter, dimension(0) :: &
       sclr_tol = 1.e-8_r8               ! Total water in kg/kg
 
   character(len=6), parameter :: &
@@ -71,10 +71,6 @@ module clubb_intr
       theta0   = 300._r8, &             ! Reference temperature                     [K]
       ts_nudge = 86400._r8, &           ! Time scale for u/v nudging (not used)     [s]
       p0_clubb = 100000._r8
-      
-  real(r8), parameter :: &
-      host_dx = 100000._r8, &           ! Host model deltax [m]
-      host_dy = 100000._r8              ! Host model deltay [m]
       
   integer, parameter :: & 
     sclr_dim = 0                        ! Higher-order scalars, set to zero
@@ -104,6 +100,7 @@ module clubb_intr
     
   logical            :: lq(pcnst)
   logical            :: lq2(pcnst)
+  logical            :: lqice(pcnst)
   logical            :: prog_modal_aero
   logical            :: do_rainturb
   logical            :: do_expldiff
@@ -509,7 +506,7 @@ end subroutine clubb_init_cnst
     integer :: ntop_eddy                        ! Top    interface level to which eddy vertical diffusion is applied ( = 1 )
     integer :: nbot_eddy                        ! Bottom interface level to which eddy vertical diffusion is applied ( = pver )
     integer :: nmodes, nspec, pmam_ncnst, m
-    integer :: ixnumliq
+    integer :: ixcldice, ixcldliq, ixnumliq, ixnumice
     integer :: lptr
 
     real(r8)  :: zt_g(pverp+1-top_lev)          ! Height dummy array
@@ -541,6 +538,11 @@ end subroutine clubb_init_cnst
     lq(1:pcnst) = .true.
     edsclr_dim  = pcnst
 
+    call cnst_get_ind('NUMICE',ixnumice)
+    call cnst_get_ind('NUMLIQ',ixnumliq)
+    call cnst_get_ind('CLDLIQ',ixcldliq)
+    call cnst_get_ind('CLDICE',ixcldice)
+
     if (prog_modal_aero) then
        ! Turn off modal aerosols and decrement edsclr_dim accordingly
        call rad_cnst_get_info(0, nmodes=nmodes)
@@ -561,11 +563,24 @@ end subroutine clubb_init_cnst
        !  In addition, if running with MAM, droplet number is transported
        !  in dropmixnuc, therefore we do NOT want CLUBB to apply transport
        !  tendencies to avoid double counted.  Else, we apply tendencies.
-       call cnst_get_ind('NUMLIQ',ixnumliq)
        lq(ixnumliq) = .false.
        edsclr_dim = edsclr_dim-1
     endif
 
+
+    if (micro_do_icesupersat) then
+       lq2(:)  = .FALSE.
+       lq2(1)  = .TRUE.
+       lq2(ixcldice) = .TRUE.
+       lq2(ixnumice) = .TRUE.
+    end if
+   
+    lqice(:)        = .false.
+    lqice(ixcldliq) = .true.
+    lqice(ixcldice) = .true.
+    lqice(ixnumliq) = .true.
+    lqice(ixnumice) = .true.
+    
     ! ----------------------------------------------------------------- !
     ! Set the debug level.  Level 2 has additional computational expense since
     ! it checks the array variables in CLUBB for invalid values.
@@ -713,6 +728,7 @@ end subroutine clubb_init_cnst
     call addfld ('DPDLFICE',         (/ 'lev' /),  'A', 'kg/kg/s',  'Detrained ice from deep convection')  
     call addfld ('DPDLFT',           (/ 'lev' /),  'A', 'K/s',      'T-tendency due to deep convective detrainment') 
     call addfld ('RELVAR',           (/ 'lev' /),  'A', '-',        'Relative cloud water variance')
+    call addfld ('CLUBB_GRID_SIZE',  horiz_only,   'A', 'm',        'Horizontal grid box size seen by CLUBB')
 
 
     call addfld ('CONCLD',           (/ 'lev' /),  'A', 'fraction', 'Convective cloud cover')
@@ -751,7 +767,7 @@ end subroutine clubb_init_cnst
        call add_default('UP2_CLUBB',        1, ' ')
        call add_default('VP2_CLUBB',        1, ' ')
     end if
-
+  
     if (history_clubb) then
 
        if (clubb_do_deep) then
@@ -964,7 +980,7 @@ end subroutine clubb_init_cnst
    integer :: itim_old
    integer :: ncol, lchnk                       ! # of columns, and chunk identifier
    integer :: err_code                          ! Diagnostic, for if some calculation goes amiss.
-   integer :: icnt, clubbtop
+   integer :: icnt, clubbtop  
    
    real(r8) :: frac_limit, ic_limit
 
@@ -1066,7 +1082,10 @@ end subroutine clubb_init_cnst
    real(r8) :: relvarmax
    real(r8) :: qmin
    real(r8) :: varmu(pcols)
-   real(r8) :: varmu2
+   real(r8) :: varmu2, se_upper_a, se_upper_b, se_upper_diss
+   real(r8) :: tw_upper_a, tw_upper_b, tw_upper_diss
+   real(r8) :: grid_dx(pcols), grid_dy(pcols)   ! CAM grid [m]
+   real(r8) :: host_dx, host_dy                 ! CAM grid [m]
    
    ! Variables below are needed to compute energy integrals for conservation
    real(r8) :: ke_a(pcols), ke_b(pcols), te_a(pcols), te_b(pcols)
@@ -1125,7 +1144,6 @@ end subroutine clubb_init_cnst
    
    integer                               :: time_elapsed                ! time keep track of stats          [s]
    real(r8), dimension(nparams)          :: clubb_params                ! These adjustable CLUBB parameters (C1, C2 ...)
-   real(r8), dimension(sclr_dim)         :: sclr_tol                    ! Tolerance on passive scalar       [units vary]
    type(pdf_parameter), dimension(pverp) :: pdf_params                  ! PDF parameters                    [units vary]
    character(len=200)                    :: temp1, sub                  ! Strings needed for CLUBB output
    logical                               :: l_Lscale_plume_centered, l_use_ice_latent
@@ -1179,7 +1197,6 @@ end subroutine clubb_init_cnst
    real(r8)  qvtend(pcols,pver)
    real(r8)  qitend(pcols,pver)
    real(r8)  initend(pcols,pver)
-   logical            :: lqice(pcnst)
    
    integer :: ixorg
 
@@ -1219,11 +1236,7 @@ end subroutine clubb_init_cnst
    call cnst_get_ind('NUMLIQ',ixnumliq)
    call cnst_get_ind('NUMICE',ixnumice)
 
- !  Initialize physics tendency arrays, copy the state to state1 array to use in this routine
-
-   if (.not. micro_do_icesupersat) then    
-     call physics_ptend_init(ptend_loc,state%psetcols, 'clubb', ls=.true., lu=.true., lv=.true., lq=lq)
-   endif
+ !  Copy the state to state1 array to use in this routine
 
    call physics_state_copy(state,state1)
 
@@ -1291,17 +1304,26 @@ end subroutine clubb_init_cnst
                            !  from moments since it has not been added yet 
    endif
 
+   ! Define the grid box size.  CLUBB needs this information to determine what
+   !  the maximum length scale should be.  This depends on the column for 
+   !  variable mesh grids and lat-lon grids
+   if (single_column) then
+     ! If single column specify grid box size to be something
+     !  similar to a GCM run
+     grid_dx(:) = 100000._r8
+     grid_dy(:) = 100000._r8
+   else
+     
+     call grid_size(state1, grid_dx, grid_dy)
+
+   endif
+
    if (micro_do_icesupersat) then
 
      ! -------------------------------------- !
      ! Ice Saturation Adjustment Computation  !
      ! -------------------------------------- !
 
-     lq2(:)  = .FALSE.
-     lq2(1)  = .TRUE.
-     lq2(ixcldice) = .TRUE.
-     lq2(ixnumice) = .TRUE.
-   
      latsub = latvap + latice
    
      call physics_ptend_init(ptend_loc, state%psetcols, 'iceadj', ls=.true., lq=lq2 )
@@ -1462,23 +1484,6 @@ end subroutine clubb_init_cnst
       vp2(1:ncol,pverp)=vp2(1:ncol,pver)
    endif
 
-   ! Compute integrals of static energy, kinetic energy, water vapor, and liquid water
-   ! for the computation of total energy before CLUBB is called.  This is for an 
-   ! effort to conserve energy since liquid water potential temperature (which CLUBB 
-   ! conserves) and static energy (which CAM conserves) are not exactly equal.   
-   se_b = 0._r8
-   ke_b = 0._r8
-   wv_b = 0._r8
-   wl_b = 0._r8
-   do k=1,pver
-     do i=1,ncol
-       se_b(i) = se_b(i) + state1%s(i,k)*state1%pdel(i,k)/gravit
-       ke_b(i) = ke_b(i) + 0.5_r8*(um(i,k)**2+vm(i,k)**2)*state1%pdel(i,k)/gravit
-       wv_b(i) = wv_b(i) + state1%q(i,k,ixq)*state1%pdel(i,k)/gravit
-       wl_b(i) = wl_b(i) + state1%q(i,k,ixcldliq)*state1%pdel(i,k)/gravit
-     enddo
-   enddo
-
    !  Compute virtual potential temperature, which is needed for CLUBB  
    do k=1,pver
      do i=1,ncol
@@ -1487,9 +1492,8 @@ end subroutine clubb_init_cnst
      enddo
    enddo
 
-   if (micro_do_icesupersat) then
-     call physics_ptend_init(ptend_loc,state%psetcols, 'clubb', ls=.true., lu=.true., lv=.true., lq=lq)
-   endif
+   !  Initialize physics tendencies
+   call physics_ptend_init(ptend_loc,state%psetcols, 'clubb', ls=.true., lu=.true., lv=.true., lq=lq)
 
    !  Loop over all columns in lchnk to advance CLUBB core
    do i=1,ncol   ! loop over columns
@@ -1522,6 +1526,10 @@ end subroutine clubb_init_cnst
 
       !  Set the elevation of the surface
       sfc_elevation = state1%zi(i,pver+1)
+      
+      !  Set the grid size
+      host_dx = grid_dx(i)
+      host_dy = grid_dy(i)
 
       !  Compute thermodynamic stuff needed for CLUBB on thermo levels.  
       !  Inputs for the momentum levels are set below setup_clubb core
@@ -1944,52 +1952,104 @@ end subroutine clubb_init_cnst
          end if
       enddo
 
-
       !  Fill up arrays needed for McICA.  Note we do not want the ghost point,
       !   thus why the second loop is needed.
      
       zi_out(i,1) = 0._r8
+
+      ! Section below is concentrated on energy fixing for conservation.
+      !   There are two steps to this process.  The first is to remove any tendencies
+      !   CLUBB may have produced above where it is active due to roundoff. 
+      !   The second is to provider a fixer because CLUBB and CAM's thermodynamic
+      !   variables are different.  
+
+      ! Limit the energy fixer to find highest layer where CLUBB is active 
+      ! Find first level where rtp2 is past a certain threshold or where
+      ! CLUBB has generated a cloud water mixing ratio greater than zero 
+      clubbtop = 1
+      do while ((rtp2(i,clubbtop) .le. 1.e-15_r8 .and. rcm(i,clubbtop) .eq. 0._r8) .and. clubbtop .lt. pver-1)
+         clubbtop = clubbtop + 1
+      enddo    
+      
+      ! Compute static energy using CLUBB's variables
+      do k=1,pver
+         clubb_s(k) = cpair*((thlm(i,k)+(latvap/cpair)*rcm(i,k))/exner_clubb(i,k))+ &
+                      gravit*state1%zm(i,k)+state1%phis(i)      
+      enddo      
+      
+      !  Compute integrals above layer where CLUBB is active
+      se_upper_a = 0._r8   ! energy in layers above where CLUBB is active AFTER CLUBB is called
+      se_upper_b = 0._r8   ! energy in layers above where CLUBB is active BEFORE CLUBB is called
+      tw_upper_a = 0._r8   ! total water in layers above where CLUBB is active AFTER CLUBB is called
+      tw_upper_b = 0._r8   ! total water in layers above where CLUBB is active BEFORE CLUBB is called
+      do k=1,clubbtop
+        se_upper_a = se_upper_a + (clubb_s(k)+0.5_r8*(um(i,k)**2+vm(i,k)**2)+(latvap+latice)* &
+	             (rtm(i,k)-rcm(i,k))+(latice)*rcm(i,k))*state1%pdel(i,k)/gravit
+	se_upper_b = se_upper_b + (state1%s(i,k)+0.5_r8*(state1%u(i,k)**2+state1%v(i,k)**2)+(latvap+latice)* &
+	             state1%q(i,k,ixq)+(latice)*state1%q(i,k,ixcldliq))*state1%pdel(i,k)/gravit
+	tw_upper_a = tw_upper_a + rtm(i,k)*state1%pdel(i,k)/gravit
+	tw_upper_b = tw_upper_b + (state1%q(i,k,ixq)+state1%q(i,k,ixcldliq))*state1%pdel(i,k)/gravit
+      enddo
+      
+      ! Compute the disbalance of total energy and water in upper levels,
+      !   divide by the thickness in the lower atmosphere where we will 
+      !   evenly distribute this disbalance
+      se_upper_diss = (se_upper_a - se_upper_b)/(state1%pint(i,pverp)-state1%pint(i,clubbtop+1))
+      tw_upper_diss = (tw_upper_a - tw_upper_b)/(state1%pint(i,pverp)-state1%pint(i,clubbtop+1))
+      
+      ! Apply the disbalances above to layers where CLUBB is active
+      do k=clubbtop+1,pver
+        clubb_s(k) = clubb_s(k) + se_upper_diss*gravit
+	rtm(i,k) = rtm(i,k) + tw_upper_diss*gravit
+      enddo
+      
+      ! Essentially "zero" out tendencies in the layers above where CLUBB is active
+      do k=1,clubbtop
+        clubb_s(k) = state1%s(i,k)
+	rcm(i,k) = state1%q(i,k,ixcldliq)
+	rtm(i,k) = state1%q(i,k,ixq) + rcm(i,k)
+      enddo           
      
       ! Compute integrals for static energy, kinetic energy, water vapor, and liquid water
-      ! after CLUBB is called.  This is for energy conservation purposes.
+      ! after CLUBB is called.  
       se_a = 0._r8
       ke_a = 0._r8
       wv_a = 0._r8
       wl_a = 0._r8
+      
+      ! Do the same as above, but for before CLUBB was called.
+      se_b = 0._r8
+      ke_b = 0._r8
+      wv_b = 0._r8
+      wl_b = 0._r8            
       do k=1,pver
-         clubb_s(k) = cpair*((thlm(i,k)+(latvap/cpair)*rcm(i,k))/exner_clubb(i,k))+ &
-                      gravit*state1%zm(i,k)+state1%phis(i)
          se_a(i) = se_a(i) + clubb_s(k)*state1%pdel(i,k)/gravit
          ke_a(i) = ke_a(i) + 0.5_r8*(um(i,k)**2+vm(i,k)**2)*state1%pdel(i,k)/gravit
          wv_a(i) = wv_a(i) + (rtm(i,k)-rcm(i,k))*state1%pdel(i,k)/gravit
          wl_a(i) = wl_a(i) + (rcm(i,k))*state1%pdel(i,k)/gravit
+	 
+         se_b(i) = se_b(i) + state1%s(i,k)*state1%pdel(i,k)/gravit
+         ke_b(i) = ke_b(i) + 0.5_r8*(state1%u(i,k)**2+state1%v(i,k)**2)*state1%pdel(i,k)/gravit
+         wv_b(i) = wv_b(i) + state1%q(i,k,ixq)*state1%pdel(i,k)/gravit
+         wl_b(i) = wl_b(i) + state1%q(i,k,ixcldliq)*state1%pdel(i,k)/gravit	 
       enddo
      
       ! Based on these integrals, compute the total energy before and after CLUBB call
-      do k=1,pver
-         te_a(i) = se_a(i) + ke_a(i) + (latvap+latice)*wv_a(i)+latice*wl_a(i)
-         te_b(i) = se_b(i) + ke_b(i) + (latvap+latice)*wv_b(i)+latice*wl_b(i)
-      enddo
-     
+      te_a(i) = se_a(i) + ke_a(i) + (latvap+latice)*wv_a(i)+latice*wl_a(i)
+      te_b(i) = se_b(i) + ke_b(i) + (latvap+latice)*wv_b(i)+latice*wl_b(i)
+      
       ! Take into account the surface fluxes of heat and moisture
-      te_b(i) = te_b(i)+(cam_in%shf(i)+(cam_in%lhf(i)/latvap)*(latvap+latice))*hdtime
-
-      ! Limit the energy fixer to find highest layer where CLUBB is active 
-      ! Find first level where wp2 is higher than lowest threshold
-      clubbtop = 1
-      do while (wp2(i,clubbtop) .eq. w_tol_sqd .and. clubbtop .lt. pver-1)
-         clubbtop = clubbtop + 1
-      enddo
+      te_b(i) = te_b(i)+(cam_in%shf(i)+(cam_in%lhf(i)/latvap)*(latvap+latice))*hdtime      
 
       ! Compute the disbalance of total energy, over depth where CLUBB is active
-      se_dis = (te_a(i) - te_b(i))/(state1%pint(i,pverp)-state1%pint(i,clubbtop))
+      se_dis = (te_a(i) - te_b(i))/(state1%pint(i,pverp)-state1%pint(i,clubbtop+1))
 
       ! Fix the total energy coming out of CLUBB so it achieves enery conservation.
       ! Apply this fixer throughout the column evenly, but only at layers where 
       ! CLUBB is active.
-      do k=clubbtop,pver
+      do k=clubbtop+1,pver
          clubb_s(k) = clubb_s(k) - se_dis*gravit
-      enddo    
+      enddo           
 
       !  Now compute the tendencies of CLUBB to CAM, note that pverp is the ghost point
       !  for all variables and therefore is never called in this loop
@@ -2054,6 +2114,7 @@ end subroutine clubb_init_cnst
          enddo
 
       enddo
+      
 
    enddo  ! end column loop
    
@@ -2111,12 +2172,6 @@ end subroutine clubb_init_cnst
    !  Initialize the shallow convective detrainment rate, will always be zero
    dlf2(:,:) = 0.0_r8
 
-   lqice(:)        = .false.
-   lqice(ixcldliq) = .true.
-   lqice(ixcldice) = .true.
-   lqice(ixnumliq) = .true.
-   lqice(ixnumice) = .true.
-    
    call physics_ptend_init(ptend_loc,state%psetcols, 'clubb', ls=.true., lq=lqice)
    
    do k=1,pver
@@ -2390,6 +2445,7 @@ end subroutine clubb_init_cnst
    call outfld( 'QT',               qt_output,               pcols, lchnk )
    call outfld( 'SL',               sl_output,               pcols, lchnk )
    call outfld( 'CONCLD',           concld,                  pcols, lchnk )
+   call outfld( 'CLUBB_GRID_SIZE',        grid_dx,                 pcols, lchnk )
 
    !  Output CLUBB history here
    if (l_stats) then 
@@ -3378,6 +3434,40 @@ end function diag_ustar
     return
 
   end subroutine stats_avg
+
+  subroutine grid_size(state, grid_dx, grid_dy)
+  ! Determine the size of the grid for each of the columns in state
+
+  use ppgrid,          only: pcols
+  use phys_grid,       only: get_area_p
+  use shr_const_mod,   only: shr_const_pi
+  use physics_types,   only: physics_state
+
+   
+  type(physics_state), intent(in) :: state
+  real(r8), intent(out)           :: grid_dx(pcols), grid_dy(pcols)   ! CAM grid [m]
+
+  real(r8), parameter :: earth_ellipsoid1 = 111132.92_r8 ! first coefficient, meters per degree longitude at equator
+  real(r8), parameter :: earth_ellipsoid2 = 559.82_r8 ! second expansion coefficient for WGS84 ellipsoid
+  real(r8), parameter :: earth_ellipsoid3 = 1.175_r8 ! third expansion coefficient for WGS84 ellipsoid
+
+  real(r8) :: mpdeglat, column_area, degree
+  integer  :: i
+
+  ! determine the column area in radians
+  do i=1,state%ncol
+      column_area = get_area_p(state%lchnk,i)
+      degree = sqrt(column_area)*(180._r8/shr_const_pi)
+       
+      ! Now find meters per degree latitude
+      ! Below equation finds distance between two points on an ellipsoid, derived from expansion
+      !  taking into account ellipsoid using World Geodetic System (WGS84) reference 
+      mpdeglat = earth_ellipsoid1 - earth_ellipsoid2 * cos(2._r8*state%lat(i)) + earth_ellipsoid3 * cos(4._r8*state%lat(i))
+      grid_dx(i) = mpdeglat * degree
+      grid_dy(i) = grid_dx(i) ! Assume these are the same
+  enddo   
+
+  end subroutine grid_size     
 
 #endif
   

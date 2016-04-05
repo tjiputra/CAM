@@ -8,7 +8,6 @@ module runtime_opts
 !-----------------------------------------------------------------------
 
 use shr_kind_mod,    only: r8=>shr_kind_r8
-use cam_abortutils,  only: endrun
 
 implicit none
 private
@@ -74,6 +73,7 @@ subroutine read_namelist(nlfilename, single_column, scmlat, scmlon)
    use prescribed_strataero,only: prescribed_strataero_readnl
    use aerodep_flx,         only: aerodep_flx_readnl
    use solar_data,          only: solar_data_readnl
+   use solar_euv_data,      only: solar_euv_data_readnl
    use tropopause,          only: tropopause_readnl
    use aoa_tracers,         only: aoa_tracers_readnl
    use prescribed_ozone,    only: prescribed_ozone_readnl
@@ -81,9 +81,6 @@ subroutine read_namelist(nlfilename, single_column, scmlat, scmlon)
    use prescribed_ghg,      only: prescribed_ghg_readnl
    use aircraft_emit,       only: aircraft_emit_readnl
    use cospsimulator_intr,  only: cospsimulator_intr_readnl
-   use sat_hist,            only: sat_hist_readnl
-   ! Needed by sat_hist_readnl
-   use cam_history,         only: hfilename_spec, mfilt, fincl, nhtfrq, avgflag_pertape
    use vertical_diffusion,  only: vd_readnl
    use rayleigh_friction,   only: rayleigh_friction_readnl
 
@@ -95,6 +92,8 @@ subroutine read_namelist(nlfilename, single_column, scmlat, scmlon)
    use offline_driver,      only: offline_driver_readnl
    use rate_diags,          only: rate_diags_readnl
    use tracers,             only: tracers_readnl
+
+   use dyn_comp,            only: dyn_readnl
 
    !---------------------------Arguments-----------------------------------
 
@@ -162,6 +161,7 @@ subroutine read_namelist(nlfilename, single_column, scmlat, scmlon)
    call prescribed_volcaero_readnl(nlfilename)
    call prescribed_strataero_readnl(nlfilename)
    call solar_data_readnl(nlfilename)
+   call solar_euv_data_readnl(nlfilename)
    call carma_readnl(nlfilename)
    call tropopause_readnl(nlfilename)
    call aoa_tracers_readnl(nlfilename)
@@ -173,7 +173,6 @@ subroutine read_namelist(nlfilename, single_column, scmlat, scmlon)
    call co2_cycle_readnl(nlfilename)
    call aircraft_emit_readnl(nlfilename)
    call cospsimulator_intr_readnl(nlfilename)
-   call sat_hist_readnl(nlfilename, hfilename_spec, mfilt, fincl, nhtfrq, avgflag_pertape)
    call diag_readnl(nlfilename)
    call check_energy_readnl(nlfilename)
    call radheat_readnl(nlfilename)
@@ -188,6 +187,8 @@ subroutine read_namelist(nlfilename, single_column, scmlat, scmlon)
    call offline_driver_readnl(nlfilename)
    call rate_diags_readnl(nlfilename)
    call scam_readnl(nlfilename, single_column, scmlat, scmlon)
+
+   call dyn_readnl(nlfilename)
 
 end subroutine read_namelist
 

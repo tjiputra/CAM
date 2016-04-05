@@ -519,7 +519,7 @@ module generate_lh_sample_module
 !   E-mail:      pjacklam@online.no
 !   URL:         http://home.online.no/~pjacklam
 !-----------------------------------------------------------------------
-
+    
     use clubb_precision, only: &
       dp ! double precision
 
@@ -533,6 +533,14 @@ module generate_lh_sample_module
 
     use anl_erf, only: &
       dp_erfc               ! Procedure
+
+#ifdef CLUBB_CAM
+    use shr_infnan_mod, only: &
+      nan => shr_infnan_nan, &
+      infp => shr_infnan_posinf, &
+      infn => shr_infnan_neginf, &
+      assignment(=)
+#endif
 
     implicit none
 
@@ -617,24 +625,47 @@ module generate_lh_sample_module
                   /((((d1*q+d2)*q+d3)*q+d4)*q+1._dp)
     end if
 
+#ifdef CLUBB_CAM
+
+! Case when P = 1:, z=+inf
+    if(p == 1._dp)then
+       z = infp
+    end if
+
+!  Case when P = 0: z = -inf
+    if (p == 0._dp) then
+       z = infn
+    end if
+
+
+!  Cases when output will be NaN:
+!   k = p < 0 | p > 1 | isnan(p);
+    if (p < 0._dp .or. p > 1._dp) then
+       z = nan
+    end if
+
+#else
+
 !  Case when P = 0: z = -inf, to create inf z =-1.0.
 !     to create NaN's inf*inf.
     z1 = 0._dp
     if (p == 0._dp) then
-      z = (-1._dp)/z1
+       z = (-1._dp)/z1
     end if
 
 ! Case when P = 1:, z=inf
     if(p == 1._dp)then
-      z = 1._dp/z1
+       z = 1._dp/z1
     end if
 
 !  Cases when output will be NaN:
 !   k = p < 0 | p > 1 | isnan(p);
 ! usually inf*inf --> NaN's.
     if (p < 0._dp .or. p > 1._dp) then
-      z = (1._dp/z1)**2
+       z = (1._dp/z1)**2
     end if
+
+#endif
 
 !  The relative error of the approximation has absolute value less
 !  than 1.15e-9. One iteration of Halley's rational method (third

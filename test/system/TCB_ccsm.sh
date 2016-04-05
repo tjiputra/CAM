@@ -76,14 +76,14 @@ else
 fi
 
 cd ${CAM_TESTDIR}/case.$1.$2
-echo "./xmlchange -file env_build.xml -id EXEROOT -val ${CAM_TESTDIR}/case.$1.$2/bld -silent"
-./xmlchange -file env_build.xml -id EXEROOT -val ${CAM_TESTDIR}/case.$1.$2/bld -silent
+echo "./xmlchange -file env_build.xml -id EXEROOT -val ${CAM_TESTDIR}/case.$1.$2/bld"
+./xmlchange -file env_build.xml -id EXEROOT -val ${CAM_TESTDIR}/case.$1.$2/bld
 
-echo "./xmlchange -file env_run.xml -id RUNDIR -val ${CAM_TESTDIR}/case.$1.$2/run -silent"
-./xmlchange -file env_run.xml -id RUNDIR -val ${CAM_TESTDIR}/case.$1.$2/run -silent
+echo "./xmlchange -file env_run.xml -id RUNDIR -val ${CAM_TESTDIR}/case.$1.$2/run"
+./xmlchange -file env_run.xml -id RUNDIR -val ${CAM_TESTDIR}/case.$1.$2/run
 
-echo "./xmlchange -file env_run.xml -id RUN_WITH_SUBMIT -val TRUE  -silent"
-./xmlchange -file env_run.xml -id RUN_WITH_SUBMIT -val TRUE  -silent
+echo "./xmlchange -file env_run.xml -id RUN_WITH_SUBMIT -val TRUE"
+./xmlchange -file env_run.xml -id RUN_WITH_SUBMIT -val TRUE
 
 # chemistry preprocessor
 if [ $usrmech != $2 ]; then
@@ -108,8 +108,8 @@ for comp in ATM LND ICE OCN CPL GLC ROF WAV; do
 done
 
 
-echo "./case_setup"
-./case_setup >> ${CAM_TESTDIR}/${test_name}/test.log 2>&1
+echo "./case.setup"
+./case.setup >> ${CAM_TESTDIR}/${test_name}/test.log 2>&1
 rc=$?
 if [ $rc -eq 0 ]; then
     echo "TCB_ccsm.sh: CESM configure was successful" 

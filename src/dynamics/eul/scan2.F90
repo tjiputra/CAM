@@ -63,7 +63,6 @@ subroutine scan2run (ztodt, cwava, etamid,t2      ,fu      ,fv    )
                            qminus, div, n3, n3m1, n3m2, phis, omga,   &
                            shift_time_indices, hadv, pdeld
    use comspe,       only: maxm
-   use rgrid,        only: nlon
    use scanslt,      only: hw1lat, engy1lat, qfcst
 #ifdef SPMD
    use mpishorthand, only: mpicom, mpir8
@@ -254,7 +253,7 @@ subroutine scan2run (ztodt, cwava, etamid,t2      ,fu      ,fv    )
 !$OMP PARALLEL DO PRIVATE (LAT)
 #endif
    do lat=beglat,endlat
-      call spegrd_aft (ztodt, lat, nlon(lat), nlon_fft_out, &
+      call spegrd_aft (ztodt, lat, plon, nlon_fft_out, &
                    cwava(lat), qfcst(1,1,1,lat), etamid, ps(1,lat,n3), &
                    u3(1,1,lat,n3), v3(1,1,lat,n3), t3(1,1,lat,n3), &
                    qminus(1,1,1,lat), vort(1,1,lat,n3), div(1,1,lat,n3), hw2al(1,lat), hw2bl(1,lat), &
@@ -295,7 +294,7 @@ else
                       qminus(1,1,1,j), hw2al(1,lat), hw2bl(1,lat), &
                       hw3al(1,lat), hw3bl(1,lat), hwxal(1,1,lat), &
                       hwxbl(1,1,lat), &
-                      nlon(lat)) 
+                      plon) 
 
    end do
 
@@ -449,7 +448,7 @@ endif ! if not SCAM
                              u3(1,1,lat,n3m2), &
                           v3(1,1,lat,n3m2), t3(1,1,lat,n3m2), q3(1,1,1,lat,n3m2), vort(1,1,lat,n3m1), &
                              div(1,1,lat,n3m1), &
-                          omga(1,1,lat), dpsl(1,lat), dpsm(1,lat), beta, hadv(1,1,1,lat) ,nlon(lat), &
+                          omga(1,1,lat), dpsl(1,lat), dpsm(1,lat), beta, hadv(1,1,1,lat) ,plon, &
                           pdeld(:,:,lat,n3), pdeld(:,:,lat,n3m1), pdeld(:,:,lat,n3m2))
                           
    end do

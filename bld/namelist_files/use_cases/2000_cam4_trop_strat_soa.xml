@@ -6,8 +6,6 @@
 <ncdata dyn="fv" hgrid="1.9x2.5">atm/cam/chem/ic/f2000.e12_rel07_chem.C4SSOA_L26.f19.f19.relv1.cam.i.0011-01-01-00000_c140430.nc</ncdata>
 <ncdata dyn="fv" hgrid="4x5"    >atm/cam/chem/ic/f2000.e12_rel07_chem.C4SSOA_L26.4x5.relv1.cam.i.0011-01-01-00000_c140430.nc</ncdata>
 
-<dust_emis_fact>0.4D0</dust_emis_fact>
-
 <!-- turn on clm MEGAN VOC emis -->
 <megan_specifier>
   'ISOP = isoprene',

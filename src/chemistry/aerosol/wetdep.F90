@@ -660,7 +660,7 @@ end subroutine wetdepa_v2
          p(pcols,pver),        &! pressure
          q(pcols,pver),        &! moisture
          pdel(pcols,pver),     &! pressure thikness
-         cldt(pcols,pver),    &! total cloud fraction
+         cldt(pcols,pver),     &! total cloud fraction
          cldc(pcols,pver),     &! convective cloud fraction
          cmfdqr(pcols,pver),   &! rate of production of convective precip
          conicw(pcols,pver),   &! convective cloud water

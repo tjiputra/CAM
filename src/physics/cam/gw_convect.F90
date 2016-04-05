@@ -50,7 +50,8 @@ subroutine gw_beres_src(ncol, band, desc, u, v, &
 !
 !-----------------------------------------------------------------------
   use gw_utils, only: get_unit_vector, dot_2d, midpoint_interp
-  use gw_common, only: GWBand, pver
+  use gw_common, only: GWBand, pver, qbo_hdepth_scaling
+
 !------------------------------Arguments--------------------------------
   ! Column dimension.
   integer, intent(in) :: ncol
@@ -184,6 +185,9 @@ subroutine gw_beres_src(ncol, band, desc, u, v, &
 
   ! Heating depth in m.
   hdepth = [ ( (zm(i,topi(i))-zm(i,boti(i))), i = 1, ncol ) ]
+
+  ! J. Richter: this is an effective reduction of the GW phase speeds (needed to drive the QBO)
+  hdepth = hdepth*qbo_hdepth_scaling
 
   hd_idx = index_of_nearest(hdepth, desc%hd)
 

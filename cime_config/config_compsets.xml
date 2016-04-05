@@ -105,6 +105,10 @@
     <lname>2000_CAM5%CLB_CLM40%SP_CICE%PRES_DOCN%DOM_RTM_SGLC_SWAV</lname>
   </compset>
   <compset>
+    <alias>FC55CLUBB</alias>        
+    <lname>2000_CAM55%CLB_CLM45%SP_CICE%PRES_DOCN%DOM_RTM_SGLC_SWAV</lname>
+  </compset>
+  <compset>
     <alias>F1850C5PM</alias>       
     <lname>1850_CAM5%PM_CLM40%SP_CICE%PRES_DOCN%DOM_RTM_SGLC_SWAV</lname>
   </compset>
@@ -130,7 +134,7 @@
   </compset>
   <compset>
     <alias>FW5SC</alias>           
-    <lname>2000_CAM5%WCSC_CLM40%SP_CICE%PRES_DOCN%DOM_RTM_SGLC_SWAV</lname>
+    <lname>2000_CAM5%WCSCM3_CLM40%SP_CICE%PRES_DOCN%DOM_RTM_SGLC_SWAV</lname>
   </compset>
   <compset>
     <alias>FWX</alias>             
@@ -187,6 +191,10 @@
   <compset>
     <alias>F55WCN</alias>          
     <lname>5505_CAM4%WCCM_CLM40%CN_CICE%PRES_DOCN%DOM_RTM_SGLC_SWAV</lname>
+  </compset>
+  <compset>
+    <alias>F55W5SC</alias>          
+    <lname>5505_CAM5%WCSCM3_CLM40%SP_CICE%PRES_DOCN%DOM_RTM_SGLC_SWAV</lname>
   </compset>
   <compset>
     <alias>FSDW</alias>            
@@ -270,6 +278,10 @@
     <alias>FADIAB</alias>   
     <lname>2000_CAM%ADIAB_SLND_SICE_SOCN_SROF_SGLC_SWAV</lname>
   </compset>
+  <compset>
+    <alias>FDABIP04</alias>   
+    <lname>2000_CAM%DABIP04_SLND_SICE_SOCN_SROF_SGLC_SWAV</lname>
+  </compset>
 
   <compset>
    <alias>NFPTAERO</alias>
@@ -326,6 +338,7 @@
 	<value  compset="FRC1_CAM5%WTSM"   >1987-01-01</value>
 	<value  compset="FRC1_CAM"         >1950-01-01</value>
 	<value  compset="SDC1_CAM"         >1979-01-01</value>
+	<value  compset="5505_CAM5%WCSCM3" >1979-01-01</value>
 	<value  compset="5505_CAM[45]"     >1955-01-01</value> 
 	<value  compset="2000_CAM[45]%WCMX">2000-01-01</value>
 	<value  compset="2000_CAM[45]%WCXI">2000-01-01</value>
@@ -344,7 +357,7 @@
 
     <entry id="CALENDAR"> 
       <values>
-	<value  compset="GEOS_">GREGORIAN</value>
+	<value  compset="GEOS_|SDC1_">GREGORIAN</value>
       </values>
     </entry>
 

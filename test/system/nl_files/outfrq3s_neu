@@ -8,5 +8,4 @@
  inithist='ENDOFRUN'
  pbuf_global_allocate=.false.
  gas_wetdep_method = 'NEU'
- nsplit = 8
 /

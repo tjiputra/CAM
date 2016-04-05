@@ -3,6 +3,7 @@
 
       use shr_kind_mod,      only : r8 => shr_kind_r8
       use cam_logfile,       only : iulog
+      use physics_buffer,    only : pbuf_get_index, pbuf_get_field
 
       implicit none
 
@@ -22,6 +23,7 @@
 
       integer :: id_co2, id_o2, id_o3, id_o2_1d, id_o2_1s, id_o1d, id_h2o, id_o, id_h
       logical :: has_hrates
+      integer :: ele_temp_ndx, ion_temp_ndx
 
       contains
    
@@ -34,7 +36,7 @@
 
         implicit none
 
-        integer :: ids(9)
+        integer :: ids(9), err
         character(len=128) :: attr  ! netcdf variable attribute
 
         id_co2   = get_spc_ndx( 'CO2' )
@@ -80,6 +82,9 @@
         attr = 'total jo2 euv photolysis rate'
         call addfld( 'JO2_EUV',    (/ 'lev' /), 'I', '/s', trim(attr) )
 
+        ele_temp_ndx = pbuf_get_index('ElecTemp',errcode=err)! electron temperature index 
+        ion_temp_ndx = pbuf_get_index('IonTemp',errcode=err) ! ion temperature index
+
       end subroutine init_hrates
 
       subroutine waccm_hrates(ncol, state, asdir, bot_mlt_lev, qrs_tot, pbuf )
@@ -119,12 +124,13 @@
       use physics_buffer,    only : physics_buffer_desc
       use phys_control,      only : waccmx_is
       use orbit,             only : zenith
+      use time_manager,      only : is_first_step
 
 !-----------------------------------------------------------------------
 !        ... dummy arguments
 !-----------------------------------------------------------------------
       integer,             intent(in)  ::  ncol                  ! number columns in chunk
-      type(physics_state), intent(in)  ::  state                 ! physics state structure
+      type(physics_state),target, intent(in)  ::  state                 ! physics state structure
       real(r8),            intent(in)  ::  asdir(pcols)          ! shortwave, direct albedo
       integer,             intent(in)  ::  bot_mlt_lev           ! lowest model level where MLT heating is needed
       real(r8),            intent(out) ::  qrs_tot(pcols,pver)   ! total heating (K/s)
@@ -193,6 +199,17 @@
       real(r8)     ::  calday                                        ! day of year
       real(r8)     ::  delta                                         ! solar declination (radians)
       logical      ::  do_diag
+
+      real(r8), pointer :: ele_temp_fld(:,:) ! electron temperature pointer
+      real(r8), pointer :: ion_temp_fld(:,:) ! ion temperature pointer
+
+      if ( ele_temp_ndx>0 .and. ion_temp_ndx>0 .and. .not.is_first_step()) then
+         call pbuf_get_field(pbuf, ele_temp_ndx, ele_temp_fld)
+         call pbuf_get_field(pbuf, ion_temp_ndx, ion_temp_fld)
+      else
+         ele_temp_fld => state%t
+         ion_temp_fld => state%t
+      endif
 
       qrs_tot(:ncol,:) = 0._r8
       if (.not. has_hrates) return
@@ -292,7 +309,7 @@
          end do
       end do
       call setrxt_hrates( reaction_rates, state%t, invariants(1,1,indexm), ncol, kbot_hrates )
-      call usrrxt_hrates( reaction_rates, state%t, state%t, state%t, invariants, &
+      call usrrxt_hrates( reaction_rates, state%t, ele_temp_fld, ion_temp_fld, invariants, &
                           h2ovmr, state%pmid, invariants(:,:,indexm), ncol, kbot_hrates )
       call adjrxt( reaction_rates, invariants, invariants(1,1,indexm), ncol )
       

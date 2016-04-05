@@ -33,7 +33,6 @@
       use shr_kind_mod, only: r8 => shr_kind_r8
       use pmgrid
       use pspect
-      use rgrid
       use comspe
       use commap
       use physconst, only: rearth

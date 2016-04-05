@@ -19,6 +19,7 @@ public :: GWBand
 public :: gw_common_init
 public :: gw_prof
 public :: gw_drag_prof
+public :: qbo_hdepth_scaling
 public :: calc_taucd, momentum_flux, momentum_fixer
 public :: energy_change, energy_fixer
 public :: coriolis_speed, adjust_inertial
@@ -40,6 +41,9 @@ integer, parameter :: west = 1
 integer, parameter :: east = 2
 integer, parameter :: south = 3
 integer, parameter :: north = 4
+
+! Scaling factor for generating QBO
+real(r8), protected :: qbo_hdepth_scaling
 
 ! 3.14159...
 real(r8), parameter :: pi = acos(-1._r8)
@@ -65,6 +69,15 @@ real(r8) :: rog = huge(1._r8)
 
 ! Newtonian cooling coefficients.
 real(r8), allocatable :: alpha(:)
+
+! Inverse Prandtl number.
+real(r8) :: prndl
+
+! Whether to limit tau without applying the efficiency factor first.
+logical :: limit_tau_without_eff
+
+! Whether to apply tendency max
+logical :: apply_tndmax
 
 !
 ! Limits to keep values reasonable.
@@ -140,7 +153,9 @@ end function new_GWBand
 !==========================================================================
 
 subroutine gw_common_init(pver_in, &
-     tau_0_ubc_in, ktop_in, gravit_in, rair_in, alpha_in, errstring)
+     tau_0_ubc_in, ktop_in, gravit_in, rair_in, alpha_in, &
+     limit_tau_without_eff_in, apply_tndmax_in, prndl_in, &
+     qbo_hdepth_scaling_in, errstring)
 
   integer,  intent(in) :: pver_in
   logical,  intent(in) :: tau_0_ubc_in
@@ -148,6 +163,10 @@ subroutine gw_common_init(pver_in, &
   real(r8), intent(in) :: gravit_in
   real(r8), intent(in) :: rair_in
   real(r8), intent(in) :: alpha_in(:)
+  logical,  intent(in) :: limit_tau_without_eff_in
+  logical,  intent(in) :: apply_tndmax_in
+  real(r8), intent(in) :: prndl_in
+  real(r8), intent(in) :: qbo_hdepth_scaling_in
   ! Report any errors from this routine.
   character(len=*), intent(out) :: errstring
 
@@ -163,6 +182,10 @@ subroutine gw_common_init(pver_in, &
   allocate(alpha(pver+1), stat=ierr, errmsg=errstring)
   if (ierr /= 0) return
   alpha = alpha_in
+  limit_tau_without_eff = limit_tau_without_eff_in
+  apply_tndmax = apply_tndmax_in
+  prndl = prndl_in
+  qbo_hdepth_scaling = qbo_hdepth_scaling_in
 
   rog = rair/gravit
 
@@ -452,13 +475,15 @@ subroutine gw_drag_prof(ncol, band, p, src_level, tend_level, dt, &
   if (tau_0_ubc) tau(:,:,ktop) = 0._r8
 
   ! Apply efficiency to completed stress profile.
-  do k = ktop, kbot_tend+1
-     do l = -band%ngwv, band%ngwv
-        where (k-1 <= tend_level)
-           tau(:,l,k) = tau(:,l,k) * effgw
-        end where
+  if (.not. limit_tau_without_eff) then
+     do k = ktop, kbot_tend+1
+        do l = -band%ngwv, band%ngwv
+           where (k-1 <= tend_level)
+              tau(:,l,k) = tau(:,l,k) * effgw
+           end where
+        end do
      end do
-  end do
+  end if
 
   !------------------------------------------------------------------------
   ! Compute the tendencies from the stress divergence.
@@ -483,6 +508,11 @@ subroutine gw_drag_prof(ncol, band, p, src_level, tend_level, dt, &
         ! near reversing c-u.
         ubtl = min(ubtl, umcfac * abs(c(:,l)-ubm(:,k)) / dt)
 
+        if ( .not. apply_tndmax ) then
+           ! Apply tndmax to the total ubt (sum from all waves). 
+           ubtl = min(ubtl, tndmax)
+        endif
+
         where (k <= tend_level)
 
            ! Save tendency for each wave (for later computation of kzz):
@@ -493,20 +523,22 @@ subroutine gw_drag_prof(ncol, band, p, src_level, tend_level, dt, &
 
      end do
 
-     ! Apply second tendency limit to maintain numerical stability.
-     ! Enforce du/dt < tndmax so that ridicuously large tendencies are not
-     ! permitted.
-     ! This can only happen above tend_level, so don't bother checking the
-     ! level explicitly.
-     where (abs(ubt(:,k)) > tndmax)
-        ubt_lim_ratio = tndmax/abs(ubt(:,k))
-        ubt(:,k) = ubt_lim_ratio * ubt(:,k)
-     elsewhere
-        ubt_lim_ratio = 1._r8
-     end where
+     if (apply_tndmax) then
+        ! Apply second tendency limit to maintain numerical stability.
+        ! Enforce du/dt < tndmax so that ridicuously large tendencies are not
+        ! permitted.
+        ! This can only happen above tend_level, so don't bother checking the
+        ! level explicitly.
+        where (abs(ubt(:,k)) > tndmax)
+           ubt_lim_ratio = tndmax/abs(ubt(:,k))
+           ubt(:,k) = ubt_lim_ratio * ubt(:,k)
+        elsewhere
+           ubt_lim_ratio = 1._r8
+        end where
+     endif
 
      do l = -band%ngwv, band%ngwv
-        gwut(:,k,l) = ubt_lim_ratio*gwut(:,k,l)
+        if (apply_tndmax) gwut(:,k,l) = ubt_lim_ratio*gwut(:,k,l)
         ! Redetermine the effective stress on the interface below from the
         ! wind tendency. If the wind tendency was limited above, then the
         ! new stress will be smaller than the old stress, causing stress
@@ -527,10 +559,29 @@ subroutine gw_drag_prof(ncol, band, p, src_level, tend_level, dt, &
      ! End of level loop.
   end do
 
+  ! If we limited tau without applying the efficiency factor, apply that
+  ! factor now to tau and the outputs of the above loop.
+  if (limit_tau_without_eff) then
+     do k = ktop, kbot_tend+1
+        do l = -band%ngwv, band%ngwv
+           where (k-1 <= tend_level)
+              tau(:,l,k) = tau(:,l,k) * effgw
+           end where
+        end do
+     end do
+     do k = ktop, kbot_tend
+        do l = -band%ngwv, band%ngwv
+           gwut(:,k,l) = gwut(:,k,l) * effgw
+        end do
+        utgw(:,k) = utgw(:,k) * effgw
+        vtgw(:,k) = vtgw(:,k) * effgw
+     end do
+  end if
+
   ! Calculate effective diffusivity and LU decomposition for the
   ! vertical diffusion solver.
   call gw_ediff (ncol, pver, band%ngwv, kbot_tend, ktop, tend_level, &
-       gwut, ubm, nm, rhoi, dt, gravit, p, c, &
+       gwut, ubm, nm, rhoi, dt, prndl, gravit, p, c, &
        egwdffi, decomp, ro_adjust=ro_adjust)
 
   ! Calculate tendency on each constituent.
@@ -704,7 +755,7 @@ subroutine momentum_fixer(tend_level, p, um_flux, vm_flux, utgw, vtgw)
         vtgw(:,k) = vtgw(:,k) + dv
      end where
   end do
-  
+
 end subroutine momentum_fixer
 
 !==========================================================================

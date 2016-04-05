@@ -6,7 +6,6 @@ module dp_coupling
 
    use shr_kind_mod,      only: r8 => shr_kind_r8
    use ppgrid,            only: pcols, pver
-   use rgrid,             only: nlon
    use pmgrid
    
    use phys_grid
@@ -150,7 +149,7 @@ CONTAINS
           call block_to_chunk_send_pters(j,plon,plev+1,tsize,bpter)
 
 !DIR$ CONCURRENT
-          do i=1,nlon(j)
+          do i=1, plon
 
              buf1(bpter(i,0))   = ps  (i,j)
              buf1(bpter(i,0)+1) = phis(i,j)
@@ -429,7 +428,7 @@ CONTAINS
 
           call chunk_to_block_recv_pters(j,plon,plev+1,tsize,bpter)
 
-          do i=1,nlon(j)
+          do i=1, plon
 
              flx_net(i,j) = buf1(bpter(i,0))
 

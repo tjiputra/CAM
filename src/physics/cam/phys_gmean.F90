@@ -262,7 +262,6 @@ module phys_gmean
 ! 
 !-----------------------------------------------------------------------
 
-      use rgrid,        only: nlon
       use dycore,       only: dycore_is
       use phys_grid,    only: gather_chunk_to_field
       use dyn_grid,     only: get_horiz_grid_dim_d, get_horiz_grid_d, get_dyn_grid_parm_real1d
@@ -334,7 +333,7 @@ module phys_gmean
                   do i=1,hdim1
                      zmean = zmean + arr_field(i,j,ifld)
                   end do
-                  tmean = tmean + zmean * 0.5_r8*w(j)/nlon(j)
+                  tmean = tmean + zmean * 0.5_r8*w(j)/hdim1
                end do
                arr_gmean(ifld) = tmean
             end do

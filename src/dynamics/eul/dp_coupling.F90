@@ -6,7 +6,6 @@ module dp_coupling
 
    use shr_kind_mod,      only: r8 => shr_kind_r8
    use ppgrid,            only: pcols, pver
-   use rgrid,             only: nlon
    use pmgrid,            only: plev, beglat, endlat, plon
    
    use phys_grid
@@ -159,7 +158,7 @@ CONTAINS
 
           call block_to_chunk_send_pters(j,plon,plev+1,tsize,bpter)
 
-          do i=1,nlon(j)
+          do i=1,plon
              buf1(bpter(i,0))   = ps  (i,j)
              buf1(bpter(i,0)+1) = phis(i,j)
           end do
@@ -167,7 +166,7 @@ CONTAINS
 !$OMP PARALLEL DO PRIVATE (K, I, M)
           do k=1,plev
 
-             do i=1,nlon(j)
+             do i=1,plon
 
                 buf1(bpter(i,k))   = t3  (i,k,j)
                 buf1(bpter(i,k)+1) = u3  (i,k,j)
@@ -444,14 +443,14 @@ CONTAINS
 
           call chunk_to_block_recv_pters(j,plon,plev+1,tsize,bpter)
 
-          do i=1,nlon(j)
+          do i=1,plon
              flx_net(i,j) = buf1(bpter(i,0))
           end do
 
 !$OMP PARALLEL DO PRIVATE (K, I, M)
           do k=1,plev
 
-             do i=1,nlon(j)
+             do i=1,plon
 
                 t2(i,k,j) = buf1(bpter(i,k))
                 fu(i,k,j) = buf1(bpter(i,k)+1)

@@ -20,7 +20,7 @@ contains
 !==========================================================================
 
 subroutine gw_ediff(ncol, pver, ngwv, kbot, ktop, tend_level, &
-     gwut, ubm, nm, rho, dt, gravit, p, c, &
+     gwut, ubm, nm, rho, dt, prndl, gravit, p, c, &
      egwdffi, decomp, ro_adjust)
 !
 ! Calculate effective diffusivity associated with GW forcing.
@@ -50,6 +50,8 @@ subroutine gw_ediff(ncol, pver, ngwv, kbot, ktop, tend_level, &
   real(r8), intent(in) :: rho(ncol,pver+1)
   ! Time step.
   real(r8), intent(in) :: dt
+  ! Inverse Prandtl number.
+  real(r8), intent(in) :: prndl
   ! Acceleration due to gravity.
   real(r8), intent(in) :: gravit
   ! Pressure coordinates.
@@ -77,8 +79,7 @@ subroutine gw_ediff(ncol, pver, ngwv, kbot, ktop, tend_level, &
   real(r8) :: dpidz_sq(ncol,pver+1)
   ! Level and wave indices.
   integer :: k, l
-  ! Inverse Prandtl number.
-  real(r8), parameter :: prndl=0.25_r8
+
   ! Density scale height.
   real(r8), parameter :: dscale=7000._r8
 
@@ -94,9 +95,9 @@ subroutine gw_ediff(ncol, pver, ngwv, kbot, ktop, tend_level, &
         egwdff_lev = &
              prndl * 0.5_r8 * gwut(:,k,l) * (c(:,l)-ubm(:,k)) / nm(:,k)**2
 
-        ! IGWs have a different Prandtl number, and need ro_adjust factor.
+        ! IGWs need ro_adjust factor.
         if (present(ro_adjust)) then
-           egwdff_lev = egwdff_lev * 4._r8 * ro_adjust(:,l,k)**2
+           egwdff_lev = egwdff_lev * ro_adjust(:,l,k)**2
         end if
 
         egwdffm(:,k) = egwdffm(:,k) + egwdff_lev

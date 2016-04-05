@@ -76,7 +76,6 @@ contains
     use spmd_utils,      only: masterproc, iam
     use pspect
     use comspe
-    use rgrid,           only: nlon, beglatpair, wnummax, nmmax, fullgrid
     use scanslt,         only: nlonex, platd, j1
     use gauaw_mod,       only: gauaw
     use commap,          only: sq, rsq, slat, w, cs, href, ecref, clat, clon, &
@@ -247,16 +246,6 @@ contains
     if (masterproc) then
       write(iulog,9950) ptrm,ptrn,ptrk
     end if
-    !
-    ! Determine whether full or reduced grid
-    !
-    fullgrid = .true.
-    do j=1,plat
-      if (masterproc) then
-        write(iulog,*)'nlon(',j,')=',nlon(j),' wnummax(',j,')=',wnummax(j)
-      end if
-      if (nlon(j).lt.plon) fullgrid = .false.
-    end do
 
     if ( single_column ) then
       do j=1,plat
@@ -278,12 +267,6 @@ contains
       latdeg(1) = clat(1)*45._r8/atan(1._r8)
       clon(1,1)   = 4.0_r8*atan(1._r8)*mod((scmlon+360._r8),360._r8)/180._r8
       londeg(1,1) = mod((scmlon+360._r8),360._r8)
-      !
-      ! SCAM not yet able to handle reduced grid.
-      !
-      if (.not. fullgrid) then
-        call endrun ('INITGRID: SCAM not yet configured to handle reduced grid')
-      end if
     else
       !
       ! Compute constants related to Legendre transforms
@@ -318,25 +301,25 @@ contains
       !
       lat = 1
       do j=j1-2,1,-1
-        nlonex(j) = nlon(lat)
+        nlonex(j) = plon
         lat = lat + 1
       end do
-      nlonex(j1-1) = nlon(1)     ! south pole
+      nlonex(j1-1) = plon     ! south pole
       !
       ! Real latitudes
       !
       j = j1
       do lat=1,plat
-        nlonex(j) = nlon(lat)
+        nlonex(j) = plon
         j = j + 1
       end do
-      nlonex(j1+plat) = nlon(plat)  ! north pole
+      nlonex(j1+plat) = plon  ! north pole
       !
       ! Mirror latitudes north of north pole
       !
       lat = plat
       do j=j1+plat+1,platd
-        nlonex(j) = nlon(lat)
+        nlonex(j) = plon
         lat = lat - 1
       end do
       !
@@ -344,36 +327,18 @@ contains
       !
       pi = 4.0_r8*atan(1.0_r8)
       do lat=1,plat
-        do i=1,nlon(lat)
-          londeg(i,lat) = (i-1)*360._r8/nlon(lat)
-          clon(i,lat)   = (i-1)*2.0_r8*pi/nlon(lat)
+        do i=1, plon
+          londeg(i,lat) = (i-1)*360._r8/plon
+          clon(i,lat)   = (i-1)*2.0_r8*pi/plon
         end do
       end do
 
-      do j=1,plat/2
-        nmmax(j) = wnummax(j) + 1
-      end do
-      do m=1,pmmax
-        do irow=1,plat/2
-          if (nmmax(irow) .ge. m) then
-            beglatpair(m) = irow
-            goto 10
-          end if
-        end do
-        call endrun ('INITGRID: Should not ever get here')
-10      continue
-      end do
       !
       ! Set up trigonometric tables for fft
       !
       do j=1,plat
-        call set99(trig(1,j),ifax(1,j),nlon(j))
+        call set99(trig(1,j),ifax(1,j), plon)
       end do
-      !
-      ! Set flag indicating dynamics grid is now defined.
-      ! NOTE: this ASSUMES initgrid is called after spmdinit.  The setting of nlon done here completes
-      ! the definition of the dynamics grid.
-      !
     endif
 
     return
@@ -722,7 +687,6 @@ contains
 ! 
 !-----------------------------------------------------------------------
    use pmgrid,        only: plat, plon
-   use rgrid,         only: nlon
    use commap,        only: clat, clon, londeg, latdeg, w
    use physconst,     only: pi, spval
    implicit none
@@ -751,7 +715,7 @@ contains
        if(size == ngcols_d) then
           n = 0
           do j = 1,plat
-             do i = 1,nlon(j)
+             do i = 1, plon
                 n = n + 1
                 clon_d_out(n) = clon(i,j)
              end do
@@ -768,7 +732,7 @@ contains
        if(size == ngcols_d) then
           n = 0
           do j = 1,plat
-             do i = 1,nlon(j)
+             do i = 1, plon
                 n = n + 1
                 clat_d_out(n) = clat(j)
              end do
@@ -784,13 +748,13 @@ contains
     if ( ( present(wght_d_out) ) ) then
 
        if(size==plat) then
-          wght_d_out(:) = (0.5_r8*w(:)/nlon(:))* (4.0_r8*pi)
+          wght_d_out(:) = (0.5_r8*w(:)/plon)* (4.0_r8*pi)
        else if(size == ngcols_d) then
           n = 0
           do j = 1,plat
-             do i = 1,nlon(j)
+             do i = 1, plon
                 n = n + 1
-                wght_d_out(n) = ( 0.5_r8*w(j)/nlon(j) ) * (4.0_r8*pi)
+                wght_d_out(n) = ( 0.5_r8*w(j)/plon ) * (4.0_r8*pi)
              end do
           end do
        end if
@@ -812,25 +776,25 @@ contains
           ! Latitude vertices
           ns_vert(:,:) = spval
           if (j .eq. 1) then
-             ns_vert(1,:nlon(1)) = -90.0_r8
+             ns_vert(1,:plon) = -90.0_r8
           else
-             ns_vert(1,:nlon(j)) = (latdeg(j) + latdeg(j-1) )*0.5_r8
+             ns_vert(1,:plon) = (latdeg(j) + latdeg(j-1) )*0.5_r8
           end if
           
           if (j .eq. plat) then
-             ns_vert(2,:nlon(plat)) =  90.0_r8
+             ns_vert(2,:plon) =  90.0_r8
           else
-             ns_vert(2,:nlon(j)) = (latdeg(j) + latdeg(j+1) )*0.5_r8
+             ns_vert(2,:plon) = (latdeg(j) + latdeg(j+1) )*0.5_r8
           end if
 
           ! Longitude vertices
-          ew_vert(:,:) = spval
-          ew_vert(1,1)          = (londeg(1,j) - 360.0_r8 + londeg(nlon(j),j))*0.5_r8
-          ew_vert(1,2:nlon(j))  = (londeg(1:nlon(j)-1,j)+ londeg(2:nlon(j),j))*0.5_r8
-          ew_vert(2,:nlon(j)-1) = ew_vert(1,2:nlon(j))
-          ew_vert(2,nlon(j))    = (londeg(nlon(j),j) + (360.0_r8 + londeg(1,j)))*0.5_r8
+          ew_vert(:,:)       = spval
+          ew_vert(1,1)       = (londeg(1,j) - 360.0_r8 + londeg(plon,j))*0.5_r8
+          ew_vert(1,2:plon)  = (londeg(1:plon-1,j)+ londeg(2:plon,j))*0.5_r8
+          ew_vert(2,:plon-1) = ew_vert(1,2:plon)
+          ew_vert(2,plon)    = (londeg(plon,j) + (360.0_r8 + londeg(1,j)))*0.5_r8
           
-          do i = 1,nlon(j)
+          do i = 1, plon
              n = n + 1
              del_phi = sin( ns_vert(2,i)*degtorad ) - sin( ns_vert(1,i)*degtorad )
              del_theta = ( ew_vert(2,i) - ew_vert(1,i) )*degtorad
@@ -843,7 +807,7 @@ contains
        if(size == ngcols_d) then
           n = 0
           do j = 1,plat
-             do i = 1,nlon(j)
+             do i = 1, plon
                 n = n + 1
                 lon_d_out(n) = londeg(i,j)
              end do
@@ -860,7 +824,7 @@ contains
        if(size == ngcols_d) then
           n = 0
           do j = 1,plat
-             do i = 1,nlon(j)
+             do i = 1, plon
                 n = n + 1
                 lat_d_out(n) = latdeg(j)
              end do
