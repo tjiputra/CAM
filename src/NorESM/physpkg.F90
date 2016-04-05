@@ -42,10 +42,6 @@ module physpkg
 
   use modal_aero_calcsize,    only: modal_aero_calcsize_init, modal_aero_calcsize_diag, modal_aero_calcsize_reg
   use modal_aero_wateruptake, only: modal_aero_wateruptake_init, modal_aero_wateruptake_dr, modal_aero_wateruptake_reg
-#ifdef OSLO_AERO
-   use opttab,          only: initopt
-   use opttab_lw,       only: initopt_lw
-#endif  ! OSLO_AERO
 
   implicit none
   private
@@ -154,12 +150,6 @@ subroutine phys_register
     use subcol,             only: subcol_register
     use subcol_utils,       only: is_subcol_on
 
-#ifdef OSLO_AERO
-   use aerosoldef,        only: aero_register
-   use condtend,          only: registerCondensation, initializeCondensation
-#endif
-
-    implicit none
     !---------------------------Local variables-----------------------------
     !
     integer  :: m        ! loop index
@@ -679,7 +669,6 @@ subroutine phys_init( phys_state, phys_tend, pbuf2d, cam_out )
     use ref_pres,           only: pref_edge, pref_mid
 
     use carma_intr,         only: carma_init
-    use cloud_rad_props,    only: cloud_rad_props_init
     use cam_control_mod,    only: initial_run
     use check_energy,       only: check_energy_init
     use chemistry,          only: chem_init
@@ -719,7 +708,9 @@ subroutine phys_init( phys_state, phys_tend, pbuf2d, cam_out )
     use aer_rad_props,      only: aer_rad_props_init
     use subcol,             only: subcol_init
     use qbo,                only: qbo_init
-    use iondrag,            only: iondrag_init
+    use iondrag,            only: iondrag_init, do_waccm_ions
+    use spedata,            only: spe_run
+    use mo_apex,            only: mo_apex_init
 #if ( defined OFFLINE_DYN )
     use metdata,            only: metdata_phys_init
 #endif
@@ -729,11 +720,6 @@ subroutine phys_init( phys_state, phys_tend, pbuf2d, cam_out )
     use sslt_rebin,         only: sslt_rebin_init
     use tropopause,         only: tropopause_init
     use solar_data,         only: solar_data_init
-    use rad_solar_var,      only: rad_solar_var_init
-#ifdef OSLO_AERO
-   use condtend,            only: initializeCondensation
-   use oslo_ocean_intr,     only: oslo_ocean_init
-#endif
    ! Input/output arguments
     type(physics_state), pointer       :: phys_state(:)
     type(physics_tend ), pointer       :: phys_tend(:)
@@ -795,7 +781,6 @@ subroutine phys_init( phys_state, phys_tend, pbuf2d, cam_out )
     ! Initialize rad constituents and their properties
     call rad_cnst_init()
     call aer_rad_props_init()
-    call cloud_rad_props_init()
 
     ! initialize carma
     call carma_init()
@@ -840,8 +825,6 @@ subroutine phys_init( phys_state, phys_tend, pbuf2d, cam_out )
 
     call radiation_init(pbuf2d)
 
-    call rad_solar_var_init()
-
     call cloud_diagnostics_init()
 
     call radheat_init(pref_mid)
@@ -869,6 +852,10 @@ subroutine phys_init( phys_state, phys_tend, pbuf2d, cam_out )
     call qbo_init
 
     call iondrag_init(pref_mid)
+    ! Geomagnetic module -- after iondrag_init
+    if (spe_run .or. do_waccm_ions) then
+      call mo_apex_init(phys_state)
+    endif
 
 #if ( defined OFFLINE_DYN )
     call metdata_phys_init()
@@ -896,8 +883,6 @@ subroutine phys_init( phys_state, phys_tend, pbuf2d, cam_out )
        call modal_aero_wateruptake_init(pbuf2d)
 
     end if
-!CAM5-Oslo specific code
-
 
 end subroutine phys_init
 
@@ -1077,7 +1062,6 @@ subroutine phys_run1_adiabatic_or_ideal(ztodt, phys_state, phys_tend,  pbuf2d)
     real(r8)            :: zero(pcols)     ! array of zeros
 
     ! physics buffer field for total energy
-    integer itim, ncol
     real(r8), pointer, dimension(:) :: teout
     logical, SAVE :: first_exec_of_phys_run1_adiabatic_or_ideal  = .TRUE.
 
@@ -1712,7 +1696,6 @@ subroutine tphysbc (ztodt, state,  &
     use cam_abortutils,  only: endrun
     use subcol,          only: subcol_gen, subcol_ptend_avg
     use subcol_utils,    only: subcol_ptend_copy, is_subcol_on
-    use radiation_utils, only: rad_diagdata_type
 
 #ifdef OSLO_AERO
     use commondefinitions
@@ -1721,9 +1704,6 @@ subroutine tphysbc (ztodt, state,  &
 
     implicit none
 
-    !
-    ! Arguments
-    !
     real(r8), intent(in) :: ztodt                          ! 2 delta t (model time increment)
 
     type(physics_state), intent(inout) :: state
@@ -1744,8 +1724,6 @@ subroutine tphysbc (ztodt, state,  &
     type(physics_ptend)   :: ptend_aero       ! ptend for microp_aero
     type(physics_ptend)   :: ptend_aero_sc    ! ptend for microp_aero on sub-columns
     type(physics_tend)    :: tend_sc          ! tend for sub-columns
-    type(rad_diagdata_type) :: rd             ! structure to hold diagnostic data for output
-
 
     integer :: nstep                          ! current timestep number
 
@@ -2475,10 +2453,8 @@ subroutine tphysbc (ztodt, state,  &
     call t_startf('radiation')
 
 
-    call radiation_tend(state, ptend, pbuf, &
-         cam_out, cam_in, &
-         cam_in%icefrac, cam_in%snowhland, &
-         net_flx, rd)
+    call radiation_tend( &
+       state, ptend, pbuf, cam_out, cam_in, net_flx)
 
     ! Set net flux used by spectral dycores
     do i=1,ncol
@@ -2523,7 +2499,6 @@ subroutine phys_timestep_init(phys_state, cam_in, cam_out, pbuf2d)
   use ghg_data,            only: ghg_data_timestep_init
   use cam3_aero_data,      only: cam3_aero_data_on, cam3_aero_data_timestep_init
   use cam3_ozone_data,     only: cam3_ozone_data_on, cam3_ozone_data_timestep_init
-  use radiation,           only: radiation_do
   use aoa_tracers,         only: aoa_tracers_timestep_init
   use vertical_diffusion,  only: vertical_diffusion_ts_init
   use radheat,             only: radheat_timestep_init

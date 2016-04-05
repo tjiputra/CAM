@@ -5,11 +5,13 @@ module mo_chm_diags
   use mo_tracname,  only : solsym
   use chem_mods,    only : rxntot, nfs, gas_pcnst, indexm, adv_mass
   use ppgrid,       only : pver
-  use mo_constants, only : pi, rgrav, rearth
+  use mo_constants, only : rgrav, rearth
   use mo_chem_utls, only : get_rxt_ndx, get_spc_ndx
   use cam_history,  only : fieldname_len
   use mo_jeuv,      only : neuv
+  use gas_wetdep_opts,only : gas_wetdep_method
 
+  implicit none
   private
 
   public :: chm_diags_inti
@@ -71,10 +73,9 @@ contains
 #endif
     implicit none
 
-    integer :: i, j, k, m, n
+    integer :: j, k, m, n
     character(len=16) :: jname, spc_name, attr
     character(len=2)  :: jchar
-    character(len=64) :: lname
     character(len=2)  :: unit_basename  ! Units 'kg' or '1' 
 
     integer :: id_pan, id_onit, id_mpan, id_isopno3, id_onitr, id_nh4no3
@@ -324,28 +325,31 @@ contains
        call addfld( dtchem_name(m), (/ 'lev' /), 'A', 'kg/s',    'net tendency from chem' )
 #if defined OSLO_AERO
        !Needed for budget term of gases! Aerosols have their own budget terms
+       !Probably move this to aero_model??
        if(.NOT. isAerosol(n))then
           if(history_aerosol)then
              call add_default( depflx_name(m), 1, ' ')
           end if
        endif
 #endif
-       wetdep_name_area(m)='WD_A_'//trim(spc_name)
-       wetdep_name(m) = 'WD_'//trim(spc_name)
-       wtrate_name(m) = 'WDR_'//trim(spc_name)
+       if (gas_wetdep_method=='MOZ') then
+          wetdep_name_area(m)='WD_A_'//trim(spc_name)
+          wetdep_name(m) = 'WD_'//trim(spc_name)
+          wtrate_name(m) = 'WDR_'//trim(spc_name)
 
-       call addfld( wetdep_name_area(m), horiz_only, 'A', 'kg/m2/s ', spc_name//' wet deposition' )
-       call addfld( wetdep_name(m), horiz_only,  'A', 'kg/s', spc_name//' wet deposition' )
-       call addfld( wtrate_name(m), (/ 'lev' /), 'A',   '/s', spc_name//' wet deposition rate' )
-       
+          call addfld( wetdep_name_area(m), horiz_only, 'A', 'kg/m2/s ', spc_name//' wet deposition' )
+          call addfld( wetdep_name(m), horiz_only,  'A', 'kg/s', spc_name//' wet deposition' )
+          call addfld( wtrate_name(m), (/ 'lev' /), 'A',   '/s', spc_name//' wet deposition rate' )
+          
 #if defined OSLO_AERO
-       !Needed for budget term of gases! Aerosols have their own budget terms
-       if(.NOT. isAerosol(n))then
-         if(history_aerosol)then
-            call add_default( wetdep_name_area(m), 1, ' ') 
-         end if
-       endif
+          !Needed for budget term of gases! Aerosols have their own budget terms
+          if(.NOT. isAerosol(n))then
+            if(history_aerosol)then
+               call add_default( wetdep_name_area(m), 1, ' ') 
+            end if
+          endif
 #endif
+       endif 
 
        if (spc_name(1:3) == 'num') then
           unit_basename = ' 1'
@@ -427,14 +431,14 @@ contains
    end do
 #endif
 
-    call addfld( 'WD_NOY', horiz_only, 'A', 'kg/s', 'NOy wet deposition' )
     call addfld( 'DF_NOY', horiz_only, 'I', 'kg/m2/s', 'NOy dry deposition flux ' )
-
-    call addfld( 'WD_SOX', horiz_only, 'A', 'kg/s', 'SOx wet deposition' )
     call addfld( 'DF_SOX', horiz_only, 'I', 'kg/m2/s', 'SOx dry deposition flux ' )
-
-    call addfld( 'WD_NHX', horiz_only, 'A', 'kg/s', 'NHx wet deposition' )
     call addfld( 'DF_NHX', horiz_only, 'I', 'kg/m2/s', 'NHx dry deposition flux ' )
+    if (gas_wetdep_method=='MOZ') then
+       call addfld( 'WD_NOY', horiz_only, 'A', 'kg/s', 'NOy wet deposition' )
+       call addfld( 'WD_SOX', horiz_only, 'A', 'kg/s', 'SOx wet deposition' )
+       call addfld( 'WD_NHX', horiz_only, 'A', 'kg/s', 'NHx wet deposition' )
+    endif
 
   end subroutine chm_diags_inti
 
@@ -444,13 +448,9 @@ contains
     !--------------------------------------------------------------------
     
     use cam_history,  only : outfld
-    use constituents, only : pcnst
+#if (defined OSLO_AERO)
     use constituents, only : cnst_get_ind
     use phys_grid,    only : get_area_all_p, pcols
-#if (defined OSLO_AERO)
-!    use aerosoldef,   only : getCloudTracerIndexDirect, getCloudTracerName &
-!                           , N_AEROSOL_TYPES, aerosolType                  &
-!                           , aerosol_type_name
     use commondefinitions
     use aerosoldef,   only : getCloudTracerIndexDirect, getCloudTracerName &
                            , aerosolType
@@ -461,9 +461,6 @@ contains
 ! CCMI
 !
     use cam_history_support, only : fillvalue
-!
-    
-    implicit none
 
     !--------------------------------------------------------------------
     !	... dummy arguments
@@ -482,6 +479,7 @@ contains
     integer,  intent(in)  :: ltrop(ncol)
 
     type(physics_buffer_desc), pointer :: pbuf(:)
+
 #ifdef OSLO_AERO
     real(r8), dimension(:,:), pointer  :: cloudTracerField
     integer                            :: cloudTracerIndex
@@ -494,8 +492,7 @@ contains
     !--------------------------------------------------------------------
     !	... local variables
     !--------------------------------------------------------------------
-    integer     :: i,j,k, m, n
-    integer :: plat
+    integer     :: i, k, m, n
     real(r8)    :: wrk(ncol,pver)
     !      real(r8)    :: tmp(ncol,pver)
     !      real(r8)    :: m(ncol,pver)
@@ -684,8 +681,6 @@ contains
           end do
        end do
        call outfld( dtchem_name(m), net_chem(:ncol,:), ncol, lchnk )
-
-
 !
 ! CCMI
 !
@@ -885,32 +880,32 @@ contains
        !
        wrk_wd(:ncol) = wrk_wd(:ncol) * rgrav * wght(:ncol) * rearth**2
        !
-       call outfld( wetdep_name(m), wrk_wd(:ncol),               ncol, lchnk )
+       if (gas_wetdep_method=='MOZ') then
+          call outfld( wetdep_name(m), wrk_wd(:ncol),               ncol, lchnk )
 #ifdef OSLO_AERO
-       if( .NOT. do_neu_wetdep)then
-         call outfld( wetdep_name_area(m), wrk_wd(:ncol)/area(:ncol)  ,ncol, lchnk )
-       endif
+          call outfld( wetdep_name_area(m), wrk_wd(:ncol)/area(:ncol)  ,ncol, lchnk )
 #endif
-       call outfld( wtrate_name(m), het_rates(:ncol,:,m), ncol, lchnk )
+          call outfld( wtrate_name(m), het_rates(:ncol,:,m), ncol, lchnk )
 
-       if ( any(noy_species == m ) ) then
-          noy_wk(:ncol) = noy_wk(:ncol) + wrk_wd(:ncol)*N_molwgt/adv_mass(m)
+          if ( any(noy_species == m ) ) then
+             noy_wk(:ncol) = noy_wk(:ncol) + wrk_wd(:ncol)*N_molwgt/adv_mass(m)
+          endif
+          if ( m == id_n2o5 ) then  ! 2 NOy molecules in N2O5
+             noy_wk(:ncol) = noy_wk(:ncol) + wrk_wd(:ncol)*N_molwgt/adv_mass(m)
+          endif
+          if ( any(sox_species == m ) ) then
+             sox_wk(:ncol) = sox_wk(:ncol) + wrk_wd(:ncol)*S_molwgt/adv_mass(m)
+          endif
+          if ( any(nhx_species == m ) ) then
+             nhx_wk(:ncol) = nhx_wk(:ncol) + wrk_wd(:ncol)*N_molwgt/adv_mass(m)
+          endif
        endif
-       if ( m == id_n2o5 ) then  ! 2 NOy molecules in N2O5
-          noy_wk(:ncol) = noy_wk(:ncol) + wrk_wd(:ncol)*N_molwgt/adv_mass(m)
-       endif
-       if ( any(sox_species == m ) ) then
-          sox_wk(:ncol) = sox_wk(:ncol) + wrk_wd(:ncol)*S_molwgt/adv_mass(m)
-       endif
-       if ( any(nhx_species == m ) ) then
-          nhx_wk(:ncol) = nhx_wk(:ncol) + wrk_wd(:ncol)*N_molwgt/adv_mass(m)
-       endif
-
     end do
-    
-    call outfld( 'WD_NOY', noy_wk(:ncol), ncol, lchnk )
-    call outfld( 'WD_SOX', sox_wk(:ncol), ncol, lchnk )
-    call outfld( 'WD_NHX', nhx_wk(:ncol), ncol, lchnk )
+    if (gas_wetdep_method=='MOZ') then
+       call outfld( 'WD_NOY', noy_wk(:ncol), ncol, lchnk )
+       call outfld( 'WD_SOX', sox_wk(:ncol), ncol, lchnk )
+       call outfld( 'WD_NHX', nhx_wk(:ncol), ncol, lchnk )
+    endif
 
   end subroutine het_diags
 

@@ -8,9 +8,6 @@ module mo_usrrxt
 #ifdef OSLO_AERO
 !   use aerosoldef, only: nmodes_oslo=> nmodes, lifeCycleNumberMedianRadius
    use commondefinitions, only: nmodes_oslo=> nmodes
-   use aerosoldef, only: lifeCycleNumberMedianRadius
-   use const, only: numberToSurface
-   use oslo_utils, only: calculateNumberConcentration
 #endif
 
   implicit none
@@ -347,7 +344,7 @@ contains
 
   subroutine usrrxt( rxt, temp, tempi, tempe, invariants, h2ovmr,  ps, &
                      pmid, m, sulfate, mmr, relhum, strato_sad, &
-                     ltrop, dlat, ncol, sad_total, cwat, mbar, pbuf )
+                     tropchemlev, dlat, ncol, sad_total, cwat, mbar, pbuf )
 
 !-----------------------------------------------------------------
 !        ... set the user specified reaction rates
@@ -368,7 +365,7 @@ contains
 !        ... dummy arguments
 !-----------------------------------------------------------------
     integer, intent(in)     :: ncol
-    integer, intent(in)     :: ltrop(pcols)               ! tropopause vertical index
+    integer, intent(in)     :: tropchemlev(pcols)         ! trop/strat reaction separation vertical index
     real(r8), intent(in)    :: dlat(:)                    ! degrees latitude
     real(r8), intent(in)    :: temp(pcols,pver)           ! temperature (K); neutral temperature
     real(r8), intent(in)    :: tempi(pcols,pver)          ! ionic temperature (K); only used if ion chemistry
@@ -496,7 +493,7 @@ contains
 
           call aero_model_surfarea( &
                mmr, rm1, relhum, pmid, temp, strato_sad, &
-               sulfate, m, ltrop, dlat, het1_ndx, pbuf, ncol, sfc_array, dm_array, sad_total )
+               sulfate, m, tropchemlev, dlat, het1_ndx, pbuf, ncol, sfc_array, dm_array, sad_total )
 
        endif
     endif
@@ -1133,7 +1130,7 @@ contains
 !
          if ( usr_strat_tau_ndx(l) > 0 ) then
             do i=1,ncol
-               rxt(i,ltrop(i)+1:pver,usr_strat_tau_ndx(l)) = 0._r8
+               rxt(i,tropchemlev(i)+1:pver,usr_strat_tau_ndx(l)) = 0._r8
             end do
          end if
 !

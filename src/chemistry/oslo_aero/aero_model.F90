@@ -51,7 +51,7 @@ module aero_model
   public :: aero_model_wetdep     ! aerosol wet removal
   public :: aero_model_emissions  ! aerosol emissions
   public :: aero_model_surfarea  ! tropopspheric aerosol wet surface area for chemistry
-  public :: aero_model_strat_surfarea ! stratospheric aerosol dry surface area for chemistry
+  public :: aero_model_strat_surfarea ! stratospheric aerosol wet surface area for chemistry
 
  ! Misc private data 
 

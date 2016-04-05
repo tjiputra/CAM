@@ -17,7 +17,7 @@ module metdata
   use spmd_utils,         only: masterproc
   use ppgrid,             only: pcols, pver, begchunk, endchunk
   use time_manager,       only: get_curr_calday, get_curr_date, get_step_size
-  use abortutils,         only: endrun
+  use cam_abortutils,     only: endrun
   use dynamics_vars,      only: T_FVDYCORE_GRID
 
 #if ( defined SPMD )
@@ -26,8 +26,9 @@ module metdata
 #endif
   use perf_mod
   use cam_logfile,        only: iulog
-  use pio, only: file_desc_t, pio_put_att, pio_global, pio_get_att, pio_inq_att, pio_inq_dimid, pio_inq_dimlen, &
-       pio_closefile, pio_get_var, pio_inq_varid
+  use pio, only: file_desc_t, pio_put_att, pio_global, pio_get_att, pio_inq_att, &
+       pio_inq_dimid, pio_inq_dimlen, pio_closefile, pio_get_var, pio_inq_varid, &
+       pio_offset_kind
   use cam_pio_utils,      only: cam_pio_openfile
     
 
@@ -111,11 +112,11 @@ module metdata
 !----------------------------------------------------------------------- 
 
   type input2d
-     real(r8), dimension(:,:), pointer :: data
+     real(r8), dimension(:,:), pointer :: data => null()
   endtype input2d
 
   type input3d
-     real(r8), dimension(:,:,:), pointer :: data
+     real(r8), dimension(:,:,:), pointer :: data => null()
   endtype input3d
 
   real(r8), allocatable :: met_t(:,:,:)  ! interpolated temperature 
@@ -166,7 +167,8 @@ module metdata
   character(len=256) :: met_filenames_list = ''
   character(len=256) :: met_data_path = ''
   type(file_desc_t) :: curr_fileid, next_fileid     ! the id of the NetCDF file
-  real(r8), pointer, dimension(:)  :: curr_data_times, next_data_times
+  real(r8), pointer, dimension(:) :: curr_data_times => null()
+  real(r8), pointer, dimension(:) :: next_data_times => null()
 
   real(r8) :: alpha = 1.0_r8 ! don't read in water vapor  
   !   real(r8), private :: alpha = 0.0  ! read in water vaper each time step
@@ -189,7 +191,7 @@ module metdata
   integer  :: num_met_levels
   real(r8) :: met_rlx_top = 60._r8
   real(r8) :: met_rlx_bot = 50._r8
-  real(r8) :: met_max_rlx = 1._r8
+  real(r8) :: met_rlx_time = 0._r8
 
   logical  :: met_fix_mass = .true.
   logical  :: has_ts = .false.
@@ -219,7 +221,7 @@ contains
         met_filenames_list, &
         met_rlx_top, &
         met_rlx_bot, &
-        met_max_rlx, &
+        met_rlx_time, &
         met_fix_mass, &
         met_shflx_name, &
         met_shflx_factor, &
@@ -255,7 +257,7 @@ contains
    call mpibcast (met_filenames_list ,len(met_filenames_list),mpichar,0,mpicom)
    call mpibcast (met_rlx_top,        1 ,mpir8,  0, mpicom )
    call mpibcast (met_rlx_bot,        1 ,mpir8,  0, mpicom )
-   call mpibcast (met_max_rlx,        1 ,mpir8,  0, mpicom )
+   call mpibcast (met_rlx_time,       1 ,mpir8,  0, mpicom )
    call mpibcast (met_fix_mass,       1 ,mpilog, 0, mpicom )
    call mpibcast (met_qflx_name      ,len(met_qflx_name),     mpichar,0,mpicom)
    call mpibcast (met_shflx_name     ,len(met_shflx_name),    mpichar,0,mpicom)
@@ -272,7 +274,7 @@ contains
        write(iulog,*)'Meteorological file names list file: ', trim(met_filenames_list) 
        write(iulog,*)'Meteorological relaxation top is (km): ', met_rlx_top
        write(iulog,*)'Meteorological relaxation bottom is (km): ', met_rlx_bot
-       write(iulog,*)'Meteorological maximum relaxation is : ',met_max_rlx
+       write(iulog,*)'Meteorological relaxation time (hours): ',met_rlx_time
        write(iulog,*)'Offline driver mass fixer is trurned on (met_fix_mass): ',met_fix_mass
        write(iulog,*)'Meteorological shflx field name : ', trim(met_shflx_name) 
        write(iulog,*)'Meteorological shflx multiplication factor : ', met_shflx_factor
@@ -289,17 +291,15 @@ contains
 !--------------------------------------------------------------------------
   subroutine metdata_dyn_init(grid)
     use infnan,          only : nan, assignment(=)
-    use cam_control_mod, only : nsrest
+    use cam_control_mod, only : restart_run
     implicit none
 
 ! !INPUT PARAMETERS:
       type (T_FVDYCORE_GRID), intent(in) :: grid
 
 
-    character(len=256) :: filen
-    integer            :: im, jm, km, jfirst, jlast, kfirst, klast 
+    integer            :: im, km, jfirst, jlast, kfirst, klast 
     integer            :: ng_d, ng_s
-    integer            :: ierr
 
     im        = grid%im
     km        = grid%km
@@ -311,7 +311,7 @@ contains
     ng_s      = grid%ng_s
 
 
-    if (nsrest/=1) then ! initial run or branch run
+    if (.not. restart_run) then ! initial run or branch run
        curr_filename = met_data_file
        next_filename = ''
     else
@@ -367,22 +367,22 @@ contains
 
  subroutine metdata_phys_init
    use infnan,      only : nan, assignment(=)
-   use cam_history, only : addfld,dyn_decomp,phys_decomp
+   use cam_history, only : addfld, horiz_only
 
-   call addfld ('MET_RLX ','     ',pver, 'A','Meteorology relax function',dyn_decomp)
-   call addfld ('MET_TAUX','        ',1, 'A','Meteorology taux',phys_decomp)
-   call addfld ('MET_TAUY','        ',1, 'A','Meteorology tauy',phys_decomp)
-   call addfld ('MET_SHFX','        ',1, 'A','Meteorology shflx',phys_decomp)
-   call addfld ('MET_QFLX','        ',1, 'A','Meteorology qflx',phys_decomp)
-   call addfld ('MET_PS','          ',1, 'A','Meteorology PS',dyn_decomp)
-   call addfld ('MET_T','        ',pver, 'A','Meteorology T',phys_decomp)
-   call addfld ('MET_U','        ',pver, 'A','Meteorology U',dyn_decomp)
-   call addfld ('MET_V','        ',pver, 'A','Meteorology V',dyn_decomp)
-   call addfld ('MET_SNOWH','    ',1,    'A','Meteorology snow height',phys_decomp)
+   call addfld ('MET_RLX',     (/ 'lev' /),  'A', ' ', 'Meteorology relax function',              gridname='fv_centers')
+   call addfld ('MET_TAUX',    horiz_only,   'A', ' ', 'Meteorology taux',                        gridname='physgrid')
+   call addfld ('MET_TAUY',    horiz_only,   'A', ' ', 'Meteorology tauy',                        gridname='physgrid')
+   call addfld ('MET_SHFX',    horiz_only,   'A', ' ', 'Meteorology shflx',                       gridname='physgrid')
+   call addfld ('MET_QFLX',    horiz_only,   'A', ' ', 'Meteorology qflx',                        gridname='physgrid')
+   call addfld ('MET_PS',      horiz_only,   'A', ' ', 'Meteorology PS',                          gridname='fv_centers')
+   call addfld ('MET_T',       (/ 'lev' /),  'A', ' ', 'Meteorology T',                           gridname='physgrid')
+   call addfld ('MET_U',       (/ 'lev' /),  'A', ' ', 'Meteorology U',                           gridname='fv_centers')
+   call addfld ('MET_V',       (/ 'lev' /),  'A', ' ', 'Meteorology V',                           gridname='fv_centers')
+   call addfld ('MET_SNOWH',   horiz_only,   'A', ' ', 'Meteorology snow height',                 gridname='physgrid')
 
-   call addfld ('MET_TS','K',1, 'A','Meteorology TS',phys_decomp)
-   call addfld ('MET_OCNFRC','fraction',1, 'A','Ocean frac derived from met TS',phys_decomp)
-   call addfld ('MET_ICEFRC','fraction',1, 'A','Sea ice frac derived from met TS',phys_decomp)
+   call addfld ('MET_TS',      horiz_only,   'A', 'K', 'Meteorology TS',                          gridname='physgrid')
+   call addfld ('MET_OCNFRC',  horiz_only,   'A', 'fraction', 'Ocean frac derived from met TS',   gridname='physgrid')
+   call addfld ('MET_ICEFRC',  horiz_only,   'A', 'fraction', 'Sea ice frac derived from met TS', gridname='physgrid')
 
 ! allocate chunked arrays   
 
@@ -694,14 +694,8 @@ contains
 
        ! now adjust mass of each layer now that water vapor has changed
        if (( .not. online_test ) .and. (alpha .ne. D1_0 )) then
-!+tht
-        if(energy_conservation_type .eq. 1)then
-          call physics_dme_adjust(state(c), tend(c), qini, dt, .true.) ! tht 15/10/14
-        else
           call physics_dme_adjust(state(c), tend(c), qini, dt)
         endif
-!-tht
-       endif
 
     end do
 
@@ -892,7 +886,8 @@ contains
   subroutine read_met_restart_pio(File)
     type(file_desc_t), intent(inout) :: File
     
-    integer :: ierr, xtype, slen
+    integer :: ierr, xtype
+    integer(pio_offset_kind) :: slen
 
     ierr = pio_inq_att(File, PIO_GLOBAL, 'current_metdata_filename',xtype, slen)
     ierr = pio_get_att(File, PIO_GLOBAL, 'current_metdata_filename', curr_filename)
@@ -1234,6 +1229,7 @@ contains
 !------------------------------------------------------------------------------
   subroutine read_next_ps(grid)
     use ncdio_atm,          only: infld
+
     implicit none
 
     type (T_FVDYCORE_GRID), intent(in) :: grid
@@ -1261,13 +1257,13 @@ contains
     call find_times( recnos, fids, datatimemn, datatimepn, next_mod_time )
 
     call infld(varname, fids(1), 'lon', 'lat',  ifirstxy, ilastxy, jfirstxy, jlastxy, &
-         wrk_xy, readvar, grid_map='DYN', timelevel=recnos(1))
+         wrk_xy, readvar, gridname='fv_centers', timelevel=recnos(1))
 
     ! transpose xy -> yz decomposition
     call transpose_xy2yz_2d( wrk_xy, met_psi_next(nm)%data, grid )
 
     call infld(varname, fids(2), 'lon', 'lat',  ifirstxy, ilastxy, jfirstxy, jlastxy, &
-         wrk_xy, readvar, grid_map='DYN', timelevel=recnos(2))
+         wrk_xy, readvar, gridname='fv_centers', timelevel=recnos(2))
 
     ! transpose xy -> yz decomposition
     call transpose_xy2yz_2d( wrk_xy, met_psi_next(np)%data, grid )
@@ -1348,6 +1344,8 @@ contains
 !------------------------------------------------------------------------
   subroutine read_next_metdata(grid)
     use ncdio_atm,          only: infld
+    use cam_grid_support,   only: cam_grid_check, cam_grid_id
+    use cam_grid_support,   only: cam_grid_get_dim_names
 
     implicit none
 
@@ -1356,6 +1354,7 @@ contains
     type(file_desc_t) :: fids(2)
 
     character(len=8) :: Uname, Vname, Tname, Qname, psname
+    character(len=8) :: dim1name, dim2name
     integer :: im, jm, km
     logical :: readvar
     integer :: ifirstxy, ilastxy, jfirstxy, jlastxy
@@ -1364,6 +1363,7 @@ contains
     real(r8), allocatable :: tmp_data(:,:,:)
     integer :: elev1,blev1, elev2,blev2
     integer :: elev3,blev3, elev4,blev4
+    integer :: grid_id  ! grid ID for data mapping
 
     call t_startf('MET__read_next_metdata')
 
@@ -1441,19 +1441,26 @@ contains
     allocate(wrk2_xy(ifirstxy:ilastxy, jfirstxy:jlastxy))
     allocate(wrk3_xy(ifirstxy:ilastxy, jfirstxy:jlastxy, 1:max(km,num_met_levels)))
 
+    ! physgrid intput for FV is probably always lon/lat but let's be pedantic
+    grid_id = cam_grid_id('physgrid')
+    if (.not. cam_grid_check(grid_id)) then
+       call endrun('read_next_metdata: Internal error, no "physgrid" grid')
+    end if
+    call cam_grid_get_dim_names(grid_id, dim1name, dim2name)
+
     do i=1,2
 
        met_ti(i)%data = 0._r8
 
-       call infld(Tname, fids(i), 'lon', 'lev', 'lat',  1, pcols, 1,num_met_levels , &
-            begchunk, endchunk, tmp_data, readvar, grid_map='PHYS',timelevel=recnos(i))
+       call infld(Tname, fids(i), dim1name, 'lev', dim2name,  1, pcols, 1,num_met_levels , &
+            begchunk, endchunk, tmp_data, readvar, gridname='physgrid',timelevel=recnos(i))
 
        met_ti(i)%data(:,blev1:elev1,:) = tmp_data(:, blev2:elev2, :)
 
        met_qi(i)%data = 0._r8
 
-       call infld(Qname, fids(i), 'lon', 'lev', 'lat',  1, pcols, 1,num_met_levels, &
-            begchunk, endchunk, tmp_data, readvar, grid_map='PHYS',timelevel=recnos(i))
+       call infld(Qname, fids(i), dim1name, 'lev', dim2name,  1, pcols, 1,num_met_levels, &
+            begchunk, endchunk, tmp_data, readvar, gridname='physgrid',timelevel=recnos(i))
 
        met_qi(i)%data(:,blev1:elev1,:) = tmp_data(:, blev2:elev2, :)
 
@@ -1461,16 +1468,16 @@ contains
 
           wrk3_xy = 0._r8
           met_usi(i)%data(:,:,:) = 0._r8
-          call infld(Uname, fids(i), 'lon', 'lev', 'slat',  ifirstxy, ilastxy, jfirstxy, jlastxy, &
-               1,num_met_levels, wrk3_xy(:,:,blev4:elev4), readvar, grid_map='DYN',timelevel=recnos(i))
+          call infld(Uname, fids(i), 'lon', 'slat', 'lev',  ifirstxy, ilastxy, jfirstxy, jlastxy, &
+               1,num_met_levels, wrk3_xy(:,:,blev4:elev4), readvar, gridname='fv_u_stagger',timelevel=recnos(i))
 
           ! transpose xy -> yz decomposition
           call transpose_xy2yz_3d( wrk3_xy(:,:,blev3:elev3), met_usi(i)%data(:,:,:), grid )
 
           wrk3_xy = 0._r8
           met_vsi(i)%data(:,:,:) = 0._r8
-          call infld(Vname, fids(i), 'slon', 'lev', 'lat',  ifirstxy, ilastxy, jfirstxy, jlastxy, &
-               1,num_met_levels, wrk3_xy(:,:,blev4:elev4), readvar, grid_map='DYN',timelevel=recnos(i))
+          call infld(Vname, fids(i), 'slon', 'lat', 'lev',  ifirstxy, ilastxy, jfirstxy, jlastxy, &
+               1,num_met_levels, wrk3_xy(:,:,blev4:elev4), readvar, gridname='fv_v_stagger',timelevel=recnos(i))
 
           ! transpose xy -> yz decomposition
           call transpose_xy2yz_3d( wrk3_xy(:,:,blev3:elev3), met_vsi(i)%data(:,:,:), grid )
@@ -1481,16 +1488,16 @@ contains
 
           wrk3_xy = 0._r8
           met_ui(i)%data = 0._r8
-          call infld(Uname, fids(i), 'lon', 'lev', 'lat',  ifirstxy, ilastxy, jfirstxy, jlastxy, &
-               1,num_met_levels, wrk3_xy(:,:,blev4:elev4), readvar, grid_map='DYN',timelevel=recnos(i))
+          call infld(Uname, fids(i), 'lon', 'lat', 'lev',  ifirstxy, ilastxy, jfirstxy, jlastxy, &
+               1,num_met_levels, wrk3_xy(:,:,blev4:elev4), readvar, gridname='fv_centers',timelevel=recnos(i))
 
           ! transpose xy -> yz decomposition
           call transpose_xy2yz_3d( wrk3_xy(:,:,blev3:elev3), met_ui(i)%data(:,:,:), grid )
 
           wrk3_xy = 0._r8
           met_vi(i)%data = 0._r8
-          call infld(Vname, fids(i), 'lon', 'lev', 'lat',  ifirstxy, ilastxy, jfirstxy, jlastxy, &
-               1,num_met_levels, wrk3_xy(:,:,blev4:elev4), readvar, grid_map='DYN',timelevel=recnos(i))
+          call infld(Vname, fids(i), 'lon', 'lat', 'lev',  ifirstxy, ilastxy, jfirstxy, jlastxy, &
+               1,num_met_levels, wrk3_xy(:,:,blev4:elev4), readvar, gridname='fv_centers',timelevel=recnos(i))
 
           ! transpose xy -> yz decomposition
           call transpose_xy2yz_3d( wrk3_xy(:,:,blev3:elev3), met_vi(i)%data(:,:,:), grid )
@@ -1498,7 +1505,7 @@ contains
        endif ! met_cell_wall_winds
 
        call infld(PSname, fids(i), 'lon', 'lat',  ifirstxy, ilastxy, jfirstxy, jlastxy, &
-            wrk2_xy, readvar, grid_map='DYN', timelevel=recnos(i))
+            wrk2_xy, readvar, gridname='fv_centers', timelevel=recnos(i))
 
        ! transpose xy -> yz decomposition
         call transpose_xy2yz_2d( wrk2_xy, met_psi_curr(i)%data, grid )
@@ -1531,20 +1538,21 @@ contains
     do i=1,2
 
        call infld(met_shflx_name, fids(i), 'lon', 'lat',  1, pcols, begchunk, endchunk, &
-            met_shflxi(i)%data, readvar, grid_map='PHYS',timelevel=recnos(i))
+            met_shflxi(i)%data, readvar, gridname='physgrid',timelevel=recnos(i))
+       
        call infld(met_qflx_name, fids(i), 'lon', 'lat',  1, pcols, begchunk, endchunk, &
-            met_qflxi(i)%data, readvar, grid_map='PHYS',timelevel=recnos(i))
+            met_qflxi(i)%data, readvar, gridname='physgrid',timelevel=recnos(i))
        call infld('TAUX', fids(i), 'lon', 'lat',  1, pcols, begchunk, endchunk, &
-            met_tauxi(i)%data, readvar, grid_map='PHYS',timelevel=recnos(i))
+            met_tauxi(i)%data, readvar, gridname='physgrid',timelevel=recnos(i))
        call infld('TAUY', fids(i), 'lon', 'lat',  1, pcols, begchunk, endchunk, &
-            met_tauyi(i)%data, readvar, grid_map='PHYS',timelevel=recnos(i))
+            met_tauyi(i)%data, readvar, gridname='physgrid',timelevel=recnos(i))
        if ( .not.met_srf_feedback ) then
           call infld('SNOWH', fids(i), 'lon', 'lat',  1, pcols, begchunk, endchunk, &
-               met_snowhi(i)%data, readvar, grid_map='PHYS',timelevel=recnos(i))
+               met_snowhi(i)%data, readvar, gridname='physgrid',timelevel=recnos(i))
        endif
        if (has_ts) then
           call infld('TS', fids(i), 'lon', 'lat',  1, pcols, begchunk, endchunk, &
-               met_tsi(i)%data, readvar, grid_map='PHYS',timelevel=recnos(i))
+               met_tsi(i)%data, readvar, gridname='physgrid',timelevel=recnos(i))
        endif
     enddo
   end subroutine read_phys_srf_flds
@@ -1552,30 +1560,47 @@ contains
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
   subroutine interp_phys_srf_flds( )
-
+    use phys_grid,           only: get_ncols_p
     real(r4) :: fact1, fact2
     real(r8) :: deltat
+    integer :: i, c, ncol
 
     deltat = datatimep - datatimem
     fact1 = (datatimep - curr_mod_time)/deltat
     fact2 = D1_0-fact1
 
-    met_shflx(:,:) = fact1*met_shflxi(nm)%data(:,:) + fact2*met_shflxi(np)%data(:,:)
-    met_qflx(:,:) = fact1*met_qflxi(nm)%data(:,:) + fact2*met_qflxi(np)%data(:,:)
-    met_taux(:,:) = fact1*met_tauxi(nm)%data(:,:) + fact2*met_tauxi(np)%data(:,:)
-    met_tauy(:,:) = fact1*met_tauyi(nm)%data(:,:) + fact2*met_tauyi(np)%data(:,:)
+
+    do c=begchunk,endchunk
+       ncol = get_ncols_p(c)
+       do i=1,ncol
+          met_shflx(i,c) = fact1*met_shflxi(nm)%data(i,c) + fact2*met_shflxi(np)%data(i,c)
+          met_qflx(i,c) = fact1*met_qflxi(nm)%data(i,c) + fact2*met_qflxi(np)%data(i,c)
+          met_taux(i,c) = fact1*met_tauxi(nm)%data(i,c) + fact2*met_tauxi(np)%data(i,c)
+          met_tauy(i,c) = fact1*met_tauyi(nm)%data(i,c) + fact2*met_tauyi(np)%data(i,c)
+       enddo
+    enddo
     if ( .not.met_srf_feedback ) then
-       met_snowh(:,:) = fact1*met_snowhi(nm)%data(:,:) + fact2*met_snowhi(np)%data(:,:)
+       do c=begchunk,endchunk
+          ncol = get_ncols_p(c)
+          do i=1,ncol
+             met_snowh(i,c) = fact1*met_snowhi(nm)%data(i,c) + fact2*met_snowhi(np)%data(i,c)
+          enddo
+       enddo
     endif
     if (has_ts) then
-       met_ts(:,:) = fact1*met_tsi(nm)%data(:,:) + fact2*met_tsi(np)%data(:,:)
+       do c=begchunk,endchunk
+          ncol = get_ncols_p(c)
+          do i=1,ncol
+             met_ts(i,c) = fact1*met_tsi(nm)%data(i,c) + fact2*met_tsi(np)%data(i,c)
+          enddo
+       enddo
     endif
 
   end subroutine interp_phys_srf_flds
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
   subroutine interpolate_metdata(grid)
-
+    use phys_grid,           only: get_ncols_p
 #if defined( SPMD )
     use mod_comm, only : mp_send4d_ns, mp_recv4d_ns
 #endif
@@ -1586,7 +1611,7 @@ contains
     real(r4) fact1, fact2
     real(r4) nfact1, nfact2
     real(r8) deltat,deltatn
-    integer :: i,j,k
+    integer :: i,c,k, ncol
     integer :: im, jm, km, jfirst, jlast, kfirst, klast, ng_d, ng_s
 
     im      = grid%im
@@ -1612,8 +1637,16 @@ contains
 !    nfact2 = (next_mod_time - datatimemn)/deltatn
     nfact2 = D1_0-nfact1
 
-    met_t(:,:,:) = fact1*met_ti(nm)%data(:,:,:) + fact2*met_ti(np)%data(:,:,:)
-    met_q(:,:,:) = fact1*met_qi(nm)%data(:,:,:) + fact2*met_qi(np)%data(:,:,:)
+    met_q = 0.0_r8
+    do c=begchunk,endchunk
+       ncol = get_ncols_p(c)
+       do k=1,pver
+          do i=1,ncol
+             met_t(i,k,c) = fact1*met_ti(nm)%data(i,k,c) + fact2*met_ti(np)%data(i,k,c)
+             met_q(i,k,c) = fact1*met_qi(nm)%data(i,k,c) + fact2*met_qi(np)%data(i,k,c)
+          enddo
+       enddo
+    enddo
 
     if (.not. online_test) where (met_q .lt. D0_0) met_q = D0_0
 
@@ -1623,7 +1656,12 @@ contains
     call interp_phys_srf_flds()
 
     if (has_ts) then
-       met_ts(:,:) = fact1*met_tsi(nm)%data(:,:) + fact2*met_tsi(np)%data(:,:)
+       do c=begchunk,endchunk
+          ncol = get_ncols_p(c)
+          do i=1,ncol
+             met_ts(i,c) = fact1*met_tsi(nm)%data(i,c) + fact2*met_tsi(np)%data(i,c)
+          enddo
+       enddo
     endif
 
     if ( .not. met_cell_wall_winds ) then
@@ -1690,7 +1728,7 @@ contains
 
     character(*), intent(in) :: fname
     type(file_desc_t), intent(inout) :: fileid
-    real(r8), pointer :: times(:)
+    real(r8), pointer, intent(inout) :: times(:)
     character(*), intent(in) :: datapath
     logical, optional, intent(in) :: check_dims
     type (T_FVDYCORE_GRID), optional, intent(in) :: grid
@@ -1866,14 +1904,32 @@ contains
 
     integer :: k, k_cnt, k_top
     real(r8), parameter :: h0 = 7._r8   ! scale height (km)
+    real(r8), parameter :: hsec = 3600._r8   ! seconds per hour
     real(r8) :: p_top, p_bot
+    real(r8) ::  met_max_rlxdt,  dtime_hrs
 
 996 format( 'set_met_rlx: ',a15, I10 )
 997 format( 'set_met_rlx: ',a15, E10.2 )
 998 format( 'set_met_rlx: ',a15, PLEV(E10.2))
 999 format( 'set_met_rlx: ',a15, PLEV(F10.5))
+993 format( 'set_met_rlx: ',a25, E10.2 )
 
     met_rlx(:) = 999._r8
+
+    dtime_hrs = get_step_size()/hsec ! hours
+
+    if (met_rlx_time > dtime_hrs) then 
+       met_max_rlxdt = dtime_hrs/met_rlx_time
+    elseif (met_rlx_time < 0._r8) then
+       met_max_rlxdt = 0._r8
+    else
+       met_max_rlxdt = 1._r8
+    endif
+
+    if (masterproc) then
+       write(iulog,fmt=993) ' met_rlx_time in hrs= ', met_rlx_time
+       write(iulog,fmt=993) ' met_max_rlxdt in % = ', met_max_rlxdt*100._r8
+    endif
 
     p_top = ps0 * exp( - met_rlx_top/h0 )
     p_bot = ps0 * exp( - met_rlx_bot/h0 )
@@ -1892,10 +1948,10 @@ contains
     endwhere
 
     where( hypm > p_bot )
-       met_rlx = met_max_rlx
+       met_rlx = met_max_rlxdt
     endwhere
 
-    if ( any( met_rlx(:) /= met_max_rlx) ) then
+    if ( any( met_rlx(:) /= met_max_rlxdt) ) then
        k_top = max(plev - met_levels, 1)
 
        do while ( met_rlx(k_top) /= 999._r8 )
@@ -1915,7 +1971,7 @@ contains
        endif
 
        do k = k_top,k_top+k_cnt
-          met_rlx(k) = met_max_rlx*real( k - k_top ) / real(k_cnt)
+          met_rlx(k) = met_max_rlxdt*real( k - k_top ) / real(k_cnt)
        enddo
     endif
 
@@ -1934,6 +1990,12 @@ contains
     endif
 
     if ( any( (met_rlx > 1._r8) .or. (met_rlx < 0._r8) ) ) then
+       if (masterproc) then
+          write(iulog,fmt=993) 'set_met_rlx:   dtime_hrs in hrs = ', dtime_hrs
+          write(iulog,fmt=993) 'set_met_rlx:met_rlx_time in hrs = ', met_rlx_time
+          write(iulog,fmt=993) 'set_met_rlx:      met_max_rlxdt = ', met_max_rlxdt
+          write(iulog,fmt=999) 'set_met_rlx:            met_rlx = ', met_rlx
+       endif
       call endrun('Offline meteorology relaxation function not set correctly.')
     endif
 

@@ -54,7 +54,7 @@ contains
 subroutine neu_wetdep_init
 !
   use constituents, only : cnst_get_ind,cnst_mw
-  use cam_history,  only : addfld, add_default
+  use cam_history,  only : addfld, add_default, horiz_only
   use phys_control, only : phys_getopts
 !
   integer :: m,l
@@ -200,8 +200,10 @@ subroutine neu_wetdep_init
 !
   do m=1,gas_wetdep_cnt
     call addfld     ('DTWR_'//trim(gas_wetdep_list(m)),(/ 'lev' /), 'A','kg/kg/s','wet removal Neu scheme tendency')
+    call addfld     ('WD_'//trim(gas_wetdep_list(m)),horiz_only, 'A','kg/s','vertical integrated wet deposition flux')
     if (history_chemistry) then
        call add_default('DTWR_'//trim(gas_wetdep_list(m)), 1, ' ')
+       call add_default('WD_'//trim(gas_wetdep_list(m)), 1, ' ')
     end if
   end do
 !
@@ -241,23 +243,18 @@ subroutine neu_wetdep_tend(lchnk,ncol,mmr,pmid,pdel,zint,tfld,delt, &
   real(r8),       intent(in)    :: tfld(pcols,pver)         ! midpoint temperature (K)
   real(r8),       intent(in)    :: delt                     ! timestep (s)
 !  
-
   real(r8),       intent(in)    :: prain(ncol, pver)
   real(r8),       intent(in)    :: nevapr(ncol, pver)
   real(r8),       intent(in)    :: cld(ncol, pver)
   real(r8),       intent(in)    :: cmfdqr(ncol, pver)
-
   real(r8),       intent(inout) :: wd_tend(pcols,pver,pcnst)
-
-
-
 !
 ! local arrays and variables
 !
   integer :: i,k,l,kk,m,id
   real(r8), parameter                       :: rearth = SHR_CONST_REARTH    ! radius earth (m)
   real(r8), parameter                       :: gravit = SHR_CONST_G         ! m/s^2
-  real(r8), dimension(ncol)                 :: area
+  real(r8), dimension(ncol)                 :: area, wk_out
   real(r8), dimension(ncol,pver)            :: cldice,cldliq,cldfrc,totprec,totevap,delz,delp,p
   real(r8), dimension(ncol,pver)            :: rls,evaprate,mass_in_layer,temp
   real(r8), dimension(ncol,pver,gas_wetdep_cnt) :: trc_mass,heff,dtwr
@@ -328,7 +325,7 @@ call phys_getopts( history_aerosol_out = history_aerosol)
 !
       temp(i,k) = tfld(i,kk)
 !
-! convert tracer mass to kg
+! convert tracer mass to kg to kg/kg
 !
       trc_mass(i,k,:) = mmr(i,kk,mapping_to_mmr(:)) * mass_in_layer(i,k)
 !
@@ -473,6 +470,16 @@ call phys_getopts( history_aerosol_out = history_aerosol)
   do m=1,gas_wetdep_cnt
     wd_tend(1:ncol,:,mapping_to_mmr(m)) = wd_tend(1:ncol,:,mapping_to_mmr(m)) + dtwr(1:ncol,:,m)
     call outfld( 'DTWR_'//trim(gas_wetdep_list(m)),dtwr(:,:,m),ncol,lchnk )
+!
+! vertical integrated wet deposition rate [kg/s]
+!
+    wk_out = 0._r8
+    do k=1,pver
+      kk = pver - k + 1
+      wk_out(1:ncol) = wk_out(1:ncol) + dtwr(1:ncol,k,m) * mass_in_layer(1:ncol,kk)
+    end do
+    call outfld( 'WD_'//trim(gas_wetdep_list(m)),wk_out,ncol,lchnk )
+  end do
 
 !This is output normally in mo_chm_diags, but
 !if neu wetdep, we have to output it here!
@@ -487,9 +494,6 @@ call phys_getopts( history_aerosol_out = history_aerosol)
        call outfld('WD_A_'//trim(gas_wetdep_list(m)),wrk_wd(:ncol),ncol,lchnk)
     end if
 #endif
-
-   end do
-
 !
   if ( do_diag ) then
     call outfld('QT_RAIN_HNO3', qt_rain, ncol, lchnk )
