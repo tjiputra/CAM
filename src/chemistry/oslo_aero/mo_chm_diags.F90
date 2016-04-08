@@ -333,23 +333,25 @@ contains
        endif
 #endif
        if (gas_wetdep_method=='MOZ') then
-          wetdep_name_area(m)='WD_A_'//trim(spc_name)
           wetdep_name(m) = 'WD_'//trim(spc_name)
           wtrate_name(m) = 'WDR_'//trim(spc_name)
 
-          call addfld( wetdep_name_area(m), horiz_only, 'A', 'kg/m2/s ', spc_name//' wet deposition' )
           call addfld( wetdep_name(m), horiz_only,  'A', 'kg/s', spc_name//' wet deposition' )
           call addfld( wtrate_name(m), (/ 'lev' /), 'A',   '/s', spc_name//' wet deposition rate' )
           
-#if defined OSLO_AERO
-          !Needed for budget term of gases! Aerosols have their own budget terms
-          if(.NOT. isAerosol(n))then
-            if(history_aerosol)then
-               call add_default( wetdep_name_area(m), 1, ' ') 
-            end if
-          endif
-#endif
        endif 
+
+#if defined OSLO_AERO
+       wetdep_name_area(m)='WD_A_'//trim(spc_name)
+       call addfld( wetdep_name_area(m), horiz_only, 'A', 'kg/m2/s ', spc_name//' wet deposition' )
+
+       !Needed for budget term of gases! Aerosols have their own budget terms
+       if(.NOT. isAerosol(n))then
+         if(history_aerosol)then
+            call add_default( wetdep_name_area(m), 1, ' ') 
+         end if
+       endif
+#endif
 
        if (spc_name(1:3) == 'num') then
           unit_basename = ' 1'

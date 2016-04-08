@@ -486,12 +486,14 @@ call phys_getopts( history_aerosol_out = history_aerosol)
 #ifdef OSLO_AERO
     if(history_aerosol)then
        wrk_wd(:ncol) = 0.0_r8
-       do k=1,pver
-          !Note sign: tendency is negative, so this becomes a positive flux!
-          wrk_wd(:ncol) = wrk_wd(:ncol)  &
-            - wd_tend(1:ncol,k,mapping_to_mmr(m))*pdel(:ncol,k)*rgrav !kg/m2/sec
+       do m=1,gas_wetdep_cnt
+          do k=1,pver
+             !Note sign: tendency is negative, so this becomes a positive flux!
+             wrk_wd(:ncol) = wrk_wd(:ncol)  &
+               - wd_tend(1:ncol,k,mapping_to_mmr(m))*pdel(:ncol,k)*rgrav !kg/m2/sec
+          end do
+          call outfld('WD_A_'//trim(gas_wetdep_list(m)),wrk_wd(:ncol),ncol,lchnk)
        end do
-       call outfld('WD_A_'//trim(gas_wetdep_list(m)),wrk_wd(:ncol),ncol,lchnk)
     end if
 #endif
 !
