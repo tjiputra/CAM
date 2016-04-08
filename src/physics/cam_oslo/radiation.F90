@@ -1150,13 +1150,8 @@ subroutine radiation_tend( &
                call rad_rrtmg_sw( &
                   lchnk, ncol, num_rrtmg_levs, r_state, state%pmid,          &
                   cldfprime, &
-#ifdef DIRIND
-
-                  per_tau*0.0_r8,   per_tau_w,    per_tau_w_g,  per_tau_w_f,            &
-#else
-
-                  aer_tau, aer_tau_w, aer_tau_w_g,  aer_tau_w_f,  &
-#endif
+!orig             aer_tau,        aer_tau_w, aer_tau_w_g, aer_tau_w_f,       &
+                  per_tau*0.0_r8, per_tau_w, per_tau_w_g, per_tau_w_f,       &
                   eccf, coszrs, rd%solin, sfac, cam_in%asdir,                &
                   cam_in%asdif, cam_in%aldir, cam_in%aldif, qrs, rd%qrsc,    &
                   fsnt, rd%fsntc, rd%fsntoa, rd%fsutoa, rd%fsntoac,          &
@@ -1174,18 +1169,18 @@ subroutine radiation_tend( &
                   !
 !ak               Note that DRF fields are now from the per_tau=0 call (clean), no longer with per_tau from pmxsub                 
                   call outfld('QRS_DRF ',ftem  ,pcols,lchnk)
-                  ftem(:ncol,:pver) = rd%qrsc(:ncol,:pver,icall)/cpair
+                  ftem(:ncol,:pver) = rd%qrsc(:ncol,:pver)/cpair
                   call outfld('QRSC_DRF',ftem  ,pcols,lchnk)
-                  call outfld('FSNT_DRF',rd%fsnt(:,icall)  ,pcols,lchnk)
-                  call outfld('FSNS_DRF',rd%fsns(:,icall)  ,pcols,lchnk)
-                  call outfld('FSNTCDRF',rd%fsntc(:,icall) ,pcols,lchnk)
-                  call outfld('FSNSCDRF',rd%fsnsc(:,icall) ,pcols,lchnk)
+                  call outfld('FSNT_DRF',fsnt(:)  ,pcols,lchnk)
+                  call outfld('FSNS_DRF',fsns(:)  ,pcols,lchnk)
+                  call outfld('FSNTCDRF',rd%fsntc(:) ,pcols,lchnk)
+                  call outfld('FSNSCDRF',rd%fsnsc(:) ,pcols,lchnk)
 #ifdef AEROCOM
-                  call outfld('FSUTADRF',rd%fsutoa(:,icall),pcols,lchnk)
-                  call outfld('FSDS_DRF',rd%fsds(:,icall)  ,pcols,lchnk)
-                  ftem_1d(1:ncol) = rd%fsds(1:ncol,icall)-rd%fsns(1:ncol,icall)
+                  call outfld('FSUTADRF',rd%fsutoa(:),pcols,lchnk)
+                  call outfld('FSDS_DRF',fsds(:)  ,pcols,lchnk)
+                  ftem_1d(1:ncol) = fsds(1:ncol)-fsns(1:ncol)
                   call outfld('FSUS_DRF',ftem_1d,pcols,lchnk)
-                  call outfld('FSDSCDRF',rd%fsdsc(:,icall) ,pcols,lchnk)
+                  call outfld('FSDSCDRF',rd%fsdsc(:) ,pcols,lchnk)
 #endif
 #endif ! AEROFFL
 #endif ! DIRIND
@@ -1295,8 +1290,8 @@ subroutine radiation_tend( &
                   rd%flut, rd%flutc, fnl, fcnl, rd%fldsc,            &
                   lu, ld)
 
-                  call outfld('FLNT_DRF',rd%flnt(:,icall)  ,pcols,lchnk)
-                  call outfld('FLNTCDRF',rd%flntc(:,icall) ,pcols,lchnk)
+                  call outfld('FLNT_DRF',flnt(:)  ,pcols,lchnk)
+                  call outfld('FLNTCDRF',rd%flntc(:) ,pcols,lchnk)
 #endif  ! AEROFFL
 #endif  ! DIRIND
 
@@ -1314,8 +1309,8 @@ subroutine radiation_tend( &
 #ifdef DIRIND
 #ifdef AEROFFL   ! FLNT_ORG is just for temporary testing vs. FLNT
 #ifdef AEROCOM
-                  call outfld('FLNT_ORG',rd%flnt(:,icall)  ,pcols,lchnk)
-                  ftem_1d(1:ncol) = cam_out%flwds(1:ncol) - rd%flns(1:ncol,icall)
+                  call outfld('FLNT_ORG',flnt(:)  ,pcols,lchnk)
+                  ftem_1d(1:ncol) = cam_out%flwds(1:ncol) - flns(1:ncol)
                   call outfld('FLUS    ',ftem_1d ,pcols,lchnk)
 #endif  ! AEROCOM
 #endif  ! AEROFFL
