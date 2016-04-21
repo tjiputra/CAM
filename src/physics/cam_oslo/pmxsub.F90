@@ -85,7 +85,7 @@ subroutine pmxsub(lchnk, ncol, pint, pmid, coszrs, state, t, qm1, Nnatk, &
    real(r8) Ca(pcols,pver), f_c(pcols,pver), f_bc(pcols,pver), f_aq(pcols,pver)
    real(r8) fnbc(pcols,pver), faitbc(pcols,pver), f_so4_cond(pcols,pver), &
             f_soa(pcols,pver),f_soana(pcols,pver), vnbc, vaitbc
-   real(r8) v_soana(pcols,pver)
+   real(r8) v_soana(pcols,pver), vnbcarr(pcols,pver), vaitbcarr(pcols,pver)
    real(r8) dCtot(pcols,pver), Ctot(pcols,pver)
    real(r8) Cam(pcols,pver,nbmodes), fbcm(pcols,pver,nbmodes), fcm(pcols,pver,nbmodes), &
             faqm(pcols,pver,nbmodes), f_condm(pcols,pver,nbmodes), &
@@ -363,6 +363,17 @@ subroutine pmxsub(lchnk, ncol, pint, pmid, coszrs, state, t, qm1, Nnatk, &
             abs550_so4(pcols), abs550_bc(pcols), abs550_pom(pcols)
    real(r8) batotsw13(pcols,pver), batotlw01(pcols,pver)
 #endif  ! AEROCOM
+!+
+#ifdef AEROCOM
+      character(len=10) :: modeString
+      character(len=20) :: varname
+      real(r8) Camrel(pcols,pver,nbmodes)
+      real(r8) Camtot(pcols,nbmodes)
+      real(r8) cxsmtot(pcols,nbmodes)
+      real(r8) cxsmrel(pcols,nbmodes)
+      real(r8) xctrel,camdiff,cxsm
+#endif  
+!-
 
 
 !
@@ -387,6 +398,13 @@ subroutine pmxsub(lchnk, ncol, pint, pmid, coszrs, state, t, qm1, Nnatk, &
 !          rhum(icol,k) = 0.01_r8
 !TEST
          end do
+      end do
+
+!     Layer thickness with unit km
+      do icol=1,ncol
+        do k=1,pver
+          deltah_km(icol,k)=1.e-4_r8*(pint(icol,k+1)-pint(icol,k))/(rhoda(icol,k)*9.8_r8) 
+        end do
       end do
 
 !     interpol-calculations only when daylight or not:
@@ -468,6 +486,77 @@ subroutine pmxsub(lchnk, ncol, pint, pmid, coszrs, state, t, qm1, Nnatk, &
         enddo
       enddo
 !soa
+
+!+
+#ifdef AEROCOM
+!     Initializing total and relative exessive (overshooting w.r.t. 
+!     look-up table maxima) added mass column:
+      do i=1,nbmodes
+        do icol=1,ncol
+           Camtot(icol,i)=0.0_r8
+           cxsmtot(icol,i)=0.0_r8
+           cxsmrel(icol,i)=0.0_r8
+        enddo
+      enddo
+!
+!     Calculating added internally mixed mass onto each mode 1-10, relative to
+!     maximum mass which can be added w.r.t. the look-up tables (for level k),
+!     as well as the relative exessive added mass column:
+      do i=1,4
+       do k=1,pver
+         do icol=1,ncol
+!            Camrel(icol,k,i) = (Cam(icol,k,i)/Nnatk(icol,k,i))/cate(i,16)
+            Camrel(icol,k,i) = (Cam(icol,k,i)/(Nnatk(icol,k,i)+eps))/cate(i,16)
+!++
+            xctrel=min(max(Camrel(icol,k,i),cate(i,1)/cate(i,16)),1.0_r8)
+            camdiff=Cam(icol,k,i)-xctrel*cate(i,16)*(Nnatk(icol,k,i)+eps)
+            cxsm=max(0.0_r8,camdiff)
+            cxsmtot(icol,i)=cxsmtot(icol,i)+cxsm*deltah_km(icol,k)          
+            Camtot(icol,i)=Camtot(icol,i)+Cam(icol,k,i)*deltah_km(icol,k)          
+!--            
+         enddo 
+       enddo  
+      enddo  
+      do i=5,nbmodes
+       do k=1,pver
+         do icol=1,ncol
+!            Camrel(icol,k,i) = (Cam(icol,k,i)/Nnatk(icol,k,i))/cat(i,6)
+            Camrel(icol,k,i) = (Cam(icol,k,i)/(Nnatk(icol,k,i)+eps))/cat(i,6)
+!++
+            xctrel=min(max(Camrel(icol,k,i),cat(i,1)/cat(i,6)),1.0_r8)
+            camdiff=Cam(icol,k,i)-xctrel*cat(i,6)*(Nnatk(icol,k,i)+eps)
+            cxsm=max(0.0_r8,camdiff)
+            cxsmtot(icol,i)=cxsmtot(icol,i)+cxsm*deltah_km(icol,k) 
+            Camtot(icol,i)=Camtot(icol,i)+Cam(icol,k,i)*deltah_km(icol,k)          
+!--            
+         enddo 
+       enddo  
+      enddo  
+!++
+      do i=1,nbmodes
+        do icol=1,ncol
+           cxsmrel(icol,i)=cxsmtot(icol,i)/(Camtot(icol,i)+eps)
+        enddo
+      enddo
+!--            
+      do i=1,nbmodes
+          modeString="  "
+          write(modeString,"(I2)"),i
+          if(i.lt.10) modeString="0"//adjustl(modeString)
+          varName = "Camrel"//trim(modeString)
+          if(i.ne.3) call outfld(varName,Camrel(:,:,i),pcols,lchnk)
+      enddo  
+!++
+      do i=1,nbmodes
+          modeString="  "
+          write(modeString,"(I2)"),i
+          if(i.lt.10) modeString="0"//adjustl(modeString)
+          varName = "Cxsrel"//trim(modeString)
+          if(i.ne.3) call outfld(varName,cxsmrel(:,i),pcols,lchnk)
+      enddo  
+!--
+#endif
+!-
 
       do k=1,pver
         do icol=1,ncol
@@ -709,7 +798,8 @@ enddo ! iloop
           mmr_aerh2o(icol,k)=1.e-9_r8*Cwater(icol,k)/rhoda(icol,k)
 #ifdef COLTST4INTCONS 
 !         and dry mass column burdens for each mode/mixture
-          deltah=1.e-4_r8*(pint(icol,k+1)-pint(icol,k))/(rhoda(icol,k)*9.8_r8)
+!-          deltah=1.e-4_r8*(pint(icol,k+1)-pint(icol,k))/(rhoda(icol,k)*9.8_r8)
+          deltah=deltah_km(icol,k)
           cmdry0(icol)=cmdry0(icol)+cmodedry(icol,k,0)*deltah
           cmdry1(icol)=cmdry1(icol)+cmodedry(icol,k,1)*deltah
           cmdry2(icol)=cmdry2(icol)+cmodedry(icol,k,2)*deltah
@@ -779,13 +869,13 @@ enddo ! iloop
 ! 12 0.263 0.345          2
 ! 13 0.200 0.263          1
       
-        do icol=1,ncol
-         do k=1,pver
-!         Layer thickness, unit km, and layer airmass, unit kg/m2
-          deltah=1.e-4_r8*(pint(icol,k+1)-pint(icol,k))/(rhoda(icol,k)*9.8_r8) 
-          deltah_km(icol,k)=deltah
-         end do
-       end do
+!-        do icol=1,ncol
+!-         do k=1,pver
+!-         Layer thickness, unit km, and layer airmass, unit kg/m2
+!-          deltah=1.e-4_r8*(pint(icol,k+1)-pint(icol,k))/(rhoda(icol,k)*9.8_r8) 
+!-          deltah_km(icol,k)=deltah
+!-         end do
+!-       end do
 
        do i=1,ncol  ! zero aerosol in the top layer
         do ib=1,14 ! 1-nbands
@@ -992,13 +1082,14 @@ enddo ! iloop
 !          taukc13(icol)=0.0_r8
           taukc14(icol)=0.0_r8
 #endif
-        enddo
+       enddo
 
         do icol=1,ncol
          do k=1,pver
 !         Layer thickness, unit km, and layer airmass, unit kg/m2
-          deltah=1.e-4_r8*(pint(icol,k+1)-pint(icol,k))/(rhoda(icol,k)*9.8_r8) 
-          deltah_km(icol,k)=deltah
+!-          deltah=1.e-4_r8*(pint(icol,k+1)-pint(icol,k))/(rhoda(icol,k)*9.8_r8) 
+!-          deltah_km(icol,k)=deltah
+          deltah=deltah_km(icol,k)
           airmass(icol,k)=1.e3_r8*deltah*rhoda(icol,k)
 !         Added mass due to nucleation, condensation, coagulation or aqueous chemistry ! not updated w.r.t. SOA!!!
 !          akso4c(icol)=akso4c(icol)+deltah* &
@@ -1429,8 +1520,9 @@ enddo ! iloop
           do icol=1,ncol
 
 !BC
-            vnbc = fnbc(icol,k)/(fnbc(icol,k) &
+            vnbcarr(icol,k) = fnbc(icol,k)/(fnbc(icol,k) &
                            +(1.0_r8-fnbc(icol,k))*rhopart(l_bc_ni)/rhopart(l_om_ni))
+            vnbc = vnbcarr(icol,k)            
             bebc440xt(icol,k) =Nnatk(icol,k,12)*be440x(icol,k,12)  &
                          +vnbc*Nnatk(icol,k,14)*be440x(icol,k,14)
             babc440xt(icol,k) =Nnatk(icol,k,12)*ba440x(icol,k,12)  &
@@ -1563,7 +1655,8 @@ enddo ! iloop
          do icol=1,ncol
           do k=1,pver
 !          Layer thickness, unit km
-           deltah=1.e-4_r8*(pint(icol,k+1)-pint(icol,k))/(rhoda(icol,k)*9.8_r8)
+!-           deltah=1.e-4_r8*(pint(icol,k+1)-pint(icol,k))/(rhoda(icol,k)*9.8_r8)
+           deltah=deltah_km(icol,k)
 !          if(k==pver) write(*,*) 'icol, deltah(pmxsub)=', icol, deltah
 !          3D optical depths for monthly averages
 !SS
@@ -1601,8 +1694,9 @@ enddo ! iloop
           +(1.0_r8-v_soana(icol,k))*Nnatk(icol,k,1)*bebg870(icol,k,1) &       ! background, SO4(Ait) mode (1)
                                   + Nnatk(icol,k,5)*bebg870(icol,k,5))*deltah ! background, SO4(Ait75) mode (5)
 !BC
-           vaitbc = faitbc(icol,k)/(faitbc(icol,k) &
+           vaitbcarr(icol,k) = faitbc(icol,k)/(faitbc(icol,k) &
                            +(1.0_r8-faitbc(icol,k))*rhopart(l_bc_ni)/rhopart(l_om_ni))
+           vaitbc = vaitbcarr(icol,k)
            dod4403d_bc(icol,k) = (bebc440tot(icol,k)+bebc440xt(icol,k)  &     ! coagulated + n-mode BC (12)
                                   + Nnatk(icol,k,2)*bebg440(icol,k,2) &       ! background, BC(Ait) mode (2)
                            + vaitbc*Nnatk(icol,k,4)*bebg440(icol,k,4) &       ! background in OC&BC(Ait) mode (4)
@@ -2045,7 +2139,8 @@ enddo ! iloop
           dload_oc_14(icol)=0.0_r8
          do k=1,pver
 !         Layer thickness, unit km
-          deltah=1.e-4_r8*(pint(icol,k+1)-pint(icol,k))/(rhoda(icol,k)*9.8_r8)
+!-          deltah=1.e-4_r8*(pint(icol,k+1)-pint(icol,k))/(rhoda(icol,k)*9.8_r8)
+          deltah=deltah_km(icol,k)
 !         Modal and total mass concentrations for clean and dry aerosol, 
 !         i.e. not including coag./cond./Aq. BC,OC,SO4 or condensed water. 
 !         Units: ug/m3 for concentrations and mg/m2 (--> kg/m2 later) for mass loading.  
@@ -2279,7 +2374,8 @@ enddo ! iloop
       call opticsAtConstRh(lchnk, ncol, pint, rhoda, Nnatk, xrhnull, irh1null, irh2null, &
                            Cam, camnull, fcm, fbcm, faqm, &
                            faqm4, fnbc, faitbc, focm, f_soana,  &
-                           vnbc, vaitbc, v_soana)
+!err                           vnbc, vaitbc, v_soana)
+                           vnbcarr, vaitbcarr, v_soana)
 
 !000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 

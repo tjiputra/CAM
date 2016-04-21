@@ -42,7 +42,9 @@
 <ncdata dyn="fv"  hgrid="0.23x0.31" nlev="30"  ic_ymd="101"     >atm/cam/inic/fv/cami-mam3_0000-01-01_0.23x0.31_L30_c110527.nc</ncdata>
 <ncdata dyn="fv"  hgrid="0.47x0.63" nlev="30"  ic_ymd="101"     >atm/cam/inic/fv/cami-mam3_0000-01-01_0.47x0.63_L30_c100929.nc</ncdata>
 <ncdata dyn="fv"  hgrid="0.9x1.25"  nlev="30"  ic_ymd="101"     >atm/cam/inic/fv/cami-mam3_0000-01-01_0.9x1.25_L30_c100618.nc</ncdata>
+<ncdata dyn="fv"  hgrid="0.9x1.25"  nlev="32"  ic_ymd="101"     >atm/cam/inic/fv/cami-mam3_0000-01-01_0.9x1.25_L32_c141031.nc</ncdata>
 <ncdata dyn="fv"  hgrid="1.9x2.5"   nlev="30"  ic_ymd="101"     >atm/cam/inic/fv/cami_0000-01-01_1.9x2.5_L30_c070703.nc</ncdata>
+<ncdata dyn="fv"  hgrid="1.9x2.5"   nlev="32"  ic_ymd="101"     >atm/cam/inic/fv/cami-mam3_0000-01-01_1.9x2.5_L32_c150407.nc</ncdata>
 <ncdata dyn="fv"  hgrid="1.9x2.5"   nlev="30"  ic_ymd="901"     >atm/cam/inic/fv/cami_0000-09-01_1.9x2.5_L30_c070109.nc</ncdata>
 <ncdata dyn="fv"  hgrid="2.5x3.33"  nlev="30"  ic_ymd="101"     >atm/cam/inic/fv/cami_0000-01-01_2.5x3.33_L30_c110309.nc </ncdata>
 <ncdata dyn="fv"  hgrid="2.5x3.33"  nlev="30"  ic_ymd="901"     >atm/cam/inic/fv/cami_0000-09-01_2.5x3.33_L30_c100831.nc</ncdata>
@@ -57,6 +59,7 @@
 <ncdata dyn="fv"  hgrid="10x15"     nlev="64"  ic_ymd="101"     >atm/cam/inic/fv/cami_0000-01-01_10x15_L64_c081013.nc</ncdata>
 
 <ncdata dyn="fv"  hgrid="1.9x2.5"   nlev="30"  chem="trop_mam3" ic_ymd="101">atm/cam/inic/fv/cami-mam3_0000-01-01_1.9x2.5_L30_c090306.nc</ncdata>
+<ncdata dyn="fv"  hgrid="1.9x2.5"   nlev="32"  chem="trop_mam3" ic_ymd="101">atm/cam/inic/fv/cami-mam3_0000-01-01_1.9x2.5_L32_c150407.nc</ncdata>
 
 <ncdata dyn="fv"  hgrid="0.47x0.63" nlev="26"  ocn="aquaplanet"  ic_ymd="101" >atm/cam/inic/fv/cami_0000-01-01_0.47x0.63_L26_APE_c080227.nc</ncdata>
 <ncdata dyn="fv"  hgrid="1.9x2.5"   nlev="26"  ocn="aquaplanet"  ic_ymd="101" >atm/cam/inic/fv/cami_0000-01-01_1.9x2.5_L26_APE_c080203.nc</ncdata>

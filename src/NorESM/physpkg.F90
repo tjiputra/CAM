@@ -78,7 +78,10 @@ module physpkg
   integer ::  qini_idx           = 0 
   integer ::  cldliqini_idx      = 0 
   integer ::  cldiceini_idx      = 0 
-
+!AL
+  integer ::  cldncini_idx      = 0 
+  integer ::  cldniini_idx      = 0 
+!AK
   integer ::  prec_str_idx       = 0
   integer ::  snow_str_idx       = 0
   integer ::  prec_sed_idx       = 0
@@ -193,7 +196,10 @@ subroutine phys_register
     call pbuf_add_field('QINI',      'physpkg', dtype_r8, (/pcols,pver/), qini_idx)
     call pbuf_add_field('CLDLIQINI', 'physpkg', dtype_r8, (/pcols,pver/), cldliqini_idx)
     call pbuf_add_field('CLDICEINI', 'physpkg', dtype_r8, (/pcols,pver/), cldiceini_idx)
-
+!AL
+    call pbuf_add_field('CLDNCINI', 'physpkg', dtype_r8, (/pcols,pver/), cldncini_idx)
+    call pbuf_add_field('CLDNIINI', 'physpkg', dtype_r8, (/pcols,pver/), cldniini_idx)
+!AL
     ! check energy package
     call check_energy_register
 
@@ -1329,7 +1335,9 @@ subroutine tphysac (ztodt,   cam_in,  &
     integer i,k,m                 ! Longitude, level indices
     integer :: yr, mon, day, tod       ! components of a date
     integer :: ixcldice, ixcldliq      ! constituent indices for cloud liquid and ice water.
-
+!AL
+    integer :: ixnumice, ixnumliq
+!AL
     logical :: labort                            ! abort flag
 
     real(r8) tvm(pcols,pver)           ! virtual temperature
@@ -1351,6 +1359,12 @@ subroutine tphysac (ztodt,   cam_in,  &
     real(r8), pointer, dimension(:,:) :: cldiceini
     real(r8), pointer, dimension(:,:) :: dtcore
     real(r8), pointer, dimension(:,:) :: ast     ! relative humidity cloud fraction 
+!AL
+    real(r8), pointer, dimension(:,:) :: cldncini
+    real(r8), pointer, dimension(:,:) :: cldniini
+    real(r8) :: tmp_cldnc(pcols,pver) ! tmp space
+    real(r8) :: tmp_cldni(pcols,pver) ! tmp space
+!AL
 
 !+tht 22/5/14 variables and flags for dry-mass energy adjustment
     real(r8):: eflx(pcols)
@@ -1385,6 +1399,10 @@ subroutine tphysac (ztodt,   cam_in,  &
     call pbuf_get_field(pbuf, qini_idx, qini)
     call pbuf_get_field(pbuf, cldliqini_idx, cldliqini)
     call pbuf_get_field(pbuf, cldiceini_idx, cldiceini)
+!AL
+    call pbuf_get_field(pbuf, cldncini_idx, cldncini)
+    call pbuf_get_field(pbuf, cldniini_idx, cldniini)
+!AL
 
     ifld = pbuf_get_index('CLD')
     call pbuf_get_field(pbuf, ifld, cld, start=(/1,1,itim_old/),kount=(/pcols,pver,1/))
@@ -1566,7 +1584,7 @@ subroutine tphysac (ztodt,   cam_in,  &
 
     ! Check energy integrals
     call check_energy_chng(state, tend, "iondrag", nstep, ztodt, zero, zero, zero, zero)
-
+    
     call t_stopf  ( 'iondrag' )
 
        !-------------- Energy budget checks vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
@@ -1601,6 +1619,12 @@ subroutine tphysac (ztodt,   cam_in,  &
        tmp_q     (:ncol,:pver) = state%q(:ncol,:pver,1)
        tmp_cldliq(:ncol,:pver) = state%q(:ncol,:pver,ixcldliq)
        tmp_cldice(:ncol,:pver) = state%q(:ncol,:pver,ixcldice)
+!AL
+       call cnst_get_ind('NUMLIQ', ixnumliq)
+       call cnst_get_ind('NUMICE', ixnumice)
+       tmp_cldnc(:ncol,:pver) = state%q(:ncol,:pver,ixnumliq)
+       tmp_cldni(:ncol,:pver) = state%q(:ncol,:pver,ixnumice)
+!AL
        call physics_dme_adjust(state, tend, qini, ztodt)
 !!!   REMOVE THIS CALL, SINCE ONLY Q IS BEING ADJUSTED. WON'T BALANCE ENERGY. TE IS SAVED BEFORE THIS
 !!!   call check_energy_chng(state, tend, "drymass", nstep, ztodt, zero, zero, zero, zero)
@@ -1622,9 +1646,12 @@ subroutine tphysac (ztodt,   cam_in,  &
        endif
     endif
 
+!AL
+!    call diag_phys_tend_writeout (state, pbuf,  tend, ztodt, tmp_q, tmp_cldliq, tmp_cldice, &
+!         qini, cldliqini, cldiceini)
     call diag_phys_tend_writeout (state, pbuf,  tend, ztodt, tmp_q, tmp_cldliq, tmp_cldice, &
-         qini, cldliqini, cldiceini)
-
+         tmp_cldnc,tmp_cldni,qini, cldliqini, cldiceini, cldncini, cldniini, eflx )
+!AL
     call clybry_fam_set( ncol, lchnk, map2chm, state%q, pbuf )
 
 end subroutine tphysac
@@ -1745,6 +1772,9 @@ subroutine tphysbc (ztodt, state,  &
 
     integer  i,k,m                             ! Longitude, level, constituent indices
     integer :: ixcldice, ixcldliq              ! constituent indices for cloud liquid and ice water.
+!AL
+    integer :: ixcldni, ixcldnc              ! constituent indices for cloud liquid and ice water.
+!AL
     ! for macro/micro co-substepping
     integer :: macmic_it                       ! iteration variables
     real(r8) :: cld_macmic_ztodt               ! modified timestep
@@ -1763,7 +1793,10 @@ subroutine tphysbc (ztodt, state,  &
     real(r8), pointer, dimension(:,:) :: cldliqini
     real(r8), pointer, dimension(:,:) :: cldiceini
     real(r8), pointer, dimension(:,:) :: dtcore
-
+!AL
+    real(r8), pointer, dimension(:,:) :: cldncini
+    real(r8), pointer, dimension(:,:) :: cldniini
+!AL
     real(r8), pointer, dimension(:,:,:) :: fracis  ! fraction of transported species that are insoluble
 
     ! convective precipitation variables
@@ -1884,6 +1917,10 @@ subroutine tphysbc (ztodt, state,  &
     call pbuf_get_field(pbuf, qini_idx, qini)
     call pbuf_get_field(pbuf, cldliqini_idx, cldliqini)
     call pbuf_get_field(pbuf, cldiceini_idx, cldiceini)
+!AL
+    call pbuf_get_field(pbuf, cldncini_idx, cldncini)
+    call pbuf_get_field(pbuf, cldniini_idx, cldniini)
+!AL
 
     ifld   =  pbuf_get_index('DTCORE')
     call pbuf_get_field(pbuf, ifld, dtcore, start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
@@ -1942,6 +1979,12 @@ subroutine tphysbc (ztodt, state,  &
     qini     (:ncol,:pver) = state%q(:ncol,:pver,       1)
     cldliqini(:ncol,:pver) = state%q(:ncol,:pver,ixcldliq)
     cldiceini(:ncol,:pver) = state%q(:ncol,:pver,ixcldice)
+!AL
+    call cnst_get_ind('NUMLIQ', ixcldnc)
+    call cnst_get_ind('NUMICE', ixcldni)
+    cldncini(:ncol,:pver) = state%q(:ncol,:pver,ixcldnc)
+    cldniini(:ncol,:pver) = state%q(:ncol,:pver,ixcldni)
+!AL
 
     call outfld('TEOUT', teout       , pcols, lchnk   )
     call outfld('TEINP', state%te_ini, pcols, lchnk   )

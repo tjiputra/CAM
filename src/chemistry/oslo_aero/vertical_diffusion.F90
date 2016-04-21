@@ -565,6 +565,10 @@ subroutine vertical_diffusion_init(pbuf2d)
     if( history_budget ) then
         call add_default( vdiffnam(ixcldliq), history_budget_histfile_num, ' ' )
         call add_default( vdiffnam(ixcldice), history_budget_histfile_num, ' ' )
+!AL
+        call add_default( vdiffnam(ixnumliq), history_budget_histfile_num, ' ' )
+        call add_default( vdiffnam(ixnumice), history_budget_histfile_num, ' ' )
+!AL
         if( history_budget_histfile_num > 1 ) then
            call add_default(  vdiffnam(1), history_budget_histfile_num, ' ' )
            call add_default( 'DTV'       , history_budget_histfile_num, ' ' )

@@ -162,12 +162,28 @@ subroutine diag_init(pbuf2d)
    use cam_control_mod,    only: moist_physics, ideal_phys
    use physics_buffer,     only: pbuf_set_field
    use tidal_diag,         only: tidal_diag_init 
+!+
+#ifdef AEROCOM
+   use commondefinitions,  only: nbmodes 
+#endif  
+!-
 
    type(physics_buffer_desc), pointer, intent(in) :: pbuf2d(:,:)
 
    integer :: k, m
    integer :: ixcldice, ixcldliq ! constituent indices for cloud liquid and ice water.
+!AL
+   integer :: ixcldni, ixcldnc ! constituent indices for cloud liquid and ice water.
+!AL
    integer :: ierr
+
+!+
+#ifdef AEROCOM
+      character(len=10) :: modeString
+      character(len=20) :: varname
+      integer :: i
+#endif  
+!-
 
    ! outfld calls in diag_phys_writeout
 
@@ -305,7 +321,7 @@ subroutine diag_init(pbuf2d)
    call addfld ('CLDFREE ',horiz_only, 'A','unitless','Cloud free fraction wrt CAODVIS and CABSVIS')
    call addfld ('DAYFOC  ',horiz_only, 'A','unitless','Daylight fraction')
    call addfld ('N_AER   ',(/'lev'/),'A', 'unitless','Aerosol number concentration')
-   call addfld ('N_AERORG',(/'lev'/),'A','unitless','Aerosol number concentration')
+!-   call addfld ('N_AERORG','unitless',pver, 'A','Aerosol number concentration',phys_decomp)
    call addfld ('SSAVIS  ',(/'lev'/),'A','unitless','Aerosol single scattering albedo in visible wavelength band')    
    call addfld ('ASYMMVIS',(/'lev'/),'A','unitless','Aerosol assymetry factor in visible wavelength band')    
    call addfld ('EXTVIS  ',(/'lev'/),'A','1/km    ','Aerosol extinction')     
@@ -512,6 +528,24 @@ subroutine diag_init(pbuf2d)
       call addfld ('BATSW13 ',(/'lev'/),'A','unitless','Aerosol 3d SW absorptive optical depth at 3.077-3.846um')
       call addfld ('BATLW01 ',(/'lev'/),'A','unitless','Aerosol 3d LW absorptive optical depth at 3.077-3.846um')
       call addfld ('AERLWA01',(/'lev'/),'A','unitless','CAM5 3d LW absorptive optical depth at 3.077-3.846um')
+!+
+      do i=1,nbmodes
+         modeString="  "
+         write(modeString,"(I2)"),i
+         if(i.lt.10) modeString="0"//adjustl(modeString)
+         varName = "Camrel"//trim(modeString)
+         if(i.ne.3) call addfld(varName, (/'lev'/),'A','unitless', 'relative added mass for mode'//modeString)
+      enddo  
+!++
+      do i=1,nbmodes
+         modeString="  "
+         write(modeString,"(I2)"),i
+         if(i.lt.10) modeString="0"//adjustl(modeString)
+         varName = "Cxsrel"//trim(modeString)
+         if(i.ne.3) call addfld(varName, horiz_only, 'A', 'unitless', 'relative exessive added mass column for mode'//modeString)
+      enddo  
+!--
+!-
 #endif  ! aerocom
 #endif  ! dirind
 
@@ -814,6 +848,24 @@ subroutine diag_init(pbuf2d)
       call add_default ('BATSW13 ', 1, ' ')
       call add_default ('BATLW01 ', 1, ' ')
       call add_default ('AERLWA01', 1, ' ')
+!+
+      do i=1,nbmodes
+         modeString="  "
+         write(modeString,"(I2)"),i
+         if(i.lt.10) modeString="0"//adjustl(modeString)
+         varName = "Camrel"//trim(modeString)
+         if(i.ne.3) call add_default(varName, 1, ' ')
+      enddo  
+!++
+      do i=1,nbmodes
+         modeString="  "
+         write(modeString,"(I2)"),i
+         if(i.lt.10) modeString="0"//adjustl(modeString)
+         varName = "Cxsrel"//trim(modeString)
+         if(i.ne.3) call add_default(varName, 1, ' ')
+      enddo  
+!--
+!-
 #endif  ! aerocom
 #endif  ! dirind
 
@@ -842,6 +894,10 @@ subroutine diag_init(pbuf2d)
    call addfld ('DTCOND_24_SIN',(/ 'lev' /), 'A','K/s','T tendency - moist processes 24hr. sin coeff.')
    call addfld ('DTCOND_12_COS',(/ 'lev' /), 'A','K/s','T tendency - moist processes 12hr. cos coeff.')
    call addfld ('DTCOND_12_SIN',(/ 'lev' /), 'A','K/s','T tendency - moist processes 12hr. sin coeff.')
+!AL
+   call cnst_get_ind('NUMLIQ', ixcldnc)
+   call cnst_get_ind('NUMICE', ixcldni)
+!AL
 
    ! determine number of constituents for which convective tendencies must be computed
    if (history_budget) then
@@ -960,6 +1016,10 @@ subroutine diag_init(pbuf2d)
    call addfld (ptendnam(       1),(/ 'lev' /), 'A', 'kg/kg/s',trim(cnst_name(       1))//' total physics tendency '      )
    call addfld (ptendnam(ixcldliq),(/ 'lev' /), 'A', 'kg/kg/s',trim(cnst_name(ixcldliq))//' total physics tendency '      )
    call addfld (ptendnam(ixcldice),(/ 'lev' /), 'A', 'kg/kg/s',trim(cnst_name(ixcldice))//' total physics tendency '      )
+!AL
+   call addfld (ptendnam(ixcldnc), (/ 'lev' /), 'A', '#/kg/s ',trim(cnst_name(ixcldnc))//' total physics tendency ')
+   call addfld (ptendnam(ixcldni), (/ 'lev' /), 'A', '#/kg/s ',trim(cnst_name(ixcldni))//' total physics tendency ')
+!AL
    if ( dycore_is('LR') )then
       call addfld (dmetendnam(       1),(/ 'lev' /), 'A','kg/kg/s', &
            trim(cnst_name(       1))//' dme adjustment tendency (FV) ')
@@ -967,6 +1027,12 @@ subroutine diag_init(pbuf2d)
            trim(cnst_name(ixcldliq))//' dme adjustment tendency (FV) ')
       call addfld (dmetendnam(ixcldice),(/ 'lev' /), 'A','kg/kg/s', &
            trim(cnst_name(ixcldice))//' dme adjustment tendency (FV) ')
+!AL
+      call addfld (dmetendnam(ixcldnc),,(/ 'lev' /), 'A','#/kg/s ',   & &
+           trim(cnst_name(ixcldnc))//' dme adjustment tendency (FV) ')
+      call addfld (dmetendnam(ixcldni),,(/ 'lev' /), 'A','#/kg/s ',   & 
+           trim(cnst_name(ixcldni))//' dme adjustment tendency (FV) ')
+!AL
    end if
 
    if ( history_budget ) then
@@ -974,10 +1040,18 @@ subroutine diag_init(pbuf2d)
       call add_default (ptendnam(       1), history_budget_histfile_num, ' ')
       call add_default (ptendnam(ixcldliq), history_budget_histfile_num, ' ')
       call add_default (ptendnam(ixcldice), history_budget_histfile_num, ' ')
+!AL
+      call add_default (ptendnam(ixcldnc), history_budget_histfile_num, ' ')
+      call add_default (ptendnam(ixcldni), history_budget_histfile_num, ' ')
+!AL
       if ( dycore_is('LR') )then
          call add_default(dmetendnam(1)       , history_budget_histfile_num, ' ')
          call add_default(dmetendnam(ixcldliq), history_budget_histfile_num, ' ')
          call add_default(dmetendnam(ixcldice), history_budget_histfile_num, ' ')
+!AL
+         call add_default(dmetendnam(ixcldnc), history_budget_histfile_num, ' ')
+         call add_default(dmetendnam(ixcldni), history_budget_histfile_num, ' ')
+!AL
       end if
       if( history_budget_histfile_num > 1 ) then
          call add_default ('DTCOND  '         , history_budget_histfile_num, ' ')
@@ -2030,10 +2104,12 @@ end subroutine diag_export
 
 
 !#######################################################################
-
+!AL
+!subroutine diag_phys_tend_writeout(state, pbuf,  tend, ztodt, tmp_q, tmp_cldliq, tmp_cldice, &
+!                                   qini, cldliqini, cldiceini, eflx)
 subroutine diag_phys_tend_writeout(state, pbuf,  tend, ztodt, tmp_q, tmp_cldliq, tmp_cldice, &
-                                   qini, cldliqini, cldiceini, eflx)
-
+                                  tmp_cldnc,tmp_cldni,qini, cldliqini, cldiceini,cldncini, cldniini, eflx)
+!AL
    !---------------------------------------------------------------
    !
    ! Purpose:  Dump physics tendencies for moisture and temperature
@@ -2057,6 +2133,12 @@ subroutine diag_phys_tend_writeout(state, pbuf,  tend, ztodt, tmp_q, tmp_cldliq,
    real(r8)           , intent(in   ) :: cldliqini (pcols,pver) ! tracer fields at beginning of physics
    real(r8)           , intent(in   ) :: cldiceini (pcols,pver) ! tracer fields at beginning of physics
    real(r8)           , intent(in   ), optional :: eflx      (pcols     ) ! pseudo-flux of heat associated with mass adj.
+!AL
+   real(r8)           , intent(inout) :: tmp_cldnc(pcols,pver) ! As input, holds pre-adjusted tracers (FV)
+   real(r8)           , intent(inout) :: tmp_cldni(pcols,pver) ! As input, holds pre-adjusted tracers (FV)
+   real(r8)           , intent(in   ) :: cldncini (pcols,pver) ! tracer fields at beginning of physics
+   real(r8)           , intent(in   ) :: cldniini (pcols,pver) ! tracer fields at beginning of physics
+!AL
    !---------------------------Local workspace-----------------------------
 
    integer  :: m      ! constituent index
@@ -2067,6 +2149,9 @@ subroutine diag_phys_tend_writeout(state, pbuf,  tend, ztodt, tmp_q, tmp_cldliq,
    real(r8) :: rtdt
    real(r8) :: heat_glob         ! global energy integral (FV only)
    integer  :: ixcldice, ixcldliq! constituent indices for cloud liquid and ice water.
+!AL
+   integer  :: ixnumice, ixnumliq! constituent indices for cloud liquid and ice water.
+!AL
    ! CAM pointers to get variables from the physics buffer
    real(r8), pointer, dimension(:,:) :: t_ttend  
    integer  :: itim_old
@@ -2078,7 +2163,10 @@ subroutine diag_phys_tend_writeout(state, pbuf,  tend, ztodt, tmp_q, tmp_cldliq,
    rtdt  = 1._r8/ztodt
    call cnst_get_ind('CLDLIQ', ixcldliq)
    call cnst_get_ind('CLDICE', ixcldice)
-
+!AL
+   call cnst_get_ind('NUMLIQ', ixnumliq)
+   call cnst_get_ind('NUMICE', ixnumice)
+!AL
    ! Dump out post-physics state (FV only)
 
    if (dycore_is('LR')) then
@@ -2114,6 +2202,12 @@ subroutine diag_phys_tend_writeout(state, pbuf,  tend, ztodt, tmp_q, tmp_cldliq,
       if ( cnst_cam_outfld(       1) ) call outfld (dmetendnam(       1), tmp_q     , pcols, lchnk)
       if ( cnst_cam_outfld(ixcldliq) ) call outfld (dmetendnam(ixcldliq), tmp_cldliq, pcols, lchnk)
       if ( cnst_cam_outfld(ixcldice) ) call outfld (dmetendnam(ixcldice), tmp_cldice, pcols, lchnk)
+!AL
+      tmp_cldnc(:ncol,:pver) = (state%q(:ncol,:pver,ixnumliq) - tmp_cldnc(:ncol,:pver))*rtdt
+      tmp_cldni(:ncol,:pver) = (state%q(:ncol,:pver,ixnumice) - tmp_cldni(:ncol,:pver))*rtdt
+      if ( cnst_cam_outfld(ixnumliq) ) call outfld (dmetendnam(ixnumliq), tmp_cldnc, pcols, lchnk)
+      if ( cnst_cam_outfld(ixnumice) ) call outfld (dmetendnam(ixnumice), tmp_cldni, pcols, lchnk)
+!AL
    end if
 
    ! Total physics tendency for moisture and other tracers
@@ -2130,6 +2224,17 @@ subroutine diag_phys_tend_writeout(state, pbuf,  tend, ztodt, tmp_q, tmp_cldliq,
       ftem3(:ncol,:pver) = (state%q(:ncol,:pver,ixcldice) - cldiceini(:ncol,:pver) )*rtdt
       call outfld (ptendnam(ixcldice), ftem3, pcols, lchnk)
    end if
+!AL
+   if ( cnst_cam_outfld(ixnumliq) ) then
+      ftem3(:ncol,:pver) = (state%q(:ncol,:pver,ixnumliq) - cldncini(:ncol,:pver) )*rtdt
+      call outfld (ptendnam(ixnumliq), ftem3, pcols, lchnk)
+   end if
+   if ( cnst_cam_outfld(ixnumice) ) then
+      ftem3(:ncol,:pver) = (state%q(:ncol,:pver,ixnumice) - cldniini(:ncol,:pver) )*rtdt
+      call outfld (ptendnam(ixnumice), ftem3, pcols, lchnk)
+   end if
+
+!AL
 
    ! Total (physics+dynamics, everything!) tendency for Temperature
 
