@@ -1028,9 +1028,9 @@ subroutine diag_init(pbuf2d)
       call addfld (dmetendnam(ixcldice),(/ 'lev' /), 'A','kg/kg/s', &
            trim(cnst_name(ixcldice))//' dme adjustment tendency (FV) ')
 !AL
-      call addfld (dmetendnam(ixcldnc),,(/ 'lev' /), 'A','#/kg/s ',   & &
+      call addfld (dmetendnam(ixcldnc),(/ 'lev' /), 'A','#/kg/s ',   &
            trim(cnst_name(ixcldnc))//' dme adjustment tendency (FV) ')
-      call addfld (dmetendnam(ixcldni),,(/ 'lev' /), 'A','#/kg/s ',   & 
+      call addfld (dmetendnam(ixcldni),(/ 'lev' /), 'A','#/kg/s ',   & 
            trim(cnst_name(ixcldni))//' dme adjustment tendency (FV) ')
 !AL
    end if
