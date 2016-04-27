@@ -285,7 +285,15 @@
 
   <compset>
    <alias>NFPTAERO</alias>
-   <lname>2000_CAM5%PTAERO_CLM40%SP_CICE%PRES_DOCN%DOM_RTM_SGLC_SWAV</lname>
+   <lname>2000_CAM5%PTAEROUPD1_CLM40%SP_CICE%PRES_DOCN%DOM_RTM_SGLC_SWAV</lname>
+  </compset>
+  <compset>
+   <alias>NFPTAERO55</alias>
+   <lname>2000_CAM55%PTAERO_CLM40%SP_CICE%PRES_DOCN%DOM_RTM_SGLC_SWAV</lname>
+  </compset>
+  <compset>
+   <alias>NFPTAERO54</alias>
+   <lname>2000_CAM54%PTAERO_CLM50%SP_CICE%PRES_DOCN%DOM_RTM_SGLC_SWAV</lname>
   </compset>
   <compset>
    <alias>NFAMIPNUDGEPTAEROUPD1</alias>

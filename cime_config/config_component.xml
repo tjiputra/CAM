@@ -33,7 +33,8 @@
     <values additive='yes'>
       <value compset="_CAM4"          >-phys cam4</value>              
       <value compset="_CAM5"          >-phys cam5</value> 
-      <value compset="_CAM55"         >-phys cam5.4 -clubb_sgs</value> 
+      <value compset="_CAM55"         >-phys cam5.4 -clubb_sgs</value>
+      <value compset="_CAM54"         >-phys cam5.4</value>  
       <value compset="_CAM5%CLB"      >-clubb_sgs</value>
       <value compset="_CAM5%WCCB"     >-clubb_sgs</value>
       <value compset="_CAM4%TBAM"     >-chem trop_bam</value>
@@ -82,7 +83,11 @@
       <value compset="%PORT"          >-offline_drv rad</value> 
 
       <value compset="_CAM5%PTAERO"   >-phys cam5 -chem trop_mam_oslo</value>             
+      <value compset="_CAM55%PTAERO" >-chem trop_mam_oslo</value>               
+      <value compset="_CAM54%PTAERO" >-chem trop_mam_oslo</value>               
+  
       <value compset="_CAM5%NUDGEPTAERO"   >-phys cam5 -chem trop_mam_oslo -offline_dyn</value>             
+
     </values>
     <group>build_component_cam</group>
     <file>env_build.xml</file>
@@ -182,6 +187,8 @@
       <value compset="AR97_CAM[45]"     >scam_arm97</value>
       <value compset="PIPD_CAM5"        >1850-PD_cam5</value>
       <value compset="2000_CAM%DABIP04" >dabi_p2004</value>
+      <value compset="1850_CAM54%PTAERO"  >1850_cam54_ptaero</value>
+      <value compset="2000_CAM54%PTAERO"  >cam54_ptaero_up1</value>
       <value compset="_CAM5%NUDGEPTAERO" >2000_cam5_oslonudge</value>
       <value compset="_CAM5%NUDGEPTAEROUPD1">cam5_nudge_ptaero_up1</value>
       <value compset="_CAM5%NUDGEMAM3" >2000_cam5_oslonudge</value>
@@ -396,6 +403,8 @@
     <desc compset="_CAM.%L60"			>CAM 60 layers and full gravity wave spectrum:</desc>
 
     <desc compset="_CAM5%PTAERO">cam 5 physics and Production tagged aerosols (OSLO_AERO)</desc>
+    <desc compset="_CAM55%PTAERO">cam 5.4+CLUBB physics and Production tagged aerosols (OSLO_AERO)</desc>
+    <desc compset="_CAM54%PTAERO">cam 5.4+Production tagged aerosols (OSLO_AERO)+clm5 </desc>
     <desc compset="_CAM5%NUDGEPTAEROUPD1">cam 5 physics and Production tagged aerosols (OSLO_AERO)</desc>
   </description>
 
