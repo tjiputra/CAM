@@ -1843,7 +1843,7 @@ subroutine micro_mg_tend ( &
            nprcitot(i,k)=nprcitot(i,k)+nprci(i,k)*icldm(i,k) 
            npraitot(i,k)=npraitot(i,k)+nprai(i,k)*icldm(i,k) 
            nnudeptot(i,k)=nnudeptot(i,k)+nnudep(i,k)*lcldm(i,k)  
-           nnuccdtot(i,k)=nnuccdtot(i,k)+nnuccd(i,k)*mtime     
+           nnuccdtot(i,k)=nnuccdtot(i,k)+nnuccd(i,k)     
 
            nctend(i,k) = nctend(i,k)+&
                 (-nnuccc(i,k)-nnucct(i,k)-npsacws(i,k)+nsubc(i,k) &
