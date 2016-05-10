@@ -38,7 +38,7 @@
 <qbo_use_forcing>.false.</qbo_use_forcing>
 
 <!-- volcanic aerosol heating -->
-<strat_aero_feedback>.false.</strat_aero_feedback> 
+<prescribed_strataero_feedback>.false.</prescribed_strataero_feedback> 
 
 <!-- emis files -->
 
@@ -57,7 +57,7 @@
   'pom_a1 -> $INPUTDATA_ROOT/atm/cam/chem/trop_mozart_aero/emis/RCP60_mam3_pom_elev_1850-2300_c20150128.nc',
   'so4_a1 -> $INPUTDATA_ROOT/atm/cam/chem/trop_mozart_aero/emis/RCP60_mam3_so4_a1_elev_1850-2300_c20150128.nc',
   'so4_a2 -> $INPUTDATA_ROOT/atm/cam/chem/trop_mozart_aero/emis/RCP60_mam3_so4_a2_elev_1850-2300_c20150128.nc',
-  'SO2    -> $INPUTDATA_ROOT/atm/cam/chem/stratvolc/GlobalVolcSO2Emis1850-2015_VEI_Pin10Tg_2deg_c151111.nc'
+  'SO2    -> $INPUTDATA_ROOT/atm/cam/chem/stratvolc/GlobalVolcSO2Emis1850-2015_VolcanEESMv1.0_2deg_c160211.nc'
 </ext_frc_specifier>
 <ext_frc_type>'INTERP_MISSING_MONTHS'</ext_frc_type>
 

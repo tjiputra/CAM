@@ -1,12 +1,11 @@
 sm132 er132 br132 bl132
 sm331 er331 br331 bl331
 sm353 er353       bl353
-sm359 er359       bl359
+sm357 er357 br357 bl357
 sm366 er366       bl366 hi366
 sm373 er373       bl373
 sm375             bl375
-sm376             bl376
-sm374 er374       bl374
+sm485 er485       bl485
 sm390 er390       bl390
 sm397 er397       bl397
 sm421 er421       bl421
@@ -17,7 +16,6 @@ sm470       br470 bl470
 sm482       br482 bl482
 sm387 er387 br387 bl387
 sm388 er388       bl388
-sm379 er379       bl379
 sm731 er731       bl731
 sm735 er735       bl735
 sm736 er736       bl736

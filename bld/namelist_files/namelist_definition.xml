@@ -1964,6 +1964,12 @@ Efficiency factor for berg
 Default: 1
 </entry>
 
+<entry id="micro_do_sb_physics" type="logical" category="microphys"
+       group="micro_mg_nl" valid_values="" >
+Do Seifert and Behang (2001) autoconversion and accretion physics when set to true.
+Default: .false.
+</entry>
+
 <entry id="microp_uniform" type="logical" category="microphys"
        group="micro_mg_nl" valid_values="" >
 Switch to control whether MG microphysics performs a uniform calculation or not
@@ -3064,7 +3070,7 @@ Default: set by build-namelist
 <entry id="cam_chempkg" type="char*32" category="build"
        group="phys_ctl_nl" valid_values="waccm_mozart,waccmx_mozart,waccm_mozart_mam3,
                                          waccm_mozart_sulfur,waccm_sc,waccm_sc_mam3,
-					 waccm_tsmlt,waccm_tsmlt_mam3,waccm_tsmlt_sulfur,
+					 waccm_tsmlt,waccm_tsmlt_mam4,waccm_tsmlt_sulfur,
 					 trop_mozart,trop_mozart_mam3,trop_mozart_soa,
 					 trop_strat_soa,trop_strat_mam3,trop_strat_mam7,trop_strat_mam4_vbs,
 					 super_fast_llnl,super_fast_llnl_mam3,trop_ghg,
@@ -4695,6 +4701,12 @@ if <varname>prescribed_strataero_type</varname> is 'FIXED'.
 Default: 0 seconds
 </entry>
 
+<entry id="prescribed_strataero_feedback" type="logical" category="cam_chem"
+       group="camexp" valid_values="" >
+Switch to turn on climate feed backs due to  prescribed stratospheric aerosols via
+the rad_climate namelist variable.
+Default: false
+</entry>
 
 <entry id="rsf_file" type="char*256" input_pathname="abs" category="cam_chem"
        group="chem_inparm" valid_values="" >
@@ -5031,7 +5043,7 @@ Default: set by build-namelist.
 </entry>
 
 <entry id="tracer_srcs_rmfile" type="logical" category="cam_chem"
-       group="chem_inparm" valid_values="CYCLICAL,SERIAL,INTERP_MISSING_MONTHS,FIXED" >
+       group="chem_inparm" valid_values="" >
 Remove the file containing prescribed chemical sources from local disk when no longer needed.
 Default: FALSE
 </entry>
@@ -5250,12 +5262,6 @@ Default: set by build-namelist.
 </entry>
 
 <!-- WACCM -->
-
-<entry id="strat_aero_feedback" type="logical" category="waccm"
-       group="camexp" valid_values="" >
- true =&gt; radiation feed backs from strat sulfur aerosol
-Default: false
-</entry>
 
 <entry id="nlte_use_mo" type="logical" category="waccm_phys"
        group="radheat_nl" valid_values="" >

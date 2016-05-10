@@ -16,9 +16,28 @@ use lib "$Bin/perl5lib";
 use Build::ChemPreprocess qw(get_species_list);
 
 our @ISA = qw(Exporter);
-our @EXPORT = qw(set_dep_lists set_aero_modes_info);
+our @EXPORT = qw(set_dep_lists set_aero_modes_info chem_has_species);
 our $VERSION = 1.00;
 
+#-------------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
+sub chem_has_species
+{
+    my ( $cfg, $species ) = @_;
+    my $chem_proc_src = $cfg->get('chem_proc_src');
+    my $chem_src_dir = $cfg->get('chem_src_dir');
+    my @species_list;
+    if ($chem_proc_src) {
+        @species_list = get_species_list($chem_proc_src);
+    } else {
+        @species_list = get_species_list($chem_src_dir);
+    }
+    my %hash;
+    @hash{@species_list}=();
+
+    return ( exists $hash{$species} );
+
+}
 #-------------------------------------------------------------------------------
 #-------------------------------------------------------------------------------
 sub set_dep_lists

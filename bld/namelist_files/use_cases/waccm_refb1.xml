@@ -14,7 +14,7 @@
 
 <qbo_use_forcing>.true.</qbo_use_forcing>
 <qbo_cyclic>.false.</qbo_cyclic>
-<strat_aero_feedback>.true.</strat_aero_feedback> 
+<prescribed_strataero_feedback>.true.</prescribed_strataero_feedback> 
 <flbc_type>SERIAL</flbc_type>
 <sad_type>SERIAL</sad_type>
 
@@ -39,7 +39,6 @@
 
 <!-- Sulfate Aerosols: DEFAULTS okay for sulf_file -->
 <prescribed_strataero_type>SERIAL</prescribed_strataero_type>
-<prescribed_strataero_file>CESM_1949_2100_sad_V2_c130627.nc</prescribed_strataero_file>
 
 <solar_parms_file>atm/waccm/phot/wasolar_c081203.nc</solar_parms_file>
 <solar_photons_file>atm/waccm/solar/photon_fluxes_1950-2007.c090217.nc</solar_photons_file>

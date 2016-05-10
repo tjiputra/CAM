@@ -29,10 +29,8 @@
 <prescribed_ozone_type>INTERP_MISSING_MONTHS</prescribed_ozone_type>
 
 <!-- Stratospheric Aerosols -->
-<strat_aero_feedback>.true.</strat_aero_feedback>
+<prescribed_strataero_feedback>.true.</prescribed_strataero_feedback>
 <prescribed_strataero_type>SERIAL</prescribed_strataero_type>
-<prescribed_strataero_file>CESM_1949_2100_sad_V2_c130627.nc</prescribed_strataero_file>
-<prescribed_strataero_datapath>atm/waccm/sulf</prescribed_strataero_datapath>
 
 <!-- TEM diagnostics output -->
 <do_circulation_diags         >.false.</do_circulation_diags>

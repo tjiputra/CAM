@@ -88,10 +88,9 @@
 
 <do_tms>.true.</do_tms>
 
-<prescribed_strataero_file>CESM_1949_2100_sad_V2_c130627.nc</prescribed_strataero_file>
 <prescribed_strataero_type>CYCLICAL</prescribed_strataero_type>
 <prescribed_strataero_cycle_yr>2000</prescribed_strataero_cycle_yr>
-<strat_aero_feedback>.true.</strat_aero_feedback>
+<prescribed_strataero_feedback>.true.</prescribed_strataero_feedback>
 
 <flbc_file>'atm/waccm/lb/LBC_1765-2500_1.9x2.5_CMIP5_RCP45_za_c120127.nc'</flbc_file>
 <flbc_list>

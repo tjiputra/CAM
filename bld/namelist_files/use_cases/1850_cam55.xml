@@ -23,38 +23,30 @@
 
 <!-- Surface emissions for MAM -->
 <srf_emis_type>CYCLICAL</srf_emis_type>
-<srf_emis_cycle_yr>0</srf_emis_cycle_yr>
-
-<dms_emis_file	   ver="mam">atm/cam/chem/trop_mozart_aero/emis/aerocom_mam3_dms_surf_2000_c090129.nc</dms_emis_file>
-<so2_emis_file	   ver="mam">atm/cam/chem/trop_mozart_aero/emis/ar5_mam3_so2_surf_1850_c090726.nc</so2_emis_file>
-<soag_emis_file	   var="mam">atm/cam/chem/trop_mozart_aero/emis/ar5_mam3_soag_1.5_surf_1850_c130423.nc</soag_emis_file>
-<bc_a1_emis_file   ver="mam">atm/cam/chem/trop_mozart_aero/emis/ar5_mam3_bc_surf_1850_c090726.nc</bc_a1_emis_file>
-<bc_a4_emis_file   ver="mam">atm/cam/chem/trop_mozart_aero/emis/ar5_mam3_bc_surf_1850_c090726.nc</bc_a4_emis_file>
-<pom_a1_emis_file  ver="mam">atm/cam/chem/trop_mozart_aero/emis/ar5_mam3_pom_surf_1850_c130423.nc</pom_a1_emis_file>
-<pom_a4_emis_file  ver="mam">atm/cam/chem/trop_mozart_aero/emis/ar5_mam3_pom_surf_1850_c130423.nc</pom_a4_emis_file>
-<so4_a1_emis_file  ver="mam">atm/cam/chem/trop_mozart_aero/emis/ar5_mam3_so4_a1_surf_1850_c090726.nc</so4_a1_emis_file>
-<so4_a2_emis_file  ver="mam">atm/cam/chem/trop_mozart_aero/emis/ar5_mam3_so4_a2_surf_1850_c090726.nc</so4_a2_emis_file>
-<num_a1_emis_file  ver="mam">atm/cam/chem/trop_mozart_aero/emis/ar5_mam3_num_a1_surf_1850_c090726.nc</num_a1_emis_file>
-<num_a2_emis_file  ver="mam">atm/cam/chem/trop_mozart_aero/emis/ar5_mam3_num_a2_surf_1850_c090726.nc</num_a2_emis_file>
-
-<mam4_num_a1_emis_file >atm/cam/chem/trop_mozart_aero/emis/ar5_mam4_num_a1_surf_1850_c20100105.nc</mam4_num_a1_emis_file>
-<mam4_num_a4_emis_file >atm/cam/chem/trop_mozart_aero/emis/ar5_mam4_num_a4_surf_1850_c20100105.nc</mam4_num_a4_emis_file>
+<srf_emis_cycle_yr>1850</srf_emis_cycle_yr>
+<dms_emis_file        >atm/cam/chem/emis/ccmi_1950_2100_rcp6/IPCC_emissions_DMS_surface_1850-2100_1.9x2.5_c130814.nc</dms_emis_file>
+<so2_emis_file        >atm/cam/chem/emis/ccmi_1950_2100_rcp6/IPCC_emissions_SO2_surface_1850-2100_1.9x2.5_c130814.nc</so2_emis_file>
+<soag_emis_file       >atm/cam/chem/trop_mozart_aero/emis/ar5_mam3_soag_surf_1850-2005_c130424.nc</soag_emis_file>
+<bc_a4_emis_file      >atm/cam/chem/trop_mozart_aero/emis/ar5_mam3_bc_surf_1850-2005_c090804.nc</bc_a4_emis_file>
+<mam4_num_a1_emis_file>atm/cam/chem/trop_mozart_aero/emis/ar5_mam4_num_a1_surf_1850-2005_c150205.nc</mam4_num_a1_emis_file>
+<num_a2_emis_file     >atm/cam/chem/trop_mozart_aero/emis/ar5_mam3_num_a2_surf_1850-2005_c090804.nc</num_a2_emis_file>
+<mam4_num_a4_emis_file>atm/cam/chem/trop_mozart_aero/emis/ar5_mam4_num_a4_surf_1850-2005_c150205.nc</mam4_num_a4_emis_file>
+<pom_a4_emis_file     >atm/cam/chem/trop_mozart_aero/emis/ar5_mam3_pom_surf_1850-2005_c130424.nc</pom_a4_emis_file>
+<so4_a1_emis_file     >atm/cam/chem/trop_mozart_aero/emis/ar5_mam3_so4_a1_surf_1850-2005_c090804.nc</so4_a1_emis_file>
+<so4_a2_emis_file     >atm/cam/chem/trop_mozart_aero/emis/ar5_mam3_so4_a2_surf_1850-2005_c090804.nc</so4_a2_emis_file>
 
 <!-- External forcing for BAM or MAM -->
 <ext_frc_type>CYCLICAL</ext_frc_type>
-<ext_frc_cycle_yr>0</ext_frc_cycle_yr>
-<so2_ext_file      ver="mam">atm/cam/chem/trop_mozart_aero/emis/ar5_mam3_so2_elev_1850_c090726.nc </so2_ext_file>
-<so4_a1_ext_file   ver="mam">atm/cam/chem/trop_mozart_aero/emis/ar5_mam3_so4_a1_elev_1850_c090726.nc</so4_a1_ext_file>
-<so4_a2_ext_file   ver="mam">atm/cam/chem/trop_mozart_aero/emis/ar5_mam3_so4_a2_elev_1850_c090726.nc</so4_a2_ext_file>
-<num_a1_ext_file   ver="mam">atm/cam/chem/trop_mozart_aero/emis/ar5_mam3_num_a1_elev_1850_c090726.nc</num_a1_ext_file>
-<num_a2_ext_file   ver="mam">atm/cam/chem/trop_mozart_aero/emis/ar5_mam3_num_a2_elev_1850_c090726.nc</num_a2_ext_file>
-<pom_a1_ext_file   ver="mam">atm/cam/chem/trop_mozart_aero/emis/ar5_mam3_pom_elev_1850_c130423.nc</pom_a1_ext_file>
-<pom_a4_ext_file   ver="mam">atm/cam/chem/trop_mozart_aero/emis/ar5_mam3_pom_elev_1850_c130423.nc</pom_a4_ext_file>
-<bc_a1_ext_file    ver="mam">atm/cam/chem/trop_mozart_aero/emis/ar5_mam3_bc_elev_1850_c090726.nc </bc_a1_ext_file>
-<bc_a4_ext_file    ver="mam">atm/cam/chem/trop_mozart_aero/emis/ar5_mam3_bc_elev_1850_c090726.nc </bc_a4_ext_file>
-
-<mam4_num_a1_ext_file  >atm/cam/chem/trop_mozart_aero/emis/ar5_mam4_num_a1_elev_1850_c20100105.nc</mam4_num_a1_ext_file>
-<mam4_num_a4_ext_file  >atm/cam/chem/trop_mozart_aero/emis/ar5_mam4_num_a4_elev_1850_c20100105.nc</mam4_num_a4_ext_file>
+<ext_frc_cycle_yr>1850</ext_frc_cycle_yr>
+<h2o_ch4_ox_file     >atm/cam/chem/emis/elev/H2O_emission_CH4_oxidationx2_elev_1850-2100_CCMI_RCP6_0_c160219.nc</h2o_ch4_ox_file>
+<so2_ext_file        >atm/cam/chem/emis/ccmi_1960-2008/IPCC_emissions_volc_SO2_1850-2100_1.9x2.5_c130426cycle.nc</so2_ext_file>
+<bc_a4_ext_file      >atm/cam/chem/trop_mozart_aero/emis/ar5_mam3_bc_elev_1850-2005_c090804.nc</bc_a4_ext_file>
+<mam4_num_a1_ext_file>atm/cam/chem/trop_mozart_aero/emis/ar5_mam4_num_a1_elev_1850-2005_c150205.nc</mam4_num_a1_ext_file>
+<num_a2_ext_file     >atm/cam/chem/trop_mozart_aero/emis/ar5_mam3_num_a2_elev_1850-2005_c090804.nc</num_a2_ext_file>
+<mam4_num_a4_ext_file>atm/cam/chem/trop_mozart_aero/emis/ar5_mam4_num_a4_elev_1850-2005_c150205.nc</mam4_num_a4_ext_file>
+<pom_a4_ext_file     >atm/cam/chem/trop_mozart_aero/emis/ar5_mam3_pom_elev_1850-2005_c130424.nc</pom_a4_ext_file>
+<so4_a1_ext_file     >atm/cam/chem/trop_mozart_aero/emis/ar5_mam3_so4_a1_elev_1850-2005_c090804.nc</so4_a1_ext_file>
+<so4_a2_ext_file     >atm/cam/chem/trop_mozart_aero/emis/ar5_mam3_so4_a2_elev_1850-2005_c090804.nc</so4_a2_ext_file>
 
 <!-- Prescribed oxidants for aerosol chemistry -->
 <tracer_cnst_type>CYCLICAL</tracer_cnst_type>

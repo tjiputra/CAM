@@ -37,6 +37,19 @@
   </help>
 
   <compset>
+    <alias>FW2000</alias>             
+    <lname>2000_CAM55%WTSM_CLM50%BGC_CICE%PRES_DOCN%DOM_MOSART_CISM1%NOEVOLVE_SWAV</lname>
+  </compset>
+   <compset>
+    <alias>FWAMIP</alias>             
+    <lname>AMIP_CAM55%WTSM_CLM50%BGC_CICE%PRES_DOCN%DOM_MOSART_CISM1%NOEVOLVE_SWAV</lname>
+  </compset>
+  <compset>
+    <alias>FSV2000</alias>   
+    <lname>2000_CAM55%VBS_CLM50%BGC_CICE%PRES_DOCN%DOM_MOSART_CISM1%NOEVOLVE_SWAV</lname>
+  </compset>
+
+  <compset>
     <alias>F1850</alias>           
     <lname>1850_CAM4_CLM40%SP_CICE%PRES_DOCN%DOM_RTM_SGLC_SWAV</lname>
   </compset>
@@ -234,35 +247,6 @@
   </compset>
 
   <compset>
-    <alias>FWMC4L40CCMIR1</alias>  
-    <lname>FRC1_CAM4%WCMA_CLM40%SP_CICE%PRES_DOCN%DOM_RTM_SGLC_SWAV</lname>
-  </compset>
-  <compset>
-    <alias>FWTC4L40CCMIR1</alias>  
-    <lname>FRC1_CAM4%WTSM_CLM40%SP_CICE%PRES_DOCN%DOM_RTM_SGLC_SWAV</lname>
-  </compset>
-  <compset>
-    <alias>FWTC5L45CCMIR1</alias>  
-    <lname>FRC1_CAM5%WTSM_CLM45%SP_CICE%PRES_DOCN%DOM_RTM_SGLC_SWAV</lname>
-  </compset>
-  <compset>
-    <alias>FTSC4L40CCMIR1</alias>  
-    <lname>FRC1_CAM4%SSOA_CLM40%SP_CICE%PRES_DOCN%DOM_RTM_SGLC_SWAV</lname>
-  </compset>
-  <compset>
-    <alias>FWMC4L40CCMIR1SD</alias>
-    <lname>SDC1_CAM4%WCMA_CLM40%SP_CICE%PRES_DOCN%DOM_RTM_SGLC_SWAV</lname>
-  </compset>
-  <compset>
-    <alias>FWTC4L40CCMIR1SD</alias>
-    <lname>SDC1_CAM4%WTSM_CLM40%SP_CICE%PRES_DOCN%DOM_RTM_SGLC_SWAV</lname>
-  </compset>
-  <compset>
-    <alias>FTSC4L40CCMIR1SD</alias>
-    <lname>SDC1_CAM4%SSOA_CLM40%SP_CICE%PRES_DOCN%DOM_RTM_SGLC_SWAV</lname>
-  </compset>
-
-  <compset>
     <alias>FC4AQUAP</alias> 
     <lname>2000_CAM4_SLND_SICE_AQUAP_SROF_SGLC_SWAV</lname>
   </compset>
@@ -327,9 +311,6 @@
 	<value  compset="PIPD_CAM[45]"     >1850-01-01</value> 
 	<value  compset="C2R[68]_CAM"      >1950-01-01</value> 
 	<value  compset="C2R4_CAM"         >2004-01-01</value>
-	<value  compset="FRC1_CAM5%WTSM"   >1987-01-01</value>
-	<value  compset="FRC1_CAM"         >1950-01-01</value>
-	<value  compset="SDC1_CAM"         >1979-01-01</value>
 	<value  compset="5505_CAM5%WCSCM3" >1979-01-01</value>
 	<value  compset="5505_CAM[45]"     >1955-01-01</value> 
 	<value  compset="2000_CAM[45]%WCMX">2000-01-01</value>
@@ -349,7 +330,7 @@
 
     <entry id="CALENDAR"> 
       <values>
-	<value  compset="GEOS_|SDC1_">GREGORIAN</value>
+	<value  compset="GEOS_">GREGORIAN</value>
       </values>
     </entry>
 

@@ -51,6 +51,7 @@
 
 <ncdata dyn="fv"  hgrid="0.9x1.25"  nlev="32"  ic_ymd="101"     >atm/cam/inic/fv/cami-mam3_0000-01-01_0.9x1.25_L32_c141031.nc</ncdata>
 <ncdata dyn="fv"  hgrid="1.9x2.5"   nlev="32"  ic_ymd="101"     >atm/cam/inic/fv/cami-mam3_0000-01-01_1.9x2.5_L32_c150407.nc</ncdata>
+<ncdata dyn="fv"  hgrid="10x15"     nlev="32"  ic_ymd="101"     >atm/cam/inic/fv/cami-mam4_0000-01-01_10x15_L32_c160304.nc</ncdata>
 
 <ncdata dyn="fv"  hgrid="1.9x2.5"   nlev="64"  ic_ymd="101"     >atm/cam/inic/fv/cami_0000-01-01_1.9x2.5_L64_c070703.nc</ncdata>
 <ncdata dyn="fv"  hgrid="4x5"       nlev="64"  ic_ymd="101"     >atm/cam/inic/fv/cami_0000-01-01_4x5_L64_c090108.nc</ncdata>
@@ -108,6 +109,7 @@
 <ncdata dyn="fv"  hgrid="0.9x1.25"  nlev="66"   ic_ymd="20000201" >atm/waccm/ic/cami_2000-02-01_0.9x1.25_L66_c040928.nc</ncdata>
 <ncdata dyn="fv"  hgrid="0.9x1.25"  nlev="103"  ic_ymd="20000201" >atm/waccm/ic/cami_2000-02-01_0.9x1.25_L103_c041005.nc</ncdata>
 <ncdata dyn="fv"  hgrid="1.9x2.5"   nlev="66"   ic_ymd="20000701" >atm/waccm/ic/cami_2000-07-01_1.9x2.5_L66_c040928.nc</ncdata>
+<ncdata dyn="fv"  hgrid="0.9x1.25"  nlev="70"                     >atm/waccm/ic/FWT2000_f09_spinup01.cam.i.0001-01-02-00000_c160315.nc</ncdata>
 <ncdata dyn="fv"  hgrid="1.9x2.5"   nlev="70"   ic_ymd="20000101" >atm/waccm/ic/f2000.waccm-mam3_1.9x2.5_L70.cam2.i.0017-01-01.c120410.nc</ncdata>
 <ncdata dyn="fv"  hgrid="4x5"       nlev="70"   ic_ymd="20000101" >atm/waccm/ic/f2000.waccm-mam3_4x5_L70.cam2.i.0017-01-01.c121113.nc</ncdata>
 <ncdata dyn="fv"  hgrid="10x15"     nlev="70"   ic_ymd="20000101" >atm/waccm/ic/f2000.waccm-mam3_10x15_L70.cam2.i.0017-01-01.c141016.nc</ncdata>
@@ -402,10 +404,7 @@
 
 <!-- Time-variant chemistry surface values -->
 <bndtvghg>atm/cam/ggas/ghg_hist_1765-2005_c091218.nc</bndtvghg>
-<flbc_file                           >atm/waccm/lb/LBC_1765-2500_1.9x2.5_CMIP5_RCP45_za_c120127.nc</flbc_file>
-<flbc_file chem="waccm_mozart_mam3"  >atm/waccm/lb/LBC_1765-2100_1.9x2.5_CCMI_RCP60_za_RNOCStrend_c141002.nc</flbc_file>
-<flbc_file chem="waccm_tsmlt_mam3"   >atm/waccm/lb/LBC_1765-2100_1.9x2.5_CCMI_RCP60_za_RNOCStrend_c141002.nc</flbc_file>
-<flbc_file chem="waccm_mozart_sulfur">atm/waccm/lb/LBC_1765-2005_1.9x2.5_CMIP5_za_c111110.nc</flbc_file>
+<flbc_file>atm/waccm/lb/LBC_1765-2100_1.9x2.5_CCMI_RCP60_za_RNOCStrend_c141002.nc</flbc_file>
 
 <!-- Time-variant CO2 fossil fuel emissions -->
 <co2flux_fuel_file hgrid="0.9x1.25" sim_year="1850-2000">atm/cam/ggas/co2flux_fossil_1751-2006-monthly_0.9x1.25_c20100204.nc</co2flux_fuel_file>
@@ -455,20 +454,26 @@
 <solar_parms_file               >atm/waccm/phot/wasolar_ave.nc</solar_parms_file>
 <solar_parms_file waccm_phys="1">atm/waccm/solar/wasolar_c140408.nc</solar_parms_file>
 
+<!-- nudged QBO  -->
+<qbo_forcing_file>atm/waccm/qbo/qbocyclic28months.nc</qbo_forcing_file>
+
 <!-- Gravity wave settings for WACCM -->
 <effgw_oro>0.125D0</effgw_oro>
 
 <effgw_cm>1.D0</effgw_cm>
 <taubgnd            >1.5D-3</taubgnd>
 <taubgnd hgrid="4x5">1.0D-3</taubgnd>
+<taubgnd hgrid="0.9x1.25">2.5D-3</taubgnd>
 
 <effgw_cm_igw>0.1D0</effgw_cm_igw>
 <taubgnd_igw>12.0D-3</taubgnd_igw>
 
 <frontgfc            >1.25D-15</frontgfc>
 <frontgfc hgrid="4x5">7.5D-16</frontgfc>
+<frontgfc hgrid="0.9x1.25">3.0D-15</frontgfc>
 
 <effgw_beres_dp>0.1D0</effgw_beres_dp>
+<effgw_beres_dp hgrid="0.9x1.25">0.4D0</effgw_beres_dp>
 
 <!-- Polar taper is needed for stability in FV, possibly because grid -->
 <!-- points become too dense near the poles. -->
@@ -627,6 +632,7 @@
 <mam4_num_a1_ext_wofire_file>atm/cam/chem/trop_mozart_aero/emis/ar5_mam4_num_a1_elev_2000_wofire_c150722.nc</mam4_num_a1_ext_wofire_file>
 
 <so2_ocs_ox_file>atm/cam/chem/emis/elev/SO2_emission_OCS_oxidation_elev_1849-2101_WACCM5_c150302.nc</so2_ocs_ox_file>
+<h2o_ch4_ox_file>atm/cam/chem/emis/elev/H2O_emission_CH4_oxidationx2_elev_1850-2100_CCMI_RCP6_0_c160219.nc</h2o_ch4_ox_file>
 
 <mam4_num_a1_emis_file >atm/cam/chem/trop_mozart_aero/emis/ar5_mam4_num_a1_surf_2000_c120716.nc</mam4_num_a1_emis_file>
 <mam4_num_a4_emis_file >atm/cam/chem/trop_mozart_aero/emis/ar5_mam4_num_a4_surf_2000_c120716.nc</mam4_num_a4_emis_file>
@@ -665,7 +671,8 @@
 <!-- SAD data -->
 <prescribed_strataero_file>CESM_1949_2100_sad_V2_c130627.nc</prescribed_strataero_file>
 <prescribed_strataero_datapath>atm/waccm/sulf</prescribed_strataero_datapath>
-<prescribed_strataero_type>SERIAL</prescribed_strataero_type>
+<prescribed_strataero_file     clubb_sgs="1" phys="cam5.4" >CESM_1849_2100_sad_V3_c160211.nc</prescribed_strataero_file>
+<prescribed_strataero_datapath clubb_sgs="1" phys="cam5.4" > atm/cam/volc</prescribed_strataero_datapath>
 
 <!-- sulfate data -->
 <sulf_file>atm/waccm/sulf/sulfate.ar5_camchem_c130304.nc</sulf_file>

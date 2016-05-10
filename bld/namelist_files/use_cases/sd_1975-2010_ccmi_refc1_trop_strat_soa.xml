@@ -36,10 +36,8 @@
 </flbc_list>
 
 <!-- Stratospheric Aerosols -->
-<strat_aero_feedback>.true.</strat_aero_feedback>
+<prescribed_strataero_feedback>.true.</prescribed_strataero_feedback>
 <prescribed_strataero_type>SERIAL</prescribed_strataero_type>
-<prescribed_strataero_datapath>atm/waccm/sulf</prescribed_strataero_datapath>
-<prescribed_strataero_file>CESM_1949_2100_sad_V2_c130627.nc</prescribed_strataero_file>
 
 <lght_no_prd_factor>1.3</lght_no_prd_factor>
 

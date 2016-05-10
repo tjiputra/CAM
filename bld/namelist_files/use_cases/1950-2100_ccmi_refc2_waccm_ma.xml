@@ -41,9 +41,8 @@
 <sulf_type>SERIAL</sulf_type>
 
 <!-- Stratospheric Aerosols -->
-<strat_aero_feedback>.true.</strat_aero_feedback>
+<prescribed_strataero_feedback>.true.</prescribed_strataero_feedback>
 <prescribed_strataero_type>SERIAL</prescribed_strataero_type>
-<prescribed_strataero_file>CESM_1949_2100_sad_V2_c130627.nc</prescribed_strataero_file>
 
 <!-- Prescribed BAM data for radiation -->
 <prescribed_aero_datapath>atm/cam/chem/trop_mozart_aero/aero</prescribed_aero_datapath>

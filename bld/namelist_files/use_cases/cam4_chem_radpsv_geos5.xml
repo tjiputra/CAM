@@ -44,7 +44,6 @@
 <flbc_type>SERIAL</flbc_type>
 
 <!-- strat aerosol data  -->
-<prescribed_strataero_file>CESM_1949_2100_sad_V2_c130627.nc</prescribed_strataero_file>
 <prescribed_strataero_type>SERIAL</prescribed_strataero_type>
 
 <!-- emissions timing  -->

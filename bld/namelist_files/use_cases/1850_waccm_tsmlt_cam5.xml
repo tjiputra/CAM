@@ -21,7 +21,7 @@
 <fv_nspltvrm>4</fv_nspltvrm>
 
 <!-- turn off prescribed volcanic aerosol heating; use prognostic MAM in the stratosphere -->
-<strat_aero_feedback>.false.</strat_aero_feedback> 
+<prescribed_strataero_feedback>.false.</prescribed_strataero_feedback> 
 
 <!-- Emissions DEFAULTS OKAY for: airpl_emis_file,ch2o_emis_file,co_emis_file,nox_emis_file-->
 

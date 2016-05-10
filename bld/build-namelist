@@ -48,7 +48,7 @@ use Getopt::Long;
 use IO::File;
 use FindBin qw($Bin);
 use lib "$Bin/perl5lib";
-use Build::ChemNamelist qw(set_dep_lists set_aero_modes_info);
+use Build::ChemNamelist qw(set_dep_lists set_aero_modes_info chem_has_species);
 #-----------------------------------------------------------------------------------------------
 
 sub usage {
@@ -1648,30 +1648,53 @@ elsif ($carma eq 'tholin') {
 }
 
 # Stratospheric sulfur aerosols 
-if (($nl->get_value('strat_aero_feedback') =~ /$TRUE/io) 
+
+# turn on stratospheric aerosol forcings in CAM5.5/CAM6 configurations
+my $chem_has_ocs = chem_has_species($cfg, 'OCS');
+if ( $phys =~ /cam5.4/ and  $cfg->get('clubb_sgs' ) ) { 
+  # turn on volc forcings in cam6 -- prognostic or prescribed
+  if ( $chem_has_ocs ) {
+      # turn on prognostic stratospheric aerosols
+      add_default($nl, 'modal_strat_sulfate','val'=>'.true.');
+  } else {
+      # turn on prescribed stratospheric aerosols
+      add_default($nl, 'prescribed_strataero_feedback','val'=>'.true.');
+  }
+}
+if ( $nl->get_value('modal_strat_sulfate')=~ /$TRUE/io and 
+     $nl->get_value('prescribed_strataero_feedback') =~ /$TRUE/io ) {
+    die "Cannot set both modal_strat_sulfate and prescribed_strataero_feedback to TRUE \n";
+}
+
+# stratospheric aerosols are needed for heterogeneous chemistry as well as radiation feedback
+my $het_chem = chem_has_species($cfg, 'N2O5');
+
+# determine if prescribed stratospheric aerosol data is needed
+if ( ($het_chem) || ($nl->get_value('prescribed_strataero_feedback') =~ /$TRUE/io ) ){
+    if ( ($carma ne 'sulfate') && !($nl->get_value('modal_strat_sulfate') =~ /$TRUE/io) ) { # if no prognostic stratospheric aerosols
+        add_default($nl, 'prescribed_strataero_datapath');
+        unless (defined $nl->get_value('prescribed_strataero_type')) {
+            add_default($nl, 'prescribed_strataero_type','val'=>'CYCLICAL');
+            add_default($nl, 'prescribed_strataero_cycle_yr', 'val'=>'2000');
+        }
+        unless (defined $nl->get_value('prescribed_strataero_file')) {
+            add_default($nl, 'prescribed_strataero_file' );
+            add_default($nl, 'prescribed_strataero_datapath' );
+        }
+    }
+}
+# add to rad_climate the contributions from stratospheric aerosols if feedback is switched on
+if (($nl->get_value('prescribed_strataero_feedback') =~ /$TRUE/io) 
  || ($nl->get_value('carma_rad_feedback') =~ /$TRUE/io)) {
     my $rel_filepath = get_default_value("VOLC_MMR");
     my $abs_filepath = set_abs_filepath($rel_filepath, $inputdata_rootdir);
     $radval .= "," . quote_string("N:VOLC_MMR:" . $abs_filepath);
 
 }
-
-# stratospheric aerosols might be needed for heterogeneous chemistry as well as radiation feedback
-# -- guess at which chemistry packages have heterogeneous chemistry
-my $het_chem = $chem =~ /trop_strat/ || $chem =~ /trop_mozart/ || $chem =~ /waccm_mozart/ || $chem =~ /waccm_tsmlt/;
-
-# determine if prescribed stratospheric aerosol data is needed
-if ( ($het_chem) || ($nl->get_value('strat_aero_feedback') =~ /$TRUE/io ) ){
-    if ( ($carma ne 'sulfate') && !($nl->get_value('modal_strat_sulfate') =~ /$TRUE/io) ) { # if no prognostic stratospheric aerosols
-        add_default($nl, 'prescribed_strataero_datapath');
-        unless (defined $nl->get_value('prescribed_strataero_type')) {
-            add_default($nl, 'prescribed_strataero_type',  'val'=>'CYCLICAL');
-            my $cycyr='1990'; # hack to keep regression test b4b
-            if ( $chem =~ /trop_/ ) { $cycyr='2000' } 
-            add_default($nl, 'prescribed_strataero_cycle_yr',  'val'=>$cycyr);
-            add_default($nl, 'prescribed_strataero_file' );
-        }
-    }
+# check for inadvertent setting of both old and new prescribed volcanoes
+if ( (defined $nl->get_value('prescribed_volcaero_file')) and 
+     (defined $nl->get_value('prescribed_strataero_file')) ) {
+    die "Cannot set both prescribed_volcaero_file and prescribed_strataero_file \n";
 }
 
 add_default($nl, 'rad_climate', 'val'=>$radval);
@@ -1838,7 +1861,7 @@ my $megan_emis = defined $nl->get_value('megan_specifier');
 if ( $megan_emis ) { add_default($nl, 'megan_factors_file'); }
 
 # Tropospheric full chemistry options
-if ($chem =~ /trop_mozart/ or $chem =~ /trop_strat/ ) {
+if ($chem =~ /trop_mozart/ or $chem =~ /trop_strat/ or $chem =~ /waccm_tsmlt/) {
  
     # Surface emission datasets:
     my %verhash;
@@ -1866,9 +1889,12 @@ if ($chem =~ /trop_mozart/ or $chem =~ /trop_strat/ ) {
                    'CH3COOH  -> ' => 'ch3cooh_emis_file',
                    'ISOP     -> ' => 'isop_emis_file',
                    );
+    if (!($chem =~ /_vbs/) and !($chem =~ /_tsmlt/)) {
+        %species = (%species,
+                    'NH3      -> ' => 'nh3_emis_file');
+    }
     if (!($chem =~ /_vbs/)) {
         %species = (%species,
-                    'NH3      -> ' => 'nh3_emis_file',
                     'C10H16   -> ' => 'c10h16_emis_file', );
     }
     if ($chem =~ /mam3/) {
@@ -1889,6 +1915,17 @@ if ($chem =~ /trop_mozart/ or $chem =~ /trop_strat/ ) {
                    'TOLUENE  -> ' => 'soa_toluene_emis_file',
                    'IVOCbb   -> ' => 'ivocbb_emis_file',
                    'IVOCff   -> ' => 'ivocff_emis_file',
+                   'bc_a4    -> ' => 'bc_a4_emis_file',
+                   'pom_a4   -> ' => 'pom_a4_emis_file',
+                   'so4_a1   -> ' => 'so4_a1_emis_file',
+                   'so4_a2   -> ' => 'so4_a2_emis_file',
+                   'num_a1   -> ' => 'mam4_num_a1_emis_file',
+                   'num_a2   -> ' => 'num_a2_emis_file',
+                   'num_a4   -> ' => 'mam4_num_a4_emis_file',
+                   );
+    } elsif ($chem =~ /mam4/) {
+        %species = (%species,
+                   'SOAG     -> ' => 'soag_emis_file',
                    'bc_a4    -> ' => 'bc_a4_emis_file',
                    'pom_a4   -> ' => 'pom_a4_emis_file',
                    'so4_a1   -> ' => 'so4_a1_emis_file',
@@ -1973,6 +2010,17 @@ if ($chem =~ /trop_mozart/ or $chem =~ /trop_strat/ ) {
                    'num_a4 -> ' => 'mam4_num_a4_ext_file',
                    'IVOCbb -> ' => 'ivocbb_ext_file' );
       $cyc_yr = '2000';
+    } elsif ($chem =~ /mam4/) {
+      %species = ( 'NO2    -> ' => 'no2_aircraft_emis_file',
+                   'SO2    -> ' => 'so2_ext_file',
+                   'so4_a1 -> ' => 'so4_a1_ext_file',
+                   'so4_a2 -> ' => 'so4_a2_ext_file',
+                   'pom_a4 -> ' => 'pom_a4_ext_file',
+                   'bc_a4  -> ' => 'bc_a4_ext_file',
+                   'num_a1 -> ' => 'mam4_num_a1_ext_file',
+                   'num_a2 -> ' => 'num_a2_ext_file',
+                   'num_a4 -> ' => 'mam4_num_a4_ext_file' );
+      $cyc_yr = '2000';
     } elsif ($chem =~ /mam7/) {
       %species = ( 'NO2    -> ' => 'no2_aircraft_emis_file',
                    'so4_a1 -> ' => 'so4_a1_ext_file', 
@@ -2006,9 +2054,6 @@ if ($chem =~ /trop_mozart/ or $chem =~ /trop_strat/ ) {
         add_default($nl, 'ext_frc_type',      'val'=>'CYCLICAL');
         add_default($nl, 'ext_frc_cycle_yr',  'val'=>$cyc_yr);
     }
-    # 
-
-    # 
 
     if ($chem =~ /trop_mozart/) {
       # Species with fixed stratosphere values
@@ -2018,10 +2063,13 @@ if ($chem =~ /trop_mozart/ or $chem =~ /trop_strat/ ) {
     }
 
     # Species with fixed lower boundary
-    if ($chem =~ /trop_strat/) {
+    if ($chem =~ /trop_strat/ or $chem =~ /_tsmlt/) {
       $val = "'CCL4','CF2CLBR','CF3BR','CFC11','CFC113','CFC12','CH3BR','CH3CCL3','CH3CL','CH4','CO2','H2','HCFC22','N2O'";
     } else {
       $val = "'CH4','H2','N2O','CO2','CFC11','CFC12'";
+    }
+    if ($chem_has_ocs) {
+        $val .= ",'OCS'";
     }
     add_default($nl, 'flbc_list', 'val'=>$val);
     unless (defined $nl->get_value('flbc_type')) {
@@ -2031,12 +2079,12 @@ if ($chem =~ /trop_mozart/ or $chem =~ /trop_strat/ ) {
 
     my @files;
     # Datasets
-    if ($chem =~ /trop_strat_soa/) {
+    if ($chem =~ /trop_strat/ or $chem =~ /waccm_tsmlt/) {
        @files = ( 'soil_erod_file', 'flbc_file', 
-                  'xs_coef_file','xs_short_file','xs_long_file', 'rsf_file', 'prescribed_strataero_file' );
+                  'xs_coef_file','xs_short_file','xs_long_file', 'rsf_file' );
     } else {
        @files = ( 'soil_erod_file', 'flbc_file', 
-                  'xs_coef_file','xs_short_file','xs_long_file', 'rsf_file', 'exo_coldens_file', 'sulf_file', 'prescribed_strataero_file' );
+                  'xs_coef_file','xs_short_file','xs_long_file', 'rsf_file', 'exo_coldens_file', 'sulf_file' );
     }
     foreach my $file (@files) {
         add_default($nl, $file);
@@ -2384,6 +2432,11 @@ if ($chem eq 'trop_mam3' or $chem eq 'waccm_sc_mam3') {
                   'num_a1      -> ' => 'num_a1_ext_file', 
                   'num_a2      -> ' => 'num_a2_ext_file', ); # background volc emissions
     }
+    # for mechanisms without OCS use prescribed OCS oxidation rates for 
+    # precursers of prognostic stratosphere aerosols 
+    if ($nl->get_value('modal_strat_sulfate') =~ /$TRUE/io) {
+	%species = (%species, 'SO2 -> ' => 'so2_ocs_ox_file');
+    }
     $first = 1;
     $pre = "";
     $val = "";
@@ -2395,11 +2448,6 @@ if ($chem eq 'trop_mam3' or $chem eq 'waccm_sc_mam3') {
             $pre = ",";
             $first = 0;
         }
-    }
-    if ($nl->get_value('modal_strat_sulfate') =~ /$TRUE/io) {
-        my $rel_filepath = get_default_value('so2_ocs_ox_file', \%verhash );
-        my $abs_filepath = set_abs_filepath($rel_filepath, $inputdata_rootdir);
-        $val .= "," . quote_string('SO2 -> ' . $abs_filepath);
     }
     add_default($nl, 'ext_frc_specifier', 'val'=>$val);
     unless (defined $nl->get_value('ext_frc_type')) {
@@ -2430,7 +2478,7 @@ if ($chem eq 'trop_mam3' or $chem eq 'waccm_sc_mam3') {
     }
 }
 
-if (($chem eq 'waccm_mozart_mam3') or ($chem eq 'waccm_tsmlt_mam3')) {
+if ($chem =~ /waccm_mozart_mam/ ) {
 
     my %species;
 
@@ -2442,13 +2490,27 @@ if (($chem eq 'waccm_mozart_mam3') or ($chem eq 'waccm_tsmlt_mam3')) {
                 'DMS       -> ' => 'dms_emis_file',
                 'SO2       -> ' => 'so2_emis_file',
                 'SOAG      -> ' => 'soag_emis_file',
-                'bc_a1     -> ' => 'bc_a1_emis_file',
-                'pom_a1    -> ' => 'pom_a1_emis_file',
                 'so4_a1    -> ' => 'so4_a1_emis_file', 
                 'so4_a2    -> ' => 'so4_a2_emis_file',
+        );
+    if ($chem =~ /_mam3/) {
+      %species = (%species,
+                'bc_a1     -> ' => 'bc_a1_emis_file',
+                'pom_a1    -> ' => 'pom_a1_emis_file',
                 'num_a1    -> ' => 'num_a1_emis_file', 
                 'num_a2    -> ' => 'num_a2_emis_file',
-        );
+	  );
+
+    } elsif ($chem =~ /_mam4/) {
+      %species = (%species,
+                'bc_a4     -> ' => 'bc_a4_emis_file',
+                'pom_a4    -> ' => 'pom_a4_emis_file',
+                'num_a1    -> ' => 'mam4_num_a1_emis_file',
+                'num_a2    -> ' => 'num_a2_emis_file',
+                'num_a4    -> ' => 'mam4_num_a4_emis_file',
+	  );
+    }
+
     my $first = 1;
     my $pre = "";
     my $val = "";
@@ -2473,10 +2535,24 @@ if (($chem eq 'waccm_mozart_mam3') or ($chem eq 'waccm_tsmlt_mam3')) {
                 'SO2         -> ' => 'so2_ext_file',
                 'so4_a1      -> ' => 'so4_a1_ext_file', 
                 'so4_a2      -> ' => 'so4_a2_ext_file',
+        );
+    if ($chem =~ /_mam3/) {
+      %species = (%species,
                 'pom_a1      -> ' => 'pom_a1_ext_file', 
                 'bc_a1       -> ' => 'bc_a1_ext_file', 
                 'num_a1      -> ' => 'num_a1_ext_file', 
-                'num_a2      -> ' => 'num_a2_ext_file', );
+                'num_a2      -> ' => 'num_a2_ext_file', 
+          );
+
+    } elsif ($chem =~ /_mam4/) {
+      %species = (%species,
+                'pom_a4      -> ' => 'pom_a4_ext_file', 
+                'bc_a4       -> ' => 'bc_a4_ext_file', 
+                'num_a1      -> ' => 'mam4_num_a1_ext_file',
+                'num_a2      -> ' => 'num_a2_ext_file',
+                'num_a4      -> ' => 'mam4_num_a4_ext_file',
+          );
+    }
     $first = 1;
     $pre = "";
     $val = "";
@@ -2566,6 +2642,16 @@ if ($chem eq 'trop_mam4') {
                   'num_a2      -> ' => 'num_a2_ext_file', # background volc emissions
                   'num_a4      -> ' => 'mam4_num_a4_ext_file', ); # only forest fire and grass fire emissions
     }
+    # for cam6 add h2o source from methane oxidation
+    if ($phys =~ /cam5.4/ &&  $cfg->get('clubb_sgs') == 1 ) {
+	%species = (%species, 'H2O -> ' => 'h2o_ch4_ox_file');
+    }
+    # for mechanisms without OCS use prescribed OCS oxidation rates for 
+    # precursers of prognostic stratosphere aerosols 
+    if ($nl->get_value('modal_strat_sulfate') =~ /$TRUE/io) {
+	%species = (%species, 'SO2 -> ' => 'so2_ocs_ox_file');
+    }
+
     $first = 1;
     $pre = "";
     $val = "";
@@ -2577,11 +2663,6 @@ if ($chem eq 'trop_mam4') {
             $pre = ",";
             $first = 0;
         }
-    }
-    if ($nl->get_value('modal_strat_sulfate') =~ /$TRUE/io) {
-        my $rel_filepath = get_default_value('so2_ocs_ox_file', \%verhash );
-        my $abs_filepath = set_abs_filepath($rel_filepath, $inputdata_rootdir);
-        $val .= "," . quote_string('SO2 -> ' . $abs_filepath);
     }
     add_default($nl, 'ext_frc_specifier', 'val'=>$val);
     unless (defined $nl->get_value('ext_frc_type')) {
@@ -2703,12 +2784,12 @@ if ($chem eq 'trop_mam7') {
     }
 }
 
-# WACCM_MOZART options.
+# WACCM options.
 if ($chem =~ /waccm_mozart/ or $chem =~ /waccmx_mozart/ or $chem =~ /waccm_tsmlt/) {
 
     # Species with fixed lower boundary
     my $val = "'CCL4', 'CF2CLBR', 'CF3BR', 'CFC11', 'CFC113', 'CFC12', 'CH3BR', 'CH3CCL3', 'CH3CL', 'CH4', 'CO2', 'H2', 'HCFC22','N2O'";
-    if ($chem eq 'waccm_mozart_sulfur' or $chem eq 'waccm_mozart_mam3' or $chem eq 'waccm_tsmlt_mam3') {
+    if ($chem_has_ocs) {
         $val .= ",'OCS'";
     }
     add_default($nl, 'flbc_list', 'val'=>$val);
@@ -2720,10 +2801,13 @@ if ($chem =~ /waccm_mozart/ or $chem =~ /waccmx_mozart/ or $chem =~ /waccm_tsmlt
     # Datasets
     my @files = ('flbc_file', 'efield_lflux_file', 'efield_hflux_file', 'efield_wei96_file',
                  'photon_file', 'electron_file',
-                 'euvac_file', 'solar_parms_file',  'sulf_file',
+                 'euvac_file', 'solar_parms_file',  
                  'depvel_lnd_file', 'clim_soilw_file', 'season_wes_file',
                  'xs_coef_file', 'xs_short_file','xs_long_file', 'rsf_file', 
                  'tgcm_ubc_file', 'snoe_ubc_file', 'soil_erod_file' );
+    if ($chem =~ /_mozart/) {
+        @files = (@files, 'sulf_file' );
+    }
 
     foreach my $file (@files) {
         add_default($nl, $file);
@@ -3081,10 +3165,12 @@ if ($phys =~ /cam5/) {
 }
 
 # cldwat ice coefficients
-add_default($nl, 'rk_strat_icritc');
-add_default($nl, 'rk_strat_icritw');
-add_default($nl, 'rk_strat_conke');
-add_default($nl, 'rk_strat_r3lcrit');
+if ($cfg->get('microphys') eq 'rk') {
+    add_default($nl, 'rk_strat_icritc');
+    add_default($nl, 'rk_strat_icritw');
+    add_default($nl, 'rk_strat_conke');
+    add_default($nl, 'rk_strat_r3lcrit');
+}
 
 # Top level pressure for troposphere cloud physics
 add_default($nl, 'trop_cloud_top_press');
@@ -3106,8 +3192,10 @@ add_default($nl, 'diff_cnsrv_mass_check');
 add_default($nl, 'do_molec_press');
 add_default($nl, 'molec_diff_bot_press');
 
-# Cloud sedimentation
-add_default($nl, 'cldsed_ice_stokes_fac');
+if ($cfg->get('microphys') eq 'rk') {
+  # Cloud sedimentation
+  add_default($nl, 'cldsed_ice_stokes_fac');
+}
 
 # Dust emissions tuning factor
 # If dust is prognostic ==> supply the tuning factor
@@ -3160,6 +3248,8 @@ if ($waccm_phys or $cfg->get('nlev') >= 60) {
     my $hdepth_scaling = '0.25D0' ;
     if ($nl->get_value('qbo_use_forcing') =~ /$TRUE/io or $nl->get_value('met_data_file')) {
        $hdepth_scaling = '1.D0' ;
+       add_default($nl, 'qbo_cyclic','val'=>'.true.');
+       add_default($nl, 'qbo_forcing_file');
     }
     add_default($nl, 'gw_qbo_hdepth_scaling', 'val'=>$hdepth_scaling);
 } else {

@@ -42,7 +42,7 @@
       <value compset="_CAM5%MOZM"     >-chem trop_mozart_mam3 -age_of_air_trcs</value> 
       <value compset="_CAM5%PM"       >-chem none</value> 
       <value compset="_CAM5%SMA3"     >-chem trop_strat_mam3 -age_of_air_trcs</value> 
-      <value compset="_CAM5%VBS"      >-chem trop_strat_mam4_vbs</value> 
+      <value compset="_CAM5.*%VBS"    >-chem trop_strat_mam4_vbs</value> 
       <value compset="_CAM5%SMA7"     >-chem trop_strat_mam7 -age_of_air_trcs</value> 
       <value compset="_CAM4%SSOA"     >-chem trop_strat_soa -age_of_air_trcs</value> 
       <value compset="C[12].*_CAM4%SSOA">-waccm_phys</value> 
@@ -53,19 +53,15 @@
       <value compset="_CAM4%WCSC"     >-chem waccm_sc</value>
       <value compset="_CAM5%WCSCM3"   >-chem waccm_sc_mam3</value>
       <value compset="_CAM4%WTSM"     >-chem waccm_tsmlt</value>
-      <value compset="_CAM5%WTSM"     >-chem waccm_tsmlt_mam3 -phys cam5.4</value>
+      <value compset="_CAM5.*%WTSM"   >-chem waccm_tsmlt_mam4</value>
       <value compset="_CAM[45]%WCBC"  >-carma bc_strat</value>
       <value compset="_CAM4%WCSF"     >-chem waccm_mozart_sulfur -carma sulfate</value>
       <value compset="_CAM[45]%WCMX"  >-waccmx</value>
       <value compset="_CAM[45]%WCXI"  >-waccmx</value>
       
       <value compset="GEOS_CAM"       >-offline_dyn</value>
-      <value compset="SDC1_CAM"       >-offline_dyn</value>
-      <value compset="GEOS_CAM4"      >-nlev 56</value>
-      <value compset="SDC1_CAM4"      >-nlev 56</value>
-      <value compset="GEOS_CAM5"      >-nlev 56</value>
-      <value compset="GEOS_CAM[45]%W" >-nlev 88</value>
-      <value compset="SDC1_CAM4%W"    >-nlev 88</value>
+      <value compset="GEOS_CAM"       >-nlev 56</value>
+      <value compset="GEOS_CAM.*%W"   >-nlev 88</value>
       
       <value compset="_CAM4%FCHM"     >-chem super_fast_llnl</value>
       <value compset="HIST_CAM4%FCHM" >-chem super_fast_llnl -age_of_air_trcs</value> 
@@ -123,22 +119,6 @@
       <value compset="2000_CAM5%MOZM"   >2000_cam5_trop_moz_mam3</value> 
       <value compset="1850_CAM5%PM"     >1850_cam5_pm</value> 
       
-      <value compset="C2R6_CAM4%WCMA">1950-2100_ccmi_refc2_waccm_ma</value>
-      <value compset="C2R8_CAM4%WCMA">1950-2100_ccmi_refc2_rcp85_waccm_ma</value>
-      <value compset="C2R6_CAM4%WTSM">1950-2100_ccmi_refc2_waccm_tsmlt</value>
-      <value compset="C2R6_CAM5%WTSM">1950-2100_ccmi_refc2_waccm_tsmlt_cam5</value>
-      <value compset="C2R6_CAM4%SSOA">1950-2100_ccmi_refc2_trop_strat_soa</value>
-      <value compset="C2R4_CAM4%SSOA">2004-2100_ccmi_refc2_rcp45_trop_strat_soa</value>
-      
-      <value compset="FRC1_CAM4%WCMA">1950-2010_ccmi_refc1_waccm_ma</value>
-      <value compset="FRC1_CAM4%WTSM">1950-2010_ccmi_refc1_waccm_tsmlt</value>
-      <value compset="FRC1_CAM5%WTSM">volc_waccm_tsmlt_megan_cam5</value>
-      <value compset="FRC1_CAM4%SSOA">1950-2010_ccmi_refc1_trop_strat_soa</value>
-      
-      <value compset="SDC1_CAM4%WCMA">sd_1975-2010_ccmi_refc1_waccm_ma</value>
-      <value compset="SDC1_CAM4%WTSM">sd_1975-2010_ccmi_refc1_waccm_tsmlt</value>
-      <value compset="SDC1_CAM4%SSOA">sd_1975-2010_ccmi_refc1_trop_strat_soa</value>
-      
       <value compset="2000_CAM4%WCMX"   >waccmx_2000_cam4</value>
       <value compset="2000_CAM4%WCXI"   >waccmxi_2000_cam4</value>
       <value compset="5505_CAM4%WCCM"   >waccm_1955-2005_cam4</value>
@@ -162,6 +142,9 @@
       <value compset="RCP8_CAM5%WCCM"   >waccm_2005-2100_cam5_rcp85</value>
       <value compset="1850_CAM5%WCCM"   >waccm_1850_cam5</value>
       <value compset="2000_CAM5%WCCM"   >waccm_2000_cam5</value>
+      <value compset="2000_CAM55%WTSM"  >waccm_tsmlt_2000_cam55</value>
+      <value compset="1850_CAM55%WTSM"  >waccm_tsmlt_1850_cam55</value>
+      <value compset="AMIP_CAM55%WTSM"  >waccm_tsmlt_amip_cam55</value>
       <value compset="2000_CAM5%WCCB"   >waccm_2000_cam5</value>
       <value compset="2013_CAM4%WCBC"   >waccm_carma_bc_2013_cam4</value>
       <value compset="GEOS_CAM4%TMOZ"   >cam4_chem_radpsv_geos5</value>
@@ -202,9 +185,6 @@
     <values>
       <value compset="_CAM.*%RCO2"> scenario_ghg=&apos;RAMP_CO2_ONLY&apos;ramp_co2_annual_rate=1 </value> 
       <value compset="_BGC%BDRD"> co2_cycle_rad_passive=.true. </value>
-      <value grid="a%1.9x2.5_l%1.9x2.5_oi%gx1v6_r%r05" compset="C2R6_CAM4%SSOA_CLM40%SP_CICE_POP2_RTM_SGLC_SWAV">
-	ncdata=&apos;$DIN_LOC_ROOT/atm/waccm/ic/b40.20th.track1.2deg.wcm.007_1.9x2.5_L26_1950-01-01-00000_c130329.nc&apos;
-      </value>
     </values>
     <group>run_component_cam</group>
     <file>env_run.xml</file>
@@ -270,11 +250,11 @@
     <valid_values></valid_values>
     <default_value>$DIN_LOC_ROOT/atm/cam/sst/sst_HadOIBl_bc_1x1_clim_c101029.nc</default_value>
     <values>
-      <value compset="(FRC1_|SDC1_|GEOS_)" grid="a%T31.*_oi%T31"            >$DIN_LOC_ROOT/atm/cam/sst/sst_HadOIBl_bc_48x96_1850_2014_c150416.nc</value>
-      <value compset="(FRC1_|SDC1_|GEOS_)" grid="a%1.9x2.5.*_oi%1.9x2.5"    >$DIN_LOC_ROOT/atm/cam/sst/sst_HadOIBl_bc_1.9x2.5_1850_2014_c150416.nc</value>
-      <value compset="(FRC1_|SDC1_|GEOS_)" grid="a%0.9x1.25.*_oi%0.9x1.25"  >$DIN_LOC_ROOT/atm/cam/sst/sst_HadOIBl_bc_0.9x1.25_1850_2014_c150416.nc</value>
-      <value compset="(FRC1_|SDC1_|GEOS_)" grid="a%0.47x0.63.*_oi%0.47x0.63">$DIN_LOC_ROOT/atm/cam/sst/sst_HadOIBl_bc_0.47x0.63_1850_2014_c150416.nc</value>
-      <value compset="(FRC1_|SDC1_|GEOS_)" grid="a%0.23x0.31.*_oi%0.23x0.31">$DIN_LOC_ROOT/atm/cam/sst/sst_HadOIBl_bc_0.23x0.31_1850_2014_c150416.nc</value>
+      <value compset="GEOS_" grid="a%T31.*_oi%T31"            >$DIN_LOC_ROOT/atm/cam/sst/sst_HadOIBl_bc_48x96_1850_2014_c150416.nc</value>
+      <value compset="GEOS_" grid="a%1.9x2.5.*_oi%1.9x2.5"    >$DIN_LOC_ROOT/atm/cam/sst/sst_HadOIBl_bc_1.9x2.5_1850_2014_c150416.nc</value>
+      <value compset="GEOS_" grid="a%0.9x1.25.*_oi%0.9x1.25"  >$DIN_LOC_ROOT/atm/cam/sst/sst_HadOIBl_bc_0.9x1.25_1850_2014_c150416.nc</value>
+      <value compset="GEOS_" grid="a%0.47x0.63.*_oi%0.47x0.63">$DIN_LOC_ROOT/atm/cam/sst/sst_HadOIBl_bc_0.47x0.63_1850_2014_c150416.nc</value>
+      <value compset="GEOS_" grid="a%0.23x0.31.*_oi%0.23x0.31">$DIN_LOC_ROOT/atm/cam/sst/sst_HadOIBl_bc_0.23x0.31_1850_2014_c150416.nc</value>
     </values>
     <group>run_component_docn</group>
     <file>env_run.xml</file>
@@ -287,11 +267,11 @@
     <valid_values></valid_values>
     <default_value>$DIN_LOC_ROOT/ocn/docn7/domain.ocn.1x1.111007.nc</default_value>
     <values>
-      <value compset="(FRC1_|SDC1_|GEOS_)" grid="a%T31.*_oi%T31"            >$DIN_LOC_ROOT/atm/cam/ocnfrac/domain.camocn.48x96_gx3v7_100114.nc</value>
-      <value compset="(FRC1_|SDC1_|GEOS_)" grid="a%1.9x2.5.*_oi%1.9x2.5"    >$DIN_LOC_ROOT/atm/cam/ocnfrac/domain.camocn.1.9x2.5_gx1v6_090403.nc</value>
-      <value compset="(FRC1_|SDC1_|GEOS_)" grid="a%0.9x1.25.*_oi%0.9x1.25"  >$DIN_LOC_ROOT/atm/cam/ocnfrac/domain.camocn.0.9x1.25_gx1v6_090403.nc</value>
-      <value compset="(FRC1_|SDC1_|GEOS_)" grid="a%0.47x0.63.*_oi%0.47x0.63">$DIN_LOC_ROOT/atm/cam/ocnfrac/domain.camocn.0.47x0.63_gx1v6_090408.nc</value>
-      <value compset="(FRC1_|SDC1_|GEOS_)" grid="a%0.23x0.31.*_oi%0.23x0.31">$DIN_LOC_ROOT/atm/cam/ocnfrac/domain.camocn.0.23x0.31_gx1v6_101108.nc</value>
+      <value compset="GEOS_" grid="a%T31.*_oi%T31"            >$DIN_LOC_ROOT/atm/cam/ocnfrac/domain.camocn.48x96_gx3v7_100114.nc</value>
+      <value compset="GEOS_" grid="a%1.9x2.5.*_oi%1.9x2.5"    >$DIN_LOC_ROOT/atm/cam/ocnfrac/domain.camocn.1.9x2.5_gx1v6_090403.nc</value>
+      <value compset="GEOS_" grid="a%0.9x1.25.*_oi%0.9x1.25"  >$DIN_LOC_ROOT/atm/cam/ocnfrac/domain.camocn.0.9x1.25_gx1v6_090403.nc</value>
+      <value compset="GEOS_" grid="a%0.47x0.63.*_oi%0.47x0.63">$DIN_LOC_ROOT/atm/cam/ocnfrac/domain.camocn.0.47x0.63_gx1v6_090408.nc</value>
+      <value compset="GEOS_" grid="a%0.23x0.31.*_oi%0.23x0.31">$DIN_LOC_ROOT/atm/cam/ocnfrac/domain.camocn.0.23x0.31_gx1v6_101108.nc</value>
     </values>
     <group>run_component_cam_sstice</group>
     <file>env_run.xml</file>
@@ -304,7 +284,7 @@
     <valid_values></valid_values>
     <default_value>1</default_value>
     <values>
-      <value compset="(FRC1_|SDC1_|GEOS_)">1850</value>
+      <value compset="GEOS_">1850</value>
     </values>
     <group>run_component_cam_sstice</group>
     <file>env_run.xml</file>
@@ -325,7 +305,7 @@
     <valid_values></valid_values>
     <default_value>0</default_value>
     <values>
-      <value compset="(FRC1_|SDC1_|GEOS_)">1850</value>
+      <value compset="GEOS_">1850</value>
     </values>
     <group>run_component_cam_sstice</group>
     <file>env_run.xml</file>
@@ -341,7 +321,7 @@
     <valid_values></valid_values>
     <default_value>0</default_value>
     <values>
-      <value compset="(FRC1_|SDC1_|GEOS_)">2014</value> 
+      <value compset="GEOS_">2014</value> 
     </values>
     <group>run_component_cam_sstice</group>
     <file>env_run.xml</file>

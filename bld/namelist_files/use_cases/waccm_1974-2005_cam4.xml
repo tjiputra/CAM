@@ -37,10 +37,9 @@
 
 <!-- Sulfate Aerosols: DEFAULTS okay for sulf_file -->
 <prescribed_strataero_type>SERIAL</prescribed_strataero_type>
-<prescribed_strataero_file>CESM_1949_2100_sad_V2_c130627.nc</prescribed_strataero_file>
 
 <!-- volcanic aerosol heating -->
-<strat_aero_feedback>.true.</strat_aero_feedback>
+<prescribed_strataero_feedback>.true.</prescribed_strataero_feedback>
 
 <!-- QBO settings -->
 <qbo_cyclic>.false.</qbo_cyclic>
