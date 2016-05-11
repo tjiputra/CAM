@@ -485,8 +485,8 @@ call phys_getopts( history_aerosol_out = history_aerosol)
 !if neu wetdep, we have to output it here!
 #ifdef OSLO_AERO
     if(history_aerosol)then
-       wrk_wd(:ncol) = 0.0_r8
        do m=1,gas_wetdep_cnt
+          wrk_wd(:ncol) = 0.0_r8
           do k=1,pver
              !Note sign: tendency is negative, so this becomes a positive flux!
              wrk_wd(:ncol) = wrk_wd(:ncol)  &
