@@ -758,6 +758,11 @@ subroutine micro_mg_cam_init(pbuf2d)
    call addfld ('MNUDEPO  ',(/ 'lev' /), 'A', 'kg/kg/s ', 'Mixing ratio deposition'                        )
    call addfld ('MPDNLIQ  ',(/ 'lev' /), 'A', '1/kg/s  ', 'CLDLIQ number tendency - Morrison microphysics' )
    call addfld ('MPDNICE  ',(/ 'lev' /), 'A', '1/kg/s  ', 'CLDICE number tendency - Morrison microphysics' )
+   call addfld ('FRZR     ',(/ 'lev' /), 'A', 'kg/kg/s  ', 'Mass freezing rain to snow'    )
+   call addfld ('NFRZR    ',(/ 'lev' /), 'A', '1/kg/s ', 'Number freezing rain to snow' )
+   call addfld ('MNUCCRI  ',(/ 'lev' /), 'A', 'kg/kg/s  ', 'Mass freezing rain to ice'  )
+   call addfld ('NNUCCRI  ',(/ 'lev' /), 'A', '1/kg/s  ', 'Number freezing rain to ice' )
+
    ! History variables for CAM5 microphysics
    call addfld ('MPDT',       (/ 'lev' /), 'A', 'W/kg',     'Heating tendency - Morrison microphysics'                )
    call addfld ('MPDQ',       (/ 'lev' /), 'A', 'kg/kg/s',  'Q tendency - Morrison microphysics'                      )
@@ -980,6 +985,14 @@ subroutine micro_mg_cam_init(pbuf2d)
          case (0)
             call add_default ('NCTNCONS ', budget_histfile, ' ')
             call add_default ('NCTNNBMN ', budget_histfile, ' ')
+         end select
+      case (2)
+         select case (micro_mg_sub_version)
+         case (0)
+            call add_default ('FRZR ', budget_histfile, ' ')
+            call add_default ('NFRZR ', budget_histfile, ' ')
+            call add_default ('MNUCCRI ', budget_histfile, ' ')
+            call add_default ('NNUCCRI ', budget_histfile, ' ')
          end select
       end select
       call add_default ('MPDNLIQ  ', budget_histfile, ' ')
@@ -1245,6 +1258,10 @@ subroutine micro_mg_cam_tend(state, ptend, dtime, pbuf)
    real(r8), target :: nitnszmn(state%psetcols,pver)   ! gamma-adjustment (ice)
    real(r8), target :: nitnszmx(state%psetcols,pver)   ! gamma-adjustment (ice)
    real(r8), target :: nitnncld(state%psetcols,pver)   ! corrrection for no cloud
+   real(r8), target :: frzr(state%psetcols,pver)       ! mass freezing rain ==>snow
+   real(r8), target :: nfrzr(state%psetcols,pver)      ! number freezing rain ==> snow
+   real(r8), target :: mnuccri(state%psetcols,pver)   ! mass freezing rain ==> ice 
+   real(r8), target :: nnuccri(state%psetcols,pver)   ! number freezing rain ==> ice 
 !AL
    ! Object that packs columns with clouds/precip.
    type(MGPacker) :: packer
@@ -1421,6 +1438,10 @@ subroutine micro_mg_cam_tend(state, ptend, dtime, pbuf)
    real(r8), allocatable, target :: packed_nitnszmn(:,:)   ! gamma-adjustment (ice)
    real(r8), allocatable, target :: packed_nitnszmx(:,:)   ! gamma-adjustment (ice)
    real(r8), allocatable, target :: packed_nitnncld(:,:)   ! corrrection for no cloud
+   real(r8), allocatable, target :: packed_frzr(:,:)       ! mass freezing rain ==> snow 
+   real(r8), allocatable, target :: packed_nfrzr(:,:)      ! number freezing rain ==> snow
+   real(r8), allocatable, target :: packed_mnuccri(:,:)    ! mass freezing rain ==> ice
+   real(r8), allocatable, target :: packed_nnuccri(:,:)    ! number freezing rain ==>ice
 !AL
 
    ! physics buffer fields for COSP simulator
@@ -2091,6 +2112,14 @@ subroutine micro_mg_cam_tend(state, ptend, dtime, pbuf)
    call post_proc%add_field(p(nitnszmx), p(packed_nitnszmx))
    allocate(packed_nitnncld(mgncol,nlev))
    call post_proc%add_field(p(nitnncld), p(packed_nitnncld))
+   allocate(packed_frzr(mgncol,nlev))
+   call post_proc%add_field(p(frzr), p(packed_frzr))
+   allocate(packed_nfrzr(mgncol,nlev))
+   call post_proc%add_field(p(nfrzr), p(packed_nfrzr))
+   allocate(packed_mnuccri(mgncol,nlev))
+   call post_proc%add_field(p(mnuccri), p(packed_mnuccri))
+   allocate(packed_nnuccri(mgncol,nlev))
+   call post_proc%add_field(p(nnuccri), p(packed_nnuccri))
 !AL
 
    ! The following are all variables related to sizes, where it does not
@@ -2349,6 +2378,21 @@ subroutine micro_mg_cam_tend(state, ptend, dtime, pbuf)
                  packed_freqs,           packed_freqr,           &
                  packed_nfice,           packed_qcrat,           &
                  errstring, &
+!AL right names?
+                  packed_nnuccco, packed_nnuccto,  &
+                  packed_npsacwso, packed_nsubco, packed_nprao,       &
+                  packed_nprc1o, packed_nqcsedten, &
+                  packed_nqisedten, packed_nmelto, packed_nhomoo,    &
+                  packed_nimelto, packed_nihomoo, packed_nsacwio,    &
+                  packed_nsubio, packed_nprcio,       &
+                  packed_npraio, packed_nnudepo,      & 
+                  packed_npccno, packed_nnuccdo, packed_mnudepo,       &
+                  packed_frzr,packed_nfrzr,        &
+                  packed_nnuccri, packed_mnuccri,               &
+                  packed_nctnszmx,packed_nctnszmn, &
+                  packed_nctnncld, packed_nitncons, &
+                  packed_nitnszmx, packed_nitnszmn, packed_nitnncld, &
+!AL
                  packed_tnd_qsnow,packed_tnd_nsnow,packed_re_ice,&
 		 packed_prer_evap,                                     &
                  packed_frzimm,  packed_frzcnt,  packed_frzdep   )
@@ -3170,6 +3214,12 @@ subroutine micro_mg_cam_tend(state, ptend, dtime, pbuf)
    call outfld ('NITNSZMN ', nitnszmn,    psetcols, lchnk, avg_subcol_field=use_subcol_microp )
    call outfld ('NITNSZMX ', nitnszmx,    psetcols, lchnk, avg_subcol_field=use_subcol_microp )
    call outfld ('NITNNCLD ', nitnncld,    psetcols, lchnk, avg_subcol_field=use_subcol_microp )
+   if (micro_mg_version > 1) then
+      call outfld ('FRZR     ', frzr, psetcols, lchnk, , avg_subcol_field=use_subcol_microp )
+      call outfld ('NFRZR    ', nfrzr, psetcols, lchnk, , avg_subcol_field=use_subcol_microp )
+      call outfld ('MNUCCRI  ', mnuccri, psetcols, lchnk, , avg_subcol_field=use_subcol_microp )
+      call outfld ('NNUCCRI  ', nnuccri, psetcols, lchnk, , avg_subcol_field=use_subcol_microp )
+   end if
 
    call outfld( 'MPDNLIQ  ', ncten,       psetcols, lchnk, avg_subcol_field=use_subcol_microp )
    call outfld( 'MPDNICE  ', niten,       psetcols, lchnk, avg_subcol_field=use_subcol_microp )
