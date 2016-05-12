@@ -3215,10 +3215,10 @@ subroutine micro_mg_cam_tend(state, ptend, dtime, pbuf)
    call outfld ('NITNSZMX ', nitnszmx,    psetcols, lchnk, avg_subcol_field=use_subcol_microp )
    call outfld ('NITNNCLD ', nitnncld,    psetcols, lchnk, avg_subcol_field=use_subcol_microp )
    if (micro_mg_version > 1) then
-      call outfld ('FRZR     ', frzr, psetcols, lchnk, , avg_subcol_field=use_subcol_microp )
-      call outfld ('NFRZR    ', nfrzr, psetcols, lchnk, , avg_subcol_field=use_subcol_microp )
-      call outfld ('MNUCCRI  ', mnuccri, psetcols, lchnk, , avg_subcol_field=use_subcol_microp )
-      call outfld ('NNUCCRI  ', nnuccri, psetcols, lchnk, , avg_subcol_field=use_subcol_microp )
+      call outfld ('FRZR   ', frzr,       psetcols, lchnk, avg_subcol_field=use_subcol_microp )
+      call outfld ('NFRZR  ', nfrzr,      psetcols, lchnk, avg_subcol_field=use_subcol_microp )
+      call outfld ('MNUCCRI', mnuccri,    psetcols, lchnk, avg_subcol_field=use_subcol_microp )
+      call outfld ('NNUCCRI', nnuccri,    psetcols, lchnk, avg_subcol_field=use_subcol_microp )
    end if
 
    call outfld( 'MPDNLIQ  ', ncten,       psetcols, lchnk, avg_subcol_field=use_subcol_microp )
