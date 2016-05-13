@@ -1947,6 +1947,12 @@ do i=1,ncol
 
          if (.not. use_hetfrz_classnuc) then
 
+!AL
+!Make sure zero output for deposition freezing
+!If no classnuc this is included in NNUCCD (Meyers 1992)
+            nnudep(k) = 0.0_r8
+            mnudep(k) = 0.0_r8
+!AL
             if (do_cldice .and. qcic(i,k).ge.qsmall .and. t(i,k).lt.269.15_r8) then
 
                ! immersion freezing (Bigg, 1953)
