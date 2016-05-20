@@ -46,7 +46,6 @@
 <!-- Sulfate Aerosols: DEFAULTS okay for sulf_file -->
 <prescribed_strataero_type>CYCLICAL</prescribed_strataero_type>
 <prescribed_strataero_cycle_yr>1996</prescribed_strataero_cycle_yr>
-<prescribed_strataero_file>CESM_1949_2100_sad_V2_c130627.nc</prescribed_strataero_file>
 
 <!-- QBO settings --> 
 <qbo_cyclic>.true.</qbo_cyclic>
@@ -54,7 +53,7 @@
 <qbo_use_forcing>.true.</qbo_use_forcing>
 
 <!-- volcanic aerosol heating -->
-<strat_aero_feedback>.true.</strat_aero_feedback> 
+<prescribed_strataero_feedback>.true.</prescribed_strataero_feedback> 
 
 <!-- emis files -->
 

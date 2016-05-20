@@ -39,7 +39,7 @@
       integer            :: fixed_ymd = 0
       integer            :: fixed_tod = 0
 
-      logical :: has_sulf = .false.
+      logical :: has_sulf_file = .false.
 
       contains 
 
@@ -130,7 +130,7 @@ subroutine sulf_readnl(nlfile)
    fixed_tod  = sulf_fixed_tod
 
    ! Turn on prescribed volcanics if user has specified an input dataset.
-   if (len_trim(filename) > 0 ) has_sulf = .true.
+   if (len_trim(filename) > 0 ) has_sulf_file = .true.
 
 end subroutine sulf_readnl
 
@@ -168,9 +168,10 @@ end subroutine sulf_readnl
       ndxs(3) = get_rxt_ndx( 'usr_NO2_aer' )
       ndxs(4) = get_rxt_ndx( 'usr_HO2_aer' )
       ndxs(5) = get_rxt_ndx( 'het1' )
-      so4_ndx = get_spc_ndx('SO4')
+      so4_ndx = get_spc_ndx( 'SO4' )
+      if ( so4_ndx < 1 ) so4_ndx = get_spc_ndx( 'so4_a1' )
 
-      read_sulf = any( ndxs > 0) .and. (so4_ndx < 0)
+      read_sulf = any( ndxs > 0) .and. (so4_ndx < 0) .and. has_sulf_file
 
       if ( .not. read_sulf ) return
 

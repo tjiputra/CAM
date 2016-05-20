@@ -8,11 +8,6 @@
 
 <gas_wetdep_method>NEU</gas_wetdep_method>
 
-<!-- strat aerosol data  -->
-<prescribed_strataero_cycle_yr>2000</prescribed_strataero_cycle_yr>
-<prescribed_strataero_file>CESM_1949_2100_sad_V2_c130627.nc</prescribed_strataero_file>
-<prescribed_strataero_type>CYCLICAL</prescribed_strataero_type>
-
 <solar_data_file>'atm/cam/solar/spectral_irradiance_Lean_1950-2012_daily_Leap_c130227.nc'</solar_data_file>
 <solar_htng_spctrl_scl>.true.</solar_htng_spctrl_scl>
 <solar_data_type>'FIXED'</solar_data_type>

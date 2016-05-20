@@ -1,3 +1,416 @@
+
+===============================================================
+
+Tag name: cam5_4_56
+Originator(s):  raghuraj@ucar.edu, chris.kerr.llc@gmail.com, cacraig
+Date: April 6, 2016
+One-line Summary: Optimized binterp in modal_aer_opt.F90
+
+Purpose of changes:
+ - Optimization changes for binterp inside modal_aer_opt.F90
+
+Bugs fixed (include bugzilla ID):
+
+Describe any changes made to build system:
+
+Describe any changes made to the namelist:
+
+List any changes to the defaults for the boundary datasets:
+
+Describe any substantial timing or memory changes:
+ - According to Chris Kerr, binterp running using the yellowstone intel 16 compiler has a 30% speedup with this version.
+
+Code reviewed by: cacraig, eaton
+
+List all subroutines eliminated:
+
+List all subroutines added and what they do:
+
+List all existing files that have been modified, and describe the changes:
+M       components/cam/src/physics/cam/modal_aer_opt.F90
+           - optimizations to binterp
+
+If there were any failures reported from running test_driver.sh on any test
+platform, and checkin with these failures has been OK'd by the gatekeeper,
+then copy the lines from the td.*.status files for the failed tests to the
+appropriate machine below.  All failed tests must be justified.
+
+yellowstone/intel: all BFB (bl357 was tested by hand as a baseline did not exist for it in cam5_4_54 -- it was BFB)
+
+hobart/nag: all BFB
+
+hobart/pgi or jaguar/pgi: all BFB
+
+CAM tag used for the baseline comparison tests if different than previous
+tag: cam5_4_54 (cam5_4_55 did not have regression tests run for it)
+
+===============================================================
+===============================================================
+
+Tag name: cam5_4_55
+Originator(s): fvitt
+Date: 5 Apr 2016
+One-line Summary: Fix pre-industrial CAM5.5 build-namelist use case
+
+Purpose of changes:
+
+ . Adjust the 1850_cam55 use case for proper inclusion of H20 forcings
+   due to oxidation of CH4
+ . Add regression test for 1850_cam55 use case
+
+Bugs fixed (include bugzilla ID):
+
+Describe any changes made to build system:
+
+Describe any changes made to the namelist:
+
+List any changes to the defaults for the boundary datasets:
+
+Describe any substantial timing or memory changes:
+
+Code reviewed by:
+
+List all subroutines eliminated:
+
+List all subroutines added and what they do:
+A  +    components/cam/test/system/config_files/f1.9c5.5h
+
+List all existing files that have been modified, and describe the changes:
+M       components/cam/bld/namelist_files/use_cases/1850_cam55.xml
+ - made adjustments for inclusion of H20 forcings due to oxidation of CH4
+
+M       components/cam/test/system/input_tests_master
+M       components/cam/test/system/tests_pretag_yellowstone
+ - added test for the 1850_cam55 use case
+
+The standard regression tests were not run since there are no code changes
+and the only change is to the 1850_cam55.xml use case file -- only tested
+the 1850_cam55 use case -- sm, er, br tests passed.
+
+===============================================================
+===============================================================
+
+Tag name: cam5_4_54
+Originator(s): chris.kerr.llc@gmail.com, cacraig
+Date: March 31, 2016
+One-line Summary: optimized MG2
+
+Purpose of changes: 
+ - Improve performance of microphysics routines. A 7-8% improvement 
+   in microphysics is seen with this optimization.
+
+Bugs fixed (include bugzilla ID):
+
+Describe any changes made to build system:
+
+Describe any changes made to the namelist:
+
+List any changes to the defaults for the boundary datasets:
+
+Describe any substantial timing or memory changes:
+
+Code reviewed by: cacraig, eaton
+
+List all subroutines eliminated:
+
+List all subroutines added and what they do:
+
+List all existing files that have been modified, and describe the changes:
+M       components/cam/src/physics/cam/micro_mg1_0.F90
+M       components/cam/src/physics/cam/micro_mg1_5.F90
+M       components/cam/src/physics/cam/micro_mg2_0.F90
+          - all arrays are automatic arrays based on the size that micro_mg_get_cols returns
+
+M       components/cam/src/physics/cam/micro_mg_cam.F90
+          - all allocations are removed and arrays are now automatic arrays
+          - micro_mg_cam_tend simply calls micro_mg_get_cols and micro_mg_cam_tend_pack 
+          - micro_mg_cam_tend_pack is basically the old micro_mg_cam_tend without
+            the calls to micro_mg_get_cols.
+
+M       components/cam/src/physics/cam/micro_mg_utils.F90
+          - moved constant code outside of the loops over columns
+
+If there were any failures reported from running test_driver.sh on any test
+platform, and checkin with these failures has been OK'd by the gatekeeper,
+then copy the lines from the td.*.status files for the failed tests to the
+appropriate machine below.  All failed tests must be justified.
+
+yellowstone/intel: BFB
+
+hobart/nag: BFB
+
+hobart/pgi or jaguar/pgi: BFB
+===============================================================
+===============================================================
+
+Tag name: cam5_4_53
+Originator(s): fvitt, mmills
+Date: 26 Mar 2016
+One-line Summary: CAM5.5 stratospheric aerosols and methane oxidation
+
+Purpose of changes:
+
+ . Changes to default namelist settings to turn on prescribed stratospheric
+   aerosols and prescribed forcing of H2O due to oxidation of methane in CAM5.5
+
+ . Update prescribed stratospheric aerosol input dataset is included for CAM5.5
+
+ . Turn on prognostic stratospheric aerosols in configurations
+   that have the appropriated chemistry
+
+ . Update volcanic sulfur emissions input dataset for transient runs with prognostic
+   stratospheric aerosols
+
+ . Misc clean up of default namelist settings for CAM5/CAM5.5
+
+ . Add CAM5.5 compsets:
+    FW2000  - WACCM with CAM5.5 physics and TSMLT chemistry
+    FWAMIP  - WACCM5.5 transient with volcanic SO2 emissions
+    FSV2000 - CAMChem with CAM5.5 stratospheric chemistry and VBS SOAs
+
+Bugs fixed (include bugzilla ID):
+
+Describe any changes made to build system:
+
+Describe any changes made to the namelist:
+
+List any changes to the defaults for the boundary datasets:
+
+Describe any substantial timing or memory changes:
+
+Code reviewed by: eaton, cacraig
+
+List all subroutines eliminated:
+D      components/cam/test/system/config_files/f10c5wtmam3dm
+D      components/cam/test/system/config_files/fsd1.9c5wtmam3h
+ - these are replaced by waccm_tsmlt_mam4 versions
+
+D      components/cam/src/chemistry/pp_waccm_tsmlt_mam3
+D      components/cam/src/chemistry/pp_waccm_tsmlt_mam3/mo_lu_solve.F90
+D      components/cam/src/chemistry/pp_waccm_tsmlt_mam3/mo_setrxt.F90
+D      components/cam/src/chemistry/pp_waccm_tsmlt_mam3/mo_adjrxt.F90
+D      components/cam/src/chemistry/pp_waccm_tsmlt_mam3/mo_rxt_rates_conv.F90
+D      components/cam/src/chemistry/pp_waccm_tsmlt_mam3/mo_imp_sol.F90
+D      components/cam/src/chemistry/pp_waccm_tsmlt_mam3/chem_mods.F90
+D      components/cam/src/chemistry/pp_waccm_tsmlt_mam3/mo_prod_loss.F90
+D      components/cam/src/chemistry/pp_waccm_tsmlt_mam3/mo_lin_matrix.F90
+D      components/cam/src/chemistry/pp_waccm_tsmlt_mam3/m_rxt_id.F90
+D      components/cam/src/chemistry/pp_waccm_tsmlt_mam3/mo_phtadj.F90
+D      components/cam/src/chemistry/pp_waccm_tsmlt_mam3/mo_nln_matrix.F90
+D      components/cam/src/chemistry/pp_waccm_tsmlt_mam3/mo_lu_factor.F90
+D      components/cam/src/chemistry/pp_waccm_tsmlt_mam3/mo_sim_dat.F90
+D      components/cam/src/chemistry/pp_waccm_tsmlt_mam3/mo_indprd.F90
+D      components/cam/src/chemistry/pp_waccm_tsmlt_mam3/m_spc_id.F90
+D      components/cam/src/chemistry/pp_waccm_tsmlt_mam3/chem_mech.doc
+D      components/cam/src/chemistry/pp_waccm_tsmlt_mam3/chem_mech.in
+ - removed waccm_tsmlt_mam3 chemistry package
+
+List all subroutines added and what they do:
+A      components/cam/bld/namelist_files/use_cases/waccm_tsmlt_amip_cam55.xml
+A      components/cam/bld/namelist_files/use_cases/waccm_tsmlt_1850_cam55.xml
+A      components/cam/bld/namelist_files/use_cases/waccm_tsmlt_2000_cam55.xml
+ - use cases added for WACCM5.5 compsets
+
+A      components/cam/test/system/config_files/f1.9c5.5wtmam4h
+A      components/cam/test/system/config_files/f10c5wtmam4dm
+ - config file for waccm_tsmlt_mam3 regression tests
+
+List all existing files that have been modified, and describe the changes:
+M      components/cam/src/chemistry/mozart/mo_sulf.F90
+ - correction to checks for the need for prescribed tropospheric sulfates
+
+M      components/cam/bld/configure
+M      components/cam/bld/config_files/definition.xml
+ - removed waccm_tsmlt_mam3 chem option
+
+M      components/cam/bld/perl5lib/Build/ChemNamelist.pm
+ - added utility to check for presence of named species in the chemistry mechanism
+
+M      components/cam/bld/build-namelist
+ - turn on stratopheric aerosol forcings for cam5.5/cam6
+   -- activate prognostic stratopheric aerosols in appropriate
+      configurations, otherwise use prescribed stratospheric aerosols
+ - turn on methane oxidation in cam5.5/cam6
+ - corrections to default emissions for tsmlt and mam4 chemistries
+
+M      components/cam/bld/namelist_files/namelist_defaults_cam.xml
+ - updates to namelist defaults for WACCM and CAMChem with cam5.5/cam6
+   -- SAD updated for CAM5.5 and CAM6
+
+M      components/cam/bld/namelist_files/namelist_definition.xml
+ - "strat_aero_feedback" renamed "prescribed_strataero_feedback"
+
+M      components/cam/bld/namelist_files/use_cases/1950-2010_ccmi_refc1_waccm_ma.xml
+M      components/cam/bld/namelist_files/use_cases/sd_waccm_geos5.xml
+M      components/cam/bld/namelist_files/use_cases/2000_cam5_trop_strat_mam3.xml
+M      components/cam/bld/namelist_files/use_cases/waccmx_2000_cam4.xml
+M      components/cam/bld/namelist_files/use_cases/2000_cam5_trop_strat_mam7.xml
+M      components/cam/bld/namelist_files/use_cases/waccm_2000_cam4.xml
+M      components/cam/bld/namelist_files/use_cases/waccm_2000_cam5.xml
+M      components/cam/bld/namelist_files/use_cases/sd_1975-2010_ccmi_refc1_trop_strat_soa.xml
+M      components/cam/bld/namelist_files/use_cases/1950-2010_ccmi_refc1_trop_strat_soa.xml
+M      components/cam/bld/namelist_files/use_cases/1950-2100_ccmi_refc2_trop_strat_soa.xml
+M      components/cam/bld/namelist_files/use_cases/1950-2010_ccmi_refc1_waccm_tsmlt.xml
+M      components/cam/bld/namelist_files/use_cases/waccm_sc_1955-2005_cam5.xml
+M      components/cam/bld/namelist_files/use_cases/waccm_1850-2005_cam4.xml
+M      components/cam/bld/namelist_files/use_cases/waccmxi_2000_cam4.xml
+M      components/cam/bld/namelist_files/use_cases/waccm_2005-2100_cam4_rcp26.xml
+M      components/cam/bld/namelist_files/use_cases/sd_waccm5_geos5.xml
+M      components/cam/bld/namelist_files/use_cases/sd_1975-2010_ccmi_refc1_waccm_ma.xml
+M      components/cam/bld/namelist_files/use_cases/1950-2100_ccmi_refc2_waccm_ma.xml
+M      components/cam/bld/namelist_files/use_cases/sd_1975-2010_ccmi_refc1_waccm_tsmlt.xml
+M      components/cam/bld/namelist_files/use_cases/2000_cam4_trop_chem.xml
+M      components/cam/bld/namelist_files/use_cases/1950-2100_ccmi_refc2_waccm_tsmlt.xml
+M      components/cam/bld/namelist_files/use_cases/sd_cam4_trop_strat_soa.xml
+M      components/cam/bld/namelist_files/use_cases/1850_waccm_tsmlt_cam5.xml
+M      components/cam/bld/namelist_files/use_cases/2000_cam4_trop_strat_soa.xml
+M      components/cam/bld/namelist_files/use_cases/2007-2011_htap_trop_strat_soa.xml
+M      components/cam/bld/namelist_files/use_cases/waccm_1850_cam4.xml
+M      components/cam/bld/namelist_files/use_cases/waccm_1850_cam5.xml
+M      components/cam/bld/namelist_files/use_cases/sd_waccm_sulfur.xml
+M      components/cam/bld/namelist_files/use_cases/2004-2100_ccmi_refc2_rcp45_trop_strat_soa.xml
+M      components/cam/bld/namelist_files/use_cases/2000_ccmi_refc1_waccm_tsmlt.xml
+M      components/cam/bld/namelist_files/use_cases/sd_2007-2011_htap_trop_strat_soa.xml
+M      components/cam/bld/namelist_files/use_cases/waccm_2005-2100_cam4_rcp45.xml
+M      components/cam/bld/namelist_files/use_cases/cam4_chem_radpsv_geos5.xml
+M      components/cam/bld/namelist_files/use_cases/cam4_trop_strat_chem.xml
+M      components/cam/bld/namelist_files/use_cases/1979-2010_sd_trop_strat_soa.xml
+M      components/cam/bld/namelist_files/use_cases/1950-2100_ccmi_refc2_rcp85_waccm_ma.xml
+M      components/cam/bld/namelist_files/use_cases/waccm_2005-2100_cam4_rcp85.xml
+M      components/cam/bld/namelist_files/use_cases/waccm_1955-2005_cam4.xml
+M      components/cam/bld/namelist_files/use_cases/waccm_1974-2005_cam4.xml
+M      components/cam/bld/namelist_files/use_cases/waccm_1955-2005_cam5.xml
+M      components/cam/bld/namelist_files/use_cases/waccm_refb1.xml
+M      components/cam/bld/namelist_files/use_cases/waccm_carma_bc_2013_cam4.xml
+M      components/cam/bld/namelist_files/use_cases/2005-2100_cam4_strataero_rcp45.xml
+M      components/cam/bld/namelist_files/use_cases/waccmx_1996_cam4.xml
+M      components/cam/bld/namelist_files/use_cases/rcp6.0_waccm_tsmlt_nomegan_cam5.xml
+ - "strat_aero_feedback" renamed "prescribed_strataero_feedback"
+
+M      components/cam/bld/namelist_files/use_cases/volc_waccm_ma_cam5.xml
+M      components/cam/bld/namelist_files/use_cases/volc_waccm_tsmlt_nomegan_cam5.xml
+M      components/cam/bld/namelist_files/use_cases/volc_waccm_tsmlt_megan_cam5.xml
+ - update the volcanic so2 emissions
+
+M      components/cam/cime_config/config_compsets.xml
+M      components/cam/cime_config/testdefs/testlist_cam.xml
+M      components/cam/cime_config/config_component.xml
+ - new compsets added:
+   FW2000  -- WACCM
+   FWAMIP
+   FSV2000 -- CAMChem with VBS SOAs
+
+M      components/cam/test/system/tests_waccm_hybrid
+M      components/cam/test/system/config_files/f1.9c5.4wtclbh
+M      components/cam/test/system/config_files/f4c5.4wtclbdm
+M      components/cam/test/system/config_files/f1.9c5.4wtclbdh
+M      components/cam/test/system/config_files/fsd1.9c5.4wtclbh
+M      components/cam/test/system/tests_pretag_yellowstone
+M      components/cam/test/system/input_tests_master
+ - changes to test waccm_tsmlt_mam4 with cam5.5 phys
+
+If there were any failures reported from running test_driver.sh on any test
+platform, and checkin with these failures has been OK'd by the gatekeeper,
+then copy the lines from the td.*.status files for the failed tests to the
+appropriate machine below.  All failed tests must be justified.
+
+yellowstone/intel:
+td.165357.status:023 bl485 TBL.sh f1.9c5.5wtmam4h outfrq3s+waccm_tsmlt_2000_cam55 9s ...........................FAIL! rc= 7 at Fri Mar 25 12:28:59 MDT 2016
+ - new test -- no baseline to compare against
+
+td.165357.status:037 bl430 TBL.sh f1.9c5mzmam3dh outfrq3s_NEUwetdep 9s .........................................FAIL! rc= 7 at Fri Mar 25 13:08:55 MDT 2016
+td.165357.status:040 bl440 TBL.sh f1.9c4soadh outfrq3s+soa_chem_megan_emis 9s ..................................FAIL! rc= 7 at Fri Mar 25 13:27:28 MDT 2016
+ - expected failures due to changes to default LBCs
+
+td.165357.status:043 bl470 TBL.sh fsd1.9c5.4wtclbh outfrq3s_sd+sd_waccm5_geos5 9s ..............................FAIL! rc= 7 at Fri Mar 25 13:49:22 MDT 2016
+ - expected failure due to changed chem package "waccm_tsmlt_mam3" to "waccm_tsmlt_mam4"
+
+hobart/nag:
+067 bl426 TBL.sh f10c4wmxdm outfrq3s_ionos 9s .................................................FAIL! rc= 7 at Fri Mar 25 09:59:00 MDT 2016
+ - expected failure due to changes in default LBC file and SAD year
+
+076 bl011 TBL.sh f4c5portdm outfrq24h_port 2d .................................................FAIL! rc= 7 at Fri Mar 25 10:31:13 MDT 2016
+ - actually bit-for-bit -- change in the LBC file changes the green house gas values recorded in history
+
+hobart/pgi:
+068 bl011 TBL.sh f4c5portdm outfrq24h_port 2d .................................................FAIL! rc= 7 at Fri Mar 25 10:08:52 MDT 2016
+ - actually bit-for-bit -- change in the LBC file changes the green house gas values recorded in history
+
+CAM tag used for the baseline comparison tests if different than previous
+tag:
+
+Summarize any changes to answers, i.e.,
+- what code configurations:
+- what platforms/compilers:
+- nature of change (roundoff; larger than roundoff but same climate; new
+  climate):
+
+If bitwise differences were observed, how did you show they were no worse
+than roundoff?
+
+If this tag changes climate describe the run(s) done to evaluate the new
+climate in enough detail that it(they) could be reproduced, i.e.,
+- source tag (all code used must be in the repository):
+- platform/compilers:
+- configure commandline:
+- build-namelist command (or complete namelist):
+- MSS location of output:
+
+MSS location of control simulations used to validate new climate:
+
+URL for AMWG diagnostics output used to validate new climate:
+
+===============================================================
+===============================================================
+
+Tag name: cam5_4_52
+Originator(s): bogensch, cacraig
+Date: March 21, 2016
+One-line Summary: Added alternative autoconversion scheme
+
+Purpose of changes:
+ - New switch to use alternative autoconversion scheme in MG2 (following Seifert and 
+   Behang 2001).   Currently this is not turned on
+
+Bugs fixed (include bugzilla ID):
+
+Describe any changes made to build system:
+
+Describe any changes made to the namelist:
+- added logical micro_do_sb_physics which turns on/off the Seifert and Behang autoconversion.  
+
+List any changes to the defaults for the boundary datasets:
+
+Describe any substantial timing or memory changes:
+
+Code reviewed by:
+
+List all subroutines eliminated:
+
+List all subroutines added and what they do:
+
+List all existing files that have been modified, and describe the changes:
+M       components/cam/bld/namelist_files/namelist_definition.xml
+          - added namelist parameter to turn on/off using the Seifert and Behang
+            autoconversion and accretion physics.  It currently defaults to false.
+
+M       components/cam/src/physics/cam/micro_mg2_0.F90
+M       components/cam/src/physics/cam/micro_mg_cam.F90
+M       components/cam/src/physics/cam/micro_mg_utils.F90
+          - changes to add the Seifert and Behang autoconversion
+
+If there were any failures reported from running test_driver.sh on any test
+platform, and checkin with these failures has been OK'd by the gatekeeper,
+then copy the lines from the td.*.status files for the failed tests to the
+appropriate machine below.  All failed tests must be justified.
+
+yellowstone/intel: all BFB
+
+hobart/nag: all BFB
+
+hobart/pgi or jaguar/pgi: all BFB
+
+===============================================================
 ===============================================================
 
 Tag name: cam5_4_51

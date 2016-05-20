@@ -33,9 +33,6 @@
 
 <!-- Deposition Velocities : DEFAULTS okay -->
 
-<!-- volcanic aerosol heating -->
-<strat_aero_feedback>.true.</strat_aero_feedback> 
-
 <!-- Emissions DEFAULTS OKAY for: airpl_emis_file,ch2o_emis_file,co_emis_file,nox_emis_file-->
 
 <!-- LBC, UBC Files -->
@@ -50,6 +47,8 @@
 <prescribed_strataero_cycle_yr>1849</prescribed_strataero_cycle_yr>
 <prescribed_strataero_file>CESM_1849_2100_sad_V2_c140307.nc</prescribed_strataero_file>
 <prescribed_strataero_datapath>atm/waccm/sulf</prescribed_strataero_datapath>
+<!-- volcanic aerosol heating -->
+<prescribed_strataero_feedback>.true.</prescribed_strataero_feedback> 
 
 <!-- emis files -->
 

@@ -51,7 +51,7 @@
 <qbo_use_forcing>.true.</qbo_use_forcing>
 
 <!-- volcanic aerosol heating -->
-<strat_aero_feedback>.true.</strat_aero_feedback> 
+<prescribed_strataero_feedback>.true.</prescribed_strataero_feedback> 
 
 <!-- emis files -->
 

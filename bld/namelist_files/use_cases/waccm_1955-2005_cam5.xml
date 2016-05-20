@@ -29,7 +29,7 @@
 <qbo_use_forcing>.true.</qbo_use_forcing>
 
 <!-- turn off prescribed volcanic aerosol heating, now handled by MAM sulfates -->
-<strat_aero_feedback>.false.</strat_aero_feedback> 
+<prescribed_strataero_feedback>.false.</prescribed_strataero_feedback> 
 
 <!-- emis files -->
 

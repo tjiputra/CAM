@@ -2,9 +2,6 @@
 New features in CAM-5.4
 -------------------------------------------------
 
-
-
-
 ## CAM-SE
 * Update SE dycore tuning parameters (XXEaton)
   - Change time stepping method to RK5 (Kinnmark & Gray Runga-Kutta 5
@@ -132,6 +129,9 @@ New features in CAM-5.4
 * Add option to specify/parameterize precipitation fraction
 
 * Add option to use a different dehydration threshold (rhmin) for in the polar stratosphere.
+
+* New switch to use alternative autoconversion scheme in MG2 (following Seifert and Behang 2001): when active this
+  uses a different autoconversion and accretion scheme for liquid in MG2
 
 ## Macrophysics
 

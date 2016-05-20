@@ -229,6 +229,7 @@ integer :: &
    frzdep_idx = -1
 
    logical :: allow_sed_supersat  ! allow supersaturated conditions after sedimentation loop
+   logical :: micro_do_sb_physics = .false. ! do SB 2001 autoconversion and accretion 
 
 interface p
    module procedure p1
@@ -260,7 +261,8 @@ subroutine micro_mg_cam_readnl(nlfile)
 
   namelist /micro_mg_nl/ micro_mg_version, micro_mg_sub_version, &
        micro_mg_do_cldice, micro_mg_do_cldliq, micro_mg_num_steps, &
-       microp_uniform, micro_mg_dcs, micro_mg_precip_frac_method, micro_mg_berg_eff_factor
+       microp_uniform, micro_mg_dcs, micro_mg_precip_frac_method, micro_mg_berg_eff_factor, &
+       micro_do_sb_physics
 
   !-----------------------------------------------------------------------------
 
@@ -319,6 +321,7 @@ subroutine micro_mg_cam_readnl(nlfile)
   call mpibcast(micro_mg_dcs,                1, mpir8,  0, mpicom)
   call mpibcast(micro_mg_berg_eff_factor,    1, mpir8,  0, mpicom)
   call mpibcast(micro_mg_precip_frac_method, 16, mpichar,0, mpicom)
+  call mpibcast(micro_do_sb_physics,           1, mpilog, 0, mpicom)
 
 #endif
 
@@ -646,7 +649,7 @@ subroutine micro_mg_cam_init(pbuf2d)
               micro_mg_dcs,                  &
               microp_uniform, do_cldice, use_hetfrz_classnuc, &
               micro_mg_precip_frac_method, micro_mg_berg_eff_factor, &
-              allow_sed_supersat, errstring)
+              allow_sed_supersat, micro_do_sb_physics, errstring)
       end select
    end select
 
@@ -1005,18 +1008,54 @@ end subroutine micro_mg_cam_init
 
 subroutine micro_mg_cam_tend(state, ptend, dtime, pbuf)
 
+   use micro_mg1_0, only: micro_mg_get_cols1_0 => micro_mg_get_cols
+   use micro_mg1_5, only: micro_mg_get_cols1_5 => micro_mg_get_cols
+   use micro_mg2_0, only: micro_mg_get_cols2_0 => micro_mg_get_cols
+
+   type(physics_state),         intent(in)    :: state
+   type(physics_ptend),         intent(out)   :: ptend
+   real(r8),                    intent(in)    :: dtime
+   type(physics_buffer_desc),   pointer       :: pbuf(:)
+
+   ! Local variables
+   integer :: ncol, nlev, mgncol
+   integer, allocatable :: mgcols(:) ! Columns with microphysics performed
+
+   ! Find the number of levels used in the microphysics.
+   nlev  = pver - top_lev + 1 
+   ncol  = state%ncol
+   
+   select case (micro_mg_version)
+   case (1)
+      select case (micro_mg_sub_version)
+      case (0)
+         call micro_mg_get_cols1_0(ncol, nlev, top_lev, state%q(:,:,ixcldliq), &
+              state%q(:,:,ixcldice), mgncol, mgcols)
+      case (5)
+         call micro_mg_get_cols1_5(ncol, nlev, top_lev, state%q(:,:,ixcldliq), &
+              state%q(:,:,ixcldice), mgncol, mgcols)
+      end select
+   case (2)
+      call micro_mg_get_cols2_0(ncol, nlev, top_lev, state%q(:,:,ixcldliq), &
+           state%q(:,:,ixcldice), state%q(:,:,ixrain), state%q(:,:,ixsnow), &
+           mgncol, mgcols)
+   end select
+
+   call micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nlev)
+
+end subroutine micro_mg_cam_tend
+
+subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nlev)
+
    use micro_mg_utils, only: size_dist_param_basic, size_dist_param_liq, &
         mg_liq_props, mg_ice_props, avg_diameter, rhoi, rhosn, rhow, rhows, &
         qsmall, mincld
 
    use micro_mg_data, only: MGPacker, MGPostProc, accum_null, accum_mean
 
-   use micro_mg1_0, only: micro_mg_tend1_0 => micro_mg_tend, &
-        micro_mg_get_cols1_0 => micro_mg_get_cols
-   use micro_mg1_5, only: micro_mg_tend1_5 => micro_mg_tend, &
-        micro_mg_get_cols1_5 => micro_mg_get_cols
-   use micro_mg2_0, only: micro_mg_tend2_0 => micro_mg_tend, &
-        micro_mg_get_cols2_0 => micro_mg_get_cols
+   use micro_mg1_0, only: micro_mg_tend1_0 => micro_mg_tend
+   use micro_mg1_5, only: micro_mg_tend1_5 => micro_mg_tend
+   use micro_mg2_0, only: micro_mg_tend2_0 => micro_mg_tend
 
    use physics_buffer,  only: pbuf_col_type_index
    use subcol,          only: subcol_field_avg
@@ -1025,6 +1064,10 @@ subroutine micro_mg_cam_tend(state, ptend, dtime, pbuf)
    type(physics_ptend),         intent(out)   :: ptend
    real(r8),                    intent(in)    :: dtime
    type(physics_buffer_desc),   pointer       :: pbuf(:)
+
+   integer, intent(in) :: nlev
+   integer, intent(in) :: mgncol
+   integer, intent(in) :: mgcols(:)
 
    ! Local variables
    integer :: lchnk, ncol, psetcols, ngrdcol
@@ -1145,143 +1188,143 @@ subroutine micro_mg_cam_tend(state, ptend, dtime, pbuf)
    type(MGPacker) :: packer
 
    ! Packed versions of inputs.
-   real(r8), allocatable :: packed_t(:,:)
-   real(r8), allocatable :: packed_q(:,:)
-   real(r8), allocatable :: packed_qc(:,:)
-   real(r8), allocatable :: packed_nc(:,:)
-   real(r8), allocatable :: packed_qi(:,:)
-   real(r8), allocatable :: packed_ni(:,:)
-   real(r8), allocatable :: packed_qr(:,:)
-   real(r8), allocatable :: packed_nr(:,:)
-   real(r8), allocatable :: packed_qs(:,:)
-   real(r8), allocatable :: packed_ns(:,:)
+   real(r8) :: packed_t(mgncol,nlev)
+   real(r8) :: packed_q(mgncol,nlev)
+   real(r8) :: packed_qc(mgncol,nlev)
+   real(r8) :: packed_nc(mgncol,nlev)
+   real(r8) :: packed_qi(mgncol,nlev)
+   real(r8) :: packed_ni(mgncol,nlev)
+   real(r8) :: packed_qr(mgncol,nlev)
+   real(r8) :: packed_nr(mgncol,nlev)
+   real(r8) :: packed_qs(mgncol,nlev)
+   real(r8) :: packed_ns(mgncol,nlev)
 
-   real(r8), allocatable :: packed_relvar(:,:)
-   real(r8), allocatable :: packed_accre_enhan(:,:)
+   real(r8) :: packed_relvar(mgncol,nlev)
+   real(r8) :: packed_accre_enhan(mgncol,nlev)
 
-   real(r8), allocatable :: packed_p(:,:)
-   real(r8), allocatable :: packed_pdel(:,:)
+   real(r8) :: packed_p(mgncol,nlev)
+   real(r8) :: packed_pdel(mgncol,nlev)
 
    ! This is only needed for MG1.5, and can be removed when support for
    ! that version is dropped.
-   real(r8), allocatable :: packed_pint(:,:)
+   real(r8) :: packed_pint(mgncol,nlev+1)
 
-   real(r8), allocatable :: packed_cldn(:,:)
-   real(r8), allocatable :: packed_liqcldf(:,:)
-   real(r8), allocatable :: packed_icecldf(:,:)
+   real(r8) :: packed_cldn(mgncol,nlev)
+   real(r8) :: packed_liqcldf(mgncol,nlev)
+   real(r8) :: packed_icecldf(mgncol,nlev)
 
-   real(r8), allocatable :: packed_naai(:,:)
-   real(r8), allocatable :: packed_npccn(:,:)
+   real(r8) :: packed_naai(mgncol,nlev)
+   real(r8) :: packed_npccn(mgncol,nlev)
 
    real(r8), allocatable :: packed_rndst(:,:,:)
    real(r8), allocatable :: packed_nacon(:,:,:)
 
    ! Optional outputs.
-   real(r8), pointer :: packed_tnd_qsnow(:,:)
-   real(r8), pointer :: packed_tnd_nsnow(:,:)
-   real(r8), pointer :: packed_re_ice(:,:)
+   real(r8) :: packed_tnd_qsnow(mgncol,nlev)
+   real(r8) :: packed_tnd_nsnow(mgncol,nlev)
+   real(r8) :: packed_re_ice(mgncol,nlev)
 
-   real(r8), pointer :: packed_frzimm(:,:)
-   real(r8), pointer :: packed_frzcnt(:,:)
-   real(r8), pointer :: packed_frzdep(:,:)
+   real(r8) :: packed_frzimm(mgncol,nlev)
+   real(r8) :: packed_frzcnt(mgncol,nlev)
+   real(r8) :: packed_frzdep(mgncol,nlev)
 
    ! Output field post-processing.
    type(MGPostProc) :: post_proc
 
    ! Packed versions of outputs.
-   real(r8), allocatable, target :: packed_rate1ord_cw2pr_st(:,:)
-   real(r8), allocatable, target :: packed_tlat(:,:)
-   real(r8), allocatable, target :: packed_qvlat(:,:)
-   real(r8), allocatable, target :: packed_qctend(:,:)
-   real(r8), allocatable, target :: packed_qitend(:,:)
-   real(r8), allocatable, target :: packed_nctend(:,:)
-   real(r8), allocatable, target :: packed_nitend(:,:)
+   real(r8), target :: packed_rate1ord_cw2pr_st(mgncol,nlev)
+   real(r8), target :: packed_tlat(mgncol,nlev)
+   real(r8), target :: packed_qvlat(mgncol,nlev)
+   real(r8), target :: packed_qctend(mgncol,nlev)
+   real(r8), target :: packed_qitend(mgncol,nlev)
+   real(r8), target :: packed_nctend(mgncol,nlev)
+   real(r8), target :: packed_nitend(mgncol,nlev)
 
-   real(r8), allocatable, target :: packed_qrtend(:,:)
-   real(r8), allocatable, target :: packed_qstend(:,:)
-   real(r8), allocatable, target :: packed_nrtend(:,:)
-   real(r8), allocatable, target :: packed_nstend(:,:)
+   real(r8), target :: packed_qrtend(mgncol,nlev)
+   real(r8), target :: packed_qstend(mgncol,nlev)
+   real(r8), target :: packed_nrtend(mgncol,nlev)
+   real(r8), target :: packed_nstend(mgncol,nlev)
 
-   real(r8), allocatable, target :: packed_prect(:)
-   real(r8), allocatable, target :: packed_preci(:)
-   real(r8), allocatable, target :: packed_nevapr(:,:)
-   real(r8), allocatable, target :: packed_am_evp_st(:,:)
-   real(r8), allocatable, target :: packed_evapsnow(:,:)
-   real(r8), allocatable, target :: packed_prain(:,:)
-   real(r8), allocatable, target :: packed_prodsnow(:,:)
-   real(r8), allocatable, target :: packed_cmeout(:,:)
-   real(r8), allocatable, target :: packed_qsout(:,:)
-   real(r8), allocatable, target :: packed_rflx(:,:)
-   real(r8), allocatable, target :: packed_sflx(:,:)
-   real(r8), allocatable, target :: packed_qrout(:,:)
-   real(r8), allocatable, target :: packed_qcsevap(:,:)
-   real(r8), allocatable, target :: packed_qisevap(:,:)
-   real(r8), allocatable, target :: packed_qvres(:,:)
-   real(r8), allocatable, target :: packed_cmei(:,:)
-   real(r8), allocatable, target :: packed_vtrmc(:,:)
-   real(r8), allocatable, target :: packed_vtrmi(:,:)
-   real(r8), allocatable, target :: packed_qcsedten(:,:)
-   real(r8), allocatable, target :: packed_qisedten(:,:)
-   real(r8), allocatable, target :: packed_qrsedten(:,:)
-   real(r8), allocatable, target :: packed_qssedten(:,:)
-   real(r8), allocatable, target :: packed_umr(:,:)
-   real(r8), allocatable, target :: packed_ums(:,:)
-   real(r8), allocatable, target :: packed_pra(:,:)
-   real(r8), allocatable, target :: packed_prc(:,:)
-   real(r8), allocatable, target :: packed_mnuccc(:,:)
-   real(r8), allocatable, target :: packed_mnucct(:,:)
-   real(r8), allocatable, target :: packed_msacwi(:,:)
-   real(r8), allocatable, target :: packed_psacws(:,:)
-   real(r8), allocatable, target :: packed_bergs(:,:)
-   real(r8), allocatable, target :: packed_berg(:,:)
-   real(r8), allocatable, target :: packed_melt(:,:)
-   real(r8), allocatable, target :: packed_homo(:,:)
-   real(r8), allocatable, target :: packed_qcres(:,:)
-   real(r8), allocatable, target :: packed_prci(:,:)
-   real(r8), allocatable, target :: packed_prai(:,:)
-   real(r8), allocatable, target :: packed_qires(:,:)
-   real(r8), allocatable, target :: packed_mnuccr(:,:)
-   real(r8), allocatable, target :: packed_pracs(:,:)
-   real(r8), allocatable, target :: packed_meltsdt(:,:)
-   real(r8), allocatable, target :: packed_frzrdt(:,:)
-   real(r8), allocatable, target :: packed_mnuccd(:,:)
-   real(r8), allocatable, target :: packed_nrout(:,:)
-   real(r8), allocatable, target :: packed_nsout(:,:)
-   real(r8), allocatable, target :: packed_refl(:,:)
-   real(r8), allocatable, target :: packed_arefl(:,:)
-   real(r8), allocatable, target :: packed_areflz(:,:)
-   real(r8), allocatable, target :: packed_frefl(:,:)
-   real(r8), allocatable, target :: packed_csrfl(:,:)
-   real(r8), allocatable, target :: packed_acsrfl(:,:)
-   real(r8), allocatable, target :: packed_fcsrfl(:,:)
-   real(r8), allocatable, target :: packed_rercld(:,:)
-   real(r8), allocatable, target :: packed_ncai(:,:)
-   real(r8), allocatable, target :: packed_ncal(:,:)
-   real(r8), allocatable, target :: packed_qrout2(:,:)
-   real(r8), allocatable, target :: packed_qsout2(:,:)
-   real(r8), allocatable, target :: packed_nrout2(:,:)
-   real(r8), allocatable, target :: packed_nsout2(:,:)
-   real(r8), allocatable, target :: packed_freqs(:,:)
-   real(r8), allocatable, target :: packed_freqr(:,:)
-   real(r8), allocatable, target :: packed_nfice(:,:)
-   real(r8), allocatable, target :: packed_prer_evap(:,:)
-   real(r8), allocatable, target :: packed_qcrat(:,:)
+   real(r8), target :: packed_prect(mgncol)
+   real(r8), target :: packed_preci(mgncol)
+   real(r8), target :: packed_nevapr(mgncol,nlev)
+   real(r8), target :: packed_am_evp_st(mgncol,nlev)
+   real(r8), target :: packed_evapsnow(mgncol,nlev)
+   real(r8), target :: packed_prain(mgncol,nlev)
+   real(r8), target :: packed_prodsnow(mgncol,nlev)
+   real(r8), target :: packed_cmeout(mgncol,nlev)
+   real(r8), target :: packed_qsout(mgncol,nlev)
+   real(r8), target :: packed_rflx(mgncol,nlev+1)
+   real(r8), target :: packed_sflx(mgncol,nlev+1)
+   real(r8), target :: packed_qrout(mgncol,nlev)
+   real(r8), target :: packed_qcsevap(mgncol,nlev)
+   real(r8), target :: packed_qisevap(mgncol,nlev)
+   real(r8), target :: packed_qvres(mgncol,nlev)
+   real(r8), target :: packed_cmei(mgncol,nlev)
+   real(r8), target :: packed_vtrmc(mgncol,nlev)
+   real(r8), target :: packed_vtrmi(mgncol,nlev)
+   real(r8), target :: packed_qcsedten(mgncol,nlev)
+   real(r8), target :: packed_qisedten(mgncol,nlev)
+   real(r8), target :: packed_qrsedten(mgncol,nlev)
+   real(r8), target :: packed_qssedten(mgncol,nlev)
+   real(r8), target :: packed_umr(mgncol,nlev)
+   real(r8), target :: packed_ums(mgncol,nlev)
+   real(r8), target :: packed_pra(mgncol,nlev)
+   real(r8), target :: packed_prc(mgncol,nlev)
+   real(r8), target :: packed_mnuccc(mgncol,nlev)
+   real(r8), target :: packed_mnucct(mgncol,nlev)
+   real(r8), target :: packed_msacwi(mgncol,nlev)
+   real(r8), target :: packed_psacws(mgncol,nlev)
+   real(r8), target :: packed_bergs(mgncol,nlev)
+   real(r8), target :: packed_berg(mgncol,nlev)
+   real(r8), target :: packed_melt(mgncol,nlev)
+   real(r8), target :: packed_homo(mgncol,nlev)
+   real(r8), target :: packed_qcres(mgncol,nlev)
+   real(r8), target :: packed_prci(mgncol,nlev)
+   real(r8), target :: packed_prai(mgncol,nlev)
+   real(r8), target :: packed_qires(mgncol,nlev)
+   real(r8), target :: packed_mnuccr(mgncol,nlev)
+   real(r8), target :: packed_pracs(mgncol,nlev)
+   real(r8), target :: packed_meltsdt(mgncol,nlev)
+   real(r8), target :: packed_frzrdt(mgncol,nlev)
+   real(r8), target :: packed_mnuccd(mgncol,nlev)
+   real(r8), target :: packed_nrout(mgncol,nlev)
+   real(r8), target :: packed_nsout(mgncol,nlev)
+   real(r8), target :: packed_refl(mgncol,nlev)
+   real(r8), target :: packed_arefl(mgncol,nlev)
+   real(r8), target :: packed_areflz(mgncol,nlev)
+   real(r8), target :: packed_frefl(mgncol,nlev)
+   real(r8), target :: packed_csrfl(mgncol,nlev)
+   real(r8), target :: packed_acsrfl(mgncol,nlev)
+   real(r8), target :: packed_fcsrfl(mgncol,nlev)
+   real(r8), target :: packed_rercld(mgncol,nlev)
+   real(r8), target :: packed_ncai(mgncol,nlev)
+   real(r8), target :: packed_ncal(mgncol,nlev)
+   real(r8), target :: packed_qrout2(mgncol,nlev)
+   real(r8), target :: packed_qsout2(mgncol,nlev)
+   real(r8), target :: packed_nrout2(mgncol,nlev)
+   real(r8), target :: packed_nsout2(mgncol,nlev)
+   real(r8), target :: packed_freqs(mgncol,nlev)
+   real(r8), target :: packed_freqr(mgncol,nlev)
+   real(r8), target :: packed_nfice(mgncol,nlev)
+   real(r8), target :: packed_prer_evap(mgncol,nlev)
+   real(r8), target :: packed_qcrat(mgncol,nlev)
 
-   real(r8), allocatable, target :: packed_rel(:,:)
-   real(r8), allocatable, target :: packed_rei(:,:)
-   real(r8), allocatable, target :: packed_lambdac(:,:)
-   real(r8), allocatable, target :: packed_mu(:,:)
-   real(r8), allocatable, target :: packed_des(:,:)
-   real(r8), allocatable, target :: packed_dei(:,:)
+   real(r8), target :: packed_rel(mgncol,nlev)
+   real(r8), target :: packed_rei(mgncol,nlev)
+   real(r8), target :: packed_lambdac(mgncol,nlev)
+   real(r8), target :: packed_mu(mgncol,nlev)
+   real(r8), target :: packed_des(mgncol,nlev)
+   real(r8), target :: packed_dei(mgncol,nlev)
 
    ! Dummy arrays for cases where we throw away the MG version and
    ! recalculate sizes on the CAM grid to avoid time/subcolumn averaging
    ! issues.
-   real(r8), allocatable :: rel_fn_dum(:,:)
-   real(r8), allocatable :: dsout2_dum(:,:)
-   real(r8), allocatable :: drout_dum(:,:)
-   real(r8), allocatable :: reff_rain_dum(:,:)
-   real(r8), allocatable :: reff_snow_dum(:,:)
+   real(r8) :: rel_fn_dum(mgncol,nlev)
+   real(r8) :: dsout2_dum(mgncol,nlev)
+   real(r8) :: drout_dum(mgncol,nlev)
+   real(r8) :: reff_rain_dum(mgncol,nlev)
+   real(r8) :: reff_snow_dum(mgncol,nlev)
 
    ! Heterogeneous-only version of mnuccdo.
    real(r8) :: mnuccdohet(state%psetcols,pver)
@@ -1493,9 +1536,6 @@ subroutine micro_mg_cam_tend(state, ptend, dtime, pbuf)
    real(r8), pointer :: nrout_grid_ptr(:,:)
    real(r8), pointer :: nsout_grid_ptr(:,:)
 
-   integer :: nlev   ! number of levels where cloud physics is done
-   integer :: mgncol ! size of mgcols
-   integer, allocatable :: mgcols(:) ! Columns with microphysics performed
 
    logical :: use_subcol_microp
    integer :: col_type ! Flag to store whether accessing grid or sub-columns in pbuf_get_field
@@ -1510,9 +1550,6 @@ subroutine micro_mg_cam_tend(state, ptend, dtime, pbuf)
    real(r8), pointer :: pckdptr(:,:)
 
    !-------------------------------------------------------------------------------
-
-   ! Find the number of levels used in the microphysics.
-   nlev  = pver - top_lev + 1
 
    lchnk = state%lchnk
    ncol  = state%ncol
@@ -1715,288 +1752,147 @@ subroutine micro_mg_cam_tend(state, ptend, dtime, pbuf)
    ! and cldice in physics_update
    call physics_ptend_init(ptend, psetcols, "cldwat", ls=.true., lq=lq)
 
-   select case (micro_mg_version)
-   case (1)
-      select case (micro_mg_sub_version)
-      case (0)
-         call micro_mg_get_cols1_0(ncol, nlev, top_lev, state%q(:,:,ixcldliq), &
-              state%q(:,:,ixcldice), mgncol, mgcols)
-      case (5)
-         call micro_mg_get_cols1_5(ncol, nlev, top_lev, state%q(:,:,ixcldliq), &
-              state%q(:,:,ixcldice), mgncol, mgcols)
-      end select
-   case (2)
-      call micro_mg_get_cols2_0(ncol, nlev, top_lev, state%q(:,:,ixcldliq), &
-           state%q(:,:,ixcldice), state%q(:,:,ixrain), state%q(:,:,ixsnow), &
-           mgncol, mgcols)
-   end select
-
    packer = MGPacker(psetcols, pver, mgcols, top_lev)
    post_proc = MGPostProc(packer)
 
-   allocate(packed_rate1ord_cw2pr_st(mgncol,nlev))
-   pckdptr => packed_rate1ord_cw2pr_st ! workaround an apparent pgi compiler bug on goldbach
+   pckdptr => packed_rate1ord_cw2pr_st ! workaround an apparent pgi compiler bug
    call post_proc%add_field(p(rate1cld), pckdptr)
-   allocate(packed_tlat(mgncol,nlev))
-   call post_proc%add_field(p(tlat), p(packed_tlat))
-   allocate(packed_qvlat(mgncol,nlev))
+   call post_proc%add_field(p(tlat) , p(packed_tlat))
    call post_proc%add_field(p(qvlat), p(packed_qvlat))
-   allocate(packed_qctend(mgncol,nlev))
    call post_proc%add_field(p(qcten), p(packed_qctend))
-   allocate(packed_qitend(mgncol,nlev))
    call post_proc%add_field(p(qiten), p(packed_qitend))
-   allocate(packed_nctend(mgncol,nlev))
    call post_proc%add_field(p(ncten), p(packed_nctend))
-   allocate(packed_nitend(mgncol,nlev))
    call post_proc%add_field(p(niten), p(packed_nitend))
 
    if (micro_mg_version > 1) then
-      allocate(packed_qrtend(mgncol,nlev))
       call post_proc%add_field(p(qrten), p(packed_qrtend))
-      allocate(packed_qstend(mgncol,nlev))
       call post_proc%add_field(p(qsten), p(packed_qstend))
-      allocate(packed_nrtend(mgncol,nlev))
       call post_proc%add_field(p(nrten), p(packed_nrtend))
-      allocate(packed_nstend(mgncol,nlev))
       call post_proc%add_field(p(nsten), p(packed_nstend))
-      allocate(packed_umr(mgncol,nlev))
       call post_proc%add_field(p(umr), p(packed_umr))
-      allocate(packed_ums(mgncol,nlev))
       call post_proc%add_field(p(ums), p(packed_ums))
    end if
 
-      allocate(packed_am_evp_st(mgncol,nlev))
-      call post_proc%add_field(p(am_evp_st), p(packed_am_evp_st))
+   call post_proc%add_field(p(am_evp_st), p(packed_am_evp_st))
 
-   allocate(packed_prect(mgncol))
    call post_proc%add_field(p(prect), p(packed_prect))
-   allocate(packed_preci(mgncol))
    call post_proc%add_field(p(preci), p(packed_preci))
-   allocate(packed_nevapr(mgncol,nlev))
    call post_proc%add_field(p(nevapr), p(packed_nevapr))
-   allocate(packed_evapsnow(mgncol,nlev))
    call post_proc%add_field(p(evapsnow), p(packed_evapsnow))
-   allocate(packed_prain(mgncol,nlev))
    call post_proc%add_field(p(prain), p(packed_prain))
-   allocate(packed_prodsnow(mgncol,nlev))
    call post_proc%add_field(p(prodsnow), p(packed_prodsnow))
-   allocate(packed_cmeout(mgncol,nlev))
    call post_proc%add_field(p(cmeice), p(packed_cmeout))
-   allocate(packed_qsout(mgncol,nlev))
    call post_proc%add_field(p(qsout), p(packed_qsout))
-   allocate(packed_rflx(mgncol,nlev+1))
    call post_proc%add_field(p(rflx), p(packed_rflx))
-   allocate(packed_sflx(mgncol,nlev+1))
    call post_proc%add_field(p(sflx), p(packed_sflx))
-   allocate(packed_qrout(mgncol,nlev))
    call post_proc%add_field(p(qrout), p(packed_qrout))
-   allocate(packed_qcsevap(mgncol,nlev))
    call post_proc%add_field(p(qcsevap), p(packed_qcsevap))
-   allocate(packed_qisevap(mgncol,nlev))
    call post_proc%add_field(p(qisevap), p(packed_qisevap))
-   allocate(packed_qvres(mgncol,nlev))
    call post_proc%add_field(p(qvres), p(packed_qvres))
-   allocate(packed_cmei(mgncol,nlev))
    call post_proc%add_field(p(cmeiout), p(packed_cmei))
-   allocate(packed_vtrmc(mgncol,nlev))
    call post_proc%add_field(p(vtrmc), p(packed_vtrmc))
-   allocate(packed_vtrmi(mgncol,nlev))
    call post_proc%add_field(p(vtrmi), p(packed_vtrmi))
-   allocate(packed_qcsedten(mgncol,nlev))
    call post_proc%add_field(p(qcsedten), p(packed_qcsedten))
-   allocate(packed_qisedten(mgncol,nlev))
    call post_proc%add_field(p(qisedten), p(packed_qisedten))
    if (micro_mg_version > 1) then
-      allocate(packed_qrsedten(mgncol,nlev))
       call post_proc%add_field(p(qrsedten), p(packed_qrsedten))
-      allocate(packed_qssedten(mgncol,nlev))
       call post_proc%add_field(p(qssedten), p(packed_qssedten))
    end if
 
-   allocate(packed_pra(mgncol,nlev))
    call post_proc%add_field(p(prao), p(packed_pra))
-   allocate(packed_prc(mgncol,nlev))
    call post_proc%add_field(p(prco), p(packed_prc))
-   allocate(packed_mnuccc(mgncol,nlev))
    call post_proc%add_field(p(mnuccco), p(packed_mnuccc))
-   allocate(packed_mnucct(mgncol,nlev))
    call post_proc%add_field(p(mnuccto), p(packed_mnucct))
-   allocate(packed_msacwi(mgncol,nlev))
    call post_proc%add_field(p(msacwio), p(packed_msacwi))
-   allocate(packed_psacws(mgncol,nlev))
    call post_proc%add_field(p(psacwso), p(packed_psacws))
-   allocate(packed_bergs(mgncol,nlev))
    call post_proc%add_field(p(bergso), p(packed_bergs))
-   allocate(packed_berg(mgncol,nlev))
    call post_proc%add_field(p(bergo), p(packed_berg))
-   allocate(packed_melt(mgncol,nlev))
    call post_proc%add_field(p(melto), p(packed_melt))
-   allocate(packed_homo(mgncol,nlev))
    call post_proc%add_field(p(homoo), p(packed_homo))
-   allocate(packed_qcres(mgncol,nlev))
    call post_proc%add_field(p(qcreso), p(packed_qcres))
-   allocate(packed_prci(mgncol,nlev))
    call post_proc%add_field(p(prcio), p(packed_prci))
-   allocate(packed_prai(mgncol,nlev))
    call post_proc%add_field(p(praio), p(packed_prai))
-   allocate(packed_qires(mgncol,nlev))
    call post_proc%add_field(p(qireso), p(packed_qires))
-   allocate(packed_mnuccr(mgncol,nlev))
    call post_proc%add_field(p(mnuccro), p(packed_mnuccr))
-   allocate(packed_pracs(mgncol,nlev))
    call post_proc%add_field(p(pracso), p(packed_pracs))
-   allocate(packed_meltsdt(mgncol,nlev))
    call post_proc%add_field(p(meltsdt), p(packed_meltsdt))
-   allocate(packed_frzrdt(mgncol,nlev))
    call post_proc%add_field(p(frzrdt), p(packed_frzrdt))
-   allocate(packed_mnuccd(mgncol,nlev))
    call post_proc%add_field(p(mnuccdo), p(packed_mnuccd))
-   allocate(packed_nrout(mgncol,nlev))
    call post_proc%add_field(p(nrout), p(packed_nrout))
-   allocate(packed_nsout(mgncol,nlev))
    call post_proc%add_field(p(nsout), p(packed_nsout))
 
-   allocate(packed_refl(mgncol,nlev))
    call post_proc%add_field(p(refl), p(packed_refl), fillvalue=-9999._r8)
-   allocate(packed_arefl(mgncol,nlev))
    call post_proc%add_field(p(arefl), p(packed_arefl))
-   allocate(packed_areflz(mgncol,nlev))
    call post_proc%add_field(p(areflz), p(packed_areflz))
-   allocate(packed_frefl(mgncol,nlev))
    call post_proc%add_field(p(frefl), p(packed_frefl))
-   allocate(packed_csrfl(mgncol,nlev))
    call post_proc%add_field(p(csrfl), p(packed_csrfl), fillvalue=-9999._r8)
-   allocate(packed_acsrfl(mgncol,nlev))
    call post_proc%add_field(p(acsrfl), p(packed_acsrfl))
-   allocate(packed_fcsrfl(mgncol,nlev))
    call post_proc%add_field(p(fcsrfl), p(packed_fcsrfl))
 
-   allocate(packed_rercld(mgncol,nlev))
    call post_proc%add_field(p(rercld), p(packed_rercld))
-   allocate(packed_ncai(mgncol,nlev))
    call post_proc%add_field(p(ncai), p(packed_ncai))
-   allocate(packed_ncal(mgncol,nlev))
    call post_proc%add_field(p(ncal), p(packed_ncal))
-   allocate(packed_qrout2(mgncol,nlev))
    call post_proc%add_field(p(qrout2), p(packed_qrout2))
-   allocate(packed_qsout2(mgncol,nlev))
    call post_proc%add_field(p(qsout2), p(packed_qsout2))
-   allocate(packed_nrout2(mgncol,nlev))
    call post_proc%add_field(p(nrout2), p(packed_nrout2))
-   allocate(packed_nsout2(mgncol,nlev))
    call post_proc%add_field(p(nsout2), p(packed_nsout2))
-   allocate(packed_freqs(mgncol,nlev))
    call post_proc%add_field(p(freqs), p(packed_freqs))
-   allocate(packed_freqr(mgncol,nlev))
    call post_proc%add_field(p(freqr), p(packed_freqr))
-   allocate(packed_nfice(mgncol,nlev))
    call post_proc%add_field(p(nfice), p(packed_nfice))
    if (micro_mg_version /= 1 .or. micro_mg_sub_version /= 0) then
-      allocate(packed_qcrat(mgncol,nlev))
       call post_proc%add_field(p(qcrat), p(packed_qcrat), fillvalue=1._r8)
    end if
 
    ! The following are all variables related to sizes, where it does not
    ! necessarily make sense to average over time steps. Instead, we keep
    ! the value from the last substep, which is what "accum_null" does.
-   allocate(packed_rel(mgncol,nlev))
    call post_proc%add_field(p(rel), p(packed_rel), &
         fillvalue=10._r8, accum_method=accum_null)
-   allocate(packed_rei(mgncol,nlev))
    call post_proc%add_field(p(rei), p(packed_rei), &
         fillvalue=25._r8, accum_method=accum_null)
-   allocate(packed_lambdac(mgncol,nlev))
    call post_proc%add_field(p(lambdac), p(packed_lambdac), &
         accum_method=accum_null)
-   allocate(packed_mu(mgncol,nlev))
    call post_proc%add_field(p(mu), p(packed_mu), &
         accum_method=accum_null)
-   allocate(packed_des(mgncol,nlev))
    call post_proc%add_field(p(des), p(packed_des), &
         accum_method=accum_null)
-   allocate(packed_dei(mgncol,nlev))
    call post_proc%add_field(p(dei), p(packed_dei), &
         accum_method=accum_null)
-   allocate(packed_prer_evap(mgncol,nlev))
    call post_proc%add_field(p(prer_evap), p(packed_prer_evap), &
         accum_method=accum_null)
 
-   ! Allocate all the dummies with MG sizes.
-   allocate(rel_fn_dum(mgncol,nlev))
-   allocate(dsout2_dum(mgncol,nlev))
-   allocate(drout_dum(mgncol,nlev))
-   allocate(reff_rain_dum(mgncol,nlev))
-   allocate(reff_snow_dum(mgncol,nlev))
-
    ! Pack input variables that are not updated during substeps.
-   allocate(packed_relvar(mgncol,nlev))
    packed_relvar = packer%pack(relvar)
-   allocate(packed_accre_enhan(mgncol,nlev))
    packed_accre_enhan = packer%pack(accre_enhan)
 
-   allocate(packed_p(mgncol,nlev))
    packed_p = packer%pack(state_loc%pmid)
-   allocate(packed_pdel(mgncol,nlev))
    packed_pdel = packer%pack(state_loc%pdel)
 
-   allocate(packed_pint(mgncol,nlev+1))
    packed_pint = packer%pack_interface(state_loc%pint)
 
-   allocate(packed_cldn(mgncol,nlev))
    packed_cldn = packer%pack(ast)
-   allocate(packed_liqcldf(mgncol,nlev))
    packed_liqcldf = packer%pack(alst_mic)
-   allocate(packed_icecldf(mgncol,nlev))
    packed_icecldf = packer%pack(aist_mic)
 
-   allocate(packed_naai(mgncol,nlev))
    packed_naai = packer%pack(naai)
-   allocate(packed_npccn(mgncol,nlev))
    packed_npccn = packer%pack(npccn)
 
    allocate(packed_rndst(mgncol,nlev,size(rndst, 3)))
    packed_rndst = packer%pack(rndst)
+
    allocate(packed_nacon(mgncol,nlev,size(nacon, 3)))
    packed_nacon = packer%pack(nacon)
 
-   if (.not. do_cldice) then
-      allocate(packed_tnd_qsnow(mgncol,nlev))
+  if (.not. do_cldice) then
       packed_tnd_qsnow = packer%pack(tnd_qsnow)
-      allocate(packed_tnd_nsnow(mgncol,nlev))
       packed_tnd_nsnow = packer%pack(tnd_nsnow)
-      allocate(packed_re_ice(mgncol,nlev))
       packed_re_ice = packer%pack(re_ice)
-   else
-      nullify(packed_tnd_qsnow)
-      nullify(packed_tnd_nsnow)
-      nullify(packed_re_ice)
    end if
 
    if (use_hetfrz_classnuc) then
-      allocate(packed_frzimm(mgncol,nlev))
       packed_frzimm = packer%pack(frzimm)
-      allocate(packed_frzcnt(mgncol,nlev))
       packed_frzcnt = packer%pack(frzcnt)
-      allocate(packed_frzdep(mgncol,nlev))
       packed_frzdep = packer%pack(frzdep)
-   else
-      nullify(packed_frzimm)
-      nullify(packed_frzcnt)
-      nullify(packed_frzdep)
-   end if
-
-   ! Allocate input variables that are updated during substeps.
-   allocate(packed_t(mgncol,nlev))
-   allocate(packed_q(mgncol,nlev))
-   allocate(packed_qc(mgncol,nlev))
-   allocate(packed_nc(mgncol,nlev))
-   allocate(packed_qi(mgncol,nlev))
-   allocate(packed_ni(mgncol,nlev))
-   if (micro_mg_version > 1) then
-      allocate(packed_qr(mgncol,nlev))
-      allocate(packed_nr(mgncol,nlev))
-      allocate(packed_qs(mgncol,nlev))
-      allocate(packed_ns(mgncol,nlev))
    end if
 
    do it = 1, num_steps
@@ -2042,7 +1938,7 @@ subroutine micro_mg_cam_tend(state, ptend, dtime, pbuf)
                  packed_ncai, packed_ncal, packed_qrout2, packed_qsout2, packed_nrout2,              &
                  packed_nsout2, drout_dum, dsout2_dum, packed_freqs,packed_freqr,            &
                  packed_nfice, packed_prer_evap, do_cldice, errstring,                      &
-		 packed_tnd_qsnow, packed_tnd_nsnow, packed_re_ice,             &
+                 packed_tnd_qsnow, packed_tnd_nsnow, packed_re_ice,             &
                  packed_frzimm, packed_frzcnt, packed_frzdep)
 
          case (5)
@@ -2132,7 +2028,7 @@ subroutine micro_mg_cam_tend(state, ptend, dtime, pbuf)
                  packed_nfice,           packed_qcrat,           &
                  errstring, &
                  packed_tnd_qsnow,packed_tnd_nsnow,packed_re_ice,&
-		 packed_prer_evap,                                     &
+                 packed_prer_evap,                                     &
                  packed_frzimm,  packed_frzcnt,  packed_frzdep   )
          end select
       end select
@@ -2187,13 +2083,6 @@ subroutine micro_mg_cam_tend(state, ptend, dtime, pbuf)
    call post_proc%process_and_unpack()
 
    call post_proc%finalize()
-
-   if (associated(packed_tnd_qsnow)) deallocate(packed_tnd_qsnow)
-   if (associated(packed_tnd_nsnow)) deallocate(packed_tnd_nsnow)
-   if (associated(packed_re_ice)) deallocate(packed_re_ice)
-   if (associated(packed_frzimm)) deallocate(packed_frzimm)
-   if (associated(packed_frzcnt)) deallocate(packed_frzcnt)
-   if (associated(packed_frzdep)) deallocate(packed_frzdep)
 
    ! Check to make sure that the microphysics code is respecting the flags that control
    ! whether MG should be prognosing cloud ice and cloud liquid or not.
@@ -3003,7 +2892,7 @@ subroutine micro_mg_cam_tend(state, ptend, dtime, pbuf)
    ! ptend_loc is deallocated in physics_update above
    call physics_state_dealloc(state_loc)
 
-end subroutine micro_mg_cam_tend
+end subroutine micro_mg_cam_tend_pack
 
 function p1(tin) result(pout)
   real(r8), target, intent(in) :: tin(:)
