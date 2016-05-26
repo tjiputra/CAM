@@ -888,7 +888,8 @@ if __name__ == '__main__':
    elif proj == 'global':
       plot_bar()
 
-   fig.tight_layout(rect=[0,0.05,1,1])
+   if proj=='global':
+      fig.tight_layout(rect=[0,0.05,1,1])
 
    if proj == 'zm':
       subplots_adjust(top=0.92)
