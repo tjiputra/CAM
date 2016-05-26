@@ -12,6 +12,7 @@
 
 <!-- Solar Inputs -->
 <solar_data_file>atm/cam/solar/spectral_irradiance_Lean_1950-2140_daily_c100804.nc</solar_data_file>
+<solar_data_type>SERIAL</solar_data_type>
 
 <!-- Kp Ap indices -->
 <solar_parms_file>atm/waccm/solar/wasolar_1948-2140_daily_c120306.nc</solar_parms_file>
@@ -37,7 +38,7 @@
 </flbc_list>
 
 <!-- Stratospheric Aerosols: turn off prescribed stratospheric aerosols; use prognostic MAM in the stratosphere -->
-<strat_aero_feedback>.false.</strat_aero_feedback>
+<prescribed_strataero_feedback>.false.</prescribed_strataero_feedback>
 
 <!-- Modal aerosol SAD for stratospheric chemistry -->
 <modal_strat_sulfate> .true. </modal_strat_sulfate>

@@ -513,14 +513,14 @@ subroutine micro_mg_tend ( &
 
   ! Used with CARMA cirrus microphysics
   ! (or similar external microphysics model)
-  real(r8), intent(in), pointer :: tnd_qsnow(:,:) ! snow mass tendency (kg/kg/s)
-  real(r8), intent(in), pointer :: tnd_nsnow(:,:) ! snow number tendency (#/kg/s)
-  real(r8), intent(in), pointer :: re_ice(:,:)    ! ice effective radius (m)
+  real(r8), intent(in) :: tnd_qsnow(:,:) ! snow mass tendency (kg/kg/s)
+  real(r8), intent(in) :: tnd_nsnow(:,:) ! snow number tendency (#/kg/s)
+  real(r8), intent(in) :: re_ice(:,:)    ! ice effective radius (m)
 
   ! From external ice nucleation.
-  real(r8), intent(in), pointer :: frzimm(:,:) ! Number tendency due to immersion freezing (1/cm3)
-  real(r8), intent(in), pointer :: frzcnt(:,:) ! Number tendency due to contact freezing (1/cm3)
-  real(r8), intent(in), pointer :: frzdep(:,:) ! Number tendency due to deposition nucleation (1/cm3)
+  real(r8), intent(in) :: frzimm(:,:) ! Number tendency due to immersion freezing (1/cm3)
+  real(r8), intent(in) :: frzcnt(:,:) ! Number tendency due to contact freezing (1/cm3)
+  real(r8), intent(in) :: frzdep(:,:) ! Number tendency due to deposition nucleation (1/cm3)
 
   ! local workspace
   ! all units mks unless otherwise stated
@@ -745,20 +745,8 @@ subroutine micro_mg_tend ( &
 
   !cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
 
-  ! default return error message
-  errstring = ' '
-
-  if (.not. (do_cldice .or. &
-       (associated(tnd_qsnow) .and. associated(tnd_nsnow) .and. associated(re_ice)))) then
-     errstring = "MG's native cloud ice processes are disabled, but &
-          &no replacement values were passed in."
-  end if
-
-  if (use_hetfrz_classnuc .and. (.not. &
-       (associated(frzimm) .and. associated(frzcnt) .and. associated(frzdep)))) then
-     errstring = "External heterogeneous freezing is enabled, but the &
-          &required tendencies were not all passed in."
-  end if
+! Return error message
+errstring = ' '
 
   ! Process inputs
 

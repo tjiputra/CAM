@@ -50,6 +50,8 @@ public :: &
      avg_diameter, &
      rising_factorial, &
      ice_deposition_sublimation, &
+     sb2001v2_liq_autoconversion,&
+     sb2001v2_accre_cld_water_rain,&       
      kk2000_liq_autoconversion, &
      ice_autoconversion, &
      immersion_freezing, &
@@ -184,6 +186,7 @@ real(r8), parameter :: aimm = 0.66_r8
 
 ! Mass of each raindrop created from autoconversion.
 real(r8), parameter :: droplet_mass_25um = 4._r8/3._r8*pi*rhow*(25.e-6_r8)**3
+real(r8), parameter :: droplet_mass_40um = 4._r8/3._r8*pi*rhow*(40.e-6_r8)**3
 
 !=========================================================
 ! Constants set in initialization
@@ -693,17 +696,17 @@ subroutine kk2000_liq_autoconversion(microp_uniform, qcic, &
   real(r8), dimension(mgncol), intent(out) :: nprc
   real(r8), dimension(mgncol), intent(out) :: nprc1
 
-  real(r8) :: prc_coef
+  real(r8), dimension(mgncol) :: prc_coef
   integer :: i
 
   ! Take variance into account, or use uniform value.
-  do i=1,mgncol
-     if (.not. microp_uniform) then
-        prc_coef = var_coef(relvar(i), 2.47_r8)
-     else
-        prc_coef = 1._r8
-     end if
+  if (.not. microp_uniform) then
+     prc_coef(:) = var_coef(relvar(:), 2.47_r8)
+  else
+     prc_coef(:) = 1._r8
+  end if
 
+  do i=1,mgncol
      if (qcic(i) >= icsmall) then
 
         ! nprc is increase in rain number conc due to autoconversion
@@ -713,7 +716,7 @@ subroutine kk2000_liq_autoconversion(microp_uniform, qcic, &
         ! factor related to qcvar below
         ! switch for sub-columns, don't include sub-grid qc
 
-        prc(i) = prc_coef * &
+        prc(i) = prc_coef(i) * &
              1350._r8 * qcic(i)**2.47_r8 * (ncic(i)*1.e-6_r8*rho(i))**(-1.79_r8)
         nprc(i) = prc(i) * (1._r8/droplet_mass_25um)
         nprc1(i) = prc(i)*ncic(i)/qcic(i)
@@ -725,6 +728,127 @@ subroutine kk2000_liq_autoconversion(microp_uniform, qcic, &
      end if
   enddo
 end subroutine kk2000_liq_autoconversion
+  
+  !========================================================================
+subroutine sb2001v2_liq_autoconversion(pgam,qc,nc,qr,rho,relvar,au,nprc,nprc1,mgncol)
+  !
+  ! ---------------------------------------------------------------------
+  ! AUTO_SB:  calculates the evolution of mass- and number mxg-ratio for
+  ! drizzle drops due to autoconversion. The autoconversion rate assumes
+  ! f(x)=A*x**(nu_c)*exp(-Bx) in drop MASS x. 
+
+  ! Code from Hugh Morrison, Sept 2014
+
+  ! autoconversion
+  ! use simple lookup table of dnu values to get mass spectral shape parameter
+  ! equivalent to the size spectral shape parameter pgam
+    
+  integer, intent(in) :: mgncol  
+  
+  real(r8), dimension(mgncol), intent (in)    :: pgam
+  real(r8), dimension(mgncol), intent (in)    :: qc  ! = qc (cld water mixing ratio)
+  real(r8), dimension(mgncol), intent (in)    :: nc  ! = nc (cld water number conc /kg)    
+  real(r8), dimension(mgncol), intent (in)    :: qr  ! = qr (rain water mixing ratio)
+  real(r8), dimension(mgncol), intent (in)    :: rho ! = rho : density profile
+  real(r8), dimension(mgncol), intent (in)    :: relvar 
+  
+  real(r8), dimension(mgncol), intent (out)   :: au ! = prc autoconversion rate
+  real(r8), dimension(mgncol), intent (out)   :: nprc1 ! = number tendency
+  real(r8), dimension(mgncol), intent (out)   :: nprc ! = number tendency fixed size for rain
+ 
+  ! parameters for droplet mass spectral shape, 
+  !used by Seifert and Beheng (2001)                             
+  ! warm rain scheme only (iparam = 1)                                                                        
+  real(r8), parameter :: dnu(16) = [0._r8,-0.557_r8,-0.430_r8,-0.307_r8, & 
+     -0.186_r8,-0.067_r8,0.050_r8,0.167_r8,0.282_r8,0.397_r8,0.512_r8, &
+     0.626_r8,0.739_r8,0.853_r8,0.966_r8,0.966_r8]
+
+  ! parameters for Seifert and Beheng (2001) autoconversion/accretion                                         
+  real(r8), parameter :: kc = 9.44e9_r8
+  real(r8), parameter :: kr = 5.78e3_r8
+  real(r8) :: dum, dum1, nu, pra_coef
+  integer :: dumi, i
+
+  do i=1,mgncol
+
+    pra_coef = var_coef(relvar(i), 2.47_r8)
+
+     if (qc(i) > qsmall) then
+       dumi=int(pgam(i))
+       nu=dnu(dumi)+(dnu(dumi+1)-dnu(dumi))* &
+               (pgam(i)-dumi)
+
+       dum = 1._r8-qc(i)/(qc(i)+qr(i))
+       dum1 = 600._r8*dum**0.68_r8*(1._r8-dum**0.68_r8)**3
+
+       au(i) = kc/(20._r8*2.6e-7_r8)* &
+         (nu+2._r8)*(nu+4._r8)/(nu+1._r8)**2._r8* &
+         (rho(i)*qc(i)/1000._r8)**4._r8/(rho(i)*nc(i)/1.e6_r8)**2._r8* &
+         (1._r8+dum1/(1._r8-dum)**2)*1000._r8 / rho(i)
+
+       au(i) = pra_coef * au(i)
+
+       nprc1(i) = au(i)*2._r8/2.6e-7_r8*1000._r8
+       nprc(i) = au(i)/droplet_mass_40um
+     else
+       au(i) = 0._r8
+       nprc1(i) = 0._r8
+       nprc(i)=0._r8
+     end if
+  
+  enddo
+
+  end subroutine sb2001v2_liq_autoconversion 
+  
+!========================================================================
+!SB2001 Accretion V2
+
+subroutine sb2001v2_accre_cld_water_rain(qc,nc,qr,rho,relvar,pra,npra,mgncol)
+  !
+  ! ---------------------------------------------------------------------
+  ! ACCR_SB calculates the evolution of mass mxng-ratio due to accretion
+  ! and self collection following Seifert & Beheng (2001).  
+  !
+  
+  integer, intent(in) :: mgncol
+  
+  real(r8), dimension(mgncol), intent (in)    :: qc  ! = qc (cld water mixing ratio)
+  real(r8), dimension(mgncol), intent (in)    :: nc  ! = nc (cld water number conc /kg)    
+  real(r8), dimension(mgncol), intent (in)    :: qr  ! = qr (rain water mixing ratio)
+  real(r8), dimension(mgncol), intent (in)    :: rho ! = rho : density profile
+  real(r8), dimension(mgncol), intent (in)    :: relvar
+
+  ! Output tendencies
+  real(r8), dimension(mgncol), intent(out) :: pra  ! MMR
+  real(r8), dimension(mgncol), intent(out) :: npra ! Number
+
+  ! parameters for Seifert and Beheng (2001) autoconversion/accretion                                         
+  real(r8), parameter :: kc = 9.44e9_r8
+  real(r8), parameter :: kr = 5.78e3_r8
+
+  real(r8) :: dum, dum1, pra_coef
+  integer :: i
+
+  ! accretion
+
+  do i =1,mgncol
+
+    pra_coef = var_coef(relvar(i), 1.15_r8)
+
+    if (qc(i) > qsmall) then
+      dum = 1._r8-qc(i)/(qc(i)+qr(i))
+      dum1 = (dum/(dum+5.e-4_r8))**4._r8
+      pra(i) = pra_coef*kr*rho(i)*0.001_r8*qc(i)*qr(i)*dum1
+      npra(i) = pra(i)*rho(i)*0.001_r8*(nc(i)*rho(i)*1.e-6_r8)/ &
+           (qc(i)*rho(i)*0.001_r8)*1.e6_r8 / rho(i)
+    else
+      pra(i) = 0._r8
+      npra(i) = 0._r8
+    end if 
+  
+  enddo
+ 
+  end subroutine sb2001v2_accre_cld_water_rain   
 
 !========================================================================
 ! Autoconversion of cloud ice to snow

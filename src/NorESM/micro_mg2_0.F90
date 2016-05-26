@@ -222,6 +222,7 @@ character(len=16)  :: micro_mg_precip_frac_method  ! type of precipitation fract
 real(r8)           :: micro_mg_berg_eff_factor     ! berg efficiency factor
 
 logical  :: allow_sed_supersat ! Allow supersaturated conditions after sedimentation loop
+logical  :: do_sb_physics ! do SB 2001 autoconversion or accretion physics
 
 !===============================================================================
 contains
@@ -233,7 +234,7 @@ subroutine micro_mg_init( &
      rhmini_in, micro_mg_dcs,            &
      microp_uniform_in, do_cldice_in, use_hetfrz_classnuc_in, &
      micro_mg_precip_frac_method_in, micro_mg_berg_eff_factor_in, &
-     allow_sed_supersat_in, errstring)
+     allow_sed_supersat_in, do_sb_physics_in, errstring)
 
   use micro_mg_utils, only: micro_mg_utils_init
 
@@ -267,6 +268,7 @@ subroutine micro_mg_init( &
   character(len=16),intent(in)  :: micro_mg_precip_frac_method_in  ! type of precipitation fraction method
   real(r8),         intent(in)  :: micro_mg_berg_eff_factor_in     ! berg efficiency factor
   logical,  intent(in)  ::  allow_sed_supersat_in ! allow supersaturated conditions after sedimentation loop
+  logical,  intent(in)  ::  do_sb_physics_in ! do SB autoconversion and accretion physics
 
 
   character(128), intent(out) :: errstring    ! Output status (non-blank for error return)
@@ -292,6 +294,7 @@ subroutine micro_mg_init( &
   micro_mg_precip_frac_method = micro_mg_precip_frac_method_in
   micro_mg_berg_eff_factor    = micro_mg_berg_eff_factor_in
   allow_sed_supersat          = allow_sed_supersat_in
+  do_sb_physics               = do_sb_physics_in
 
   ! latent heats
 
@@ -412,6 +415,8 @@ subroutine micro_mg_tend ( &
   ! Microphysical processes.
   use micro_mg_utils, only: &
        ice_deposition_sublimation, &
+       sb2001v2_liq_autoconversion,&
+       sb2001v2_accre_cld_water_rain,&       
        kk2000_liq_autoconversion, &
        ice_autoconversion, &
        immersion_freezing, &
@@ -607,14 +612,14 @@ subroutine micro_mg_tend ( &
 
   ! Used with CARMA cirrus microphysics
   ! (or similar external microphysics model)
-  real(r8), intent(in), pointer :: tnd_qsnow(:,:) ! snow mass tendency (kg/kg/s)
-  real(r8), intent(in), pointer :: tnd_nsnow(:,:) ! snow number tendency (#/kg/s)
-  real(r8), intent(in), pointer :: re_ice(:,:)    ! ice effective radius (m)
+  real(r8), intent(in) :: tnd_qsnow(:,:) ! snow mass tendency (kg/kg/s)
+  real(r8), intent(in) :: tnd_nsnow(:,:) ! snow number tendency (#/kg/s)
+  real(r8), intent(in) :: re_ice(:,:)    ! ice effective radius (m)
 
   ! From external ice nucleation.
-  real(r8), intent(in), pointer :: frzimm(:,:) ! Number tendency due to immersion freezing (1/cm3)
-  real(r8), intent(in), pointer :: frzcnt(:,:) ! Number tendency due to contact freezing (1/cm3)
-  real(r8), intent(in), pointer :: frzdep(:,:) ! Number tendency due to deposition nucleation (1/cm3)
+  real(r8), intent(in) :: frzimm(:,:) ! Number tendency due to immersion freezing (1/cm3)
+  real(r8), intent(in) :: frzcnt(:,:) ! Number tendency due to contact freezing (1/cm3)
+  real(r8), intent(in) :: frzdep(:,:) ! Number tendency due to deposition nucleation (1/cm3)
 
   ! local workspace
   ! all units mks unless otherwise stated
@@ -840,20 +845,8 @@ subroutine micro_mg_tend ( &
 
   !cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
 
-  ! default return error message
+  ! Return error message
   errstring = ' '
-
-  if (.not. (do_cldice .or. &
-       (associated(tnd_qsnow) .and. associated(tnd_nsnow) .and. associated(re_ice)))) then
-     errstring = "MG's native cloud ice processes are disabled, but &
-          &no replacement values were passed in."
-  end if
-
-  if (use_hetfrz_classnuc .and. (.not. &
-       (associated(frzimm) .and. associated(frzcnt) .and. associated(frzdep)))) then
-     errstring = "External heterogeneous freezing is enabled, but the &
-          &required tendencies were not all passed in."
-  end if
 
   ! Process inputs
 
@@ -1338,8 +1331,10 @@ subroutine micro_mg_tend ( &
      ! formula from Khrouditnov and Kogan (2000), modified for sub-grid distribution of qc
      ! minimum qc of 1 x 10^-8 prevents floating point error
 
+     if (.not. do_sb_physics) then
      call kk2000_liq_autoconversion(microp_uniform, qcic(:,k), &
           ncic(:,k), rho(:,k), relvar(:,k), prc(:,k), nprc(:,k), nprc1(:,k), mgncol)
+     endif
 
      ! assign qric based on prognostic qr, using assumed precip fraction
      ! note: this could be moved above for consistency with qcic and qiic calculations
@@ -1366,6 +1361,12 @@ subroutine micro_mg_tend ( &
 
      call size_dist_param_basic(mg_ice_props, qiic(:,k), niic(:,k), &
           lami(:,k), mgncol, n0=n0i(:,k))
+
+     ! Alternative autoconversion 
+     if (do_sb_physics) then
+       call sb2001v2_liq_autoconversion(pgam(:,k),qcic(:,k),ncic(:,k), &
+            qric(:,k),rho(:,k),relvar(:,k),prc(:,k),nprc(:,k),nprc1(:,k), mgncol)     
+     endif	  
 
      !.......................................................................
      ! Autoconversion of cloud ice to snow
@@ -1528,8 +1529,13 @@ subroutine micro_mg_tend ( &
      call heterogeneous_rain_freezing(t(:,k), qric(:,k), nric(:,k), lamr(:,k), &
           mnuccr(:,k), nnuccr(:,k), mgncol)
 
+     if (do_sb_physics) then
+       call sb2001v2_accre_cld_water_rain(qcic(:,k), ncic(:,k), qric(:,k), &
+            rho(:,k), relvar(:,k), pra(:,k), npra(:,k), mgncol)     
+     else
      call accrete_cloud_water_rain(microp_uniform, qric(:,k), qcic(:,k), &
           ncic(:,k), relvar(:,k), accre_enhan(:,k), pra(:,k), npra(:,k), mgncol)
+     endif
 
      call self_collection_rain(rho(:,k), qric(:,k), nric(:,k), nragg(:,k), mgncol)
 
@@ -1962,7 +1968,7 @@ subroutine micro_mg_tend ( &
         bergtot(i,k) = berg(i,k)
         prcitot(i,k) = prci(i,k)*icldm(i,k)
         praitot(i,k) = prai(i,k)*icldm(i,k)
-        mnuccdtot(i,k) = mnuccd(i,k)*icldm(i,k) !?? included in cmeiout, but no icldm
+        mnuccdtot(i,k) = mnuccd(i,k)*icldm(i,k)
 
         pracstot(i,k) = pracs(i,k)*precip_frac(i,k)
         mnuccrtot(i,k) = mnuccr(i,k)*precip_frac(i,k)
@@ -3041,7 +3047,7 @@ subroutine micro_mg_tend ( &
 
   do i = 1,mgncol
      do k=1,nlev
-        if (qc(i,k).ge.qsmall) then
+        if (qc(i,k).ge.qsmall .and. (nc(i,k)+nctend(i,k)*deltat).gt.10._r8) then
            dum=(qc(i,k)/lcldm(i,k)*rho(i,k)*1000._r8)**2 &
                 /(0.109_r8*(nc(i,k)+nctend(i,k)*deltat)/lcldm(i,k)*rho(i,k)/1.e6_r8)*lcldm(i,k)/precip_frac(i,k)
         else

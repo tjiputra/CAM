@@ -39,7 +39,6 @@
 <tgcm_ubc_data_type>INTERP_MISSING_MONTHS</tgcm_ubc_data_type>
 
 <!-- Sulfate Aerosols: DEFAULTS okay for sulf_file -->
-<prescribed_strataero_file>CESM_1949_2100_sad_V2_c130627.nc</prescribed_strataero_file>
 <prescribed_strataero_type>SERIAL</prescribed_strataero_type>
 
 <!-- QBO settings --> 
@@ -48,7 +47,7 @@
 <qbo_use_forcing>.false.</qbo_use_forcing>
 
 <!-- volcanic aerosol heating -->
-<strat_aero_feedback>.false.</strat_aero_feedback> 
+<prescribed_strataero_feedback>.false.</prescribed_strataero_feedback> 
 
 <!-- emis files -->
 
