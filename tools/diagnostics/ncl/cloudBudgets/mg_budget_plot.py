@@ -81,6 +81,44 @@ if __name__ == '__main__':
    pan_row = 2
    pan_col = panels/pan_row
 
+   # For histogram: number of bars:
+   nbars = 9
+ 
+   # colours
+   bar_colour =(0.2,0.3,0.9)       # a blue colour
+   bar_colour_bdgt = (0.9,0.4,0.5) # a pink colour
+   
+   # Set y-axis limits
+   ######################
+   #y-limits for ice mass
+   qi_ymin=-1.0e-9
+   qi_ymax=1.0e-9
+
+   # Poster: y-limits for liquid mass
+   qc_ymin=-2.1e-9
+   qc_ymax=0.5e-9
+
+   # Poster: y-limits for ice number
+   ni_ymin=-3.5
+   ni_ymax=2.5
+
+   # Poster: y-limits for liquid number
+   nc_ymin=-150
+   nc_ymax=650
+
+   # font sizes
+   ###############
+   # axis label
+   ax_fsz = 14
+   # tick label
+   tk_fsz = 12
+   # title 
+   tt_fsz = 16
+
+   # figure size
+   fg_sz_x=9
+   fg_sz_y=7
+
    # Logscale for plotting?
    logscale = False
    logscale = True
@@ -520,17 +558,55 @@ if __name__ == '__main__':
        var_g_sorted_hist[2:varnb2] = var_g_sorted[1:varnb]
        var_g_sorted_hist[1]=varnb2-1
 
+
+       #var_g_s = var_g[:10].copy()
+       #print var_g_s
+
+       var_g_h = var_g.copy()
+       var_g_h[:varnb2-1]=0
+       var_g_h[0]=var_g[0]
+
+       #print var_g_sorted_hist
+
+
+       var_g_s = var_g[var_g_sorted_hist]
+       var_g_hs = var_g_h[var_g_sorted_hist]
+
+
+
+       # Poster: font side for axis label here.
        if budget == 'number':
-          ax.set_ylabel('Number [1/kg/s]', fontsize=12)
+          ax.set_ylabel('Number [1/kg/s]', fontsize=ax_fsz)
        elif budget == 'mass':
-          ax.set_ylabel('Mass [kg/kg/s]', fontsize=12)
+          ax.set_ylabel('Mass [kg/kg/s]', fontsize=ax_fsz)
 
-       c = ax.bar(arange(1,varnb2+1),var_g[var_g_sorted_hist])
+       #xpos=arange(1,varnb2+1)
+       xpos=arange(1,nbars+1)
 
-       xticks(arange(1,varnb2+1)+0.4,np_var[var_g_sorted_hist], fontsize=10, rotation =30)
+       c = ax.bar(xpos,var_g_s[:nbars],color=bar_colour)
+       c = ax.bar(xpos,var_g_hs[:nbars],color=bar_colour_bdgt)
 
-       hlines(0,0, varnb2+1+0.4, colors='k', linestyles='solid' )
+       fig.subplots_adjust(hspace=None)
+       xticks(arange(1,nbars+1)+0.4,np_var[var_g_sorted_hist], fontsize=tk_fsz, rotation =30)
 
+       ax.hlines(0,0.4, nbars+1+0.4, colors='k', linestyles='solid' )
+
+       if budget == 'mass':
+          if state == 'cldice':
+             if diff:
+                p_min = -1*1e-10
+             else:
+                ax.set_ylim(qi_ymin,qi_ymax)
+          else: #liq
+             ax.set_ylim(qc_ymin,qi_ymax)
+       else: # number
+          if state == 'cldice':
+             if diff:
+                p_min = -1*1e-10
+             else:
+                ax.set_ylim(nc_ymin,nc_ymax)
+          else: #liq
+             ax.set_ylim(nc_ymin,nc_ymax) 
        ax.set_title('Global average '+plottitle)
    #####################################################################################
    #####################################################################################
@@ -772,21 +848,16 @@ if __name__ == '__main__':
                 #l_f = LogFormatter(base=10, labelOnlyBase=True)
                 #l_f = LogFormatterExponent(base=10, labelOnlyBase=True)
                 l_f = LogFormatterMathtext(base=10, labelOnlyBase=True)
-                cb1 = colorbar(c1,ax=ax[m,n],orientation='horizontal', format=l_f,extend='both')
              else:
-                cb1 = colorbar(c1,ax=ax[m,n],orientation='horizontal',label=n_var_long[j])
                 #cb1 = colorbar(c1,ax=ax[m,n],orientation='horizontal',label=n_var_long[j], format='%.1e')
              #   cb1.set_label(n_var_long[j],labelpad=-50)
                 cb1.formatter.set_powerlimits((0, 0))
-             if pan_row > pan_col:
-                cb1.set_label(n_var_long[j],labelpad=-46,fontsize=tfs)
-             else:
-                cb1.set_label(n_var_long[j],labelpad=-60)
-             ##cb1.update_ticks()
              c1.set_cmap(cmap)
       
              i=i+1     
 
+       cbar_ax = fig.add_axes([0.1, 0.025, 0.8, 0.02])
+       fig.colorbar(c1, cax=cbar_ax,orientation='horizontal', format=l_f,)      
 
    ##########################################################################################
    ##########################################################################################
@@ -796,7 +867,7 @@ if __name__ == '__main__':
    if proj == 'map' or proj == 'zm':
       fig, ax = subplots(pan_row,pan_col)
       if pan_row > pan_col:
-         fig.set_size_inches(9.7,14, forward=True)
+         fig.set_size_inches(9.2,14, forward=True)
       else:
          fig.set_size_inches(23,10, forward=True)
    else:
@@ -806,6 +877,9 @@ if __name__ == '__main__':
       #ax =fig.add_subplot(1,1,1)
       title=False
 
+   # Poster: Set figure size here for histogram
+   fig.set_size_inches(fg_sz_x,fg_sz_y, forward=True)
+
    # Plot   
    if proj == 'zm':
       plot_zm()
@@ -813,10 +887,14 @@ if __name__ == '__main__':
       plot_map()
    elif proj == 'global':
       plot_bar()
-   fig.tight_layout()
+
+   fig.tight_layout(rect=[0,0.05,1,1])
+
+   if proj == 'zm':
+      subplots_adjust(top=0.92)
 
    if title:
-      fig.suptitle(plottitle, fontsize=16)
+      fig.suptitle(plottitle, fontsize=tt_fsz)
    
    #Only show figure if no outputfile is given
    if(len(args.outputFile)>0):
