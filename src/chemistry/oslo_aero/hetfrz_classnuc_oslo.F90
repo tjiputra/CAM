@@ -776,6 +776,8 @@ subroutine get_aer_num(qaerpt, qaercwpt, rhoair,           &   ! input
     num_dst1_idx = MODE_IDX_DST_A2
     num_dst3_idx = MODE_IDX_DST_A3
 
+    as_acm = f_acm(num_dst1_idx)
+    as_condm = f_condm(num_dst1_idx)
 
 !*****************************************************************************
 !                calculate intersitial aerosol 
