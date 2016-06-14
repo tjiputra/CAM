@@ -1,24 +1,22 @@
-
 module check_energy
-
-!---------------------------------------------------------------------------------
-! Purpose:
-!
-! Module to check 
-!   1. vertically integrated total energy and water conservation for each
-!      column within the physical parameterizations
-!
-!   2. global mean total energy conservation between the physics output state
-!      and the input state on the next time step.
-!
-!   3. add a globally uniform heating term to account for any change of total energy in 2.
-!
-! Author: Byron Boville  Oct 31, 2002
-!         
-! Modifications:
-!   03.03.29  Boville  Add global energy check and fixer.        
-!
-!---------------------------------------------------------------------------------
+ !---------------------------------------------------------------------------------
+ ! Purpose:
+ !
+ ! Module to check 
+ !   1. vertically integrated total energy and water conservation for each
+ !      column within the physical parameterizations
+ !
+ !   2. global mean total energy conservation between the physics output state
+ !      and the input state on the next time step.
+ !
+ !   3. add a globally uniform heating term to account for any change of total energy in 2.
+ !
+ ! Author: Byron Boville  Oct 31, 2002
+ !         
+ ! Modifications:
+ !   03.03.29  Boville                    Add global energy check and fixer.        
+ !   15.11.05  Williamson-Olson-Toniazzo  Correct energy calculation, add diagnostics
+ !---------------------------------------------------------------------------------
 
   use shr_kind_mod,    only: r8 => shr_kind_r8
   use ppgrid,          only: pcols, pver, begchunk, endchunk
@@ -267,7 +265,6 @@ end subroutine check_energy_get_integrals
     do i = 1, ncol
        se(i) = se(i) + state%phis(i)*state%ps(i)/gravit
     end do
-
     ! Don't require cloud liq/ice to be present.  Allows for adiabatic/ideal phys.
     if (ixcldliq > 1  .and.  ixcldice > 1) then
        do k = 1, pver
@@ -552,7 +549,8 @@ end subroutine check_energy_get_integrals
        heat_glob  = -tedif_glob/dtime * gravit / (psurf_glob - ptopb_glob)
 
        if (masterproc) then
-          write(iulog,'(1x,a9,1x,i8,4(1x,e25.17))') "nstep, te", nstep, teinp_glob, teout_glob, heat_glob, psurf_glob
+          write(iulog,'(1x,a9,1x,i8,4(1x,e25.17))') "nstep, te", nstep, teinp_glob, &
+                                                    teout_glob, heat_glob, psurf_glob
        end if
     else
        heat_glob = 0._r8
@@ -655,7 +653,7 @@ end subroutine check_energy_get_integrals
           tracerint%tracer(i,m) = tr(i)
        end do
 
-       ! zero cummulative boundary fluxes 
+       ! zero cumulative boundary fluxes 
        tracerint%tracer_tnd(:ncol,m) = 0._r8
 
        tracerint%count(m) = 0
@@ -751,7 +749,7 @@ end subroutine check_energy_get_integrals
           ! expected tendencies from boundary fluxes for last process
           tracer_tnd(i,m) = cflx(i,m)
 
-          ! cummulative tendencies from boundary fluxes
+          ! cumulative tendencies from boundary fluxes
           tracerint%tracer_tnd(i,m) = tracerint%tracer_tnd(i,m) + tracer_tnd(i,m)
 
           ! expected new values from original values plus boundary fluxes

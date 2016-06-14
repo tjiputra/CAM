@@ -150,7 +150,7 @@ if (plot_type.eq.0) then
  xdims_II = dimsizes(gw0_II)
  ;print(xdims_I)
  ydims_II = dimsizes(load_IIa)
- ;print(ydims_II)
+; print(ydims_II)
  do i=0,dimsizes(gw0_II)-1
  load_IIa(:,i,:)=load_II(:,i,:)*coffa*dlon_II*gw0_II(i)
  end do

@@ -267,17 +267,14 @@ subroutine oslo_dms_emis_intr(state, cam_in)
    real(r8) :: odms(pcols)                ! Ocean dms concentration [nmol/L] from file
    real(r8) :: open_ocn(pcols)            ! Open Ocean 
 
-
-
-   ! IF CONCENTRATION FILE
-   if (dms_source=='lana' .or. dms_source=='kettle') then
-      !number of columns in use
-      ncol  = state%ncol
-      lchnk = state%lchnk 
-
       !pointers to land model variables
       ocnfrc => cam_in%ocnfrac
       icefrc => cam_in%icefrac
+   ncol  = state%ncol
+   lchnk = state%lchnk 
+
+   ! IF CONCENTRATION FILE
+   if (dms_source=='lana' .or. dms_source=='kettle') then
 
       !start with midpoint wind speed
       u10m(:ncol)=sqrt(state%u(:ncol,pver)**2+state%v(:ncol,pver)**2)

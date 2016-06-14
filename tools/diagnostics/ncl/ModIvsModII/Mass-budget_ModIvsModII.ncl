@@ -200,7 +200,6 @@ begin
 
  emis_II= (/(f1_II[:]->SFSO4_PR)/)/3.06 + (/(f1_II[:]->SO4_PR_CLXF)/)/3.06
 
-;err sour_II=emis_II + (/(f1_II[:]->GS_H2SO4)/)/3.06 + (/(f1_I[:]->WD_A_H2SO4)/)/3.06  \ ; gas phase H2SO4 production
  sour_II=emis_II + (/(f1_II[:]->GS_H2SO4)/)/3.06 + (/(f1_II[:]->WD_A_H2SO4)/)/3.06  \ ; gas phase H2SO4 production
                   + (/f1_II[:]->AQ_SO4_A2_OCW/)/3.59 \ ; aq phase H2SO4 production
                   + (/f1_II[:]->AQ_H2SO4/)/3.06      ; some of the aq phase prod is just cond of gas phase
@@ -241,7 +240,6 @@ begin
    wet_I=(/f1_I[:]->BC_ASFWET/) + (/f1_I[:]->BC_ACSFWET/) + (/f1_I[:]->BC_AXSFWET/) + (/f1_I[:]->BC_AISFWET/) + (/f1_I[:]->BC_NISFWET/) + (/f1_I[:]->BC_NSFWET/) \
    + (/f1_I[:]->BC_A_OCWSFWET/) + (/f1_I[:]->BC_AC_OCWSFWET/) + (/f1_I[:]->BC_AI_OCWSFWET/) + (/f1_I[:]->BC_NI_OCWSFWET/) + (/f1_I[:]->BC_N_OCWSFWET/)
 
-;err   dry_I=(/f1_II[:]->BC_ADDF/) + (/f1_I[:]->BC_ACDDF/) + (/f1_I[:]->BC_AXDDF/) + (/f1_I[:]->BC_AIDDF/) + (/f1_I[:]->BC_NIDDF/) + (/f1_I[:]->BC_NDDF/) \
    dry_I=(/f1_I[:]->BC_ADDF/) + (/f1_I[:]->BC_ACDDF/) + (/f1_I[:]->BC_AXDDF/) + (/f1_I[:]->BC_AIDDF/) + (/f1_I[:]->BC_NIDDF/) + (/f1_I[:]->BC_NDDF/) \
        + (/f1_I[:]->BC_A_OCWDDF/) + (/f1_I[:]->BC_AC_OCWDDF/) + (/f1_I[:]->BC_AI_OCWDDF/) + (/f1_I[:]->BC_NI_OCWDDF/) + (/f1_I[:]->BC_N_OCWDDF/)
 

@@ -265,7 +265,7 @@ else if (var .eq. "RELHUM") then
 else if (var .eq. "CLDLIQ") then
   res@tiMainString  = "Cloud Liquid Water (mg kg~S~-1~N~)"
 else if (var .eq. "CLDICE") then
-  res@tiMainString  = "Cloud Liquid Ice (mg kg~S~-1~N~)"
+  res@tiMainString  = "Cloud Ice Water (mg kg~S~-1~N~)"
 else if (var .eq. "CDNC") then
  if(ModI.eq."CAM4-Oslo") then
   res@tiMainString  = "CDNC (CDNC/CLDFOC) (cm~S~-3~N~)"
@@ -305,7 +305,7 @@ else if (var .eq. "RELHUM") then
 else if (var .eq. "CLDLIQ") then
   res2@tiMainString  = "Cloud Liquid Water (mg kg~S~-1~N~)"
 else if (var .eq. "CLDICE") then
-  res2@tiMainString  = "Cloud Liquid Ice (mg kg~S~-1~N~)"
+  res2@tiMainString  = "Cloud Ice Water (mg kg~S~-1~N~)"
 else if (var .eq. "CDNC") then
   res2@tiMainString  = "CDNC (AWNC/FREQL) (cm~S~-3~N~)"
 else if (var .eq. "REFFL") then

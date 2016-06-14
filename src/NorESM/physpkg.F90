@@ -1367,9 +1367,15 @@ subroutine tphysac (ztodt,   cam_in,  &
 !AL
 
 !+tht 22/5/14 variables and flags for dry-mass energy adjustment
-    real(r8):: eflx(pcols)
-    logical :: lglobal, lclutter, te_conserve
+    real(r8):: eflx(pcols), dsema(pcols) !+tht 05.11.2015: added DSEMA
     integer :: energy_conservation_type
+  ! make choices clearer here
+  ! logical :: lglobal, lclutter, te_conserve, ohf_adjust ! last one added 29/10/2015
+  !!+tht 02/11/2015: strict energy budgeting option  (N.B. =.true. is a kludge)
+  ! logical, parameter:: lstickback=.false.
+    logical :: lglobal, lclutter
+    logical, parameter:: lstickback =.true.  ! strict energy budgeting option  (T -> kludge)
+    logical, parameter:: ohf_adjust =.false.  ! condensates have surface specific enthalpy
 !-tht
     !-----------------------------------------------------------------------
     lchnk = state%lchnk
@@ -1650,7 +1656,7 @@ subroutine tphysac (ztodt,   cam_in,  &
 !    call diag_phys_tend_writeout (state, pbuf,  tend, ztodt, tmp_q, tmp_cldliq, tmp_cldice, &
 !         qini, cldliqini, cldiceini)
     call diag_phys_tend_writeout (state, pbuf,  tend, ztodt, tmp_q, tmp_cldliq, tmp_cldice, &
-         tmp_cldnc,tmp_cldni,qini, cldliqini, cldiceini, cldncini, cldniini, eflx )
+         tmp_cldnc,tmp_cldni,qini, cldliqini, cldiceini, cldncini, cldniini, eflx,dsema ) !+tht 05.11.2015 added D
 !AL
     call clybry_fam_set( ncol, lchnk, map2chm, state%q, pbuf )
 

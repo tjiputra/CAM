@@ -31,7 +31,7 @@
       real rgm(60)
       real dndlogr(288,192,60,0:14), dndlogrsum(288,192,60)
       real dmdlogr_ss(288,192,60), dmdlogr_du(288,192,60)
-
+      real dndlogrsummode(288,192,0:14)
       real writfield(288,192), writfield3d(288,192,60)
 
       character*128 filename
@@ -63,8 +63,8 @@
         diameter(ibin) = 2.*rgm(ibin)*1.e6        ! unit um
       end do
 
-!     Calculate const in "dN/dlogD = dN/dlogr = const * NNAT/log(SIGMA)*exp(-0,5*(...)**2)
-      const=1./(log10(2.)*sqrt(2.*pi)) 
+!     Calculate const in "dN/dlogD = const * NNAT/log(SIGMA)*exp(-0,5*(...)**2)
+      const=1./sqrt(2.*pi) 
 !      write(*,*) 'const =', const
 
 
@@ -144,12 +144,15 @@
                 dmdlogr_ss(i,j,ibin)=0.0
                 dmdlogr_du(i,j,ibin)=0.0
               end do 
+              do inr=0,14
+                dndlogrsummode(i,j,inr)=0.0
+              end do
            end do
           end do         
 
 !     Calculate dry number size distributions dN/dlogr (unit cm-3) for each mode inr
 
-       do inr=1,14 
+       do inr=0,14 
         if(inr.ne.3.and.inr.ne.11.and.inr.ne.13) then
          do ibin=1,60
           do j=1,192
@@ -203,8 +206,41 @@
          end do 
        end do
 
-!      Some test output 
-!       do ibin=1,60
+!      Some test output------------------------- 
+       do ibin=1,60
+!      Ca. Birkenes station in southern Norway
+        do j=157,157  
+          do i=7,7
+            write(101,*) diameter(ibin), dndlogr(i,j,ibin,1), nt         
+            write(102,*) diameter(ibin), dndlogrsum(i,j,ibin), nt         
+          end do
+        end do         
+       end do 
+       write(103,*) nt, nmr(7,157,1)         
+       write(104,*) nt, num(7,157,1)         
+!     Checking that the sum of particles from each bin actually sums up to the total:
+        do inr=0,14
+         if(inr.ne.3.and.inr.ne.11.and.inr.ne.13) then
+          do j=1,192
+            do i=1,288
+              do ibin=1,60
+               dndlogrsummode(i,j,inr)=dndlogrsummode(i,j,inr)
+     &          + 0.05*dndlogr(i,j,ibin,inr)
+              end do
+            end do         
+          end do
+         endif
+        end do
+        do inr=0,14
+         if(inr.ne.3.and.inr.ne.11.and.inr.ne.13) then
+          do j=157,157
+            do i=7,7
+               write(100,*) nt, inr, num(i,j,inr),
+     &         dndlogrsummode(i,j,inr)/num(i,j,inr)         
+            end do         
+          end do
+         endif
+        end do
 !      for a dusty region (Arabic peninsula)
 !        do j=120,120  
 !          do i=38,38
@@ -222,12 +258,14 @@
 !          end do
 !        end do         
 !       end do 
+!      Some test output------------------------- 
+       
 
 !     Finally write the final data to a single netcdf file (for each PNSD variable) 
 !      filename='/work/kirkevag/pnsd/dndlogd_global.nc'
       fp='/work/kirkevag/pnsd/'
 
-      wn='aerocom03_CAM5.3-Oslo_INSITU-PNSD_dndlogdaer_2000_monthly.nc'
+      wn='aerocom03_CAM5.3-Oslo_global-PNSD_dndlogdaer_2000_monthly.nc'
       filename=trim(fp)//trim(wn)
       woutname='dndlogdaer'  ! note that dndlogdaer=dndlograer
       longname='dndlogdaer'
@@ -247,7 +285,7 @@
      & 'particle diameter','time in months',
      & 'deg','deg','um','month')
 
-      wn='aerocom03_CAM5.3-Oslo_INSITU-PNSD_dmdlogdss_2000_monthly.nc'
+      wn='aerocom03_CAM5.3-Oslo_global-PNSD_dmdlogdss_2000_monthly.nc'
       filename=trim(fp)//trim(wn)
       woutname='dmdlogdss'
       longname='dmdlogdss'
@@ -267,7 +305,7 @@
      & 'particle diameter','time in months',
      & 'deg','deg','um','month')
 
-      wn='aerocom03_CAM5.3-Oslo_INSITU-PNSD_dmdlogddust_2000_monthly.nc'
+      wn='aerocom03_CAM5.3-Oslo_global-PNSD_dmdlogddust_2000_monthly.nc'
       filename=trim(fp)//trim(wn)
       woutname='dmdlogddust'
       longname='dmdlogddust'

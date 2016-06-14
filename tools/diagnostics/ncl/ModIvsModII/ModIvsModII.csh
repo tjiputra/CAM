@@ -68,6 +68,7 @@ ModelI=CAM5-Oslo  # gives CAM5-Oslo Revision N vs. CAM5-Oslo Revision M comparis
 #**********************************************************************************************
 #No changes by the user should be necessary below...
 
+
 echo ''
 echo 'Running Emis_ModIvsModII.ncl'
 echo ''
@@ -178,6 +179,13 @@ echo 'Running EffDryRad_ModIvsModII.ncl'
 echo ''
 for I in {0..2};do
  ncl plot_type=$I format=\"$plotf\" filepath_I=\"$pthI\" filename_I=\"$fnmI\" filepath_II=\"$pthII\" filename_II=\"$fnmII\" filenamep_I=\"$fnmpI\" filenamep_II=\"$fnmpII\" EffDryRad_ModIvsModII.ncl 
+done
+
+echo ''
+echo 'Running ZonalModepar_ModIvsModII.ncl'
+echo ''
+for I in {1..9};do
+ ncl plot_type=$I format=\"$plotf\" filepath_I=\"$pthI\" filename_I=\"$fnmI\" filepath_II=\"$pthII\" filename_II=\"$fnmII\" filenamep_I=\"$fnmpI\" filenamep_II=\"$fnmpII\" ModI=\"$ModelI\" ZonalModepar_ModIvsModII.ncl
 done
 
 echo ''

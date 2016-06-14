@@ -206,8 +206,12 @@ subroutine diag_init(pbuf2d)
    call addfld (apcnst(1) , (/ 'lev' /), 'A','kg/kg',trim(cnst_longname(1))//' (after physics)')
    if ( dycore_is('LR') ) then
       call addfld ('TFIX',        horiz_only,  'A'     ,'K/s','T fixer (T equivalent of Energy correction)')
-      call addfld ('PTTEND_RESID',(/'lev'/), 'A',  'K/s' ,&
-                   'T-tendency due to BAB kluge at end of tphysac (diagnostic not part of T-budget)')
+      !call addfld ('PTTEND_RESID',(/'lev'/), 'A',  'K/s' ,&
+      !             'T-tendency due to BAB kluge at end of tphysac (diagnostic not part of T-budget)')
+      call addfld ('PTTEND_DME',(/'lev'/), 'A'     ,'K/s', &
+                   'T-tendency due to dry mass adjustment at the end of tphysac')
+      call addfld ('IETEND_DME',horiz_only, 'A'    ,'W/m2',&
+                   'Column DSE tendency due to mass adjustment at end of tphysac')
       call addfld ('EFLX    ',horiz_only, 'A'  ,'W/m2',&
                    'Equivalent heat flux due to mass adjustment at end of tphysac')
    end if
@@ -628,7 +632,8 @@ subroutine diag_init(pbuf2d)
       call add_default (apcnst(1)   , history_budget_histfile_num, ' ')
       if ( dycore_is('LR') .or. dycore_is('SE') ) then
          call add_default ('TFIX    '    , history_budget_histfile_num, ' ')
-         call add_default ('PTTEND_RESID', history_budget_histfile_num, ' ')
+         call add_default ('PTTEND_DME', history_budget_histfile_num, ' ') !+tht
+         call add_default ('IETEND_DME', history_budget_histfile_num, ' ') !+tht
          call add_default ('EFLX    '    , history_budget_histfile_num, ' ')
       end if
    end if
@@ -2108,7 +2113,7 @@ end subroutine diag_export
 !subroutine diag_phys_tend_writeout(state, pbuf,  tend, ztodt, tmp_q, tmp_cldliq, tmp_cldice, &
 !                                   qini, cldliqini, cldiceini, eflx)
 subroutine diag_phys_tend_writeout(state, pbuf,  tend, ztodt, tmp_q, tmp_cldliq, tmp_cldice, &
-                                  tmp_cldnc,tmp_cldni,qini, cldliqini, cldiceini,cldncini, cldniini, eflx)
+                                  tmp_cldnc,tmp_cldni,qini, cldliqini, cldiceini,cldncini, cldniini, eflx,dsema)
 !AL
    !---------------------------------------------------------------
    !
@@ -2132,7 +2137,8 @@ subroutine diag_phys_tend_writeout(state, pbuf,  tend, ztodt, tmp_q, tmp_cldliq,
    real(r8)           , intent(in   ) :: qini      (pcols,pver) ! tracer fields at beginning of physics
    real(r8)           , intent(in   ) :: cldliqini (pcols,pver) ! tracer fields at beginning of physics
    real(r8)           , intent(in   ) :: cldiceini (pcols,pver) ! tracer fields at beginning of physics
-   real(r8)           , intent(in   ), optional :: eflx      (pcols     ) ! pseudo-flux of heat associated with mass adj.
+   real(r8)           , intent(in), optional ::eflx (pcols    ) ! heat-flux associated with moisture mass change
+   real(r8)           , intent(in), optional ::dsema(pcols    ) ! enthalpy tendency associated with mass adj.
 !AL
    real(r8)           , intent(inout) :: tmp_cldnc(pcols,pver) ! As input, holds pre-adjusted tracers (FV)
    real(r8)           , intent(inout) :: tmp_cldni(pcols,pver) ! As input, holds pre-adjusted tracers (FV)
@@ -2170,7 +2176,8 @@ subroutine diag_phys_tend_writeout(state, pbuf,  tend, ztodt, tmp_q, tmp_cldliq,
    ! Dump out post-physics state (FV only)
 
    if (dycore_is('LR')) then
-      if(present(eflx))call outfld('EFLX',eflx, pcols, lchnk)
+      if(present(dsema))call outfld('IETEND_DME', dsema, pcols, lchnk) !+tht 05.11.2015
+      if(present(eflx) )call outfld('EFLX'      ,  eflx, pcols, lchnk)
    end if
    call outfld('TAP', state%t, pcols, lchnk   )
    call outfld('UAP', state%u, pcols, lchnk   )

@@ -3,9 +3,9 @@
 
 ;;    fna = "example_monthly_2D.nc"
 ;;    fna = "example_monthly_3D.nc"
-;;    fna = "dndlogdaer_global.nc"
-;;    fna = "dmdlogdss_global.nc"
-    fna = "dmdlogddust_global.nc"
+;;    fna = "aerocom03_CAM5.3-Oslo_global-PNSD_dndlogdaer_2000_monthly.nc"
+;;    fna = "aerocom03_CAM5.3-Oslo_global-PNSD_dmdlogdss_2000_monthly.nc"
+    fna = "aerocom03_CAM5.3-Oslo_global-PNSD_dmdlogddust_2000_monthly.nc"
 
 ;;  site location information 
 
