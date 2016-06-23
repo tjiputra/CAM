@@ -133,8 +133,6 @@ contains
          fdiurn_oxid = max(1.0e-3_r8, sum/(t2-t1)/tlight)
 
       end if
-!if(deglat.gt.0._r8.and.deglat.lt.1._r8) &
-!   write(6,*) deglon,tlight,tset,trise,ncsec,dtc,fdiurn_oxid(i)
 
   if (inv_oh) then
       do k=1,pver
@@ -405,6 +403,8 @@ contains
 !	end if
 !c determine julian day number
 
+
+
 !c there is no year 0 in the Gregorian calendar and the leap year cycle
 !c changes for earlier years. 
 !	if (iyear .lt. 1) then
@@ -413,27 +413,24 @@ contains
 !	end if
 !c leap years are divisible by 4, except for centurial years not divisible
 !c by 400. 
-	year = real (iyear)
-!	if ((amod(year,4.) .eq. 0.0) .and. (amod(year,100.) .ne. 0.0)) &
-     	  leapyr=.true.
-!	if(amod(year,400.) .eq. 0.0) leapyr = .true.
-!        if(leapyear) then 
-!  	   jday = iimonthleap(month) + iday
-!        else 
-!  	   jday = iimonthleap(month) + iday
-!        end if
 
+
+!	year = real (iyear)
+!	if ((amod(year,4.) .eq. 0.0) .and. (amod(year,100.) .ne. 0.0)) &
+!     	  leapyr = 1
+!	if(amod(year,400.) .eq. 0.0) leapyr = 1 
+  	jday = iimonth(month) + iday
+!	if ((leapyr .eq. 1) .and. (month .gt. 2)) jday = jday + 1
 
 ! 
 
 !The 
 !c construct Julian centuries since J2000 at 0 hours UT of date,
 !c days.fraction since J2000, and UT hours.
- 	   delta_years = 0._r8
-!iyear - 2000.
+ 	   delta_years = iyear - 2000._r8
 !c delta_days is days from 2000/01/00 (1900's are negative). 
   	 delta_days = delta_years * 365._r8 + delta_years / 4._r8 + jday
-!    	if (iyear .gt. 2000) delta_days = delta_days + 1.
+    	if (iyear .gt. 2000) delta_days = delta_days + 1._r8
 !c J2000 is 2000/01/01.5 
   	  days_j2000 = delta_days - 1.5_r8
     	cent_j2000 = days_j2000 / 36525._r8
@@ -445,7 +442,7 @@ contains
 	mean_anomaly = (f_mean_anomaly / 360._r8 - int(f_mean_anomaly    &
         /360._r8)) * twopi
 	mean_longitude = (f_mean_longitude /360. - int(            &
-        f_mean_longitude/360.)) * twopi
+        f_mean_longitude/360._r8)) * twopi
   	mean_obliquity = (23.439_r8 - 4.0e-7_r8 * days_j2000) * deg_rad   
   	ecliptic_long = ((1.915_r8 * sin(mean_anomaly)) +     &
                    (0.020_r8 * sin(2.0 * mean_anomaly))) * deg_rad +  &
@@ -484,7 +481,7 @@ contains
 !c compute UTs of sunrise and sunset.
 !c A. A. 1990, A12.
   	tangterm = tan_lat * tan_dec
-  	if (abs(tangterm) .gt. 1.0) then
+  	if (abs(tangterm) .gt. 1.0_r8) then
     		sunrise = -100._r8
     		sunset = -100._r8
   	else
