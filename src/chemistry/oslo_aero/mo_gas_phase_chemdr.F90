@@ -620,12 +620,13 @@ contains
     !-----------------------------------------------------------------------  
     call setinv( invariants, tfld, h2ovmr, vmr, pmid, ncol, lchnk, pbuf )
 
-    !-----------------------------------------------------------------------      
+    !-----------------------------------------------------------------------     
+! 240616 Commented out call to day/night cycle due to lack of testing of corrected bug. Follows now the MAM set-up , i.e. no diurnal variation 
 #if defined (OSLO_AERO)
     !        ... Set the "day/night cycle for prescribed oxidants"
     !----------------------------------------------------------------------- 
-    if (inv_oh.or.inv_ho2)  &
-      call set_diurnal_invariants(invariants,delt,ncol,lchnk,inv_oh,inv_ho2,id_oh,id_ho2)
+!    if (inv_oh.or.inv_ho2)  &
+!      call set_diurnal_invariants(invariants,delt,ncol,lchnk,inv_oh,inv_ho2,id_oh,id_ho2)
   
 #endif
     !        ... stratosphere aerosol surface area
