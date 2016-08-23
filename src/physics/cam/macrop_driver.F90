@@ -31,7 +31,7 @@
   public :: macrop_driver_register
   public :: macrop_driver_init
   public :: macrop_driver_tend
-  public :: ice_macro_tend
+  public :: liquid_macro_tend
 
   logical, public :: do_cldice             ! .true., park macrophysics is prognosing cldice
   logical, public :: do_cldliq             ! .true., park macrophysics is prognosing cldliq
@@ -47,8 +47,6 @@
   !               liquid condensate, not cumulus ice condensate.
 
   logical, parameter :: cu_det_st  = .false.  
-
-  logical :: micro_do_icesupersat
 
   ! Parameters used for selecting generalized critical RH for liquid and ice stratus
   integer :: rhminl_opt = 0
@@ -85,8 +83,7 @@
     concld_idx,   &! concld index in physics buffer
     fice_idx,     &  
     cmeliq_idx,   &  
-    shfrc_idx,    &
-    naai_idx 
+    shfrc_idx 
 
   integer :: &
     tke_idx = -1,       &! tke defined at the model interfaces
@@ -221,8 +218,7 @@ end subroutine macrop_driver_readnl
 
     call phys_getopts(history_aerosol_out              = history_aerosol      , &
                       history_budget_out               = history_budget       , &
-                      history_budget_histfile_num_out  = history_budget_histfile_num, &
-                      micro_do_icesupersat_out         = micro_do_icesupersat)
+                      history_budget_histfile_num_out  = history_budget_histfile_num )
 
   ! Find out whether shfrc from convect_shallow will be used in cldfrc
 
@@ -322,10 +318,6 @@ end subroutine macrop_driver_readnl
     CC_ni_idx   = pbuf_get_index('CC_ni')
     CC_qlst_idx = pbuf_get_index('CC_qlst')
     cmfmc_sh_idx = pbuf_get_index('CMFMC_SH')
-
-    if (micro_do_icesupersat) then 
-       naai_idx      = pbuf_get_index('NAAI')
-    endif
 
     if (rhminl_opt > 0 .or. rhmini_opt > 0) then
        cmfr_det_idx = pbuf_get_index('cmfr_det', istat)
@@ -482,8 +474,6 @@ end subroutine macrop_driver_readnl
 
   real(r8), pointer, dimension(:,:) :: fice_ql      ! Cloud ice/water partitioning ratio.
 
-  real(r8), pointer, dimension(:,:) :: naai         ! Number concentration of activated ice nuclei
- 
   real(r8) :: latsub
 
   ! tendencies for ice saturation adjustment
@@ -595,10 +585,6 @@ end subroutine macrop_driver_readnl
   real(r8) :: cldsice(pcols,pver)
 
   ! ======================================================================
-
-  if (micro_do_icesupersat) then 
-     call pbuf_get_field(pbuf, naai_idx, naai)
-  endif
 
   lchnk = state%lchnk
   ncol  = state%ncol
@@ -782,53 +768,6 @@ end subroutine macrop_driver_readnl
    ! update local copy of state with the detrainment tendency
    ! ptend_loc is reset to zero by this call
    call physics_update(state_loc, ptend_loc, dtime)
-
-   if (micro_do_icesupersat) then 
-
-      ! -------------------------------------- !
-      ! Ice Saturation Adjustment Computation  !
-      ! -------------------------------------- !
-
-      lq(:)        = .FALSE.
-
-      lq(1)        = .true.
-      lq(ixcldice) = .true.
-      lq(ixnumice) = .true.
-
-      latsub = latvap + latice
-
-      call physics_ptend_init(ptend_loc, state%psetcols, 'iceadj', ls=.true., lq=lq)
-
-      stend(:ncol,:)=0._r8
-      qvtend(:ncol,:)=0._r8
-      qitend(:ncol,:)=0._r8
-      initend(:ncol,:)=0._r8
-
-      call ice_macro_tend(naai(:ncol,top_lev:pver),state%t(:ncol,top_lev:pver), &
-           state%pmid(:ncol,top_lev:pver),state%q(:ncol,top_lev:pver,1),state%q(:ncol,top_lev:pver,ixcldice),&
-           state%q(:ncol,top_lev:pver,ixnumice),latsub,dtime,&
-           stend(:ncol,top_lev:pver),qvtend(:ncol,top_lev:pver),qitend(:ncol,top_lev:pver),&
-           initend(:ncol,top_lev:pver))
-
-      ! update local copy of state with the tendencies
-      ptend_loc%q(:ncol,top_lev:pver,1)=qvtend(:ncol,top_lev:pver)
-      ptend_loc%q(:ncol,top_lev:pver,ixcldice)=qitend(:ncol,top_lev:pver)  
-      ptend_loc%q(:ncol,top_lev:pver,ixnumice)=initend(:ncol,top_lev:pver)
-      ptend_loc%s(:ncol,top_lev:pver)=stend(:ncol,top_lev:pver) 
-
-      ! Add the ice tendency to the output tendency
-      call physics_ptend_sum(ptend_loc, ptend, ncol)
- 
-      ! ptend_loc is reset to zero by this call
-      call physics_update(state_loc, ptend_loc, dtime)
-
-      ! Write output for tendencies:
-      call outfld( 'TTENDICE',  stend/cpair, pcols, lchnk )
-      call outfld( 'QVTENDICE', qvtend, pcols, lchnk )
-      call outfld( 'QITENDICE', qitend, pcols, lchnk )
-      call outfld( 'NITENDICE', initend, pcols, lchnk )
-
-   endif
 
    ! -------------------------------------- !
    ! Computation of Various Cloud Fractions !
@@ -1121,71 +1060,64 @@ end subroutine macrop_driver_readnl
 
 end subroutine macrop_driver_tend
 
-! Saturation adjustment for ice
-! Add ice mass if supersaturated
-elemental subroutine ice_macro_tend(naai,t,p,qv,qi,ni,xxls,deltat,stend,qvtend,qitend,nitend) 
 
-  use wv_sat_methods, only: wv_sat_qsat_ice
+! Saturation adjustment for liquid
+!
+! With CLUBB, we are seeing relative humidity with respect to water
+! greater than 1. This should not be happening and is not what the
+! microphsyics expects from the macrophysics. As a work around while
+! this issue is investigated in CLUBB, this routine will enfornce a 
+! maximum RHliq of 1 everywhere in the atmosphere. Any excess water will
+! be converted into cloud drops.
+elemental subroutine liquid_macro_tend(npccn,t,p,qv,qc,nc,xxlv,deltat,stend,qvtend,qctend,nctend)
 
-  real(r8), intent(in)  :: naai   !Activated number of ice nuclei 
+  use wv_sat_methods, only: wv_sat_qsat_ice, wv_sat_qsat_water
+  use micro_mg_utils, only: rhow
+  use physconst,      only: rair
+  use cldfrc2m,       only: rhmini_const, rhmaxi_const
+
+  real(r8), intent(in)  :: npccn  !Activated number of cloud condensation nuclei 
   real(r8), intent(in)  :: t      !temperature (k)
-  real(r8), intent(in)  :: p      !pressure (pa0
+  real(r8), intent(in)  :: p      !pressure (pa)
   real(r8), intent(in)  :: qv     !water vapor mixing ratio
-  real(r8), intent(in)  :: qi     !ice mixing ratio
-  real(r8), intent(in)  :: ni     !ice number concentration
-  real(r8), intent(in)  :: xxls   !latent heat of sublimation
+  real(r8), intent(in)  :: qc     !liquid mixing ratio
+  real(r8), intent(in)  :: nc     !liquid number concentration
+  real(r8), intent(in)  :: xxlv   !latent heat of vaporization
   real(r8), intent(in)  :: deltat !timestep
   real(r8), intent(out) :: stend  ! 'temperature' tendency 
   real(r8), intent(out) :: qvtend !vapor tendency
-  real(r8), intent(out) :: qitend !ice mass tendency
-  real(r8), intent(out) :: nitend !ice number tendency  
- 
-  real(r8) :: ESI
-  real(r8) :: QSI
-  real(r8) :: tau
-  logical  :: tau_constant
+  real(r8), intent(out) :: qctend !liquid mass tendency
+  real(r8), intent(out) :: nctend !liquid number tendency 
 
-  tau_constant = .true.
+
+  real(r8) :: ESL
+  real(r8) :: QSL
 
   stend = 0._r8
   qvtend = 0._r8
-  qitend = 0._r8
-  nitend = 0._r8
+  qctend = 0._r8
+  nctend = 0._r8
 
-  ! calculate qsati from t,p,q
+  ! calculate qsatl from t,p,q
+  call wv_sat_qsat_water(t, p, ESL, QSL)
 
-  call wv_sat_qsat_ice(t, p, ESI, QSI)
+  ! Don't allow supersaturation with respect to liquid.
+  if (qv.gt.QSL) then
 
-  if (naai.gt.1.e-18_r8.and.qv.gt.QSI) then
+     qctend = (qv - QSL) / deltat
+     qvtend = 0._r8 - qctend
+     stend  = qctend * xxlv    ! moist static energy tend...[J/kg/s] !
 
-     !optional timescale on condensation
-     !tau in sections. Try 300. or tau = f(T): 300s  t> 268, 1800s for t<238
-     !     
-     if (.not. tau_constant) then
-        if( t.gt. 268.15_r8 ) then
-           tau = 300.0_r8
-        elseif(t.lt.238.15_r8 ) then
-           tau = 1800._r8
-        else
-           tau = 300._r8 + (1800._r8 - 300._r8) * ( 268.15_r8 - t ) / 30._r8
-        endif
-     else
-         tau = 1800._r8
-     end if
-
-     qitend = (qv-QSI)/deltat * exp(-tau/deltat)
-     qvtend = 0._r8 - qitend
-     stend  = qitend * xxls    ! moist static energy tend...[J/kg/s] !
-
-     ! kg(h2o)/kg(air)/s * J/kg(h2o)  = J/kg(air)/s (=W/kg)
-     ! if ice exists (more than 1 L-1) and there is condensation, do not add to number (= growth), else, add 10um ice
-
-     if (ni.lt.1.e3_r8.and.(qi+qitend*deltat).gt.1e-18_r8) then
-        nitend = nitend + 3._r8 * qitend/(4._r8*3.14_r8* 10.e-6_r8**3*997._r8)
+     ! If drops  exists (more than 1 L-1) and there is condensation,
+     ! do not add to number (= growth), otherwise  add 6um drops.
+     !
+     ! This is somewhat arbitrary, but ensures that some reasonable droplet
+     ! size is create to remove the excess water. This could be enhanced to
+     ! look at npccn, but ideally this entire routine should go away.
+     if (nc*p/rair/t.lt.1e3_r8.and.(qc+qctend*deltat).gt.1e-18_r8) then
+        nctend = nctend + 3._r8 * qctend/(4._r8*3.14_r8*6.e-6_r8**3*rhow)
      endif
-
   endif
-
-end subroutine ice_macro_tend
+end subroutine liquid_macro_tend
 
 end module macrop_driver

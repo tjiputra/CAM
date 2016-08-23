@@ -127,13 +127,11 @@
 !
 !---------------------------Local variables-----------------------------
 !
-      INTEGER udat,unit,ios
+      INTEGER unit,ios
       integer ll, mm, k, m, klimit, kk, nn, ii, i, n, ilimit, mlimit, l
 
       REAL(r8) C(0:3)
       real(r8) stpr, step
-
-      CHARACTER*15 skip
 
       INTEGER MaxL,MaxM,MaxN
       REAL(r8) Cn( 0:3 , 0:1 , 0:4 , 0:1 , 0:8 , 0:3 )
@@ -173,7 +171,6 @@
  2000 FORMAT(3I2)
  3000 FORMAT(2I2,4E15.6)
 
-!     READ(udat,900) skip
       if (debug) write(iulog,*) 'Weimer: reading file ',trim(locfn),' unit ',unit	
       READ(unit,1000,iostat = ios) MaxL,MaxM,MaxN
       if(ios.gt.0) then

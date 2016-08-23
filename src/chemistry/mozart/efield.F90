@@ -99,7 +99,6 @@
         ed2(0:nmlon,0:nmlat)        ! meridional electric field Ed2/sin I_m  [V/m]  
        
       real(r8) :: &
-       date,  & ! iyear+iday+ut
        day      ! iday+ut
 
       logical, parameter :: iutav=.false.   ! .true.  means UT-averaging 
@@ -131,10 +130,8 @@
      	rtd ,     &    ! radians -> deg
      	dtr,      &    ! deg -> radians
      	sqr2,     &      
-     	hr2rd,    &    ! pi/12 hrs
      	dy2rd,    &    ! 2*pi/365.24  average year
      	deg2mlt,  &    ! for mlon to deg
-     	mlt2deg,  &    ! for mlt to mlon
         sinIm_mag(0:nmlat)    ! sinIm
 
       integer :: jmin, jmax   ! latitude index for interpolation of 
@@ -223,9 +220,8 @@
       use mo_solar_parms, only : solar_parms_get
       use mag_parms,      only : get_mag_parms
       use mo_apex,        only : geomag_year
-      use spmd_utils,     only : masterproc
 
-      integer :: idum1, idum2, tod ! time of day [s] 
+      integer :: tod ! time of day [s] 
 
 !-----------------------------------------------------------------------
 ! get current calendar day of year & date components 
@@ -233,7 +229,7 @@
 !-----------------------------------------------------------------------
       iday = get_curr_calday()                   ! day of year
       call get_curr_date (iyear,imo,iday_m,tod)  ! year, time of day [sec]
-      iyear = geomag_year
+      iyear = int(geomag_year)
 
       if( iyear < 1900 ) then
         write(iulog,"(/,'>>> get_efield: year < 1900 not possible: year=',i5)") iyear
@@ -250,11 +246,7 @@
 ! get mag parms
 !-----------------------------------------------------------------------
       call get_mag_parms( by = by, bz = bz )
-#ifdef EFIELD_DIAGS
-      if( masterproc ) then
-         write(iulog,*) 'get_efield: f107d,by,bz = ', f107d,by,bz 
-      end if
-#endif
+
 !-----------------------------------------------------------------------
 ! ajust S_a
 !-----------------------------------------------------------------------
@@ -293,7 +285,7 @@
       integer  :: ilon, ilat, idlat
       integer  :: ihlat_bnd(0:nmlon)                  ! high latitude boundary
       integer  :: itrans_width(0:nmlon)               ! width of transition zone
-      real(r8) :: mlt, mlon, mlat, mlat_90, pot
+      real(r8) :: mlat, mlat_90, pot
       real(r8) :: pot_midlat(0:nmlon,0:nmlat)         ! potential from L. Scherliess model
       real(r8) :: pot_highlat(0:nmlon,0:nmlat)        ! potential from Weimer model
       real(r8) :: pot_highlats(0:nmlon,0:nmlat)	      ! smoothed potential from Weimer model
@@ -307,7 +299,6 @@
 ! convert to date and day	
 !-----------------------------------------------------------------------
       day  = iday + ut/24._r8
-      date = iyear + day/dy2yr
 
 !-----------------------------------------------------------------------
 ! low/midlatitude electric potential - empirical model Scherliess 1999  
@@ -422,7 +413,7 @@
 !-----------------------------------------------------------------------
 ! local variables
 !-----------------------------------------------------------------------
-      integer  :: m, i, j, mmo
+      integer  :: m, mmo
       real(r8) :: sp, cp    
 
       sp   = sin( ph/rtd )
@@ -463,7 +454,7 @@
 !-----------------------------------------------------------------------
 ! local variables
 !-----------------------------------------------------------------------
-      integer  :: mp, m, n, np
+      integer  :: mp, m, n
       real(r8) :: pm2, st
 
 !      ct = min( ct,.99_r8 )		! cos(colat)
@@ -477,7 +468,6 @@
 	end if
 	pm2 = 0._r8                                                                  
 	do n = mp,nm                    ! n=m+1,N
-	   np     = n + 1
 	   p(n,m) = (ct*p(n-1,m) - r(n-1,m)*pm2)/r(n,m)
 	   pm2    = p(n-1,m)
         end do
@@ -602,7 +592,7 @@
       character(len=*), intent(in) :: efield_lflux_file
       character(len=*), intent(in) :: efield_hflux_file
 
-      integer  :: i,ios,unit,istat
+      integer  :: ios,unit
       character (len=256):: locfn
 
 !----------------------------------------------------------------------------                                                                   
@@ -734,10 +724,8 @@
       rtd     = 180._r8/pi	        ! radians -> deg
       dtr     = pi/180._r8	        ! deg -> radians
       sqr2    = sqrt(2.e0_r8)
-      hr2rd   = pi/12._r8	        ! pi/12 hrs
       dy2rd   = 2._r8*pi/dy2yr          ! 2*pi/365.24  average year
       deg2mlt = 24._r8/360._r8          ! convert degrees to MLT hours
-      mlt2deg = 360._r8/24._r8          ! for mlt to mlon       
 
 !----------------------------------------------------------------------------                                                                   
 ! Set grid deltas:
@@ -1019,7 +1007,7 @@
 !----------------------------------------------------------------------------                                                                   
 ! local variables
 !----------------------------------------------------------------------------                                                                   
-      integer  :: ilon, ilat, id
+      integer  :: ilat, id
       real(r8) :: wgt, del
       real(r8) :: w(-idlat:idlat)
 !     real(r8) :: pot_smo(0:nmlat) ! temp array for smooth. potential
@@ -1085,7 +1073,7 @@
 !----------------------------------------------------------------------------                                                                   
 ! local variables
 !----------------------------------------------------------------------------                                                                   
-      integer  :: ilon, ilat, id
+      integer  :: ilat, id
       real(r8) :: wgt, del
       real(r8) :: w(-idlat:idlat)
 !     real(r8) :: pot_smo(0:nmlat) ! temp array for smooth. potential
@@ -1143,10 +1131,9 @@
 !----------------------------------------------------------------------------                                                                   
 ! local variables
 !----------------------------------------------------------------------------                                                                   
-      integer  :: ilon, ilat, id, iabs
+      integer  :: ilon, ilat, id
       real(r8) :: wgt, del
       real(r8) :: w(-idlon:idlon)
-      real(r8) :: pot_smo(0:nmlath) ! temp array for smooth. potential
       real(r8) :: tmp(-idlon:nmlon+idlon) ! temp array for smooth. potential
 
 !----------------------------------------------------------------------------                                                                   
@@ -1279,7 +1266,7 @@
       integer, parameter :: nmax_a = 2*nmax_sin+1 ! absolute array length
       integer, parameter :: ishf   = nmax_sin+1
       integer  :: ilon, i, i1, j, bnd
-      real(r8) :: sum, mlon
+      real(r8) :: sum
       real(r8) :: rhs(nmax_a)
       real(r8) :: lsg(nmax_a)
       real(r8) :: u(nmax_a,nmax_a)
@@ -1356,7 +1343,7 @@
 !----------------------------------------------------------------------------                                                                   
 ! local:     
 !----------------------------------------------------------------------------                                                                   
-      integer  :: bnd, ilon, ilat, ilatS, ibnd60, ibnd_hl
+      integer  :: ilon, ilat, ilatS, ibnd60, ibnd_hl
       real(r8) :: pot60, pot_hl, del
 
 !----------------------------------------------------------------------------                                                                   
@@ -1438,7 +1425,7 @@
       integer  :: ilon, ilat
       integer  :: ibnd, tw, hb1, hb2, lat_ind
       integer  :: j1, j2
-      real(r8) :: a, b, lat, b1, b2
+      real(r8) :: a, b, b1, b2
       real(r8) :: wrk1, wrk2
 
 !$omp parallel do private(ilat,ilon,ibnd,tw)

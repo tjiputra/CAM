@@ -1036,10 +1036,10 @@ contains
 
     real(r8) :: vmrcw(ncol,pver,gas_pcnst)            ! cloud-borne aerosol (vmr)
 
-    real(r8) ::  aqso4(1,pver)               ! aqueous phase chemistry
-    real(r8) ::  aqh2so4(1,pver)             ! aqueous phase chemistry
-    real(r8) ::  aqso4_h2o2(pver)            ! SO4 aqueous phase chemistry due to H2O2
-    real(r8) ::  aqso4_o3(pver)              ! SO4 aqueous phase chemistry due to O3
+    real(r8) ::  aqso4(ncol,1)               ! aqueous phase chemistry
+    real(r8) ::  aqh2so4(ncol,1)             ! aqueous phase chemistry
+    real(r8) ::  aqso4_h2o2(ncol)            ! SO4 aqueous phase chemistry due to H2O2
+    real(r8) ::  aqso4_o3(ncol)              ! SO4 aqueous phase chemistry due to O3
     real(r8) ::  xphlwc(ncol,pver)           ! pH value multiplied by lwc
 
 

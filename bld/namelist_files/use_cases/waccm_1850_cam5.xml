@@ -2,6 +2,8 @@
 
 <namelist_defaults>
 
+<fixed_geomag_year>1850</fixed_geomag_year>
+
 <!-- Solar data from Lean (via Caspar Ammann) -->
 <solar_data_file>atm/cam/solar/spectral_irradiance_Lean_1850_cntl_c100407.nc</solar_data_file>
 <solar_data_ymd>18500101</solar_data_ymd>
@@ -32,7 +34,9 @@
 
 <!-- Sulfate Aerosols: DEFAULTS okay for sulf_file -->
 <prescribed_strataero_type>CYCLICAL</prescribed_strataero_type>
-<prescribed_strataero_cycle_yr>1849</prescribed_strataero_cycle_yr>
+<prescribed_strataero_cycle_yr>1850</prescribed_strataero_cycle_yr>
+<prescribed_strataero_file>CESM_1849_2100_sad_V3_c160211.nc</prescribed_strataero_file>
+<prescribed_strataero_datapath> atm/cam/volc</prescribed_strataero_datapath>
 
 <!-- emis files -->
 
@@ -65,7 +69,7 @@
 <num_a2_ext_file>atm/cam/chem/trop_mozart_aero/emis/ar5_mam3_num_a2_elev_1850_c090726.nc</num_a2_ext_file>
 <pom_a1_ext_file>atm/cam/chem/trop_mozart_aero/emis/ar5_mam3_pom_elev_1850_c130423.nc</pom_a1_ext_file>
 <bc_a1_ext_file>atm/cam/chem/trop_mozart_aero/emis/ar5_mam3_bc_elev_1850_c090726.nc </bc_a1_ext_file>
-<ext_frc_type>CYCLICAL</ext_frc_type>
+<ext_frc_type>'CYCLICAL'</ext_frc_type>
 <ext_frc_cycle_yr>0</ext_frc_cycle_yr>
 
 <solar_parms_file>atm/waccm/phot/wasolar_ave.nc</solar_parms_file>
@@ -91,8 +95,8 @@
   'HNO3_GAS', 'NO_Aircraft', 'NO_Lightning', 'QNO', 'QRS_AUR', 'QRS_CO2NIR', 'QRS_EUV', 
   'SAD_ICE', 'SAD_LNAT', 'SAD_SULFC', 'T', 'TREFHT', 
   'TTGW', 'U', 'UTGWORO', 'UTGWSPEC', 'V', 'VERT', 'VTGWORO', 'VTGWSPEC', 'Z3', 'O2_1S', 
-  'O2_1D', 'NOX', 'NOY', 'CLOX', 'CLOY', 'BROX', 'BROY', 'TCLY', 'TOTH', 'QJOULE', 'UE', 
-  'VE', 'UIONTEND', 'VIONTEND', 'DTCORE', 'T_24_COS',  'T_24_SIN', 'T_12_COS', 'T_12_SIN',
+  'O2_1D', 'NOX', 'NOY', 'CLOX', 'CLOY', 'BROX', 'BROY', 'TCLY', 'TOTH', 'QJOULE', 'UI', 
+  'VI', 'UIONTEND', 'VIONTEND', 'DTCORE', 'T_24_COS',  'T_24_SIN', 'T_12_COS', 'T_12_SIN',
   'OMEGA_24_COS', 'OMEGA_24_SIN', 'OMEGA_12_COS', 'OMEGA_12_SIN',
   'U_24_COS', 'U_24_SIN', 'U_12_COS', 'U_12_SIN', 'V_24_COS', 'V_24_SIN', 'V_12_COS', 
   'V_12_SIN', 'PS_24_COS', 'PS_24_SIN', 'PS_12_COS', 'PS_12_SIN', 'CLDLIQ','CLDICE','CONCLD',

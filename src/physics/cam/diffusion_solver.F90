@@ -131,7 +131,8 @@
                             p               , t                  , rhoi          , ztodt        , taux        , &
                             tauy            , shflx              , cflx          , &
                             kvh             , kvm                , kvq           , cgs          , cgh         , &
-                            zi              , ksrftms            , qmincg        , fieldlist    , fieldlistm  , &
+                            zi              , ksrftms            , dragblj       , & 
+                            qmincg          , fieldlist          , fieldlistm    , &
                             u               , v                  , q             , dse          ,               &
                             tautmsx         , tautmsy            , dtk           , topflx       , errstring   , &
                             tauresx         , tauresy            , itaures       , cpairv       , dse_top, &
@@ -188,6 +189,7 @@
     real(r8), intent(in)    :: cflx(pcols,ncnst)         ! Surface constituent flux [ kg/m2/s ]
     real(r8), intent(in)    :: zi(pcols,pver+1)          ! Interface heights [ m ]
     real(r8), intent(in)    :: ksrftms(pcols)            ! Surface drag coefficient for turbulent mountain stress. > 0. [ kg/s/m2 ]
+    real(r8), intent(in)    :: dragblj(pcols,pver)       ! Drag profile from Beljaars SGO form drag  > 0. [ 1/s ]
     real(r8), intent(in)    :: qmincg(ncnst)             ! Minimum constituent mixing ratios from cg fluxes
     real(r8), intent(in)    :: cpairv(pcols,pver)        ! Specific heat at constant pressure
     real(r8), intent(in)    :: kvh(pcols,pver+1)         ! Eddy diffusivity for heat [ m2/s ]
@@ -346,6 +348,9 @@
     real(r8) :: tauimpx(pcols)                           ! Actual net stress added at the current step other than mountain stress
     real(r8) :: tauimpy(pcols)                           ! Actual net stress added at the current step other than mountain stress
     real(r8) :: ramda                                    ! dt/timeres [ no unit ]
+
+    real(r8) :: taubljx(pcols)                           ! recomputed explicit/residual beljaars stress
+    real(r8) :: taubljy(pcols)                           ! recomputed explicit/residual beljaars stress
 
     ! Rate at which external (surface) stress damps wind speeds (1/s).
     real(r8) :: tau_damp_rate(ncol, pver)
@@ -531,7 +536,14 @@
        ! Therefore, gravit*ksrf/p%del is the acceleration of wind per unit
        ! wind speed, i.e. the rate at which wind is exponentially damped by
        ! surface stress.
+
+       ! Beljaars et al SGO scheme incorporated here. It 
+       ! appears as a "3D" tau_damp_rate specification.
+
        tau_damp_rate(:,pver) = -gravit*ksrf(:ncol)*p%rdel(:,pver)
+       do k=1,pver
+          tau_damp_rate(:,k) = tau_damp_rate(:,k) + dragblj(:ncol,k)
+       end do
 
        decomp = fin_vol_lu_decomp(ztodt, p, &
             coef_q=tau_damp_rate, coef_q_diff=kvm(:ncol,:)*dpidz_sq)
@@ -556,6 +568,16 @@
           tautmsx(i) = -ksrftms(i)*u(i,pver)
           tautmsy(i) = -ksrftms(i)*v(i,pver)
 
+          ! We want to add vertically-integrated Beljaars drag to residual stress.
+          ! So this has to be calculated locally. 
+          ! We may want to rethink the residual drag calculation performed here on. (jtb)
+          taubljx(i) = 0._r8
+          taubljy(i) = 0._r8
+          do k = 1, pver
+             taubljx(i) = taubljx(i) + (1._r8/gravit)*dragblj(i,k)*u(i,k)*p%del(i,k)
+             taubljy(i) = taubljy(i) + (1._r8/gravit)*dragblj(i,k)*v(i,k)*p%del(i,k)
+          end do
+        
           if( do_iss ) then
 
             ! Compute vertical integration of final horizontal momentum
@@ -584,8 +606,8 @@
             ! the sum of 'taux(i) - ksrftms(i)*u(i,pver) + tauresx(i)'.
 
               if( itaures .eq. 1 ) then
-                 tauresx(i) = taux(i) + tautmsx(i) + tauresx(i) - tauimpx(i)
-                 tauresy(i) = tauy(i) + tautmsy(i) + tauresy(i) - tauimpy(i)
+                 tauresx(i) = taux(i) + tautmsx(i) + taubljx(i) + tauresx(i)- tauimpx(i)
+                 tauresy(i) = tauy(i) + tautmsy(i) + taubljy(i) + tauresy(i)- tauimpy(i)
               endif
 
           else

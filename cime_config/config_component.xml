@@ -33,6 +33,7 @@
     <values additive='yes'>
       <value compset="_CAM4"          >-phys cam4</value>              
       <value compset="_CAM5"          >-phys cam5</value> 
+      <value compset="_CAM54"         >-phys cam5.4</value> 
       <value compset="_CAM55"         >-phys cam5.4 -clubb_sgs</value> 
       <value compset="_CAM5%CLB"      >-clubb_sgs</value>
       <value compset="_CAM5%WCCB"     >-clubb_sgs</value>
@@ -48,14 +49,15 @@
       <value compset="C[12].*_CAM4%SSOA">-waccm_phys</value> 
       <!-- Match against "%WC" to set defaults for all WACCM cases. -->
       <!-- Later settings of "-chem" take precedence over earlier ones. -->
-      <value compset="_CAM4%WC"       >-chem waccm_mozart</value>
-      <value compset="_CAM5%WC"       >-chem waccm_mozart_mam3</value>
+      <value compset="_CAM4%WC"       >-chem waccm_ma</value>
+      <value compset="_CAM5%WC"       >-chem waccm_ma_mam4</value>
+      <value compset="_CAM5%WCMD"     >-chem waccm_mad_mam4</value>
       <value compset="_CAM4%WCSC"     >-chem waccm_sc</value>
       <value compset="_CAM5%WCSCM3"   >-chem waccm_sc_mam3</value>
       <value compset="_CAM4%WTSM"     >-chem waccm_tsmlt</value>
       <value compset="_CAM5.*%WTSM"   >-chem waccm_tsmlt_mam4</value>
       <value compset="_CAM[45]%WCBC"  >-carma bc_strat</value>
-      <value compset="_CAM4%WCSF"     >-chem waccm_mozart_sulfur -carma sulfate</value>
+      <value compset="_CAM4%WCSF"     >-chem waccm_ma_sulfur -carma sulfate</value>
       <value compset="_CAM[45]%WCMX"  >-waccmx</value>
       <value compset="_CAM[45]%WCXI"  >-waccmx</value>
       
@@ -82,7 +84,7 @@
     <desc>
       CAM configure options, see CAM configure utility for details
       Provides option(s) for the CAM configure utility. 
-      CAM_CONFIG_OPTS are normally set as compset variables (e.g., -phys  cam3_5_1 -chem waccm_mozart) 
+      CAM_CONFIG_OPTS are normally set as compset variables (e.g., -phys  cam4 -chem waccm_ma) 
       and in general should not be modified for supported compsets.  It is recommended that if you want 
       to modify this value for your experiment, you should use your own user-defined
       component sets via using create_newcase with a compset_file argument
@@ -151,6 +153,7 @@
       <value compset="GEOS_CAM4%TBAM"   >cam4_bam_radpsv_geos5</value>
       <value compset="GEOS_CAM4%WCCM"   >sd_waccm_geos5</value>
       <value compset="GEOS_CAM5%W"      >sd_waccm5_geos5</value>
+      <value compset="GEOS_CAM5%WCMD"   >sd_waccm5_mad_geos5</value>
       <value compset="GEOS_CAM4%WCSF"   >sd_waccm_sulfur</value>
       <value compset="_CAM4%MOZS"       >soa_chem_megan_emis</value>         
       <value compset="2000_CAM5%SMA3"   >2000_cam5_trop_strat_mam3</value>

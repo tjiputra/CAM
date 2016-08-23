@@ -56,9 +56,6 @@
 <!-- Kp Ap indices -->
 <solar_parms_file>atm/waccm/solar/wasolar_c150720.nc</solar_parms_file>
 
-<!-- Solar protons -->
-<spe_data_file>atm/waccm/solar/spes_1963-2014_c150717.nc</spe_data_file>
-
 <!-- Stratospheric Aerosols: turn off prescribed stratospheric aerosols; use prognostic MAM in the stratosphere -->
 <prescribed_strataero_feedback>.false.</prescribed_strataero_feedback>
 

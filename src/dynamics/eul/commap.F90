@@ -4,11 +4,6 @@ module commap
    use pmgrid, only: plev, plat, plon
    use pspect, only: pmmax, pnmax
 
-   private
-
-   public bps, sq, rsq, slat, w, cs, href, ecref, clat, clon, latdeg, bm1
-   public tau, londeg, t0, xm
-
    real(r8) :: bps(plev)          ! coefficient for ln(ps) term in divergence eqn
    real(r8) :: sq(pnmax)          ! n(n+1)/a^2  (del^2 response function)
    real(r8) :: rsq(pnmax)         ! a^2/(n(n+1))

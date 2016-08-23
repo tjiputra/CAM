@@ -51,7 +51,7 @@ CONTAINS
     use derivative_mod, only  : derivinit
     use dimensions_mod, only  : npsq, nelemd
     use dof_mod, only         : UniquePoints
-    use dyn_comp, only        : dom_mt
+    use dyn_grid, only        : dom_mt
     use hybrid_mod, only      : hybrid_create
     use parallel_mod, only    : par
     use ppgrid, only          : pver
@@ -107,7 +107,7 @@ CONTAINS
     use derivative_mod, only : gradient_sphere, ugradv_sphere
     use edge_mod, only : edgevpack, edgevunpack
     use bndry_mod, only : bndry_exchangev
-    use dyn_comp, only : hvcoord
+    use dyn_grid, only : hvcoord
     implicit none
     type (hybrid_t)      , intent(in) :: hybrid
     type (element_t)     , intent(inout), target :: elem(:)

@@ -41,6 +41,7 @@ public :: nucleati_init, nucleati
 
 logical  :: use_preexisting_ice
 logical  :: use_hetfrz_classnuc
+logical  :: use_incloud_nuc
 integer  :: iulog
 real(r8) :: pi
 real(r8) :: mincld
@@ -63,11 +64,12 @@ contains
 !===============================================================================
 
 subroutine nucleati_init( &
-   use_preexisting_ice_in, use_hetfrz_classnuc_in, iulog_in, pi_in, &
+   use_preexisting_ice_in, use_hetfrz_classnuc_in, use_incloud_nuc_in, iulog_in, pi_in, &
    mincld_in, subgrid_in)
 
    logical,  intent(in) :: use_preexisting_ice_in
    logical,  intent(in) :: use_hetfrz_classnuc_in
+   logical,  intent(in) :: use_incloud_nuc_in
    integer,  intent(in) :: iulog_in
    real(r8), intent(in) :: pi_in
    real(r8), intent(in) :: mincld_in
@@ -75,6 +77,7 @@ subroutine nucleati_init( &
 
    use_preexisting_ice = use_preexisting_ice_in
    use_hetfrz_classnuc = use_hetfrz_classnuc_in
+   use_incloud_nuc     = use_incloud_nuc_in
    iulog               = iulog_in
    pi                  = pi_in
    mincld              = mincld_in
@@ -91,7 +94,8 @@ subroutine nucleati(  &
    qc, qi, ni_in, rhoair,               &
    so4_num, dst_num, soot_num,          &
    nuci, onihf, oniimm, onidep, onimey, &
-   wpice, weff, fhom)
+   wpice, weff, fhom, regm, &
+   oso4_num, odst_num, osoot_num)
 
    ! Input Arguments
    real(r8), intent(in) :: wbar        ! grid cell mean vertical velocity (m/s)
@@ -116,6 +120,10 @@ subroutine nucleati(  &
    real(r8), intent(out) :: wpice      ! diagnosed Vertical velocity Reduction caused by preexisting ice (m/s), at Shom
    real(r8), intent(out) :: weff       ! effective Vertical velocity for ice nucleation (m/s); weff=wbar-wpice
    real(r8), intent(out) :: fhom       ! how much fraction of cloud can reach Shom
+   real(r8), intent(out) :: regm       ! nucleation regime indiator
+   real(r8), intent(out) :: oso4_num   ! so4 aerosol number (#/cm^3)
+   real(r8), intent(out) :: odst_num   ! total dust aerosol number (#/cm^3)
+   real(r8), intent(out) :: osoot_num  ! soot (hydrophilic) aerosol number (#/cm^3)
 
    ! Local workspace
    real(r8) :: nihf                      ! nucleated number from homogeneous freezing of so4
@@ -123,7 +131,7 @@ subroutine nucleati(  &
    real(r8) :: nidep                     ! nucleated number from deposition nucleation
    real(r8) :: nimey                     ! nucleated number from deposition nucleation (meyers)
    real(r8) :: n1, ni                    ! nucleated number
-   real(r8) :: tc, A, B, regm            ! work variable
+   real(r8) :: tc, A, B                  ! work variable
    real(r8) :: esl, esi, deles           ! work variable
    real(r8) :: wbar1, wbar2
 
@@ -137,9 +145,15 @@ subroutine nucleati(  &
    real(r8) :: weffhet    ! effective Vertical velocity for ice nucleation (m/s)  weff=wbar-wpicehet 
    !-------------------------------------------------------------------------------
 
+   RHimean = relhum*svp_water(tair)/svp_ice(tair)*subgrid
+
    ! temp variables that depend on use_preexisting_ice
    wbar1 = wbar
    wbar2 = wbar
+
+   ! If not using prexisting ice, the homogeneous freezing happens in the
+   ! entire gridbox.
+   fhom = 1._r8
 
    if (use_preexisting_ice) then
 
@@ -167,9 +181,11 @@ subroutine nucleati(  &
       wbar2 = weffhet
 
       detaT   = wbar/0.23_r8
-      RHimean = 1.0_r8
-      call frachom(tair, RHimean, detaT, fhom)
-
+      if (use_incloud_nuc) then
+        call frachom(tair, 1._r8, detaT, fhom)
+      else
+        call frachom(tair, RHimean, detaT, fhom)
+      end if
    end if
 
    ni = 0._r8
@@ -181,10 +197,15 @@ subroutine nucleati(  &
    nihf  = 0._r8
    deles = 0._r8
    esi   = 0._r8
+   regm  = 0._r8
 
-   if (so4_num >= 1.0e-10_r8 .and. (soot_num+dst_num) >= 1.0e-10_r8 .and. cldn > 0._r8) then
+   oso4_num  = 0._r8
+   odst_num  = 0._r8
+   osoot_num = 0._r8
 
-      if ((relhum*svp_water(tair)/svp_ice(tair)*subgrid).ge.1.2_r8) then
+   if ((so4_num >= 1.0e-10_r8 .or. (soot_num+dst_num) >= 1.0e-10_r8) .and. cldn > 0._r8) then
+
+      if (RHimean.ge.1.2_r8) then
 
          if ( ((tc.le.0.0_r8).and.(tc.ge.-37.0_r8).and.(qc.lt.1.e-12_r8)).or.(tc.le.-37.0_r8)) then
 
@@ -193,57 +214,60 @@ subroutine nucleati(  &
             regm = A * log(wbar1) + B
 
             ! heterogeneous nucleation only
-            if (tc .gt. regm) then
+            if (tc .gt. regm .or. so4_num < 1.0e-10_r8) then
 
-               if(tc.lt.-40._r8 .and. wbar1.gt.1._r8) then ! exclude T<-40 & W>1m/s from hetero. nucleation
+               if(tc.lt.-40._r8 .and. wbar1.gt.1._r8 .and. so4_num >= 1.0e-10_r8) then ! exclude T<-40 & W>1m/s from hetero. nucleation
 
                   call hf(tc,wbar1,relhum,so4_num,nihf)
                   niimm=0._r8
                   nidep=0._r8
 
-                  if (use_preexisting_ice) then
-                     if (nihf.gt.1e-3_r8) then ! hom occur,  add preexisting ice
-                        niimm=min(dst_num,Ni_preice*1e-6_r8)       ! assuming dst_num freeze firstly
-                        nihf=nihf + Ni_preice*1e-6_r8 - niimm
-                     endif
-                     nihf=nihf*fhom
-                     n1=nihf+niimm 
-                  else
-                     n1=nihf
-                  end if
+                  ! If some homogeneous nucleation happened, assume all of the that heterogeneous
+                  ! and coarse mode sulfate particles nucleated.
+                  if (nihf.gt.1e-3_r8) then ! hom occur,  add preexisting ice
+                     niimm     = dst_num + soot_num       ! assuming dst_num freeze firstly
+                     odst_num  = dst_num
+                     osoot_num = soot_num
+                     
+                     oso4_num  = nihf
+                  endif
 
+                  nihf      = nihf * fhom
+                  oso4_num  = oso4_num * fhom
+
+                  n1        = nihf + niimm
                else
 
                   call hetero(tc,wbar2,soot_num+dst_num,niimm,nidep)
 
-                  if (use_preexisting_ice) then
-                     if (niimm .gt. 1e-6_r8) then ! het freezing occur, add preexisting ice
-                        niimm = niimm + Ni_preice*1e-6_r8
-                        niimm = min(dst_num, niimm)        ! niimm < dst_num 
-                     end if
-                  end if
-                  nihf=0._r8
-                  n1=niimm+nidep
-
+                  nihf = 0._r8
+                  n1   = niimm + nidep
+                  
+                  osoot_num = soot_num * (niimm + nidep) / (soot_num + dst_num) 
+                  odst_num  = dst_num  * (niimm + nidep) / (soot_num + dst_num) 
                endif
 
             ! homogeneous nucleation only
-            else if (tc.lt.regm-5._r8) then
+            else if (tc.lt.regm-5._r8 .or. (soot_num+dst_num) < 1.0e-10_r8) then
 
                call hf(tc,wbar1,relhum,so4_num,nihf)
                niimm=0._r8
                nidep=0._r8
 
-               if (use_preexisting_ice) then
-                  if (nihf.gt.1e-3_r8) then !  hom occur,  add preexisting ice
-                     niimm=min(dst_num,Ni_preice*1e-6_r8)       ! assuming dst_num freeze firstly
-                     nihf=nihf + Ni_preice*1e-6_r8 - niimm
-                  endif
-                  nihf=nihf*fhom
-                  n1=nihf+niimm 
-               else
-                  n1=nihf
-               end if
+               ! If some homogeneous nucleation happened, assume all of the that
+               ! heterogeneous and coarse mode sulfate particles nucleated.
+               if (nihf.gt.1e-3_r8) then !  hom occur,  add preexisting ice
+                  niimm     = dst_num + soot_num       ! assuming dst_num freeze firstly
+                  odst_num  = dst_num
+                  osoot_num = soot_num
+                     
+                  oso4_num  = nihf
+               endif
+
+               nihf      = nihf * fhom
+               oso4_num  = oso4_num * fhom
+
+               n1        = nihf + niimm
 
             ! transition between homogeneous and heterogeneous: interpolate in-between
             else
@@ -254,49 +278,56 @@ subroutine nucleati(  &
                   niimm = 0._r8
                   nidep = 0._r8
 
-                  if (use_preexisting_ice) then
-                     if (nihf .gt. 1e-3_r8) then ! hom occur,  add preexisting ice
-                        niimm = min(dst_num, Ni_preice*1e-6_r8)       ! assuming dst_num freeze firstly
-                        nihf  = nihf + Ni_preice*1e-6_r8 - niimm
-                     endif
-                     nihf = nihf*fhom
-                     n1   = nihf + niimm
-                  else
-                     n1 = nihf
-                  end if
+                  ! If some homogeneous nucleation happened, assume all of the
+                  ! that heterogeneous and coarse mode sulfate particles nucleated.
+                  if (nihf.gt.1e-3_r8) then ! hom occur,  add preexisting ice
+                     niimm     = dst_num + soot_num       ! assuming dst_num freeze firstly
+                     odst_num  = dst_num
+                     osoot_num = soot_num
+
+                     oso4_num  = nihf
+                  endif
+
+                  nihf      = nihf * fhom
+                  oso4_num  = oso4_num * fhom
+
+                  n1        = nihf + niimm
 
                else
 
                   call hf(regm-5._r8,wbar1,relhum,so4_num,nihf)
                   call hetero(regm,wbar2,soot_num+dst_num,niimm,nidep)
 
-                  if (use_preexisting_ice) then
-                     nihf = nihf*fhom
-                  end if
-
-                  if (nihf .le. (niimm+nidep)) then
-                     n1 = nihf
-                  else
-                     n1=(niimm+nidep)*((niimm+nidep)/nihf)**((tc-regm)/5._r8)
+                  ! If some homogeneous nucleation happened, assume all of the
+                  ! heterogeneous particles nucleated and add in a fraction of
+                  ! the homogeneous freezing.
+                  if (nihf.gt.1e-3_r8) then ! hom occur,  add preexisting ice
+                     oso4_num  = nihf
                   endif
+                     
+                  osoot_num = soot_num * (niimm + nidep) / (soot_num + dst_num)
+                  odst_num  = dst_num  * (niimm + nidep) / (soot_num + dst_num)
 
-                  if (use_preexisting_ice) then
-                     if (n1 .gt. 1e-3_r8) then   ! add preexisting ice
-                        n1    = n1 + Ni_preice*1e-6_r8
-                        niimm = min(dst_num, n1)  ! assuming all dst_num freezing earlier than hom  !!
-                        nihf  = n1 - niimm
-                     else
-                        n1    = 0._r8
-                        niimm = 0._r8
-                        nihf  = 0._r8                         
-                     endif
-                  end if
+                  nihf      = nihf      * fhom * ((regm - tc) / 5._r8)**2
+                  oso4_num  = oso4_num  * fhom * ((regm - tc) / 5._r8)**2
+
+                  n1 = niimm + nidep + nihf
 
                end if
             end if
 
+            ! Scale the rates for in-cloud number, since this is what
+            ! MG is expecting to find.
             ni = n1
 
+            if (.not. use_incloud_nuc) then
+               ni = ni / max(mincld, cldn)
+            end if
+            
+            ! If using prexsiting ice, then add it to the total.
+            if (use_preexisting_ice) then
+              ni = ni + Ni_preice * 1e-6_r8
+            end if
          end if
       end if
    end if
@@ -313,7 +344,12 @@ subroutine nucleati(  &
 
    if (use_hetfrz_classnuc) nimey = 0._r8
 
-   nuci=ni+nimey
+   if (use_incloud_nuc) then
+     nuci=ni + nimey
+   else
+     nuci=ni + nimey / max(mincld,cldn)
+   end if
+
    if(nuci.gt.9999._r8.or.nuci.lt.0._r8) then
       write(iulog, *) 'Warning: incorrect ice nucleation number (nuci reset =0)'
       write(iulog, *) ni, tair, relhum, wbar, nihf, niimm, nidep,deles,esi,dst_num,so4_num
@@ -325,7 +361,6 @@ subroutine nucleati(  &
    onidep = nidep*1.e+6_r8/rhoair
    oniimm = niimm*1.e+6_r8/rhoair
    onihf  = nihf*1.e+6_r8/rhoair
-
 end subroutine nucleati
 
 !===============================================================================
@@ -532,8 +567,7 @@ subroutine frachom(Tmean,RHimean,detaT,fhom)
       end if
    end do
 
-   fhom=fhom/0.997_r8   ! accounting for the finite limits (-3 , 3)
-
+   fhom = min(1.0_r8, fhom/0.997_r8)   ! accounting for the finite limits (-3 , 3)
 end subroutine frachom
 
 end module nucleate_ice

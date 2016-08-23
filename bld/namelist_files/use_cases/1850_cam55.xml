@@ -53,6 +53,10 @@
 <tracer_cnst_cycle_yr>1850</tracer_cnst_cycle_yr>
 <tracer_cnst_file>oxid_1.9x2.5_L26_1850clim_c091123.nc</tracer_cnst_file>
 
+<!-- Prescribed stratospheric aerosols -->
+<prescribed_strataero_type>CYCLICAL</prescribed_strataero_type>
+<prescribed_strataero_cycle_yr>1850</prescribed_strataero_cycle_yr>
+
 <!-- sim_year used for CLM datasets and SSTs forcings -->
 <sim_year>1850</sim_year>
 

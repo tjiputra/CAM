@@ -2,6 +2,6 @@
 -dyn fv
 -res 1.9x2.5
 -phys cam4
--chem waccm_mozart
+-chem waccm_ma
 -carma bc_strat
 -s

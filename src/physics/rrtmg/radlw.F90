@@ -31,6 +31,11 @@ public ::&
 ! Private data
 integer :: ntoplw    ! top level to solve for longwave cooling
 
+! Flag for cloud overlap method
+! 0=clear, 1=random, 2=maximum/random, 3=maximum
+integer, parameter :: icld = 2
+                              
+
 !===============================================================================
 CONTAINS
 !===============================================================================
@@ -97,12 +102,6 @@ subroutine rad_rrtmg_lw(lchnk   ,ncol      ,rrtmg_levs,r_state,       &
    real(r8) :: fdl(pcols,pverp)     ! Total downwards longwave flux
    real(r8) :: fsdl(pcols,pverp)    ! Clear sky downwards longwv flux
 
-   integer :: inflglw               ! Flag for cloud parameterization method
-   integer :: iceflglw              ! Flag for ice cloud param method
-   integer :: liqflglw              ! Flag for liquid cloud param method
-   integer :: icld                  ! Flag for cloud overlap method
-                                 ! 0=clear, 1=random, 2=maximum/random, 3=maximum
-
    real(r8) :: tsfc(pcols)          ! surface temperature
    real(r8) :: emis(pcols,nbndlw)   ! surface emissivity
 
@@ -156,8 +155,6 @@ subroutine rad_rrtmg_lw(lchnk   ,ncol      ,rrtmg_levs,r_state,       &
    ! Call sub-column generator for McICA in radiation
    call t_startf('mcica_subcol_lw')
 
-   ! Select cloud overlap approach (1=random, 2=maximum-random, 3=maximum)
-   icld = 2
    ! Set permute seed (must be offset between LW and SW by at least 140 to insure 
    ! effective randomization)
    permuteseed = 150
@@ -177,33 +174,6 @@ subroutine rad_rrtmg_lw(lchnk   ,ncol      ,rrtmg_levs,r_state,       &
    
    call t_startf('rrtmg_lw')
 
-   !
-   ! Call RRTMG_LW model
-   !
-   ! Set input flags for cloud parameterizations
-   ! Use separate specification of ice and liquid cloud optical depth.
-   ! Use either Ebert and Curry ice parameterization (iceflglw = 0 or 1), 
-   ! or use Key (Streamer) approach (iceflglw = 2), or use Fu method
-   ! (iceflglw = 3), and Hu/Stamnes for liquid (liqflglw = 1).
-   ! For use in Fu method (iceflglw = 3), rei is converted in RRTMG_LW
-   ! from effective radius to generalized effective size using the
-   ! conversion of D. Mitchell, JAS, 2002.  For ice particles outside
-   ! the effective range of either the Key or Fu approaches, the 
-   ! Ebert and Curry method is applied. 
-
-   ! Input CAM cloud optical depth directly
-   inflglw = 0
-   iceflglw = 0
-   liqflglw = 0
-   ! Use E&C approach for ice to mimic CAM3
-   !   inflglw = 2
-   !   iceflglw = 1
-   !   liqflglw = 1
-   ! Use merged Fu and E&C params for ice
-   !   inflglw = 2
-   !   iceflglw = 3
-   !   liqflglw = 1
-
    ! Convert incoming water amounts from specific humidity to vmr as needed;
    ! Convert other incoming molecular amounts from mmr to vmr as needed;
    ! Convert pressures from Pa to hPa;
@@ -221,7 +191,7 @@ subroutine rad_rrtmg_lw(lchnk   ,ncol      ,rrtmg_levs,r_state,       &
    call rrtmg_lw(lchnk  ,ncol ,rrtmg_levs    ,icld    ,                 &
         r_state%pmidmb  ,r_state%pintmb  ,r_state%tlay    ,r_state%tlev    ,tsfc    ,r_state%h2ovmr, &
         r_state%o3vmr   ,r_state%co2vmr  ,r_state%ch4vmr  ,r_state%o2vmr   ,r_state%n2ovmr  ,r_state%cfc11vmr,r_state%cfc12vmr, &
-        r_state%cfc22vmr,r_state%ccl4vmr ,emis    ,inflglw ,iceflglw,liqflglw, &
+        r_state%cfc22vmr,r_state%ccl4vmr ,emis    ,&
         cld_stolw,tauc_stolw,cicewp_stolw,cliqwp_stolw ,rei, rel, &
         taua_lw, &
         uflx    ,dflx    ,hr      ,uflxc   ,dflxc   ,hrc, &

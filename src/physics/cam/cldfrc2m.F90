@@ -30,7 +30,7 @@ public ::           &
 ! Namelist variables
 real(r8) :: cldfrc2m_rhmini            ! Minimum rh for ice cloud fraction > 0.
 real(r8) :: cldfrc2m_rhmaxi
-
+logical  :: cldfrc2m_do_subgrid_growth = .false.
 ! -------------------------- !
 ! Parameters for Ice Stratus !
 ! -------------------------- !
@@ -67,7 +67,7 @@ subroutine cldfrc2m_readnl(nlfile)
 
    use namelist_utils,  only: find_group_name
    use units,           only: getunit, freeunit
-   use mpishorthand
+   use spmd_utils,      only: mpicom, masterprocid, mpi_logical, mpi_real8
 
    character(len=*), intent(in) :: nlfile  ! filepath for file containing namelist input
 
@@ -75,7 +75,7 @@ subroutine cldfrc2m_readnl(nlfile)
    integer :: unitn, ierr
    character(len=*), parameter :: subname = 'cldfrc2m_readnl'
 
-   namelist /cldfrc2m_nl/ cldfrc2m_rhmini, cldfrc2m_rhmaxi
+   namelist /cldfrc2m_nl/ cldfrc2m_rhmini, cldfrc2m_rhmaxi, cldfrc2m_do_subgrid_growth
    !-----------------------------------------------------------------------------
 
    if (masterproc) then
@@ -97,11 +97,10 @@ subroutine cldfrc2m_readnl(nlfile)
 
    end if
 
-#ifdef SPMD
    ! Broadcast namelist variables
-   call mpibcast(rhmini_const,      1, mpir8,  0, mpicom)
-   call mpibcast(rhmaxi_const,      1, mpir8,  0, mpicom)
-#endif
+   call mpi_bcast(rhmini_const,               1, mpi_real8,  masterprocid, mpicom, ierr)
+   call mpi_bcast(rhmaxi_const,               1, mpi_real8,  masterprocid, mpicom, ierr)
+   call mpi_bcast(cldfrc2m_do_subgrid_growth, 1, mpi_logical,masterprocid, mpicom, ierr)
 
 end subroutine cldfrc2m_readnl
 
@@ -117,15 +116,16 @@ subroutine cldfrc2m_init()
 
    if( masterproc ) then
       write(iulog,*) 'cldfrc2m parameters:'
-      write(iulog,*) '  rhminl          = ', rhminl_const
-      write(iulog,*) '  rhminl_adj_land = ', rhminl_adj_land_const
-      write(iulog,*) '  rhminh          = ', rhminh_const
-      write(iulog,*) '  premit          = ', premit
-      write(iulog,*) '  premib          = ', premib
-      write(iulog,*) '  iceopt          = ', iceopt
-      write(iulog,*) '  icecrit         = ', icecrit
-      write(iulog,*) '  rhmini          = ', rhmini_const
-      write(iulog,*) '  rhmaxi          = ', rhmaxi_const
+      write(iulog,*) '  rhminl            = ', rhminl_const
+      write(iulog,*) '  rhminl_adj_land   = ', rhminl_adj_land_const
+      write(iulog,*) '  rhminh            = ', rhminh_const
+      write(iulog,*) '  premit            = ', premit
+      write(iulog,*) '  premib            = ', premib
+      write(iulog,*) '  iceopt            = ', iceopt
+      write(iulog,*) '  icecrit           = ', icecrit
+      write(iulog,*) '  rhmini            = ', rhmini_const
+      write(iulog,*) '  rhmaxi            = ', rhmaxi_const
+      write(iulog,*) '  do_subgrid_growth = ', cldfrc2m_do_subgrid_growth
    end if
 
 end subroutine cldfrc2m_init
@@ -692,7 +692,8 @@ end subroutine astG_RHU
 !================================================================================================
 
 subroutine aist_single(qv, T, p, qi, landfrac, snowh, aist, &
-                       rhmaxi_in, rhmini_in, rhminl_in, rhminl_adj_land_in, rhminh_in)
+                       rhmaxi_in, rhmini_in, rhminl_in, rhminl_adj_land_in, rhminh_in, &
+                       qsatfac_out)
 
    ! --------------------------------------------------------- !
    ! Compute non-physical ice stratus fraction                 ! 
@@ -712,6 +713,7 @@ subroutine aist_single(qv, T, p, qi, landfrac, snowh, aist, &
    real(r8), optional, intent(in)  :: rhminl_in          ! Critical relative humidity for low-level  liquid stratus
    real(r8), optional, intent(in)  :: rhminl_adj_land_in ! Adjustment drop of rhminl over the land
    real(r8), optional, intent(in)  :: rhminh_in          ! Critical relative humidity for high-level liquid stratus
+   real(r8), optional, intent(out) :: qsatfac_out        ! Subgrid scaling factor for qsat
 
    ! Local variables
    real(r8) rhmin                           ! Critical RH
@@ -772,6 +774,8 @@ subroutine aist_single(qv, T, p, qi, landfrac, snowh, aist, &
    if (present(rhminl_adj_land_in)) rhminl_adj_land = rhminl_adj_land_in
    rhminh = rhminh_const
    if (present(rhminh_in)) rhminh = rhminh_in
+   if (present(qsatfac_out)) qsatfac_out = 1.0_r8
+
 
    ! ---------------- !
    ! Main computation !
@@ -831,6 +835,14 @@ subroutine aist_single(qv, T, p, qi, landfrac, snowh, aist, &
         rhdif= (rhi-rhmini) / (rhmaxi - rhmini)
         aist = min(1.0_r8, max(rhdif,0._r8)**2)
 
+        ! Similar to alpha in Wilson & Ballard (1999), determine a
+        ! scaling factor for saturation vapor pressure that reflects
+        ! the cloud fraction, rhmini, and rhmaxi.
+        !
+        ! NOTE: Limit qsatfac so that adjusted RHliq would be 1. or less.
+        if (present(qsatfac_out) .and. cldfrc2m_do_subgrid_growth) then
+           qsatfac_out = max(min(qv / qs, 1._r8), (1._r8 - aist) * rhmini + aist * rhmaxi)
+        end if 
 
         ! limiter to remove empty cloud and ice with no cloud
         ! and set icecld fraction to mincld if ice exists
@@ -867,7 +879,8 @@ end subroutine aist_single
 !================================================================================================
 
 subroutine aist_vector(qv_in, T_in, p_in, qi_in, ni_in, landfrac_in, snowh_in, aist_out, ncol, &
-                       rhmaxi_in, rhmini_in, rhminl_in, rhminl_adj_land_in, rhminh_in )
+                       rhmaxi_in, rhmini_in, rhminl_in, rhminl_adj_land_in, rhminh_in, &
+                       qsatfac_out )
 
    ! --------------------------------------------------------- !
    ! Compute non-physical ice stratus fraction                 ! 
@@ -889,6 +902,7 @@ subroutine aist_vector(qv_in, T_in, p_in, qi_in, ni_in, landfrac_in, snowh_in, a
    real(r8), optional, intent(in)  :: rhminl_in(pcols)          ! Critical relative humidity for low-level  liquid stratus
    real(r8), optional, intent(in)  :: rhminl_adj_land_in(pcols) ! Adjustment drop of rhminl over the land
    real(r8), optional, intent(in)  :: rhminh_in(pcols)          ! Critical relative humidity for high-level liquid stratus
+   real(r8), optional, intent(out) :: qsatfac_out(pcols)        ! Subgrid scaling factor for qsat
 
    ! Local variables
 
@@ -963,6 +977,8 @@ subroutine aist_vector(qv_in, T_in, p_in, qi_in, ni_in, landfrac_in, snowh_in, a
      rhminl          = rhminl_const
      rhminl_adj_land = rhminl_adj_land_const
      rhminh          = rhminh_const
+
+     if (present(qsatfac_out)) qsatfac_out = 1.0_r8
 
    ! ---------------- !
    ! Main computation !
@@ -1064,6 +1080,14 @@ subroutine aist_vector(qv_in, T_in, p_in, qi_in, ni_in, landfrac_in, snowh_in, a
 
      if (iceopt.eq.5 .or. iceopt.eq.6) then
 
+        ! Similar to alpha in Wilson & Ballard (1999), determine a
+        ! scaling factor for saturation vapor pressure that reflects
+        ! the cloud fraction, rhmini, and rhmaxi.
+        !
+        ! NOTE: Limit qsatfac so that adjusted RHliq would be 1. or less.
+        if (present(qsatfac_out) .and. cldfrc2m_do_subgrid_growth) then
+           qsatfac_out(i) = max(min(qv / qs, 1._r8), (1._r8 - aist) * rhmini + aist * rhmaxi)
+        end if
 
         ! limiter to remove empty cloud and ice with no cloud
         ! and set icecld fraction to mincld if ice exists

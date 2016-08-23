@@ -107,19 +107,21 @@ end function microp_driver_implements_cnst
 
 !===============================================================================
 
-subroutine microp_driver_init_cnst(name, q, gcid)
+subroutine microp_driver_init_cnst(name, latvals, lonvals, mask, q)
 
    ! Initialize the microphysics constituents, if they are
    ! not read from the initial file.
 
-   character(len=*), intent(in)  :: name     ! constituent name
-   real(r8),         intent(out) :: q(:,:)   ! mass mixing ratio (gcol, plev)
-   integer,          intent(in)  :: gcid(:)  ! global column id
+   character(len=*), intent(in)  :: name       ! constituent name
+   real(r8),         intent(in)  :: latvals(:) ! lat in degrees (ncol)
+   real(r8),         intent(in)  :: lonvals(:) ! lon in degrees (ncol)
+   logical,          intent(in)  :: mask(:)    ! Only initialize where .true.
+   real(r8),         intent(out) :: q(:,:)     ! kg tracer/kg dry air (gcol, plev
    !-----------------------------------------------------------------------
 
    select case (microp_scheme)
    case ('MG')
-      call micro_mg_cam_init_cnst(name, q, gcid)
+      call micro_mg_cam_init_cnst(name, latvals, lonvals, mask, q)
    case ('RK')
       ! microp_driver doesn't handle this one
       continue

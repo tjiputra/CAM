@@ -14,25 +14,25 @@
 
       save
 
-      integer, parameter :: phtcnt = 136, & ! number of photolysis reactions
-                            rxntot = 535, & ! number of total reactions
-                            gascnt = 399, & ! number of gas phase reactions
+      integer, parameter :: phtcnt = 134, & ! number of photolysis reactions
+                            rxntot = 507, & ! number of total reactions
+                            gascnt = 373, & ! number of gas phase reactions
                             nabscol = 2, & ! number of absorbing column densities
-                            gas_pcnst = 244, & ! number of "gas phase" species
+                            gas_pcnst = 237, & ! number of "gas phase" species
                             nfs = 3, & ! number of "fixed" species
                             relcnt = 0, & ! number of relationship species
                             grpcnt = 0, & ! number of group members
-                            nzcnt = 2067, & ! number of non-zero matrix entries
+                            nzcnt = 1912, & ! number of non-zero matrix entries
                             extcnt = 16, & ! number of species with external forcing
                             clscnt1 = 24, & ! number of species in explicit class
                             clscnt2 = 0, & ! number of species in hov class
                             clscnt3 = 0, & ! number of species in ebi class
-                            clscnt4 = 220, & ! number of species in implicit class
+                            clscnt4 = 213, & ! number of species in implicit class
                             clscnt5 = 0, & ! number of species in rodas class
                             indexm = 1, & ! index of total atm density in invariant array
                             indexh2o = 0, & ! index of water vapor density
                             clsze = 1, & ! loop length for implicit chemistry
-                            rxt_tag_cnt = 514, &
+                            rxt_tag_cnt = 491, &
                             enthalpy_cnt = 0, &
                             nslvd = 0
 

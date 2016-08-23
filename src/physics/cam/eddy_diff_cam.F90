@@ -319,7 +319,7 @@ end subroutine eddy_diff_init
 
 subroutine eddy_diff_tend(state, pbuf, cam_in, &
      ztodt, p, tint, rhoi, cldn, wstarent, &
-     kvm_in, kvh_in, ksrftms, tauresx, tauresy, &
+     kvm_in, kvh_in, ksrftms, dragblj,tauresx, tauresy, &
      rrho, ustar, pblh, kvm, kvh, kvq, cgh, cgs, tpert, qpert, &
      tke, sprod, sfi, turbtype, sm_aw)
 
@@ -339,6 +339,7 @@ subroutine eddy_diff_tend(state, pbuf, cam_in, &
   real(r8), intent(in) :: kvm_in(pcols,pver+1)
   real(r8), intent(in) :: kvh_in(pcols,pver+1)
   real(r8), intent(in) :: ksrftms(pcols)
+  real(r8), intent(in) :: dragblj(pcols,pver)       ! Drag profile from Beljaars SGO form drag [ 1/s ]
   real(r8), intent(inout) :: tauresx(pcols)
   real(r8), intent(inout) :: tauresy(pcols)
   real(r8), intent(out) :: rrho(pcols)
@@ -369,7 +370,7 @@ subroutine eddy_diff_tend(state, pbuf, cam_in, &
        kvh      , kvq         , cgh        ,                                         &
        cgs      , tpert       , qpert      , tke            ,                        &
        sprod    , sfi         ,                                                      &
-       tauresx  , tauresy     , ksrftms    , turbtype   , sm_aw )
+       tauresx  , tauresy     , ksrftms    , dragblj , turbtype   , sm_aw )
 
   ! The diffusivities from diag_TKE can be much larger than from HB in the free
   ! troposphere and upper atmosphere. These seem to be larger than observations,
@@ -415,7 +416,7 @@ subroutine compute_eddy_diff( pbuf, lchnk  ,                                    
                               ustar  , pblh   , kvm_in   , kvh_in  , kvm_out  , kvh_out , kvq   , &
                               cgh    , cgs    , tpert    , qpert   , tke     ,                    &
                               sprod  , sfi    ,                                                   &
-                              tauresx, tauresy, ksrftms  , turbtype, sm_aw )
+                              tauresx, tauresy, ksrftms, dragblj, turbtype, sm_aw )
 
   !-------------------------------------------------------------------- !
   ! Purpose: Interface to compute eddy diffusivities.                   !
@@ -469,6 +470,7 @@ subroutine compute_eddy_diff( pbuf, lchnk  ,                                    
   real(r8), intent(in)    :: kvm_in(pcols,pver+1)      ! kvm saved from last timestep [ m2/s ]
   real(r8), intent(in)    :: kvh_in(pcols,pver+1)      ! kvh saved from last timestep [ m2/s ]
   real(r8), intent(in)    :: ksrftms(pcols)            ! Surface drag coefficient of turbulent mountain stress [ unit ? ]
+  real(r8), intent(in)    :: dragblj(pcols,pver)       ! Drag profile from Beljaars SGO form drag [ 1/s ]
 
   ! ---------------- !
   ! Output Variables !
@@ -672,7 +674,7 @@ subroutine compute_eddy_diff( pbuf, lchnk  ,                                    
      ! I am using updated wind, here.
 
      ! Compute ustar
-     call calc_ustar( tfd(:ncol,pver), pmid(:ncol,pver), &
+     call calc_ustar( ncol, tfd(:ncol,pver), pmid(:ncol,pver), &
                       taux(:ncol) - ksrftms(:ncol) * ufd(:ncol,pver), & ! Zonal wind stress
                       tauy(:ncol) - ksrftms(:ncol) * vfd(:ncol,pver), & ! Meridional wind stress
                       rrho(:ncol), ustar(:ncol))
@@ -799,7 +801,8 @@ subroutine compute_eddy_diff( pbuf, lchnk  ,                                    
                             p        , t        , rhoi, ztodt        , taux      , &
                             tauy    , shflx    , qflx     , &
                             kvh_out , kvm_out  , kvh_out  , cgs          , cgh       , &
-                            zi      , ksrftms  , zero     , fieldlist_wet, fieldlist_molec, &
+                            zi      , ksrftms  , dragblj  , & 
+                            zero    , fieldlist_wet, fieldlist_molec, &
                             ufd     , vfd      , qtfd     , slfd         ,             &
                             jnk1d   , jnk1d    , jnk2d    , jnk1d        , errstring , &
                             tauresx , tauresy  , 0        , cpairv(:,:,lchnk), zero, &

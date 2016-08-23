@@ -40,83 +40,97 @@ module dyn_comp
 !   AM  07.10.31:  Supports overlap of trac2d and cd_core subcycles
 !----------------------------------------------------------------------
 
-use shr_kind_mod,           only: r8=>shr_kind_r8
-use spmd_utils,             only: npes, masterproc
-use dynamics_vars,          only: T_FVDYCORE_GRID,            &
-                                  T_FVDYCORE_STATE, T_FVDYCORE_CONSTANTS
+use shr_kind_mod,       only: r8=>shr_kind_r8
+use spmd_utils,         only: masterproc, iam
+use pmgrid,             only: plon, plat, plev
+use constituents,       only: cnst_name, cnst_read_iv, qmin
 
-use fv_control_mod,         only: nsplit, nspltrac, nspltvrm, iord, jord, kord, &
-                                  dyn_conservative, filtcw, ct_overlap, trac_decomp, &
-                                  fft_flt, div24del2flag, del2coef
+use time_manager,       only: get_step_size
 
-#if defined(SPMD)
-use mpishorthand,           only: mpicom, mpir8
-use spmd_dyn,               only: spmd_readnl, spmdinit_dyn
-#endif
+use dynamics_vars,      only: t_fvdycore_grid,            &
+                              t_fvdycore_state, t_fvdycore_constants
+use dyn_internal_state, only: get_dyn_state, get_dyn_state_grid
 
-use perf_mod
-use cam_logfile,            only: iulog
-use cam_abortutils,         only: endrun
-use hycoef,                 only: hycoef_init, hyai, hybi
-use pio,                    only: file_desc_t
+use dyn_grid,           only: get_block_gcol_d, get_horiz_grid_dim_d
+use spmd_dyn,           only: spmd_readnl
+
+use cam_control_mod,    only: initial_run, ideal_phys, aqua_planet, moist_physics
+
+use cam_initfiles,      only: initial_file_get_id, topo_file_get_id, pertlim
+use cam_pio_utils,      only: clean_iodesc_list
+use cam_history_support,only: fillvalue
+use ncdio_atm,          only: infld
+use pio,                only: file_desc_t, pio_inq_varid, pio_get_att
+
+
+use perf_mod,           only: t_startf, t_stopf, t_barrierf
+use cam_logfile,        only: iulog
+use cam_abortutils,     only: endrun
+
+use pio,                only: file_desc_t
 
 implicit none
 private
 save
 
-public :: dyn_readnl, dyn_init, dyn_run, dyn_final
-public :: dyn_import_t, dyn_export_t, dyn_state
+public :: &
+   dyn_readnl,   &
+   dyn_register, &
+   dyn_init,     &
+   dyn_run,      &
+   dyn_final,    &
+   dyn_import_t, &
+   dyn_export_t, &
+   dyn_state,    &
+   frontgf_idx,  &
+   frontga_idx,  &
+   uzm_idx
 
-type (T_FVDYCORE_STATE), target :: dyn_state
+type (t_fvdycore_state), target :: dyn_state
 
 type dyn_import_t
-     real(r8), dimension(:,: ),    pointer     :: phis   ! Surface geopotential
-     real(r8), dimension(:,: ),    pointer     :: ps     ! Surface pressure
-     real(r8), dimension(:,:,:  ), pointer     :: u3s    ! U-winds (staggered)
-     real(r8), dimension(:,:,:  ), pointer     :: v3s    ! V-winds (staggered)
-     real(r8), dimension(:,:,:  ), pointer     :: pe     ! Pressure
-     real(r8), dimension(:,:,:  ), pointer     :: pt     ! Potential temperature
-     real(r8), dimension(:,:,:  ), pointer     :: t3     ! Temperatures
-     real(r8), dimension(:,:,:  ), pointer     :: pk     ! Pressure to the kappa
-     real(r8), dimension(:,:,:  ), pointer     :: pkz    ! Pressure to the kappa offset
-     real(r8), dimension(:,:,:  ), pointer     :: delp   ! Delta pressure
-     real(r8), dimension(:,:,:,:), pointer     :: tracer ! Tracers
+     real(r8), dimension(:,: ),    pointer :: phis   ! Surface geopotential
+     real(r8), dimension(:,: ),    pointer :: ps     ! Surface pressure
+     real(r8), dimension(:,:,:),   pointer :: u3s    ! U-winds (staggered)
+     real(r8), dimension(:,:,:),   pointer :: v3s    ! V-winds (staggered)
+     real(r8), dimension(:,:,:),   pointer :: pe     ! Pressure
+     real(r8), dimension(:,:,:),   pointer :: pt     ! Potential temperature
+     real(r8), dimension(:,:,:),   pointer :: t3     ! Temperatures
+     real(r8), dimension(:,:,:),   pointer :: pk     ! Pressure to the kappa
+     real(r8), dimension(:,:,:),   pointer :: pkz    ! Pressure to the kappa offset
+     real(r8), dimension(:,:,:),   pointer :: delp   ! Delta pressure
+     real(r8), dimension(:,:,:,:), pointer :: tracer ! Tracers
 end type dyn_import_t
 
 type dyn_export_t
-     real(r8), dimension(:,: ),    pointer     :: phis   ! Surface geopotential
-     real(r8), dimension(:,: ),    pointer     :: ps     ! Surface pressure
-     real(r8), dimension(:,:,:  ), pointer     :: u3s    ! U-winds (staggered)
-     real(r8), dimension(:,:,:  ), pointer     :: v3s    ! V-winds (staggered)
-     real(r8), dimension(:,:,:  ), pointer     :: pe     ! Pressure
-     real(r8), dimension(:,:,:  ), pointer     :: pt     ! Potential temperature
-     real(r8), dimension(:,:,:  ), pointer     :: t3     ! Temperatures
-     real(r8), dimension(:,:,:  ), pointer     :: pk     ! Pressure to the kappa
-     real(r8), dimension(:,:,:  ), pointer     :: pkz    ! Pressure to the kappa offset
-     real(r8), dimension(:,:,:  ), pointer     :: delp   ! Delta pressure
-     real(r8), dimension(:,:,:,:), pointer     :: tracer ! Tracers
-     real(r8), dimension(:,:,:  ), pointer     :: peln   !
-     real(r8), dimension(:,:,:  ), pointer     :: omga   ! Vertical velocity
-     real(r8), dimension(:,:,:  ), pointer     :: mfx    ! Mass flux in X
-     real(r8), dimension(:,:,:  ), pointer     :: mfy    ! Mass flux in Y
+     real(r8), dimension(:,: ),    pointer :: phis   ! Surface geopotential
+     real(r8), dimension(:,: ),    pointer :: ps     ! Surface pressure
+     real(r8), dimension(:,:,:),   pointer :: u3s    ! U-winds (staggered)
+     real(r8), dimension(:,:,:),   pointer :: v3s    ! V-winds (staggered)
+     real(r8), dimension(:,:,:),   pointer :: pe     ! Pressure
+     real(r8), dimension(:,:,:),   pointer :: pt     ! Potential temperature
+     real(r8), dimension(:,:,:),   pointer :: t3     ! Temperatures
+     real(r8), dimension(:,:,:),   pointer :: pk     ! Pressure to the kappa
+     real(r8), dimension(:,:,:),   pointer :: pkz    ! Pressure to the kappa offset
+     real(r8), dimension(:,:,:),   pointer :: delp   ! Delta pressure
+     real(r8), dimension(:,:,:,:), pointer :: tracer ! Tracers
+     real(r8), dimension(:,:,:),   pointer :: peln   !
+     real(r8), dimension(:,:,:),   pointer :: omga   ! Vertical velocity
+     real(r8), dimension(:,:,:),   pointer :: mfx    ! Mass flux in X
+     real(r8), dimension(:,:,:),   pointer :: mfy    ! Mass flux in Y
 end type dyn_export_t
 
 ! The FV core is always called in its "full physics" mode.  We don't want
 ! the dycore to know what physics package is responsible for the forcing.
 logical, parameter         :: convt = .true.
 
-real(r8), parameter        :: ZERO                 = 0.0_r8
-real(r8), parameter        :: HALF                 = 0.5_r8
-real(r8), parameter        :: THREE_QUARTERS       = 0.75_r8
-real(r8), parameter        :: ONE                  = 1.0_r8
-real(r8), parameter        :: SECS_IN_SIX_HOURS    = 21600.0_r8
+! Indices for fields that are computed in the dynamics and passed to the physics
+! via the physics buffer
+integer, protected :: frontgf_idx  = -1
+integer, protected :: frontga_idx  = -1
+integer, protected :: uzm_idx = -1
 
-! Frontogenesis indices
-integer, public :: frontgf_idx = -1
-integer, public :: frontga_idx = -1
-
-! Index into physics buffer for zonal mean zonal wind.
-integer, public :: uzm_idx = -1
+logical :: readvar            ! inquiry flag:  true => variable exists on netCDF file
 
 !=============================================================================================
 CONTAINS
@@ -145,18 +159,24 @@ subroutine dyn_readnl(nlfilename)
    integer :: fv_iord        = 4       ! scheme to be used in E-W direction
    integer :: fv_jord        = 4       ! scheme to be used in N-S direction
    integer :: fv_kord        = 4       ! scheme to be used for vertical mapping
+                                       ! _ord = 1: first order upwind
+                                       ! _ord = 2: 2nd order van Leer (Lin et al 1994)
+                                       ! _ord = 3: standard PPM 
+                                       ! _ord = 4: enhanced PPM (default)
    logical :: fv_conserve    = .false. ! Flag indicating whether the dynamics is conservative
    integer :: fv_filtcw      = 0       ! flag for filtering c-grid winds
-   integer :: fv_ct_overlap  = 0       ! nonzero for overlap of cd_core and trac2d, 0 otherwise
-   integer :: fv_trac_decomp = 1       ! size of tracer domain decomposition for trac2d
    integer :: fv_fft_flt     = 1       ! 0 => FFT/algebraic filter; 1 => FFT filter
    integer :: fv_div24del2flag = 2     ! 2 for 2nd order div damping, 4 for 4th order div damping,
                                        ! 42 for 4th order div damping plus 2nd order velocity damping
    real(r8):: fv_del2coef    = 3.e5_r8 ! strength of 2nd order velocity damping
 
    namelist /dyn_fv_inparm/ fv_nsplit, fv_nspltrac, fv_nspltvrm, fv_iord, fv_jord,   &
-                            fv_kord, fv_conserve, fv_filtcw, fv_ct_overlap, fv_trac_decomp, &
-                            fv_fft_flt, fv_div24del2flag, fv_del2coef
+                            fv_kord, fv_conserve, fv_filtcw, fv_fft_flt, &
+                            fv_div24del2flag, fv_del2coef
+
+   type(t_fvdycore_state), pointer :: dyn_state
+
+   real(r8) :: dt
    !-----------------------------------------------------------------------------
 
    if (masterproc) then
@@ -203,12 +223,6 @@ subroutine dyn_readnl(nlfilename)
    call mpi_bcast(fv_filtcw, 1, mpi_integer, mstrid, mpicom, ierr)
    if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: fv_filtcw")
 
-   call mpi_bcast(fv_ct_overlap, 1, mpi_integer, mstrid, mpicom, ierr)
-   if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: fv_ct_overlap")
-
-   call mpi_bcast(fv_trac_decomp, 1, mpi_integer, mstrid, mpicom, ierr)
-   if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: fv_trac_decomp")
-
    call mpi_bcast(fv_fft_flt, 1, mpi_integer, mstrid, mpicom, ierr)
    if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: fv_fft_flt")
 
@@ -218,543 +232,78 @@ subroutine dyn_readnl(nlfilename)
    call mpi_bcast(fv_del2coef, 1, mpi_real8, mstrid, mpicom, ierr)
    if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: fv_del2coef")
 
-   nsplit           = fv_nsplit
-   nspltrac         = fv_nspltrac
-   nspltvrm         = fv_nspltvrm
-   iord             = fv_iord
-   jord             = fv_jord
-   kord             = fv_kord
-   dyn_conservative = fv_conserve
-   filtcw           = fv_filtcw
-   ct_overlap       = fv_ct_overlap
-   trac_decomp      = fv_trac_decomp
-   fft_flt          = fv_fft_flt
-   div24del2flag    = fv_div24del2flag
-   del2coef         = fv_del2coef
+   ! Store namelist settings in fv state object
+   dyn_state => get_dyn_state()
 
-#if defined(SPMD)
+   ! Calculate nsplit if it was specified as 0
+   if ( fv_nsplit <= 0 ) then
+      dt = get_step_size()
+      dyn_state%nsplit= init_nsplit(dt, plon, plat)
+   else
+      dyn_state%nsplit= fv_nsplit
+   end if
+
+   ! Calculate nspltrac if it was specified as 0
+   if (fv_nspltrac <= 0) then
+      dyn_state%nspltrac = max (1, dyn_state%nsplit/4)
+   else
+      dyn_state%nspltrac = fv_nspltrac
+   end if
+
+   ! Set nspltvrm to 1 if it was specified as 0
+   if (fv_nspltvrm <= 0) then
+      dyn_state%nspltvrm = 1
+   else
+      dyn_state%nspltvrm = fv_nspltvrm
+   end if
+
+   dyn_state%iord = fv_iord
+   dyn_state%jord = fv_jord
+   dyn_state%kord = fv_kord
+
+   ! Calculation of orders for the C grid is fixed by D-grid IORD, JORD
+   if( fv_iord <= 2 ) then
+      dyn_state%icd =  1
+   else
+      dyn_state%icd = -2
+   end if
+
+   if( fv_jord <= 2 ) then
+      dyn_state%jcd =  1
+   else
+      dyn_state%jcd =  -2
+   end if
+
+   dyn_state%consv         = fv_conserve
+   dyn_state%filtcw        = fv_filtcw
+   dyn_state%fft_flt       = fv_fft_flt
+   dyn_state%div24del2flag = fv_div24del2flag
+   dyn_state%del2coef      = fv_del2coef
+
+   if (masterproc) then
+      write(iulog,*)'FV dycore configuration:'
+      write(iulog,*)'  Lagrangian time splits (fv_nsplit)                = ', fv_nsplit
+      write(iulog,*)'  Tracer time splits (fv_nslptrac)                  = ', fv_nspltrac
+      write(iulog,*)'  Vertical re-mapping time splits (fv_nspltvrm)     = ', fv_nspltvrm
+      write(iulog,*)'  Scheme in E-W direction (fv_iord)                 = ', fv_iord
+      write(iulog,*)'  Scheme in N-S direction (fv_jord)                 = ', fv_jord
+      write(iulog,*)'  Scheme for vertical mapping (fv_kord)             = ', fv_kord
+      write(iulog,*)'  Conservative dynamics (fv_conserve)               = ', fv_conserve
+      write(iulog,*)'  Filtering c-grid winds (fv_filcw)                 = ', fv_filtcw
+      write(iulog,*)'  FFT filter (fv_fft_flt)                           = ', fv_fft_flt
+      write(iulog,*)'  Divergence/velocity damping (fv_div24del2flag)    = ', fv_div24del2flag
+      write(iulog,*)'  Coef for 2nd order velocity damping (fv_del2coef) = ', fv_del2coef
+   end if
+
    call spmd_readnl(nlfilename)
-#endif
 
    call ctem_readnl(nlfilename)
 
-end subroutine dyn_readnl
-
-!=============================================================================================
-
-subroutine dyn_init(file, dyn_state, dyn_in, dyn_out)
-
-   ! DESCRIPTION: Initialize the FV dynamical core
-   !
-   ! REVISION HISTORY:
-   !   05.06.18   Sawyer  Creation
-   !   06.03.03   Sawyer  Added dyn_state as argument (for reentrancy)
-   !   06.05.09   Sawyer  Added dyn_conservative to conserve total energy
-   !==================================================================================
-
-   use constituents,  only : pcnst
-   use pmgrid,        only : plon, plat, plev, plevp,                         &
-                                    beglonxy, endlonxy, beglatxy, endlatxy,   &
-                                    beglat,   endlat,   beglev,   endlev,     &
-                                    npr_y, npr_z, nprxy_x, nprxy_y,           &
-                                    twod_decomp
-   use time_manager,  only : get_step_size
-   use dynamics_vars, only : dynamics_init
-   use dycore,        only : get_resolution
-   use dyn_grid,      only : define_cam_grids, initgrid
-#if ( defined OFFLINE_DYN )
-   use metdata, only:  metdata_dyn_init
-#endif
-#if defined(SPMD)
-   use parutilitiesmodule, only : gid, parcollective, maxop
-   use spmd_dyn, only : geopkdist, geopkblocks, geopk16byte,                 &
-                        npes_xy, npes_yz, mpicom_xy, mpicom_yz, mpicom_nyz,  &
-                        modcomm_transpose, modcomm_geopk, modcomm_gatscat,   &
-                        modc_sw_dynrun, modc_hs_dynrun,                      &
-                        modc_send_dynrun, modc_mxreq_dynrun,                 &
-                        modc_sw_cdcore, modc_hs_cdcore,                      &
-                        modc_send_cdcore, modc_mxreq_cdcore,                 &
-                        modc_sw_gather, modc_hs_gather,                      &
-                        modc_send_gather, modc_mxreq_gather,                 &
-                        modc_sw_scatter, modc_hs_scatter,                    &
-                        modc_send_scatter, modc_mxreq_scatter,               &
-                        modc_sw_tracer, modc_hs_tracer,                      &
-                        modc_send_tracer, modc_mxreq_tracer,                 &
-                        modc_onetwo, modc_tracers
-#endif
-   use ctem,            only : ctem_init
-   use physconst,       only : omega,             & 
-                               rearth,            &
-                               rair,              &
-                               cpair,             &
-                               zvir,              &
-                               pi
-   use phys_control,    only : use_gw_front, use_gw_front_igw
-   use qbo,             only : qbo_use_forcing
-   use physics_buffer,  only : pbuf_add_field, dtype_r8
-   use ppgrid,          only : pcols, pver
-
-   ! ARGUMENTS:
-   type(file_desc_t),       intent(in)  :: file       ! PIO file handle for initial or restart file
-   type (T_FVDYCORE_STATE), target      :: dyn_state
-   type (dyn_import_t),     intent(OUT) :: dyn_in
-   type (dyn_export_t),     intent(OUT) :: dyn_out
-
-   ! Local variables
-
-   real(r8), parameter ::  D0_0                  =   0.0_r8
-   real(r8), parameter ::  D1E5                  =   1.0e5_r8
-
-   type (T_FVDYCORE_GRID)      , pointer :: GRID      ! For convenience
-   type (T_FVDYCORE_CONSTANTS) , pointer :: CONSTANTS ! For convenience
-   integer              :: unit
-
-#if defined(SPMD)
-   integer :: tmp(npes)
-#endif
-   integer, allocatable :: jmyz(:),kmyz(:),imxy(:),jmxy(:) ! used for nonblocking receive
-
-   integer :: nstep, nymd, nhms
-   integer :: yr, mm, dd, h, m, s, itmp
-   integer :: INT_PACK(6)
-
-   integer             :: k
-   integer             :: TE_METHOD = 0
-   integer             :: NTOTQ                !  Method for total energy remapping
-   integer             :: NQ                   !  No. advected tracers
-   integer             :: IFIRSTXY             !  No. total tracers
-   integer             :: ILASTXY
-   integer             :: JFIRSTXY
-   integer             :: JLASTXY
-   integer             :: JFIRST
-   integer             :: JLAST
-   integer             :: KFIRST
-   integer             :: KLAST
-   integer             :: im, jm, km
-   real(r8)            :: dt
-   real(r8)            :: cp       ! heat capacity of air at constant pressure
-   real(r8)            :: ae       ! radius of the earth (m)
-   real(r8), allocatable :: ak(:), bk(:)     !  Vertical coordinates
-   integer             :: ks               !  True # press. levs
-
-#if !defined( SPMD )
-   integer :: npes_xy=1
-   integer :: npes_yz=1
-   integer :: mpicom=0
-   integer :: mpicom_xy=0
-   integer :: mpicom_yz=0
-   integer :: mpicom_nyz=0
-#endif
-
-   !----------------------------------------------------------------------
-
-   if (use_gw_front .or. use_gw_front_igw) then
-      call pbuf_add_field("FRONTGF", "global", dtype_r8, (/pcols,pver/), &
-         frontgf_idx)
-      call pbuf_add_field("FRONTGA", "global", dtype_r8, (/pcols,pver/), &
-         frontga_idx)
-   end if
-
-   if (qbo_use_forcing) then
-      call pbuf_add_field("UZM", "global", dtype_r8, (/pcols,pver/), &
-         uzm_idx)
-   end if
-
-   ! Initialize hybrid coordinate arrays
-   call hycoef_init(file)
-
-   allocate( ak(plev+1) )
-   allocate( bk(plev+1) )
-   do k = 1, plev+1
-      ak(k) = hyai(k) * D1E5
-      bk(k) = hybi(k)
-      if( bk(k) == D0_0 ) ks = k-1
-   end do
-
-   ! Get the layout and store directly in the GRID data structure
-
-   GRID => DYN_STATE%GRID     ! For convenience
-   CONSTANTS => DYN_STATE%CONSTANTS
-
-   dt = get_step_size()
-
-#if defined(SPMD)
-   call spmdinit_dyn()
-#endif
-
-   IFIRSTXY = beglonxy
-   ILASTXY  = endlonxy
-   JFIRSTXY = beglatxy
-   JLASTXY  = endlatxy
-   JFIRST   = beglat
-   JLAST    = endlat
-   KFIRST   = beglev
-   KLAST    = endlev
-   NTOTQ  = pcnst
-   NQ     = pcnst
-   IM     = plon
-   JM     = plat
-   KM     = plev
-   cp     = cpair
-   ae     = rearth
-
-   ! Set constants
-   constants%pi    = pi
-   constants%omega = omega
-   constants%ae    = ae
-   constants%rair  = rair
-   constants%cp    = cp
-   constants%cappa = rair/cpair
-   constants%zvir  = zvir
-
-   allocate (jmyz(npr_y))
-   allocate (kmyz(npr_z))
-   allocate (imxy(nprxy_x))
-   allocate (jmxy(nprxy_y))
-
-
-   ! SPMD-related stuff
-#if defined(SPMD)
-   grid%twod_decomp = twod_decomp
-   grid%geopkdist= geopkdist
-   grid%geopk16byte = geopk16byte
-   grid%geopkblocks = geopkblocks
-   grid%mod_method = modcomm_transpose
-   grid%mod_geopk  = modcomm_geopk
-   grid%mod_gatscat  = modcomm_gatscat
-
-   grid%modc_dynrun(1)   = modc_sw_dynrun
-   if (modc_hs_dynrun) then
-      grid%modc_dynrun(2) = 1
-   else
-      grid%modc_dynrun(2) = 0
-   end if
-   if (modc_send_dynrun) then
-      grid%modc_dynrun(3) = 1
-   else
-      grid%modc_dynrun(3) = 0
-   end if
-   grid%modc_dynrun(4) = modc_mxreq_dynrun
-
-   grid%modc_cdcore(1)   = modc_sw_cdcore
-   if (modc_hs_cdcore) then
-      grid%modc_cdcore(2) = 1
-   else
-      grid%modc_cdcore(2) = 0
-   end if
-   if (modc_send_cdcore) then
-      grid%modc_cdcore(3) = 1
-   else
-      grid%modc_cdcore(3) = 0
-   end if
-   grid%modc_cdcore(4) = modc_mxreq_cdcore
-
-   grid%modc_gather(1)   = modc_sw_gather
-   if (modc_hs_gather) then
-      grid%modc_gather(2) = 1
-   else
-      grid%modc_gather(2) = 0
-   end if
-   if (modc_send_gather) then
-      grid%modc_gather(3) = 1
-   else
-      grid%modc_gather(3) = 0
-   end if
-   grid%modc_gather(4) = modc_mxreq_gather
-
-   grid%modc_scatter(1)   = modc_sw_scatter
-   if (modc_hs_scatter) then
-      grid%modc_scatter(2) = 1
-   else
-      grid%modc_scatter(2) = 0
-   end if
-   if (modc_send_scatter) then
-      grid%modc_scatter(3) = 1
-   else
-      grid%modc_scatter(3) = 0
-   end if
-   grid%modc_scatter(4) = modc_mxreq_scatter
-
-   grid%modc_tracer(1)   = modc_sw_tracer
-   if (modc_hs_tracer) then
-      grid%modc_tracer(2) = 1
-   else
-      grid%modc_tracer(2) = 0
-   endif
-   if (modc_send_tracer) then
-      grid%modc_tracer(3) = 1
-   else
-      grid%modc_tracer(3) = 0
-   end if
-   grid%modc_tracer(4) = modc_mxreq_tracer
-
-   grid%modc_onetwo       = modc_onetwo
-   grid%modc_tracers      = modc_tracers
-
-   !  Define imxy, jmxy, jmyz, kmyz from ifirstxy, ilastxy, etc.
-
-   tmp = 0
-   tmp(gid+1) = ilastxy-ifirstxy+1
-   call parcollective( mpicom, maxop, npes, tmp )
-   imxy(1:nprxy_x) = tmp(1:nprxy_x)
-
-   tmp = 0
-   tmp(gid+1) = jlastxy-jfirstxy+1
-   call parcollective( mpicom, maxop, npes, tmp )
-   do k=1,nprxy_y
-      jmxy(k) = tmp((k-1)*nprxy_x+1)
-   end do
-
-   tmp = 0
-   tmp(gid+1)   = jlast-jfirst+1
-   call parcollective( mpicom, maxop, npes, tmp )
-   jmyz(1:npr_y) = tmp(1:npr_y)
-
-   tmp = 0
-   tmp(gid+1)   = klast-kfirst+1
-   call parcollective( mpicom, maxop, npes, tmp )
-   do k=1,npr_z
-      kmyz(k) = tmp((k-1)*npr_y+1)
-   end do
-
-#else
-
-   ! Sensible initializations for serial or OMP-only
-
-   grid%twod_decomp = 0
-   grid%geopkdist   = .false.
-   grid%geopk16byte = .false.
-   grid%geopkblocks = 1
-   grid%mod_method  = 0
-   grid%mod_geopk   = 0
-   grid%mod_gatscat = 0
-
-   grid%modc_dynrun(1)  = 0
-   grid%modc_dynrun(2)  = 1
-   grid%modc_dynrun(3)  = 1
-   grid%modc_dynrun(4)  = -1
-
-   grid%modc_cdcore(1)  = 0
-   grid%modc_cdcore(2)  = 1
-   grid%modc_cdcore(3)  = 1
-   grid%modc_cdcore(4)  = -1
-    
-   grid%modc_gather(1)  = 0
-   grid%modc_gather(2)  = 1
-   grid%modc_gather(3)  = 1
-   grid%modc_gather(4)  = -1
-
-   grid%modc_scatter(1) = 0
-   grid%modc_scatter(2) = 1
-   grid%modc_scatter(3) = 1
-   grid%modc_scatter(4) = -1
-
-   grid%modc_tracer(1)  = 0
-   grid%modc_tracer(2)  = 1
-   grid%modc_tracer(3)  = 1
-   grid%modc_tracer(4)  = -1
-
-   grid%modc_onetwo     = 1
-   grid%modc_tracers    = 0
-
-#endif
-
-   ! These are run-specific variables:  
-   !     DT              Time step
-   !     IORD            Order (mode) of X interpolation (1,..,6)
-   !     JORD            Order (mode) of Y interpolation (1,..,6)
-   !     NSPLIT          Ratio of big to small timestep (set to zero if in doubt)
-   !     NSPLTRAC        Ratio of big to tracer timestep
-   !     NSPLTVRM        Ratio of big to vertical re-mapping timestep
-
-   DYN_STATE%DOTIME    = .TRUE.
-   DYN_STATE%CHECK_DT  = SECS_IN_SIX_HOURS ! Check max and min every 6 hours.
-   DYN_STATE%DT        = DT         ! Should this be part of state??
-   DYN_STATE%NSPLIT    = NSPLIT
-   DYN_STATE%NSPLTRAC  = NSPLTRAC
-   DYN_STATE%NSPLTVRM  = NSPLTVRM
-   DYN_STATE%IORD      = IORD
-   DYN_STATE%JORD      = JORD
-   DYN_STATE%KORD      = KORD
-   DYN_STATE%TE_METHOD = TE_METHOD
-   DYN_STATE%CONSV     = dyn_conservative
-   DYN_STATE%FILTCW    = filtcw
-
-   if (filtcw .gt. 0) then
-      if (masterproc) then
-         write (iulog,*) ' '
-         write (iulog,*) 'Filtering of c-grid winds turned on'
-         write (iulog,*) ' '
-      end if
-   end if
-
-   ! Calculation of orders for the C grid is fixed by D-grid IORD, JORD
-   if( iord <= 2 ) then
-      DYN_STATE%ICD =  1
-   else
-      DYN_STATE%ICD = -2
-   end if
-
-   if( jord <= 2 ) then
-      DYN_STATE%JCD =  1
-   else
-      DYN_STATE%JCD =  -2
-   end if
-
-   ! Calculate NSPLIT if it was specified as 0
-   if ( NSPLIT <= 0 ) DYN_STATE%NSPLIT= INIT_NSPLIT(DYN_STATE%DT,IM,JM)
-
-   ! Calculate NSPLTRAC if it was specified as 0
-   if (NSPLTRAC <= 0) then
-      if (get_resolution() == '0.23x0.31') then
-         DYN_STATE%NSPLTRAC = max ( 1, DYN_STATE%NSPLIT/2 )
-      else
-         DYN_STATE%NSPLTRAC = max ( 1, DYN_STATE%NSPLIT/4 )
-      end if
-   end if
-
-   ! Set NSPLTVRM to 1 if it was specified as 0
-   if (NSPLTVRM <= 0) then
-      DYN_STATE%NSPLTVRM = 1
-   end if
-
-   ! Create the dynamics interface
-
-   call dyn_create_interface(ifirstxy, ilastxy, jfirstxy, jlastxy, &
-                             1, km, ntotq, dyn_in, dyn_out )
-
-   ! Initialize the FVDYCORE variables, which are now all in the GRID
-
-   call dynamics_init(dt, dyn_state%jord, im, jm, km,         &
-                      pi, ae, omega, nq, ntotq, ks,           &
-                      ifirstxy, ilastxy, jfirstxy, jlastxy,   &
-                      jfirst, jlast, kfirst, klast,           &
-                      npes_xy, npes_yz, mpicom, mpicom_xy,    &
-                      mpicom_yz, mpicom_nyz,                  &
-                      nprxy_x, nprxy_y, npr_y, npr_z,         &
-                      imxy,    jmxy,    jmyz,    kmyz,        &
-                      ak,      bk,      unit, grid )
-
-   ! Clear wall clock time clocks and global budgets
-   DYN_STATE%RUN_TIMES = 0
-   DYN_STATE%NUM_CALLS = 0
-
-#if ( defined OFFLINE_DYN )
-   call metdata_dyn_init(grid)
-#endif
-
-   deallocate (jmyz)
-   deallocate (kmyz)
-   deallocate (imxy)
-   deallocate (jmxy)
-   deallocate (ak)
-   deallocate (bk)
-
-   ! Call initgrid (nee initcom, initializes some coordinate info)
-   call initgrid()
-
-   ! Define the CAM grids (this has to be after dycore spinup).
-   call define_cam_grids()
-
-   ! Setup circulation diagnostics (has to be after define_cam_grids)
-   call ctem_init()
-
-   ! Set history defaults (has to be after grids are defined)
-   call history_defaults()
-
-!=============================================================================================
-contains
-!=============================================================================================
-
-   subroutine dyn_create_interface(I1, IN, J1, JN, K1, KN, LM, &
-                                   dyn_in, dyn_out )
-
-      ! create the dynamics import and export objects
-
-      use infnan, only : inf, assignment(=)
-
-      ! arguments
-      integer,             intent(in)  :: I1, IN, J1, JN, K1, KN, LM
-      type (dyn_import_t), intent(out) :: dyn_in
-      type (dyn_export_t), intent(out) :: dyn_out
-
-      ! local vars
-      integer :: ierror
-      !-----------------------------------------------------------------------
-
-      allocate( dyn_in%phis( I1:IN, J1:JN  ), stat=ierror  )
-      if ( ierror /= 0 ) call endrun('DYN_COMP ALLOC error: array PHIS')
-      allocate( dyn_in%ps(   I1:IN, J1:JN  ), stat=ierror  )
-      if ( ierror /= 0 ) call endrun('DYN_COMP ALLOC error: array PS')
-      allocate( dyn_in%u3s(  I1:IN,J1:JN,K1:KN  ), stat=ierror )
-      if ( ierror /= 0 ) call endrun('DYN_COMP ALLOC error: array U3S')
-      allocate( dyn_in%v3s(  I1:IN,J1:JN,K1:KN  ), stat=ierror )
-      if ( ierror /= 0 ) call endrun('DYN_COMP ALLOC error: array V3S')
-      allocate( dyn_in%pe(   I1:IN,K1:KN+1,J1:JN  ), stat=ierror )
-      if ( ierror /= 0 ) call endrun('DYN_COMP ALLOC error: array PE')
-      allocate( dyn_in%pt(   I1:IN,J1:JN,K1:KN  ), stat=ierror )
-      if ( ierror /= 0 ) call endrun('DYN_COMP ALLOC error: array PT')
-      allocate( dyn_in%t3(   I1:IN,J1:JN,K1:KN  ), stat=ierror )
-      if ( ierror /= 0 ) call endrun('DYN_COMP ALLOC error: array T3')
-      allocate( dyn_in%pk(   I1:IN,J1:JN,K1:KN+1  ), stat=ierror )
-      if ( ierror /= 0 ) call endrun('DYN_COMP ALLOC error: array PK')
-      allocate( dyn_in%pkz(  I1:IN,J1:JN,K1:KN  ), stat=ierror )
-      if ( ierror /= 0 ) call endrun('DYN_COMP ALLOC error: array PKZ')
-      allocate( dyn_in%delp( I1:IN,J1:JN,K1:KN  ), stat=ierror )
-      if ( ierror /= 0 ) call endrun('DYN_COMP ALLOC error: array DELP')
-
-      ! allocate tracer contents
-      allocate( dyn_in%tracer(I1:IN,J1:JN,K1:KN,LM), stat=ierror )
-      if ( ierror /= 0 ) then
-         write(iulog,*) "Allocation error", ierror, "for tracer"
-         call endrun('dyn_create_interface ALLOC error: array TRACER')
-      endif
-
-      dyn_in%tracer = inf     
-      dyn_in%phis = inf
-      dyn_in%ps = inf
-      dyn_in%u3s = inf
-      dyn_in%v3s = inf
-      dyn_in%pe = inf
-      dyn_in%pt = inf
-      dyn_in%t3 = inf
-      dyn_in%pk = inf
-      dyn_in%pkz = inf
-      dyn_in%delp = inf
-
-      ! Output has all of these except phis
-      dyn_out%phis => dyn_in%phis
-      dyn_out%ps   => dyn_in%ps
-      dyn_out%u3s  => dyn_in%u3s
-      dyn_out%v3s  => dyn_in%v3s
-      dyn_out%pe   => dyn_in%pe
-      dyn_out%pt   => dyn_in%pt
-      dyn_out%t3   => dyn_in%t3
-      dyn_out%pk   => dyn_in%pk
-      dyn_out%pkz  => dyn_in%pkz
-      dyn_out%delp => dyn_in%delp
-      dyn_out%tracer => dyn_in%tracer
-
-      ! And several more which are not in the import container
-      allocate( dyn_out%peln( I1:IN,K1:KN+1,J1:JN  ), stat=ierror )
-      if ( ierror /= 0 ) call endrun('DYN_COMP ALLOC error: array PELN')
-      allocate( dyn_out%omga( I1:IN,K1:KN,J1:JN    ), stat=ierror )
-      if ( ierror /= 0 ) call endrun('DYN_COMP ALLOC error: array OMGA')
-      allocate( dyn_out%mfx( I1:IN,J1:JN,K1:KN    ), stat=ierror )
-      if ( ierror /= 0 ) call endrun('DYN_COMP ALLOC error: array MFX')
-      allocate( dyn_out%mfy( I1:IN,J1:JN,K1:KN    ), stat=ierror )
-      if ( ierror /= 0 ) call endrun('DYN_COMP ALLOC error: array MFY')
-
-      dyn_out%peln = inf
-      dyn_out%omga = inf
-      dyn_out%mfx  = inf
-      dyn_out%mfy  = inf
-
-   end subroutine dyn_create_interface
-
-!=============================================================================================
-
-   integer function INIT_NSPLIT(dtime, im, jm) 
+   !---------------------------------------------------------------------------
+   contains
+   !---------------------------------------------------------------------------
+
+   integer function init_nsplit(dtime, im, jm)
 
       !-----------------------------------------------------------------------
       ! find proper value for nsplit if not specified
@@ -775,106 +324,246 @@ contains
 
       ! LOCAL VARIABLES:
       real (r8)   pdt                       ! Time-step in seconds
-                                            ! Negative dt (backward in time
-                                            ! integration) is allowed
       real (r8)   dim
       real (r8)   dim0                      ! base dimension
       real (r8)   dt0                       ! base time step
       real (r8)   ns0                       ! base nsplit for base dimension
       real (r8)   ns                        ! final value to be returned
-      real (r8)   one                       ! equal to unity
 
       parameter ( dim0 = 191._r8  )
       parameter ( dt0  = 1800._r8 )
       parameter ( ns0  = 4._r8    )
-      parameter ( one  = 1.0_r8   )
       !-----------------------------------------------------------------------
 
       pdt = int(dtime)   ! dtime is a variable internal to this module
       dim = max ( im, 2*(jm-1) )
-      ns  = int ( ns0*abs(pdt)*dim/(dt0*dim0) + THREE_QUARTERS )
-      ns  = max ( one, ns )   ! for cases in which dt or dim is too small
+      ns  = int ( ns0*abs(pdt)*dim/(dt0*dim0) + 0.75_r8 )
+      ns  = max ( 1._r8, ns )   ! for cases in which dt or dim is too small
 
       init_nsplit = ns
 
-   end function INIT_NSPLIT
+   end function init_nsplit
+   !---------------------------------------------------------------------------
+
+end subroutine dyn_readnl
 
 !=============================================================================================
 
-   subroutine history_defaults
+subroutine dyn_register()
 
-      use shr_kind_mod, only: r8=>shr_kind_r8
-      use constituents, only: pcnst, cnst_name, cnst_longname, tottnam, cnst_get_ind
-      use ppgrid,       only: pver, pverp
-      use pmgrid,       only: plev, plevp
-      use cam_history,  only: addfld, add_default, horiz_only
-      use phys_control, only: phys_getopts
+   use physics_buffer,  only: pbuf_add_field, dtype_r8
+   use ppgrid,          only: pcols, pver
+   use phys_control,    only: use_gw_front, use_gw_front_igw
+   use qbo,             only: qbo_use_forcing
 
-      ! local vars
+   ! These fields are computed by the dycore and passed to the physics via the
+   ! physics buffer.
 
-      integer :: m
-      integer :: ixcldice, ixcldliq  ! constituent indices for cloud liquid and ice water.
-      logical :: history_budget      ! output tendencies and state variables for CAM4
-                                     ! temperature, water vapor, cloud ice and cloud
-                                     ! liquid budgets.
-      integer :: history_budget_histfile_num  ! output history file number for budget fields
+   if (use_gw_front .or. use_gw_front_igw) then
+      call pbuf_add_field("FRONTGF", "global", dtype_r8, (/pcols,pver/), &
+         frontgf_idx)
+      call pbuf_add_field("FRONTGA", "global", dtype_r8, (/pcols,pver/), &
+         frontga_idx)
+   end if
 
-      !----------------------------------------------------------------------------
-      ! Dynamics variables which belong in dynamics specific initialization modules
-      !----------------------------------------------------------------------------
-      call addfld ('US',    (/ 'lev' /),'A','m/s','Zonal wind, staggered', gridname='fv_u_stagger' )
-      call addfld ('VS',    (/ 'lev' /),'A','m/s','Meridional wind, staggered', gridname='fv_v_stagger' )
-      call addfld ('US&IC', (/ 'lev' /),'I','m/s','Zonal wind, staggered',gridname='fv_u_stagger' )
-      call addfld ('VS&IC', (/ 'lev' /),'I','m/s','Meridional wind, staggered',gridname='fv_v_stagger' )
-      call addfld ('PS&IC', horiz_only, 'I','Pa', 'Surface pressure',gridname='fv_centers' )
-      call addfld ('T&IC',  (/ 'lev' /),'I','K',  'Temperature',gridname='fv_centers' )
-      do m = 1, pcnst
-         call addfld (trim(cnst_name(m))//'&IC',(/ 'lev' /),'I','kg/kg',cnst_longname(m),gridname='fv_centers' )
-      end do
+   if (qbo_use_forcing) then
+      call pbuf_add_field("UZM", "global", dtype_r8, (/pcols,pver/), &
+         uzm_idx)
+   end if
 
-      do m = 1, pcnst
-         call addfld (tottnam(m),(/ 'lev' /),'A','kg/kg/s',trim(cnst_name(m))//' horz + vert + fixer tendency ',  &
-                      gridname='fv_centers')
-      end do
+end subroutine dyn_register
 
-      call addfld ('DUH',      (/ 'lev' /), 'A','K/s','U horizontal diffusive heating',                 gridname='fv_centers')
-      call addfld ('DVH',      (/ 'lev' /), 'A','K/s','V horizontal diffusive heating',                 gridname='fv_centers')
-      call addfld ('ENGYCORR', (/ 'lev' /), 'A','W/m2','Energy correction for over-all conservation',   gridname='fv_centers')
+!=============================================================================================
 
-      call addfld ('FU',       (/ 'lev' /), 'A','m/s2','Zonal wind forcing term',                       gridname='fv_centers')
-      call addfld ('FV',       (/ 'lev' /), 'A','m/s2','Meridional wind forcing term',                  gridname='fv_centers')
-      call addfld ('FU_S',     (/ 'lev' /), 'A','m/s2','Zonal wind forcing term on staggered grid',     gridname='fv_u_stagger')
-      call addfld ('FV_S',     (/ 'lev' /), 'A','m/s2','Meridional wind forcing term on staggered grid',gridname='fv_v_stagger')
-      call addfld ('UTEND',    (/ 'lev' /), 'A','m/s2','U tendency',                                    gridname='fv_centers')
-      call addfld ('VTEND',    (/ 'lev' /), 'A','m/s2','V tendency',                                    gridname='fv_centers')
-      call addfld ('TTEND',    (/ 'lev' /), 'A','K/s','Total T tendency (all processes)',               gridname='fv_centers')
-      call addfld ('LPSTEN',   horiz_only,  'A','Pa/s','Surface pressure tendency',                     gridname='fv_centers')
-      call addfld ('VAT',      (/ 'lev' /), 'A','K/s','Vertical advective tendency of T',               gridname='fv_centers')
-      call addfld ('KTOOP',    (/ 'lev' /), 'A','K/s','(Kappa*T)*(omega/P)',                            gridname='fv_centers')
+subroutine dyn_init(dyn_in, dyn_out)
 
-      !----------------------------------------------------------------------------
-      ! variables output by default
-      !----------------------------------------------------------------------------
-      call phys_getopts( history_budget_out = history_budget, history_budget_histfile_num_out = history_budget_histfile_num)
-      if ( history_budget ) then
-         call cnst_get_ind('CLDLIQ', ixcldliq)
-         call cnst_get_ind('CLDICE', ixcldice)
-         call add_default(tottnam(       1), history_budget_histfile_num, ' ')
-         call add_default(tottnam(ixcldliq), history_budget_histfile_num, ' ')
-         call add_default(tottnam(ixcldice), history_budget_histfile_num, ' ')
-         call add_default('TTEND   '       , history_budget_histfile_num, ' ')
-      end if
+   ! Initialize FV dynamical core state variables
 
-      call add_default ('US&IC   ', 0, 'I')
-      call add_default ('VS&IC   ', 0, 'I')   
-      call add_default ('PS&IC      ',0, 'I')
-      call add_default ('T&IC       ',0, 'I')
+   use physconst,       only: pi, omega, rearth, rair, cpair, zvir
+   use infnan,          only: inf, assignment(=)
 
-      do m = 1,pcnst
-         call add_default(trim(cnst_name(m))//'&IC',0, 'I')
-      end do
+   use constituents,    only: pcnst, cnst_name, cnst_longname, tottnam, cnst_get_ind
+   use cam_history,     only: addfld, add_default, horiz_only
+   use phys_control,    only: phys_getopts
 
-   end subroutine history_defaults
+#if ( defined OFFLINE_DYN )
+   use metdata,         only: metdata_dyn_init
+#endif
+   use ctem,            only: ctem_init
+
+   ! arguments:
+   type (dyn_import_t),     intent(out) :: dyn_in
+   type (dyn_export_t),     intent(out) :: dyn_out
+
+   ! Local variables
+   type (t_fvdycore_state),     pointer :: dyn_state
+   type (t_fvdycore_grid),      pointer :: grid
+   type (t_fvdycore_constants), pointer :: constants
+
+   real(r8) :: dt
+
+   integer :: ifirstxy, ilastxy
+   integer :: jfirstxy, jlastxy
+   integer :: km
+   integer :: ierr
+
+   integer :: m, ixcldice, ixcldliq
+   logical :: history_budget      ! output tendencies and state variables for budgets
+   integer :: budget_hfile_num
+
+   character(len=*), parameter :: sub='dyn_init'
+   !----------------------------------------------------------------------------
+
+   dyn_state => get_dyn_state()
+   grid      => dyn_state%grid
+   constants => dyn_state%constants
+
+   ! Set constants
+   constants%pi    = pi
+   constants%omega = omega
+   constants%ae    = rearth
+   constants%rair  = rair
+   constants%cp    = cpair
+   constants%cappa = rair/cpair
+   constants%zvir  = zvir
+
+   dt = get_step_size()
+   dyn_state%dt        = dt         ! Should this be part of state??
+
+   dyn_state%check_dt  = 21600.0_r8 ! Check max and min every 6 hours.
+   dyn_state%te_method = 0
+
+   ! Create the dynamics import and export state objects
+   ifirstxy = grid%ifirstxy
+   ilastxy  = grid%ilastxy
+   jfirstxy = grid%jfirstxy
+   jlastxy  = grid%jlastxy
+   km       = grid%km
+
+   allocate(dyn_in%phis(  ifirstxy:ilastxy,jfirstxy:jlastxy),          &
+            dyn_in%ps(    ifirstxy:ilastxy,jfirstxy:jlastxy),          &
+            dyn_in%u3s(   ifirstxy:ilastxy,jfirstxy:jlastxy,km),       &
+            dyn_in%v3s(   ifirstxy:ilastxy,jfirstxy:jlastxy,km),       &
+            dyn_in%pe(    ifirstxy:ilastxy,km+1,jfirstxy:jlastxy),     &
+            dyn_in%pt(    ifirstxy:ilastxy,jfirstxy:jlastxy,km),       &
+            dyn_in%t3(    ifirstxy:ilastxy,jfirstxy:jlastxy,km),       &
+            dyn_in%pk(    ifirstxy:ilastxy,jfirstxy:jlastxy,km+1),     &
+            dyn_in%pkz(   ifirstxy:ilastxy,jfirstxy:jlastxy,km),       &
+            dyn_in%delp(  ifirstxy:ilastxy,jfirstxy:jlastxy,km),       &
+            dyn_in%tracer(ifirstxy:ilastxy,jfirstxy:jlastxy,km,pcnst), &
+            stat=ierr)
+   if ( ierr /= 0 ) then
+      write(iulog,*) sub//': ERROR: allocating components of dyn_in.  ierr=', ierr
+      call endrun(sub//': ERROR: allocating components of dyn_in')
+   end if
+
+   dyn_in%phis   = inf
+   dyn_in%ps     = inf
+   dyn_in%u3s    = inf
+   dyn_in%v3s    = inf
+   dyn_in%pe     = inf
+   dyn_in%pt     = inf
+   dyn_in%t3     = inf
+   dyn_in%pk     = inf
+   dyn_in%pkz    = inf
+   dyn_in%delp   = inf
+   dyn_in%tracer = inf     
+
+   ! Export object has all of these except phis
+   dyn_out%phis   => dyn_in%phis
+   dyn_out%ps     => dyn_in%ps
+   dyn_out%u3s    => dyn_in%u3s
+   dyn_out%v3s    => dyn_in%v3s
+   dyn_out%pe     => dyn_in%pe
+   dyn_out%pt     => dyn_in%pt
+   dyn_out%t3     => dyn_in%t3
+   dyn_out%pk     => dyn_in%pk
+   dyn_out%pkz    => dyn_in%pkz
+   dyn_out%delp   => dyn_in%delp
+   dyn_out%tracer => dyn_in%tracer
+
+   ! And several more which are not in the import container
+   allocate(dyn_out%peln(ifirstxy:ilastxy,km+1,jfirstxy:jlastxy), &
+            dyn_out%omga(ifirstxy:ilastxy,km,jfirstxy:jlastxy),   &
+            dyn_out%mfx( ifirstxy:ilastxy,jfirstxy:jlastxy,km),   &
+            dyn_out%mfy( ifirstxy:ilastxy,jfirstxy:jlastxy,km),   &
+            stat=ierr)
+   if ( ierr /= 0 ) then
+      write(iulog,*) sub//': ERROR: allocating components of dyn_out.  ierr=', ierr
+      call endrun(sub//': ERROR: allocating components of dyn_out')
+   end if
+
+   dyn_out%peln = inf
+   dyn_out%omga = inf
+   dyn_out%mfx  = inf
+   dyn_out%mfy  = inf
+
+#if ( defined OFFLINE_DYN )
+   call metdata_dyn_init(grid)
+#endif
+
+   ! Setup circulation diagnostics
+   call ctem_init()
+
+   if (initial_run) then
+
+      ! Read in initial data
+      call read_inidat(dyn_in)
+      call clean_iodesc_list()
+
+   end if
+
+   ! History output
+
+   call addfld('US',    (/ 'lev' /),'A','m/s','Zonal wind, staggered', gridname='fv_u_stagger')
+   call addfld('VS',    (/ 'lev' /),'A','m/s','Meridional wind, staggered', gridname='fv_v_stagger')
+   call addfld('US&IC', (/ 'lev' /),'I','m/s','Zonal wind, staggered', gridname='fv_u_stagger')
+   call addfld('VS&IC', (/ 'lev' /),'I','m/s','Meridional wind, staggered', gridname='fv_v_stagger')
+   call addfld('PS&IC', horiz_only, 'I','Pa', 'Surface pressure', gridname='fv_centers')
+   call addfld('T&IC',  (/ 'lev' /),'I','K',  'Temperature', gridname='fv_centers')
+   do m = 1, pcnst
+      call addfld(trim(cnst_name(m))//'&IC',(/ 'lev' /),'I','kg/kg', cnst_longname(m), gridname='fv_centers')
+   end do
+   do m = 1, pcnst
+      call addfld(tottnam(m),(/ 'lev' /),'A','kg/kg/s',trim(cnst_name(m))//' horz + vert + fixer tendency ',  &
+                  gridname='fv_centers')
+   end do
+
+   call add_default('US&IC   ', 0, 'I')
+   call add_default('VS&IC   ', 0, 'I')   
+   call add_default('PS&IC      ',0, 'I')
+   call add_default('T&IC       ',0, 'I')
+   do m = 1, pcnst
+      call add_default(trim(cnst_name(m))//'&IC',0, 'I')
+   end do
+
+   call addfld('DUH',      (/ 'lev' /), 'A','K/s','U horizontal diffusive heating', gridname='fv_centers')
+   call addfld('DVH',      (/ 'lev' /), 'A','K/s','V horizontal diffusive heating', gridname='fv_centers')
+   call addfld('ENGYCORR', (/ 'lev' /), 'A','W/m2','Energy correction for over-all conservation', &
+                                                   gridname='fv_centers')
+
+   call addfld('FU',       (/ 'lev' /), 'A','m/s2','Zonal wind forcing term', gridname='fv_centers')
+   call addfld('FV',       (/ 'lev' /), 'A','m/s2','Meridional wind forcing term', gridname='fv_centers')
+   call addfld('FU_S',     (/ 'lev' /), 'A','m/s2','Zonal wind forcing term on staggered grid', &
+                                                   gridname='fv_u_stagger')
+   call addfld('FV_S',     (/ 'lev' /), 'A','m/s2','Meridional wind forcing term on staggered grid', &
+                                                   gridname='fv_v_stagger')
+   call addfld('UTEND',    (/ 'lev' /), 'A','m/s2','U tendency',                      gridname='fv_centers')
+   call addfld('VTEND',    (/ 'lev' /), 'A','m/s2','V tendency',                      gridname='fv_centers')
+   call addfld('TTEND',    (/ 'lev' /), 'A','K/s','Total T tendency (all processes)', gridname='fv_centers')
+   call addfld('LPSTEN',   horiz_only,  'A','Pa/s','Surface pressure tendency',       gridname='fv_centers')
+   call addfld('VAT',      (/ 'lev' /), 'A','K/s','Vertical advective tendency of T', gridname='fv_centers')
+   call addfld('KTOOP',    (/ 'lev' /), 'A','K/s','(Kappa*T)*(omega/P)',              gridname='fv_centers')
+
+   call phys_getopts(history_budget_out=history_budget, history_budget_histfile_num_out=budget_hfile_num)
+   if ( history_budget ) then
+      call cnst_get_ind('CLDLIQ', ixcldliq)
+      call cnst_get_ind('CLDICE', ixcldice)
+      call add_default(tottnam(       1), budget_hfile_num, ' ')
+      call add_default(tottnam(ixcldliq), budget_hfile_num, ' ')
+      call add_default(tottnam(ixcldice), budget_hfile_num, ' ')
+      call add_default('TTEND   '       , budget_hfile_num, ' ')
+   end if
 
 end subroutine dyn_init
 
@@ -894,62 +583,78 @@ subroutine dyn_run(ptop, ndt, te0, dyn_state, dyn_in, dyn_out, rc)
    !                 |
    !               u(i,j)
    !
-   ! External routine required: the user needs to supply a subroutine to set up
-   !                            "Eulerian vertical coordinate" for remapping purpose.
-   !                             Currently this routine is named as set_eta()
-   !                             In principle any terrian following vertical
-   !                             coordinate can be used. The input to fvcore
-   !                             need not be on the same vertical coordinate
-   !                             as the output.
-   !                             If SPMD is defined the Pilgrim communication
-   !                             library developed by Will Sawyer will be needed.
+   ! External routine required:
    !
-   ! Remarks: values at poles for both u and v need not be defined; but values for
-   !          all other scalars needed to be defined at both poles (as polar cap mean
-   !          quantities). Tracer advection is done "off-line" using the
-   !          large time step. Consistency is maintained by using the time accumulated
-   !          Courant numbers and horizontal mass fluxes for the FFSL algorithm.
-   !          The input "pt" can be either dry potential temperature
-   !          defined as T/pkz (adiabatic case) or virtual potential temperature
-   !          defined as T*/pkz (full phys case). IF convt is true, pt is not updated.
-   !          Instead, virtual temperature is ouput.
-   !          ipt is updated if convt is false.
-   !          The user may set the value of nx to optimize the SMP performance
-   !          The optimal valuse of nx depends on the total number of available
-   !          shared memory CPUs per node (NS). Assuming the maximm MPI 
-   !          decomposition is used in the y-direction, set nx=1 if the
-   !          NS <=4; nx=4 if NS=16.
+   ! The user needs to supply a subroutine to set up
+   ! Eulerian vertical coordinate" for remapping purpose.
+   ! Currently this routine is named as set_eta()
+   ! In principle any terrian following vertical
+   ! coordinate can be used. The input to fvcore
+   ! need not be on the same vertical coordinate
+   ! as the output.
+   ! If SPMD is defined the Pilgrim communication
+   ! library developed by Will Sawyer will be needed.
+   !
+   ! Remarks:
+   !
+   ! Values at poles for both u and v need not be defined; but values for
+   ! all other scalars needed to be defined at both poles (as polar cap mean
+   ! quantities). Tracer advection is done "off-line" using the
+   ! large time step. Consistency is maintained by using the time accumulated
+   ! Courant numbers and horizontal mass fluxes for the FFSL algorithm.
+   ! The input "pt" can be either dry potential temperature
+   ! defined as T/pkz (adiabatic case) or virtual potential temperature
+   ! defined as T*/pkz (full phys case). IF convt is true, pt is not updated.
+   ! Instead, virtual temperature is ouput.
+   ! ipt is updated if convt is false.
+   ! The user may set the value of nx to optimize the SMP performance
+   ! The optimal valuse of nx depends on the total number of available
+   ! shared memory CPUs per node (NS). Assuming the maximm MPI 
+   ! decomposition is used in the y-direction, set nx=1 if the
+   ! NS <=4; nx=4 if NS=16.
+   !
+   ! A 2D xy decomposition is used for handling the Lagrangian surface
+   ! remapping, the ideal physics, and (optionally) the geopotential
+   ! calculation.
+   !
+   ! The transpose from yz to xy decomposition takes place within dynpkg.
+   ! The xy decomposed variables are then transposed directly to the
+   ! physics decomposition within d_p_coupling.
+   !
+   ! The xy decomposed variables have names corresponding to the
+   ! yz decomposed variables: simply append "xy". Thus, "uxy" is the
+   ! xy decomposed version of "u".
    !
    ! This version supports overlap of trac2d and cd_core subcycles (Art Mirin, November 2007).
-   !   This refers to the subcycles described by the "do n=1,n2" loop and has nothing to
-   !   do with the "do it=1,nsplit" lower-level subcycling. Each trac2d call (n), other than the last,
-   !   is overlapped with the subsequent cd_core 'series' (n+1). The controlling namelist variable
-   !   is ct_overlap. The overlapping trac2d calls are carried out on the second set of
-   !   npes_yz processes (npes_yz <= iam < 2*npes_yz). The tracer arrays are sent to the
-   !   auxiliary processes prior to the do n=1,n2 loop. During each subcycle (other than the last),
-   !   the dp0 array is sent prior to the cd_core series; arrays cx, cy, mfx, mfy are sent directly
-   !   from cd_core during the last call in the series (it=nsplit). At the completion of the last
-   !   auxiliary trac2d subcycle (n=n2-1), the updated tracer values are returned to the
-   !   primary processes; the last tracer subcycle (n=n2) is carried out on the primary processes.
-   !   Communication calls are nonblocking, with attempt to overlap computation to the extent
-   !   possible. The CCSM mpi layer (wrap_mpi) is used. Tags with values greater than npes_xy
-   !   are chosen to avoid possible interference between the messages sent from cd_core and
-   !   the geopk-related transpose messages called from cd_core thereafter. The auxiliary
-   !   processes must use values of jfirst, jlast, kfirst, klast corresponding to their primary
-   !   process antecedents, whereas by design those values are (1,0,1,0), resp. (set in spmdinit_dyn).
-   !   We therefore add auxiliary subdomain limits to the grid datatype: jfirstct, jlastct,
-   !   kfirstct, klastct. For the primary processes, these are identical to the actual subdomain
-   !   limits; for the secondary processes, these correspond to the subdomain limits of the
-   !   antecedent primary process. These values are communicated to the auxiliary processes
-   !   during initialization (spmd_vars_init). During the auxiliary calculations (and allocations)
-   !   we temporarily set jfirst equal to jfirstct (etc.) and when done, restore to the original
-   !   values. Other information needed by the auxiliary processes is obtained through the grid
-   !   datatype.
+   ! This refers to the subcycles described by the "do n=1,n2" loop and has nothing to
+   ! do with the "do it=1,nsplit" lower-level subcycling. Each trac2d call (n), other than the last,
+   ! is overlapped with the subsequent cd_core 'series' (n+1). The controlling namelist variable
+   ! is ct_overlap. The overlapping trac2d calls are carried out on the second set of
+   ! npes_yz processes (npes_yz <= iam < 2*npes_yz). The tracer arrays are sent to the
+   ! auxiliary processes prior to the do n=1,n2 loop. During each subcycle (other than the last),
+   ! the dp0 array is sent prior to the cd_core series; arrays cx, cy, mfx, mfy are sent directly
+   ! from cd_core during the last call in the series (it=nsplit). At the completion of the last
+   ! auxiliary trac2d subcycle (n=n2-1), the updated tracer values are returned to the
+   ! primary processes; the last tracer subcycle (n=n2) is carried out on the primary processes.
+   ! Communication calls are nonblocking, with attempt to overlap computation to the extent
+   ! possible. The CCSM mpi layer (wrap_mpi) is used. Tags with values greater than npes_xy
+   ! are chosen to avoid possible interference between the messages sent from cd_core and
+   ! the geopk-related transpose messages called from cd_core thereafter. The auxiliary
+   ! processes must use values of jfirst, jlast, kfirst, klast corresponding to their primary
+   ! process antecedents, whereas by design those values are (1,0,1,0), resp. (set in spmdinit_dyn).
+   ! We therefore add auxiliary subdomain limits to the grid datatype: jfirstct, jlastct,
+   ! kfirstct, klastct. For the primary processes, these are identical to the actual subdomain
+   ! limits; for the secondary processes, these correspond to the subdomain limits of the
+   ! antecedent primary process. These values are communicated to the auxiliary processes
+   ! during initialization (spmd_vars_init). During the auxiliary calculations (and allocations)
+   ! we temporarily set jfirst equal to jfirstct (etc.) and when done, restore to the original
+   ! values. Other information needed by the auxiliary processes is obtained through the grid
+   ! datatype.
    !
    ! This version supports tracer decomposition with trac2d (Art Mirin, January 2008).
-   !   This option is mutually exclusive with ct_overlap. Variable "trac_decomp" is the size of the
-   !   decomposition. The tracers are divided into trac_decomp groups, and the kth group is solved
-   !   on the kth set of npes_yz processes. Much of the methodology is similar to that for ct_overlap.
+   ! This option is mutually exclusive with ct_overlap. Variable "trac_decomp" is the size of the
+   ! decomposition. The tracers are divided into trac_decomp groups, and the kth group is solved
+   ! on the kth set of npes_yz processes. Much of the methodology is similar to that for ct_overlap.
    !
    ! REVISION HISTORY:
    !   SJL 99.04.13:  Initial SMP version delivered to Will Sawyer
@@ -976,18 +681,13 @@ subroutine dyn_run(ptop, ndt, te0, dyn_state, dyn_in, dyn_out, rc)
    !   WS  06.06.28:  Using new version of benergy
    !-----------------------------------------------------------------------
 
-   use shr_kind_mod, only  : r8 => shr_kind_r8
 
    use diag_module, only   : compute_vdot_gradp
-   use spmd_utils,   only  : masterproc
-   use fv_control_mod, only: ct_overlap, trac_decomp
 
 #if defined( SPMD )
-   use mod_comm, only : mp_sendirr,                        &
-                        mp_recvirr, mp_sendirr_r4,         &
-                        mp_recvirr_r4, mp_send4d_ns,       &
-                        mp_recv4d_ns, mp_sendtrirr,        &
-                        mp_recvtrirr
+   use mpishorthand,   only: mpir8
+   use mod_comm,       only: mp_sendirr, mp_recvirr, mp_send4d_ns, &
+                             mp_recv4d_ns, mp_sendtrirr, mp_recvtrirr
 #endif
 #if ( defined OFFLINE_DYN )
    use metdata,     only: get_met_fields, advance_met, get_us_vs, met_fix_mass, met_rlx
@@ -1089,7 +789,6 @@ subroutine dyn_run(ptop, ndt, te0, dyn_state, dyn_in, dyn_out, rc)
    integer :: jlast     ! ending latitude index for MPI
    integer :: kfirst    ! starting vertical index for MPI
    integer :: klast     ! ending vertical index for MPI
-   integer :: klastp    ! klast, except km+1 when klast=km
    integer :: ntotq     ! total # of tracers to be advected
    integer :: iord      ! parameter controlling monotonicity in E-W
                                    ! recommendation: iord=4
@@ -1102,10 +801,11 @@ subroutine dyn_run(ptop, ndt, te0, dyn_state, dyn_in, dyn_out, rc)
                                    ! GEOS5 uses te_method=1 (Cubic Interp.)
    integer :: icd       ! X algorithm order on C-grid
    integer :: jcd       ! Y algorithm order on C-grid
-   integer :: ng_c      ! Ghosting width on C-grid
    integer :: ng_d      ! Ghosting width on D-grid
    integer :: ng_s      ! Ghosting width (staggered, for winds)
    integer :: ns        ! overall split
+   integer :: div24del2flag
+   real(r8):: del2coef
 
    integer :: ifirstxy, ilastxy, jfirstxy, jlastxy  ! xy decomposition
    integer :: npr_z
@@ -1123,13 +823,9 @@ subroutine dyn_run(ptop, ndt, te0, dyn_state, dyn_in, dyn_out, rc)
 #else
    parameter (nx = 4)     ! user may set nx=1 if there is NO shared memory multitasking
 #endif
-   integer ipe, it, iv
-   integer nsplit, nspltrac, n, n2, nv
-   integer incount, outcount
-   integer iqa, iqb, iqc, iqd, mq  ! used for tracer transpose grouping
-#if (! defined SPMD)
-   integer :: mpicom = 0
-#endif
+   integer :: ipe, it, iv
+   integer :: nsplit, n, n2, nv
+   integer :: mq
 
    ! Move the following 3D arrays to an initialization routine?
    real(r8), allocatable :: worka(:,:,:),workb(:,:,:),dp0(:,:,:),cx(:,:,:),cy(:,:,:)
@@ -1162,12 +858,14 @@ subroutine dyn_run(ptop, ndt, te0, dyn_state, dyn_in, dyn_out, rc)
    real(r8), allocatable :: v_tmp(:,:,:)
 #endif
 
-   logical fill
+   logical :: fill
 
-   integer imh
-   real(r8) dt
-   real(r8) bdt
-   integer filtcw
+   real(r8) :: dt
+   real(r8) :: bdt
+   integer  :: filtcw
+   integer  :: ct_overlap
+   integer  :: trac_decomp
+
    integer modc_tracers, mlast
 
    ! cd_core / trac2d overlap and tracer decomposition data (AAM)
@@ -1175,12 +873,14 @@ subroutine dyn_run(ptop, ndt, te0, dyn_state, dyn_in, dyn_out, rc)
    integer :: jfirstct, jlastct, kfirstct, klastct            ! primary subdomain limits
    integer :: jkstore(4)                                      ! storage for subdomain limits
    integer :: iamlocal                                        ! task number (global indexing)
-   integer :: iremotea(trac_decomp)                           ! source/target; id array
+   integer :: iremotea(dyn_state%grid%trac_decomp)            ! source/target; id array
    integer :: iremote                                         ! source/target; working id
    integer :: ndp0, ncx, ncy, nmfx, nmfy, ntrac               ! message sizes
    integer :: dp0tag, cxtag, cytag, mfxtag, mfytag, tractag   ! message tags
-   integer :: cxtaga(trac_decomp), cytaga(trac_decomp)        ! tag arrays for cd_core
-   integer :: mfxtaga(trac_decomp), mfytaga(trac_decomp)      ! tag arrays for cd_core
+   integer :: cxtaga(dyn_state%grid%trac_decomp)              ! tag arrays for cd_core
+   integer :: cytaga(dyn_state%grid%trac_decomp)              ! tag arrays for cd_core
+   integer :: mfxtaga(dyn_state%grid%trac_decomp)             ! tag arrays for cd_core
+   integer :: mfytaga(dyn_state%grid%trac_decomp)             ! tag arrays for cd_core
    logical :: ct_aux                                          ! true if auxiliary process
    logical :: s_trac                                          ! true for cd_core posting tracer-related sends
    integer, allocatable :: ctreq(:,:)                         ! used for nonblocking receive
@@ -1240,7 +940,9 @@ subroutine dyn_run(ptop, ndt, te0, dyn_state, dyn_in, dyn_out, rc)
    iord = dyn_state%iord
    jord = dyn_state%jord
    kord = dyn_state%kord
-   filtcw = dyn_state%filtcw
+   div24del2flag = dyn_state%div24del2flag
+   del2coef      = dyn_state%del2coef
+   filtcw        = dyn_state%filtcw
 
    consv     = dyn_state%consv
    te_method = dyn_state%te_method
@@ -1257,7 +959,6 @@ subroutine dyn_run(ptop, ndt, te0, dyn_state, dyn_in, dyn_out, rc)
    jm = grid%jm
    km = grid%km
 
-   ng_c  = grid%ng_c
    ng_d  = grid%ng_d
    ng_s  = grid%ng_s
 
@@ -1270,7 +971,6 @@ subroutine dyn_run(ptop, ndt, te0, dyn_state, dyn_in, dyn_out, rc)
    jlast    = grid%jlast
    kfirst   = grid%kfirst
    klast    = grid%klast
-   klastp   = grid%klastp
 
    ntotq    = grid%ntotq
    modc_tracers = grid%modc_tracers
@@ -1278,12 +978,14 @@ subroutine dyn_run(ptop, ndt, te0, dyn_state, dyn_in, dyn_out, rc)
    npr_z    = grid%npr_z
 
    ! cd_core/trac2d overlap and tracer decomposition
-   jfirstct = grid%jfirstct
-   jlastct  = grid%jlastct
-   kfirstct = grid%kfirstct
-   klastct  = grid%klastct
-   commnyz = grid%commnyz
-   iamlocal = grid%iam
+   ct_overlap  = grid%ct_overlap
+   trac_decomp = grid%trac_decomp
+   jfirstct    = grid%jfirstct
+   jlastct     = grid%jlastct
+   kfirstct    = grid%kfirstct
+   klastct     = grid%klastct
+   commnyz     = grid%commnyz
+   iamlocal    = grid%iam
 
    ! kaux is an index describing the set of npes_yz processes; 0 for first set, 1 for second set, etc.
    kaux = iamlocal/grid%npes_yz
@@ -1511,16 +1213,16 @@ subroutine dyn_run(ptop, ndt, te0, dyn_state, dyn_in, dyn_out, rc)
          if ( (nsplit*n2*nv /= dyn_state%nsplit) .or. (n2*nv /= dyn_state%nspltrac) ) then
             write(iulog,*) "ERROR:  Because of loop nesting, FV dycore can't use the specified namelist settings for subcycling"
             write(iulog,*) '  The original namelist settings were:'
-            write(iulog,*) '  NSPLIT   = ', dyn_state%nsplit
-            write(iulog,*) '  NSPLTRAC = ', dyn_state%nspltrac
-            if( dyn_state%nspltvrm /= 1 ) write(iulog,*) '  NSPLTVRM = ', dyn_state%nspltvrm
+            write(iulog,*) '  fv_nsplit   = ', dyn_state%nsplit
+            write(iulog,*) '  fv_nspltrac = ', dyn_state%nspltrac
+            if( dyn_state%nspltvrm /= 1 ) write(iulog,*) '  fv_nspltvrm = ', dyn_state%nspltvrm
             write(iulog,*)
-            write(iulog,*) '  NSPLIT needs to be a multiple of NSPLTRAC'
-            if( dyn_state%nspltvrm /= 1 ) write(iulog,*) '    which in turn needs to be a multiple of NSPLTVRM.'
+            write(iulog,*) '  fv_nsplit needs to be a multiple of fv_nspltrac'
+            if( dyn_state%nspltvrm /= 1 ) write(iulog,*) '    which in turn needs to be a multiple of fv_nspltvrm.'
             write(iulog,*) '  Suggested settings would be:'
-            write(iulog,*) '  NSPLIT   = ', nsplit*n2*nv
-            write(iulog,*) '  NSPLTRAC = ', n2*nv
-            if( dyn_state%nspltvrm /= 1 ) write(iulog,*) '  NSPLTVRM = ', nv
+            write(iulog,*) '  fv_nsplit   = ', nsplit*n2*nv
+            write(iulog,*) '  fv_nspltrac = ', n2*nv
+            if( dyn_state%nspltvrm /= 1 ) write(iulog,*) '  fv_nspltvrm = ', nv
             call endrun("Bad namelist settings for FV subcycling.")
          end if
       end if
@@ -1766,7 +1468,7 @@ subroutine dyn_run(ptop, ndt, te0, dyn_state, dyn_in, dyn_out, rc)
 
       call t_stopf  ('xy_to_yz')
 
-      omgaxy(:,:,:) = ZERO
+      omgaxy(:,:,:) = 0._r8
 
       ! Begin tracer sub-cycle loop
       do n = 1, n2
@@ -1784,10 +1486,10 @@ subroutine dyn_run(ptop, ndt, te0, dyn_state, dyn_in, dyn_out, rc)
                      ! Initialize the CFL number accumulators: (cx, cy)
                      ! Initialize total mass fluxes: (mfx, mfy)
                      dp0(i,j,k) = delp(i,j,k)
-                     cx(i,j,k) = ZERO
-                     cy(i,j,k) = ZERO
-                     mfx(i,j,k) = ZERO
-                     mfy(i,j,k) = ZERO
+                     cx(i,j,k) = 0._r8
+                     cy(i,j,k) = 0._r8
+                     mfx(i,j,k) = 0._r8
+                     mfy(i,j,k) = 0._r8
                   end do
                end do
             end do
@@ -1872,6 +1574,7 @@ subroutine dyn_run(ptop, ndt, te0, dyn_state, dyn_in, dyn_out, rc)
                             delp,   pe,     pk,  nsplit,  dt,                &
                             ptop,   umax,   pi, ae,  cp,  cappa,             &
                             icd,    jcd, iord, jord,   ipe,                  &
+                            div24del2flag, del2coef,                         &
                             om,     phis,     cx  ,  cy, mfx, mfy,           &
                             delpf, uc, vc, pkz, dpt, worka,                  &
                             dwz, pkc, wz,  phisxy, ptxy, pkxy,               &
@@ -1897,13 +1600,13 @@ subroutine dyn_run(ptop, ndt, te0, dyn_state, dyn_in, dyn_out, rc)
                do j = jfirstxy, jlastxy
                   do k = 1, km
                      do i = ifirstxy, ilastxy
-                        omgaxy(i,k,j) = omgaxy(i,k,j) + HALF*(pexy(i,k,j) + pexy(i,k+1,j) - &
+                        omgaxy(i,k,j) = omgaxy(i,k,j) + 0.5_r8*(pexy(i,k,j) + pexy(i,k+1,j) - &
                                         pexy_om(i,k,j) - pexy_om(i,k+1,j))/dt
                      end do
                   end do
                   do k = 1, km+1
                      do i = ifirstxy, ilastxy
-                        pexy_om(i,k,j) = HALF*(pexy_om(i,k,j) + pexy(i,k,j))
+                        pexy_om(i,k,j) = 0.5_r8*(pexy_om(i,k,j) + pexy(i,k,j))
                      end do
                   end do
                end do
@@ -1947,8 +1650,8 @@ subroutine dyn_run(ptop, ndt, te0, dyn_state, dyn_in, dyn_out, rc)
                do i = 1, im
                   do j = jfirst, jlast
                      do k = kfirst, klast
-                        if (i .ne. 1) cx(i,j,k) = mfx(i,j,k)/(HALF*(dp0(i-1,j,k)+dp0(i,j,k)))
-                        if (i .eq. 1) cx(i,j,k) = mfx(i,j,k)/(HALF*(dp0(1,j,k)+dp0(im,j,k)))
+                        if (i .ne. 1) cx(i,j,k) = mfx(i,j,k)/(0.5_r8*(dp0(i-1,j,k)+dp0(i,j,k)))
+                        if (i .eq. 1) cx(i,j,k) = mfx(i,j,k)/(0.5_r8*(dp0(1,j,k)+dp0(im,j,k)))
                      end do
                   end do
                end do
@@ -1958,7 +1661,7 @@ subroutine dyn_run(ptop, ndt, te0, dyn_state, dyn_in, dyn_out, rc)
                   do j = jfirst, jlast
                      do k = kfirst, klast
                         if ((j .gt. 1) .and. (j .lt. jm)) cy(i,j,k) = &
-                           mfy(i,j,k)/(HALF*(dp0(i,j-1,k)+dp0(i,j,k)))/grid%cose(j)
+                           mfy(i,j,k)/(0.5_r8*(dp0(i,j-1,k)+dp0(i,j,k)))/grid%cose(j)
                      end do
                   end do
                end do
@@ -2505,9 +2208,9 @@ subroutine dyn_final(restart_file, dyn_state, dyn_in, dyn_out)
    call dynamics_clean    ( dyn_state%grid  )
    call dyn_free_interface( dyn_in, dyn_out )
 
-!=============================================================================================
-contains
-!=============================================================================================
+   !=============================================================================================
+   contains
+   !=============================================================================================
 
    subroutine dyn_free_interface ( dyn_in, dyn_out )
 
@@ -2551,5 +2254,299 @@ contains
 end subroutine dyn_final
 
 !=============================================================================================
+! Private routines
+!=========================================================================================
+
+subroutine read_inidat(dyn_in)
+
+   ! Read initial dataset
+
+   ! Arguments
+   type (dyn_import_t), target, intent(inout) :: dyn_in
+
+   ! Local variables
+   integer :: ifirstxy, ilastxy, jfirstxy, jlastxy, km
+   integer :: m, ntotq
+
+   character(len=16) :: fieldname
+
+   type(file_desc_t), pointer :: fh_ini    ! PIO filehandle
+   type(file_desc_t), pointer :: fh_topo
+
+   type (t_fvdycore_grid), pointer :: grid
+     
+   character(len=*), parameter :: sub='read_inidat'
+   !----------------------------------------------------------------------------
+    
+   fh_ini  => initial_file_get_id()
+   fh_topo => topo_file_get_id()
+
+   grid     => get_dyn_state_grid()
+   ifirstxy =  grid%ifirstxy
+   ilastxy  =  grid%ilastxy
+   jfirstxy =  grid%jfirstxy
+   jlastxy  =  grid%jlastxy
+   km       =  grid%km
+   ntotq    =  grid%ntotq
+
+   !-----------
+   ! 2-D fields
+   !-----------
+
+   fieldname = 'PS'
+   call infld(fieldname, fh_ini, 'lon', 'lat', ifirstxy, ilastxy, jfirstxy, jlastxy, &
+              dyn_in%ps, readvar, gridname='fv_centers')
+   if (.not. readvar) call endrun(sub//': ERROR: PS not found')
+   call process_inidat(fh_ini, grid, dyn_in, 'PS')
+
+   fieldname = 'PHIS'
+   readvar   = .false.
+   if (ideal_phys .or. aqua_planet .or. .not. associated(fh_topo)) then
+      dyn_in%phis(:,:) = 0._r8
+   else
+      call infld(fieldname, fh_topo, 'lon', 'lat', ifirstxy, ilastxy, jfirstxy, jlastxy, &
+            dyn_in%phis, readvar, gridname='fv_centers')
+      if (.not. readvar) call endrun(sub//': ERROR: PHIS not found')
+      call process_inidat(fh_ini, grid, dyn_in, 'PHIS')
+   end if
+
+   !-----------
+   ! 3-D fields
+   !-----------
+
+   fieldname = 'US'
+   dyn_in%u3s = fillvalue
+   call infld(fieldname, fh_ini, 'lon', 'slat', 'lev',  ifirstxy, ilastxy, jfirstxy, jlastxy, &
+              1, km, dyn_in%u3s, readvar, gridname='fv_u_stagger')
+   if (.not. readvar) call endrun(sub//': ERROR: US not found')
+
+   fieldname = 'VS'
+   call infld(fieldname, fh_ini, 'slon', 'lat', 'lev',  ifirstxy, ilastxy, jfirstxy, jlastxy, &
+              1, km, dyn_in%v3s, readvar, gridname='fv_v_stagger')
+   if (.not. readvar) call endrun(sub//': ERROR: VS not found')
+
+   fieldname = 'T'
+   call infld(fieldname, fh_ini, 'lon', 'lat', 'lev', ifirstxy, ilastxy, jfirstxy, jlastxy, &
+              1, km, dyn_in%t3, readvar, gridname='fv_centers')
+   if (.not. readvar) call endrun(sub//': ERROR: T not found')
+   call process_inidat(fh_ini, grid, dyn_in, 'T')
+        
+   ! Constituents (read and process one at a time)
+   do m = 1, ntotq
+      readvar   = .false.
+      fieldname = cnst_name(m)
+      if (cnst_read_iv(m)) then
+         call infld(fieldname, fh_ini, 'lon', 'lat', 'lev', ifirstxy, ilastxy, jfirstxy, jlastxy, &
+                    1, km, dyn_in%tracer(:,:,:,m), readvar, gridname='fv_centers')
+      end if
+      call process_inidat(fh_ini, grid, dyn_in, 'CONSTS', m_cnst=m)
+   end do
+
+end subroutine read_inidat
+
+!=========================================================================================
+
+subroutine process_inidat(fh_ini, grid, dyn_in, fieldname, m_cnst)
+
+   ! Post-process input fields
+   use const_init,          only: cnst_init_default
+   use commap,              only: latdeg, londeg
+   use const_init,          only: cnst_init_default
+
+   ! arguments
+   type(file_desc_t),             intent(inout) :: fh_ini
+   type(t_fvdycore_grid), target, intent(inout) :: grid        ! dynamics state grid
+   type(dyn_import_t),    target, intent(inout) :: dyn_in      ! dynamics import
+   character(len=*),              intent(in)    :: fieldname   ! field to be processed
+   integer,             optional, intent(in)    :: m_cnst      ! constituent index
+
+   ! Local variables
+   integer :: i, j, k                     ! grid and constituent indices
+   integer :: npes_xy
+   integer :: im, jm, km
+   integer :: ifirstxy, ilastxy, jfirstxy, jlastxy
+
+   integer :: nglon, nglat, rndm_seed_sz
+   integer, allocatable :: rndm_seed(:)
+   real(r8) :: pertval                       ! perturbation value
+
+   real(r8), pointer :: phisxy(:,:), psxy(:,:), t3xy(:,:,:)
+   real(r8), pointer :: tracer(:,:,:,:)
+
+   real(r8) :: xsum(grid%km)               ! temp array for parallel sums
+
+   integer :: varid                        ! variable id
+   integer :: ret                          ! return values
+   character(len=256) :: trunits           ! tracer untis
+
+   character(len=*), parameter :: sub='process_inidat'
+   !----------------------------------------------------------------------------
+
+   psxy   => dyn_in%ps
+   phisxy => dyn_in%phis
+   t3xy   => dyn_in%t3
+
+   npes_xy  = grid%npes_xy
+   im       = grid%im
+   jm       = grid%jm
+   km       = grid%km
+   ifirstxy = grid%ifirstxy
+   ilastxy  = grid%ilastxy
+   jfirstxy = grid%jfirstxy
+   jlastxy  = grid%jlastxy
+
+   select case (fieldname)
+
+   case ('T')
+
+      if (iam >= npes_xy) return
+
+      ! Add random perturbation to temperature if requested
+      if (pertlim /= 0._r8) then
+
+         if (masterproc) then
+            write(iulog,*) sub//':  Adding random perturbation bounded by +/-', &
+                           pertlim,' to initial temperature field'
+         end if
+
+         call get_horiz_grid_dim_d(nglon, nglat)
+         call random_seed(size=rndm_seed_sz)
+         allocate(rndm_seed(rndm_seed_sz))
+
+         do j = jfirstxy, jlastxy
+            do i = ifirstxy, ilastxy
+               ! seed random_number generator based on global column index
+               rndm_seed = i + (j-1)*nglon
+               call random_seed(put=rndm_seed)
+               do k = 1, km
+                  call random_number(pertval)
+                  pertval = 2._r8*pertlim*(0.5_r8 - pertval)
+                  t3xy(i,j,k) = t3xy(i,j,k)*(1._r8 + pertval)
+               end do
+            end do
+         end do
+             
+         deallocate(rndm_seed)
+      end if
+
+      ! Average T at the poles.
+      if (jfirstxy == 1) then
+         call par_xsum(grid, t3xy(:,1,:), km, xsum)
+         do k=1, km
+            do i = ifirstxy, ilastxy
+               t3xy(i,1,k) = xsum(k) / real(im,r8)
+            end do
+         end do
+      end if
+      if (jlastxy == jm) then
+         call par_xsum(grid, t3xy(:,jm,:), km, xsum)
+         do k = 1, km
+            do i = ifirstxy, ilastxy
+               t3xy(i,jm,k) = xsum(k) / real(im,r8)
+            end do
+         end do
+      end if
+
+   case ('CONSTS')
+
+      if (.not. present(m_cnst)) then
+         call endrun(sub//': ERROR:  m_cnst needs to be present in the'// &
+                     ' argument list')
+      end if
+
+      tracer => dyn_in%tracer	
+
+      if (readvar) then
+
+         ! Check that all tracer units are in mass mixing ratios
+         ret = pio_inq_varid(fh_ini, cnst_name(m_cnst), varid)
+         ret = pio_get_att (fh_ini, varid, 'units', trunits)
+         if (trunits(1:5) .ne. 'KG/KG' .and. trunits(1:5) .ne. 'kg/kg') then
+            call endrun(sub//': ERROR:  Units for tracer ' &
+                  //trim(cnst_name(m_cnst))//' must be in KG/KG')
+         end if
+
+      else
+
+         ! Constituents not read from initial file are initialized by the package that implements them.
+
+         if (iam >= npes_xy) return
+
+         if (m_cnst == 1 .and. moist_physics) then
+            call endrun(sub//': ERROR:  Q must be on Initial File')
+         end if
+
+         call cnst_init_default(m_cnst, latdeg(jfirstxy:jlastxy), londeg(ifirstxy:ilastxy,1), tracer(:,:,:,m_cnst))
+       end if
+
+      do k = 1, km
+         do j = jfirstxy, jlastxy
+            do i = ifirstxy, ilastxy                
+               tracer(i,j,k,m_cnst) = max(tracer(i,j,k,m_cnst), qmin(m_cnst))
+            end do
+         end do
+      end do
+
+      if (iam >= npes_xy) return
+
+      ! Compute polar average
+      if (jfirstxy == 1) then
+         call par_xsum(grid, dyn_in%tracer(:,1,:,m_cnst), km, xsum)
+         do k = 1, km
+            do i = ifirstxy, ilastxy
+               dyn_in%tracer(i,1,k,m_cnst) = xsum(k) / real(im,r8)
+            end do
+         end do
+      end if
+      if (jlastxy == jm) then
+         call par_xsum(grid, dyn_in%tracer(:,jm,:,m_cnst), km, xsum)
+         do k = 1, km
+            do i = ifirstxy, ilastxy
+               dyn_in%tracer(i,jm,k,m_cnst) = xsum(k) / real(im,r8)
+            end do
+         end do
+      end if
+
+   case ('PS')
+
+      ! Average PS at the poles.
+      if (jfirstxy == 1) then
+         if (size(psxy,2) > 0) then
+            call par_xsum(grid, psxy(:,1:1), 1, xsum(1:1))
+            do i = ifirstxy, ilastxy
+               psxy(i,1) = xsum(1) / real(im,r8)
+            end do
+         end if
+      end if
+      if (jlastxy == jm) then
+         call par_xsum(grid, psxy(:,jm:jm), 1, xsum(1:1))
+         do i = ifirstxy, ilastxy
+            psxy(i,jm) = xsum(1) / real(im,r8)
+         end do
+      end if
+
+   case ('PHIS')
+
+      ! Average PHIS at the poles.
+      if (jfirstxy == 1) then
+         if (size(phisxy,2) > 0) then
+            call par_xsum(grid, phisxy(:,1:1), 1, xsum(1:1))
+            do i = ifirstxy, ilastxy
+               phisxy(i,1) = xsum(1) / real(im,r8)
+            end do
+         end if
+      end if
+      if (jlastxy == jm) then
+         call par_xsum(grid, phisxy(:,jm:jm), 1, xsum(1:1))
+         do i = ifirstxy, ilastxy
+            phisxy(i,jm) = xsum(1) / real(im,r8)
+         end do
+      end if
+
+   end select
+
+end subroutine process_inidat
+
+!=========================================================================================
 
 end module dyn_comp

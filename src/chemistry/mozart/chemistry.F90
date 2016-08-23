@@ -17,6 +17,8 @@ module chemistry
   use shr_megan_mod,    only : shr_megan_mechcomps, shr_megan_mechcomps_n 
   use tracer_data,      only : MAXTRCRS
   use gcr_ionization,   only : gcr_ionization_readnl, gcr_ionization_init, gcr_ionization_adv
+  use epp_ionization,   only : epp_ionization_readnl, epp_ionization_adv
+  use mo_apex,          only : mo_apex_readnl
   use ref_pres,         only : do_molec_diff, ptop_ref
   use phys_control,     only : waccmx_is   ! WACCM-X switch query function
 
@@ -344,7 +346,6 @@ end function chem_is
     use aero_model,       only: aero_model_readnl
     use dust_model,       only: dust_readnl
     use gas_wetdep_opts,  only: gas_wetdep_readnl
-    use spedata,          only: spedata_defaultopts, spedata_setopts
     use upper_bc,         only: ubc_defaultopts, ubc_setopts
     use mo_drydep,        only: drydep_srf_file
     use noy_ubc,          only: noy_ubc_readnl
@@ -402,11 +403,6 @@ end function chem_is
     real(r8)           :: t_pert_ubc   ! temperature perturbation at ubc
     real(r8)           :: no_xfac_ubc  ! no multiplicative factor at ubc
 
-    ! waccm solor proton data variables
-    logical            :: spe_remove_file     ! true => the offline spe file will be removed
-    character(len=shr_kind_cl) :: spe_data_file       ! name of file that contains the spe data
-    character(len=shr_kind_cl) :: spe_filenames_list  ! file that lists a series of spe files 
-
     namelist /chem_inparm/ chem_freq, airpl_emis_file, &
          euvac_file, photon_file, electron_file, &
          depvel_file, xs_coef_file, xs_short_file, &
@@ -447,9 +443,6 @@ end function chem_is
     namelist /chem_inparm/ tgcm_ubc_file, tgcm_ubc_data_type, tgcm_ubc_cycle_yr, tgcm_ubc_fixed_ymd, tgcm_ubc_fixed_tod, &
                            snoe_ubc_file, t_pert_ubc, no_xfac_ubc
 
-    ! solar proton namelist variables
-    namelist /chem_inparm/ spe_data_file, spe_remove_file, spe_filenames_list
-
     ! get the default settings
 
     call linoz_data_defaultopts( &
@@ -481,11 +474,6 @@ end function chem_is
          tracer_srcs_cycle_yr_out  = tracer_srcs_cycle_yr,  &
          tracer_srcs_fixed_ymd_out = tracer_srcs_fixed_ymd, &
          tracer_srcs_fixed_tod_out = tracer_srcs_fixed_tod  )
-
-    ! for solar proton events forcings
-    call spedata_defaultopts( spe_data_file_out = spe_data_file, &
-         spe_remove_file_out = spe_remove_file, &
-         spe_filenames_list_out = spe_filenames_list )
 
     ! Upper boundary conditions
     call ubc_defaultopts( &
@@ -587,11 +575,6 @@ end function chem_is
     call mpibcast (t_pert_ubc,    1,                  mpir8,   0, mpicom)
     call mpibcast (no_xfac_ubc,   1,                  mpir8,   0, mpicom)
 
-    ! solar proton variables
-    call mpibcast (spe_data_file      ,len(spe_data_file)     ,mpichar,0,mpicom)
-    call mpibcast (spe_remove_file    ,1                      ,mpilog, 0, mpicom )
-    call mpibcast (spe_filenames_list ,len(spe_filenames_list),mpichar,0,mpicom)
-
     ! linoz data
 
     call mpibcast (linoz_data_file,      len(linoz_data_file),                  mpichar, 0, mpicom)
@@ -664,10 +647,6 @@ end function chem_is
         tracer_srcs_fixed_ymd_in = tracer_srcs_fixed_ymd, &
         tracer_srcs_fixed_tod_in = tracer_srcs_fixed_tod )
 
-   call spedata_setopts( spe_data_file_in = spe_data_file, &
-        spe_remove_file_in = spe_remove_file, &
-        spe_filenames_list_in = spe_filenames_list )
-
    ! Upper boundary conditions
    call ubc_setopts( &
         snoe_ubc_file_in =snoe_ubc_file, &
@@ -684,6 +663,8 @@ end function chem_is
 !
    call gas_wetdep_readnl(nlfile)
    call gcr_ionization_readnl(nlfile)
+   call epp_ionization_readnl(nlfile)
+   call mo_apex_readnl(nlfile)
    call noy_ubc_readnl(nlfile)
    call sulf_readnl(nlfile)
    call solar_parms_readnl(nlfile)
@@ -1040,7 +1021,7 @@ end function chem_is_active
 
 !================================================================================
 
-  subroutine chem_init_cnst( name, q, gcid)
+  subroutine chem_init_cnst( name, latvals, lonvals, mask, q)
 !----------------------------------------------------------------------- 
 ! 
 ! Purpose: 
@@ -1058,9 +1039,11 @@ end function chem_is_active
 !-----------------------------------------------------------------------
 ! Dummy arguments
 !-----------------------------------------------------------------------
-    character(len=*), intent(in) :: name                   !  constituent name
-    real(r8), intent(inout) :: q(:,:)           !  mass mixing ratio
-    integer, intent(in)     :: gcid(:)
+    character(len=*), intent(in)  :: name       !  constituent name
+    real(r8),         intent(in)  :: latvals(:) ! lat in degrees (ncol)
+    real(r8),         intent(in)  :: lonvals(:) ! lon in degrees (ncol)
+    logical,          intent(in)  :: mask(:)    ! Only initialize where .true.
+    real(r8),         intent(out) :: q(:,:)     ! kg tracer/kg dry air (gcol, plev
 
 !-----------------------------------------------------------------------
 ! Local variables
@@ -1118,7 +1101,6 @@ end function chem_is_active
 
     use mo_solar_parms,    only : solar_parms_timestep_init
     use mo_aurora,         only : aurora_timestep_init
-    use spedata,           only : advance_spedata
     use mo_photo,          only : photo_timestep_init
     use linoz_data,        only : linoz_data_adv
     use chlorine_loading_data, only : chlorine_loading_advance
@@ -1208,15 +1190,11 @@ end function chem_is_active
     !-----------------------------------------------------------------------------
     call photo_timestep_init( calday )
 
-    !-----------------------------------------------------------------------
-    ! Set up solar proton data
-    !-----------------------------------------------------------------------
-    call advance_spedata()
-
     call update_cfc11star( pbuf2d, phys_state )
     
     ! Galatic Cosmic Rays ...
     call gcr_ionization_adv( pbuf2d, phys_state )
+    call epp_ionization_adv()
 
   end subroutine chem_timestep_init
 

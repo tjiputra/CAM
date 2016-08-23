@@ -699,7 +699,7 @@ my $rad_prog_bcarb = (($prog_species =~ "BC"   or $aero_chem) and !($chem_rad_pa
 my $rad_prog_sulf  = (($prog_species =~ "SO4"  or $aero_chem or $chem =~ "super_fast_llnl") and !($chem_rad_passive));
 my $rad_prog_dust  = (($prog_species =~ "DST"  or $aero_chem) and !($chem_rad_passive));
 my $rad_prog_sslt  = (($prog_species =~ "SSLT" or $aero_chem) and !($chem_rad_passive));
-my $rad_prog_ozone = (($chem =~ "mozart" or $chem =~ "tsmlt" or $chem =~ "trop_strat" or $chem =~ "super_fast_llnl") and !($chem_rad_passive));
+my $rad_prog_ozone = (($chem =~ "mozart" or $chem =~ "waccm_ma" or $chem =~ "tsmlt" or $chem =~ "trop_strat" or $chem =~ "super_fast_llnl") and !($chem_rad_passive));
 
 # Check for eruptive volcano emissions.  These will be radiatively active by default, but
 # only if using BAM and the camrt radiation package
@@ -858,7 +858,7 @@ if ($rad_pkg eq 'rrtmg' or $chem =~ /waccm/) {
       die "$ProgName - ERROR: Specifying solar_const with RRTMG or WACCM is not allowed.\n"
    }
 
-   # use solar data file as the default for rrtmg and waccm_mozart
+   # use solar data file as the default for rrtmg and waccm_ma
    add_default($nl, 'solar_data_file');
    add_default($nl, 'solar_htng_spctrl_scl', 'val'=>'.true.');
 
@@ -985,7 +985,7 @@ my @aerosources = ();
 # and commas) that will be assigned to the namelist variable rad_climate.  
 my $radval = "'A:Q:H2O'";
 
-if (($chem =~ /waccm_mozart/ or $chem =~ /waccmx_mozart/ or $chem =~ /waccm_tsmlt/) and !$chem_rad_passive) {
+if (($chem =~ /waccm_ma/ or $chem =~ /waccmx_ma/ or $chem =~ /waccm_tsmlt/) and !$chem_rad_passive) {
     $radval .= ",'A:O2:O2','A:CO2:CO2'";
 }
 elsif ($chem =~ /trop_strat/ and !$chem_rad_passive) {
@@ -1017,7 +1017,7 @@ if ($rad_prog_ozone) {
 
 if (($chem =~ /super_fast_llnl/) and !$chem_rad_passive ) {
     $radval .= ",'N:N2O:N2O','N:prsd_ch4:CH4','N:CFC11:CFC11','N:CFC12:CFC12'";
-} elsif ((($chem =~ /waccm_mozart/) or ($chem =~ /waccmx_mozart/) or ($chem =~ /waccm_tsmlt/) or ($chem =~ /trop_strat/)) and !$chem_rad_passive ) {
+} elsif ((($chem =~ /waccm_ma/) or ($chem =~ /waccmx_ma/) or ($chem =~ /waccm_tsmlt/) or ($chem =~ /trop_strat/)) and !$chem_rad_passive ) {
     $radval .= ",'A:N2O:N2O','A:CH4:CH4','N:CFC11STAR:CFC11','A:CFC12:CFC12'";
 } elsif ($prog_ghg1 and $prog_ghg2 and !$chem_rad_passive ) {
     $radval .= ",'A:N2O:N2O','A:CH4:CH4','A:CFC11:CFC11','A:CFC12:CFC12'";
@@ -2008,7 +2008,7 @@ if ($chem =~ /trop_mozart/ or $chem =~ /trop_strat/ or $chem =~ /waccm_tsmlt/) {
                    'num_a1 -> ' => 'mam4_num_a1_ext_file',
                    'num_a2 -> ' => 'num_a2_ext_file',
                    'num_a4 -> ' => 'mam4_num_a4_ext_file',
-                   'IVOCbb -> ' => 'ivocbb_ext_file' );
+                   'SVOCbb -> ' => 'svocbb_ext_file' );
       $cyc_yr = '2000';
     } elsif ($chem =~ /mam4/) {
       %species = ( 'NO2    -> ' => 'no2_aircraft_emis_file',
@@ -2478,7 +2478,7 @@ if ($chem eq 'trop_mam3' or $chem eq 'waccm_sc_mam3') {
     }
 }
 
-if ($chem =~ /waccm_mozart_mam/ ) {
+if (($chem eq 'waccm_ma_mam3') or ($chem eq 'waccm_tsmlt_mam3')) {
 
     my %species;
 
@@ -2785,7 +2785,7 @@ if ($chem eq 'trop_mam7') {
 }
 
 # WACCM options.
-if ($chem =~ /waccm_mozart/ or $chem =~ /waccmx_mozart/ or $chem =~ /waccm_tsmlt/) {
+if ($chem =~ /waccm_ma/ or $chem =~ /waccmx_ma/ or $chem =~ /waccm_tsmlt/) {
 
     # Species with fixed lower boundary
     my $val = "'CCL4', 'CF2CLBR', 'CF3BR', 'CFC11', 'CFC113', 'CFC12', 'CH3BR', 'CH3CCL3', 'CH3CL', 'CH4', 'CO2', 'H2', 'HCFC22','N2O'";
@@ -2800,7 +2800,7 @@ if ($chem =~ /waccm_mozart/ or $chem =~ /waccmx_mozart/ or $chem =~ /waccm_tsmlt
 
     # Datasets
     my @files = ('flbc_file', 'efield_lflux_file', 'efield_hflux_file', 'efield_wei96_file',
-                 'photon_file', 'electron_file',
+                 'photon_file', 'electron_file', 'igrf_geomag_coefs_file',
                  'euvac_file', 'solar_parms_file',  
                  'depvel_lnd_file', 'clim_soilw_file', 'season_wes_file',
                  'xs_coef_file', 'xs_short_file','xs_long_file', 'rsf_file', 
@@ -2842,7 +2842,7 @@ if ($chem =~ /waccm_mozart/ or $chem =~ /waccmx_mozart/ or $chem =~ /waccm_tsmlt
     my %species = ('CO   -> ' => 'co_emis_file',
                    'CH2O -> ' => 'ch2o_emis_file',
                    'NO   -> ' => 'nox_emis_file' );
-    if ($chem eq 'waccm_mozart_sulfur') {
+    if ($chem eq 'waccm_ma_sulfur') {
        $species{ 'SO2  -> ' } = ( 'so2_emis_file' );
     }
 
@@ -2968,6 +2968,27 @@ add_default($nl, 'waccmx_opt');
 
 # Chemistry options
 
+# EPP namelist sanity checks
+
+(my $epp_all_file = $nl->get_value('epp_all_filepath')) =~ s/\s//g;
+(my $epp_spe_file = $nl->get_value('epp_spe_filepath')) =~ s/\s//g;
+(my $epp_gcr_file = $nl->get_value('epp_gcr_filepath')) =~ s/\s//g;
+(my $epp_mee_file = $nl->get_value('epp_mee_filepath')) =~ s/\s//g;
+(my $gcr_ion_file = $nl->get_value('gcr_ionization_filename')) =~ s/\s//g;
+
+if (length($gcr_ion_file)>2) {
+    if (length($epp_all_file)>2 or length($epp_gcr_file)>2) {
+	die "CAM Namelist ERROR: Conflicting GCR inputs specified.  Variable gcr_ionization_filename".
+            " is set while epp_all_filepath or epp_gcr_filepath is set.\n";
+    }
+}
+if (length($epp_all_file)>2) {
+    if (length($epp_gcr_file)>2 or length($epp_spe_file)>2 or length($epp_mee_file)>2 ) {
+        die "CAM Namelist ERROR: Conflicting EPP inputs specified.  Variable epp_all_filepath".
+            " is set while epp_gcr_filepath or epp_spe_filepath or epp_mee_filepath is set.\n";
+    }
+}
+
 # Add the name of the chemistry package based on the info in configure.  If the user tries
 # to explicitly specify this namelist variable issue error.
 my $cam_chempkg = $nl->get_value('cam_chempkg');
@@ -3000,7 +3021,6 @@ add_default($nl, 'srf_flux_avg', 'eddy_scheme'=>$eddy_scheme);
 # Microphysics scheme
 add_default($nl, 'use_subcol_microp');
 add_default($nl, 'microp_scheme');
-add_default($nl, 'micro_do_icesupersat');
 
 if ($cfg->get('microphys') =~ /^mg/) {
     add_default($nl, 'micro_mg_version');
@@ -3011,12 +3031,18 @@ if ($cfg->get('microphys') =~ /^mg/) {
     add_default($nl, 'micro_mg_dcs');
     add_default($nl, 'micro_mg_precip_frac_method');
     add_default($nl, 'micro_mg_berg_eff_factor');
+    add_default($nl, 'nucleate_ice_incloud');
+    add_default($nl, 'nucleate_ice_strat');
 }
 
 # Ice nucleation options
 add_default($nl, 'use_hetfrz_classnuc');
 add_default($nl, 'use_preexisting_ice');
-
+if ($chem =~ /_mam7/) {
+    if ($nl->get_value('use_preexisting_ice') =~ m/$TRUE/io) {
+        die "$ProgName - Error: use_preexisting_ice is not supported by MAM7 \n";
+    }
+}
 
 # Macrophysics scheme
 add_default($nl, 'macrop_scheme');
@@ -3071,20 +3097,11 @@ if ($clubb_sgs  =~ /$TRUE/io) {
    if($clubb_do_adv == '1') {
        add_default($nl, 'clubb_do_adv', 'val'=>'.true.');
    }
-   my $clubb_do_deep = $cfg->get('clubb_do_deep');
-   if($clubb_do_deep == '1') {
-       add_default($nl, 'clubb_do_deep', 'val'=>'.true.');
-   }
    add_default($nl, 'clubb_history');
    add_default($nl, 'clubb_rad_history');
 
-   # Check compatibility of clubb_do_deep (if set) with deep_scheme
-   my $clubb_do_deep = $nl->get_value('clubb_do_deep');
-   if (defined $clubb_do_deep) {
-      my $deep_scheme = $nl->get_value('deep_scheme');
-      if ($deep_scheme ne "'CLUBB_SGS'" &&  $clubb_do_deep == /$TRUE/io) {
-        die "$ProgName - ERROR: clubb_do_deep = .true. but incompatible deep_scheme=$deep_scheme and needs to be 'CLUBB_SGS'\n";
-      }
+   if ($nl->get_value('clubb_history') =~ "true" &&  $nl->get_value('atm_nthreads') != 1) {
+     die "$ProgName - ERROR: clubb_history = .true. with multiple threads is not supported. \n";
    }
 
    add_default($nl, 'clubb_expldiff');
@@ -3093,6 +3110,25 @@ if ($clubb_sgs  =~ /$TRUE/io) {
    add_default($nl, 'clubb_timestep');
    add_default($nl, 'clubb_rnevap_effic');
    add_default($nl, 'clubb_stabcorrect');
+
+   add_default($nl, 'clubb_c11');
+   add_default($nl, 'clubb_c11b');
+   add_default($nl, 'clubb_mult_coef');
+   add_default($nl, 'clubb_gamma_coef');
+   add_default($nl, 'clubb_c_K10');
+   add_default($nl, 'clubb_c_K10h');
+   add_default($nl, 'clubb_beta');
+   add_default($nl, 'clubb_C2rt');
+   add_default($nl, 'clubb_C2thl');
+   add_default($nl, 'clubb_C2rtthl');
+   add_default($nl, 'clubb_C8');
+   add_default($nl, 'clubb_C7');
+   add_default($nl, 'clubb_C7b');
+   add_default($nl, 'clubb_lambda0_stability_coef');
+   add_default($nl, 'clubb_Skw_denom_coef');
+   add_default($nl, 'clubb_l_lscale_plume_centered');
+   add_default($nl, 'clubb_l_use_ice_latent');
+   add_default($nl, 'clubb_do_liqsupersat');
 }
 
 # Tuning for wet scavenging of modal aerosols
@@ -3110,13 +3146,23 @@ my $do_tms = $nl->get_value('do_tms');
 if (defined $nl->get_value('tms_orocnst') or defined $nl->get_value('tms_z0fac')) {
     # a tms parameter has been set in the namelist.  Make sure do_tms is true.
     if ( $do_tms =~ /$FALSE/io ) {
-        die "CAM Namelist ERROR: If tms_oroconst or tms_z0fac is set do_tms must be .true..\n".
+        die "$ProgName - ERROR: If tms_oroconst or tms_z0fac is set do_tms must be .true..\n".
             "Either remove these from the namelist or add do_tms=.true.\n";
     }
 }
 if ( $do_tms =~ /$TRUE/io ) {
     add_default($nl, 'tms_orocnst');
     add_default($nl, 'tms_z0fac');
+}
+
+
+# Beljaars 
+add_default($nl, 'do_beljaars');
+my $do_beljaars = $nl->get_value('do_beljaars');
+if ($do_tms =~ /$TRUE/io and $do_beljaars =~ /$TRUE/io) {
+    die "$ProgName - ERROR: by default, do_beljaars and do_tms cannot be set to  \n".
+        "true at the same time. If you really want to set do_beljaars and do_tms \n".
+        "to true at the same time, remove this check from the build-namelist.    \n";
 }
 
 # Implicit Turbulent Surface Stress
@@ -3142,6 +3188,7 @@ add_default($nl, 'cldfrc_iceopt');
 add_default($nl, 'cldfrc_icecrit');
 add_default($nl, 'cldfrc2m_rhmini');
 add_default($nl, 'cldfrc2m_rhmaxi');
+add_default($nl, 'cldfrc2m_do_subgrid_growth');
 
 my $rk_strat_polstrat_rhmin = $nl->get_value('rk_strat_polstrat_rhmin');
 if ($rk_strat_polstrat_rhmin and !($cfg->get('microphys') eq 'rk')) {
@@ -3156,6 +3203,7 @@ add_default($nl, 'zmconv_c0_ocn');
 add_default($nl, 'zmconv_ke');
 add_default($nl, 'zmconv_ke_lnd');
 add_default($nl, 'zmconv_org');
+add_default($nl, 'zmconv_num_cin');
 
 # moist convection rainwater coefficients
 add_default($nl, 'hkconv_cmftau');
@@ -3232,10 +3280,11 @@ if ($chem =~ /_mam(\d)/) {
 
 # By default, orographic waves are always on
 add_default($nl, 'use_gw_oro'       , 'val'=>'.true.');
+add_default($nl, 'use_gw_rdg_beta'  , 'val'=>'.false.');
+add_default($nl, 'use_gw_rdg_gamma' , 'val'=>'.false.');
 add_default($nl, 'use_gw_front_igw' , 'val'=>'.false.');
 add_default($nl, 'use_gw_convect_sh', 'val'=>'.false.');
 add_default($nl, 'gw_lndscl_sgh');
-add_default($nl, 'gw_prndl');
 add_default($nl, 'gw_oro_south_fac');
 add_default($nl, 'gw_limit_tau_without_eff');
 add_default($nl, 'gw_apply_tndmax');
@@ -3258,11 +3307,13 @@ if ($waccm_phys or $cfg->get('nlev') >= 60) {
 }
 
 # We need a lot of logic to use these below, so make flags for them.
-my $do_gw_oro = ($nl->get_value('use_gw_oro') =~ /$TRUE/io);
-my $do_gw_front = ($nl->get_value('use_gw_front') =~ /$TRUE/io);
-my $do_gw_front_igw = ($nl->get_value('use_gw_front_igw') =~ /$TRUE/io);
+my $do_gw_oro        = ($nl->get_value('use_gw_oro')        =~ /$TRUE/io);
+my $do_gw_front      = ($nl->get_value('use_gw_front')      =~ /$TRUE/io);
+my $do_gw_front_igw  = ($nl->get_value('use_gw_front_igw')  =~ /$TRUE/io);
 my $do_gw_convect_dp = ($nl->get_value('use_gw_convect_dp') =~ /$TRUE/io);
 my $do_gw_convect_sh = ($nl->get_value('use_gw_convect_sh') =~ /$TRUE/io);
+my $do_gw_rdg_beta   = ($nl->get_value('use_gw_rdg_beta')   =~ /$TRUE/io);
+my $do_gw_rdg_gamma  = ($nl->get_value('use_gw_rdg_gamma')  =~ /$TRUE/io);
 
 # GW option used only for backwards compatibility with CAM3.
 add_default($nl, 'fcrit2');
@@ -3312,6 +3363,34 @@ if ($do_gw_convect_dp) {
 if ($do_gw_convect_sh) {
     add_default($nl, 'gw_drag_file_sh');
     add_default($nl, 'effgw_beres_sh');
+}
+
+if ($do_gw_rdg_beta) {
+    add_default($nl, 'n_rdg_beta',          'val'=>'10');
+    add_default($nl, 'effgw_rdg_beta',      'val'=>'1.0D0');
+    add_default($nl, 'effgw_rdg_beta_max',  'val'=>'1.0D0');
+    add_default($nl, 'trpd_leewv_rdg_beta', 'val'=>'.false.');
+    add_default($nl, 'rdg_beta_cd_llb',     'val'=>'1.0D0');
+}
+
+if ($do_gw_rdg_beta) {
+    add_default($nl, 'gw_prndl',      'val'=>'0.5D0');  
+} else {
+    add_default($nl, 'gw_prndl');
+}
+
+if ($do_gw_rdg_gamma) {
+    add_default($nl, 'n_rdg_gamma',           'val'=>'-1');
+    add_default($nl, 'effgw_rdg_gamma',       'val'=>'1.0D0');
+    add_default($nl, 'effgw_rdg_gamma_max',   'val'=>'1.0D0');
+    add_default($nl, 'trpd_leewv_rdg_gamma',  'val'=>'.true.');
+    add_default($nl, 'rdg_gamma_cd_llb',      'val'=>'1.0D0');
+    add_default($nl, 'bnd_rdggm');
+}
+
+if (($do_gw_rdg_beta or $do_gw_rdg_gamma) and $do_gw_oro) {
+    die "$ProgName - ERROR: both orographic wave and ridge scheme are on. \n" ;
+    "Turn off one of them.\n";
 }
 
 # Some complexity to unpack.

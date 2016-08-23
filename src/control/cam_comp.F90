@@ -75,10 +75,13 @@ subroutine cam_init(EClock, &
 
    use history_defaults, only: bldfld
    use cam_initfiles,    only: cam_initfiles_open
-   use inital,           only: cam_initial
+   use dyn_grid,         only: dyn_grid_init
+   use phys_grid,        only: phys_grid_init
+   use physpkg,          only: phys_register, phys_init
+   use chem_surfvals,    only: chem_surfvals_init
+   use dyn_comp,         only: dyn_init
    use cam_restart,      only: cam_read_restart
    use stepon,           only: stepon_init
-   use physpkg,          only: phys_init, phys_register
    
 #if (defined BFB_CAM_SCAM_IOP)
    use history_defaults, only: initialize_iop_history
@@ -158,14 +161,25 @@ subroutine cam_init(EClock, &
    filein = "atm_in" // trim(inst_suffix)
    call read_namelist(filein, single_column, scmlat, scmlon)
 
+   ! Open initial or restart file, and topo file if specified.
+   call cam_initfiles_open()
+
+   ! Initialize grids and dynamics grid decomposition
+   call dyn_grid_init()
+
+   ! Initialize physics grid decomposition
+   call phys_grid_init()
+
    ! Register advected tracers and physics buffer fields
    call phys_register ()
 
+   ! Initialize ghg surface values before default initial distributions
+   ! are set in dyn_init
+   call chem_surfvals_init()
 
    if (initial_run) then
 
-      call cam_initfiles_open()
-      call cam_initial(dyn_in, dyn_out)
+      call dyn_init(dyn_in, dyn_out)
 
       ! Allocate and setup surface exchange data
       call atm2hub_alloc(cam_out)

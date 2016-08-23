@@ -7,8 +7,8 @@ include(CESM_utils)
 
 # Useful paths.
 set(CAMROOT ../../)
-set(CESMROOT ${CAMROOT}../../../)
-set(SHAREROOT ${CESMROOT}/models/csm_share)
+set(CESMROOT ${CAMROOT}../../)
+set(SHAREROOT ${CESMROOT}/cime/share/csm_share)
 
 # Add share code to source list.
 include_directories(${SHAREROOT}/include ${SHAREROOT}/shr)
@@ -23,6 +23,7 @@ add_subdirectory(mock)
 
 # Build part of csm_share as a library.
 add_library(csm_share ${share_sources})
+declare_generated_dependencies(csm_share "${share_genf90_sources}")
 get_target_property(includes csm_share INCLUDE_DIRECTORIES)
 if(NOT includes)
   unset(includes)

@@ -1887,7 +1887,7 @@ contains
 !-----------------------------------------------------------------------
   subroutine set_met_rlx( )
 
-    use pmgrid
+    use pmgrid, only: plev
     use hycoef, only: hypm, ps0
 
     integer :: k, k_cnt, k_top

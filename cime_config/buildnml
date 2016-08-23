@@ -94,7 +94,7 @@ if ($BUILD_COMPLETE eq 'FALSE') {
 
     $sysmod = "$SRCROOT/components/cam/bld/configure -s -fc_type $COMPILER -ccsm_seq -ice none " .
               " -ocn $ocn -comp_intf $comp $scm -spmd $spmd -smp $smp -dyn $CAM_DYCORE "          .
-              " -res $ATM_GRID $nlev $CAM_LIB_DIRS $CAM_CONFIG_OPTS"                              ;
+              " -res $ATM_GRID $nlev $CAM_LIB_DIRS $CAM_CONFIG_OPTS -usr_src $CASEROOT/SourceMods/src.cam ";
     system($sysmod) == 0 or die "ERROR cam.buildnml: $sysmod failed: $?\n";
 
 } else {

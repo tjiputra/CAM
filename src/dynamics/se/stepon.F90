@@ -199,7 +199,7 @@ subroutine stepon_run2(phys_state, phys_tend, dyn_in, dyn_out )
    use dimensions_mod, only: nlev, nelemd, np, npsq
    use dp_coupling,    only: p_d_coupling
    use parallel_mod,   only: par
-   use dyn_comp,       only: TimeLevel
+   use dyn_grid,       only: TimeLevel
    
    use time_mod,        only: tstep, phys_tscale, TimeLevel_Qdp   !  dynamics typestep
    use control_mod,     only: ftype, qsplit, smooth_phis_numcycle

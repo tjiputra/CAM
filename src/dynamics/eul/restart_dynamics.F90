@@ -381,26 +381,28 @@ subroutine init_restart_dynamics(File, dyn_out)
   !#######################################################################
 
   subroutine read_restart_dynamics (File, dyn_in, dyn_out)
+
     use dyn_comp, only : dyn_init, dyn_import_t, dyn_export_t
     use cam_pio_utils, only : pio_subsystem
 
     use pmgrid,          only: plon, plat, beglat, endlat
-    use scanslt,         only: scanslt_alloc
+    use ppgrid,          only: pver
+    
 #if ( defined BFB_CAM_SCAM_IOP )
     use iop,             only: init_iop_fields
 #endif
     use massfix,         only: alpha, hw1, hw2, hw3
-    use prognostics,     only:  ptimelevels, n3m2, n3m1, n3, initialize_prognostics
-    use ppgrid,          only: pver
+    use prognostics,     only: n3m2, n3m1, n3
+
     use constituents,    only: pcnst
     use eul_control_mod, only: fixmas, tmass0
 
     !
     ! Input arguments
     !
-    type(file_desc_t), intent(inout) :: File     ! PIO file handle
-    type(dyn_import_t) :: dyn_in    ! not used by this dycore, included for compatibility
-    type(dyn_export_t) :: dyn_out ! not used by this dycore, included for compatibility
+    type(file_desc_t),  intent(inout) :: File     ! PIO file handle
+    type(dyn_import_t), intent(out)   :: dyn_in
+    type(dyn_export_t), intent(out)   :: dyn_out
     !
     ! Local workspace
     !
@@ -416,10 +418,8 @@ subroutine init_restart_dynamics(File, dyn_out)
     integer :: ndims, timelevels, i, s2d, s3d, s4d
     type(var_desc_t), pointer :: vdesc
 
-    call dyn_init(file)
+    call dyn_init(dyn_in, dyn_out)
 
-    call initialize_prognostics
-	
     dims4d(1) = plon
     dims4d(2) = pver
     dims4d(3) = pcnst
@@ -445,8 +445,6 @@ subroutine init_restart_dynamics(File, dyn_out)
     call pio_initdecomp(pio_subsystem, pio_double, (/plon,plat/), ldof, iodesc2d)
     deallocate(ldof)
 
-    call scanslt_alloc()
-    
     ierr = PIO_Inq_varid(File, 'tmass0', tmass0desc)
     ierr = pio_get_var(File, tmass0desc, tmass0)
     ierr = PIO_Inq_varid(File,'fixmas', fixmasdesc)

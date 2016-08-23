@@ -326,9 +326,9 @@ contains
     integer :: lchnk      ! Chunk number 
     integer :: ncol       ! Number of columns in current chunk 
 
-    integer :: indxUe     ! pbuf index for eastward ExB drift
-    integer :: indxVe     ! pbuf index for northward ExB drift
-    integer :: indxWe     ! pbuf index for upward ExB drift
+    integer :: indxUi     ! pbuf index for eastward ExB drift
+    integer :: indxVi     ! pbuf index for northward ExB drift
+    integer :: indxWi     ! pbuf index for upward ExB drift
 
     integer :: indxIR     ! pbuf index for ionization rates
     integer :: indxAIPRS  ! pbuf index for aurora ion production rate sum
@@ -349,9 +349,12 @@ contains
     real(r8), parameter :: teTiBotPres   = 50._r8   ! Pressure above which electron/ion temperature are calculated in WACCM-X. (Pa)
     real(r8), parameter :: vAmbBotPres   = 0.001_r8 ! Pressure above which O+ is calculated in WACCM-X. (Pa)
     
-    real(r8), dimension(:), pointer   :: ue  ! pointer to eastward ExB drift in pbuf (from module iondrag)
-    real(r8), dimension(:), pointer   :: ve  ! pointer to northward ExB drift in pbuf
-    real(r8), dimension(:), pointer   :: we  ! pointer to upward ExB drift in pbuf
+!
+! Pointers to 3d ion drift velocities
+!
+    real(r8), dimension(:,:), pointer :: ui  ! pointer to eastward ExB drift in pbuf
+    real(r8), dimension(:,:), pointer :: vi  ! pointer to northward ExB drift in pbuf
+    real(r8), dimension(:,:), pointer :: wi  ! pointer to upward ExB drift in pbuf
 
     character(len = 3), dimension(nCnst) :: cCnst
 
@@ -559,33 +562,24 @@ contains
     
     enddo
 
-    !---------------------------------------------------------------------------------
-    ! Get ion ExB drift from physics buffer (they were defined by exbdrift module)
-    ! Ion drifts are 2d output arrays, i.e., no vertical dimension but 1d here (pcols)
-    !---------------------------------------------------------------------------------
-    indxUe = pbuf_get_index( 'UE' )
-    indxVe = pbuf_get_index( 'VE' )
-    indxWe = pbuf_get_index( 'WE' )
-    call pbuf_get_field(pbuf, indxUe, ue)
-    call pbuf_get_field(pbuf, indxVe, ve)
-    call pbuf_get_field(pbuf, indxWe, we)
+    !--------------------------------------------------------------------------------------
+    ! Get ion ExB drift velocities from physics buffer (they were defined by exbdrift module)
+    !--------------------------------------------------------------------------------------
 
-    !-------------------------------------------------------------------------------
-    !  Form 2D drifts needed for this module.  Vertical level goes to teTiBotP since
-    !  needed below to get vertical drift on interface levels
-    !-------------------------------------------------------------------------------
+    indxUi = pbuf_get_index( 'UI' )
+    indxVi = pbuf_get_index( 'VI' )
+    indxWi = pbuf_get_index( 'WI' )
+    call pbuf_get_field(pbuf, indxUi, ui)
+    call pbuf_get_field(pbuf, indxVi, vi)
+    call pbuf_get_field(pbuf, indxWi, wi)
     do iVer = 1, pver
-    
-      do iCol = 1, ncol
-
-        ue2d(iCol,iVer) = ue(iCol)
-        ve2d(iCol,iVer) = ve(iCol)
-        we2d(iCol,iVer) = we(iCol)
-
-      enddo
-    
+       do iCol = 1, ncol
+          ue2d(iCol,iVer) = ui(iCol,iVer)
+          ve2d(iCol,iVer) = vi(iCol,iVer)
+          we2d(iCol,iVer) = wi(iCol,iVer)
+       enddo
     enddo
-     
+
     !-------------------------------------------------------------------------------
     !  Need vertical ExB drift on interface levels
     !-------------------------------------------------------------------------------
@@ -1432,7 +1426,6 @@ contains
     use exbdrift,            only : map_mag2geo, cal_mlt             ! Methods to convert e field from mag to geo coords
     use constituents,        only : cnst_get_ind, cnst_mw            ! Routines to get molecular weights for constituents
     use short_lived_species, only : slvd_index                       ! Routine to access short lived species in pbuf
-    use charge_neutrality,   only : charge_fix
     use constituents,        only : pcnst                            ! Number of state%q constituents
 
     implicit none

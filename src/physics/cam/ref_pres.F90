@@ -3,7 +3,7 @@ module ref_pres
 ! 
 ! Provides access to reference pressures for use by the physics
 ! parameterizations.  The pressures are provided by the dynamical core
-! since it currently determines the grid used by the physics.
+! since it determines the grid used by the physics.
 ! 
 ! Note that the init method for this module is called before the init
 ! method in physpkg; therefore, most physics modules can use these
@@ -103,32 +103,39 @@ end subroutine ref_pres_readnl
 
 !====================================================================================
 
-subroutine ref_pres_init
+subroutine ref_pres_init(pref_edge_in, pref_mid_in, num_pr_lev_in)
 
-  use dyn_grid,     only: dyn_grid_get_pref
+   ! Initialize reference pressures
 
-  ! Get reference pressures from the dynamical core.
-  call dyn_grid_get_pref(pref_edge, pref_mid, num_pr_lev)
+   ! arguments
+   real(r8), intent(in) :: pref_edge_in(:) ! reference pressure at layer edges (Pa)
+   real(r8), intent(in) :: pref_mid_in(:)  ! reference pressure at layer midpoints (Pa)
+   integer,  intent(in) :: num_pr_lev_in   ! number of top levels using pure pressure representation
+   !---------------------------------------------------------------------------
 
-  ptop_ref = pref_edge(1)
-  psurf_ref = pref_edge(pverp)
+   pref_edge = pref_edge_in
+   pref_mid  = pref_mid_in
+   num_pr_lev = num_pr_lev_in
 
-  pref_mid_norm = pref_mid/psurf_ref
+   ptop_ref = pref_edge(1)
+   psurf_ref = pref_edge(pverp)
 
-  ! Find level corresponding to the top of troposphere clouds.
-  trop_cloud_top_lev = press_lim_idx(trop_cloud_top_press, &
-       top=.true.)
+   pref_mid_norm = pref_mid/psurf_ref
 
-  ! Find level corresponding to the top for MAM processes.
-  clim_modal_aero_top_lev = press_lim_idx(clim_modal_aero_top_press, &
-       top=.true.)
+   ! Find level corresponding to the top of troposphere clouds.
+   trop_cloud_top_lev = press_lim_idx(trop_cloud_top_press, &
+      top=.true.)
 
-  ! Find level corresponding to the molecular diffusion bottom.
-  do_molec_diff = (ptop_ref < do_molec_press)
-  if (do_molec_diff) then
-     nbot_molec = press_lim_idx(molec_diff_bot_press, &
-          top=.false.)
-  end if
+   ! Find level corresponding to the top for MAM processes.
+   clim_modal_aero_top_lev = press_lim_idx(clim_modal_aero_top_press, &
+      top=.true.)
+
+   ! Find level corresponding to the molecular diffusion bottom.
+   do_molec_diff = (ptop_ref < do_molec_press)
+   if (do_molec_diff) then
+      nbot_molec = press_lim_idx(molec_diff_bot_press, &
+         top=.false.)
+   end if
 
 end subroutine ref_pres_init
 

@@ -137,12 +137,17 @@ real(r8), parameter, public :: bs = 0.41_r8
 ! cloud ice
 real(r8), parameter, public :: ai = 700._r8
 real(r8), parameter, public :: bi = 1._r8
+! small cloud ice (r< 10 um) - sphere, bulk density
+real(r8), parameter, public :: aj = ac*((rhoi/rhows)**(bc/3._r8))*rhows/rhow
+real(r8), parameter, public :: bj = bc
 ! rain
 real(r8), parameter, public :: ar = 841.99667_r8
 real(r8), parameter, public :: br = 0.8_r8
 
 ! mass of new crystal due to aerosol freezing and growth (kg)
-real(r8), parameter, public :: mi0 = 4._r8/3._r8*pi*rhoi*(10.e-6_r8)**3
+! Make this consistent with the lower bound, to support UTLS and
+! stratospheric ice, and the smaller ice size limit.
+real(r8), parameter, public :: mi0 = 4._r8/3._r8*pi*rhoi*(1.e-6_r8)**3
 
 !=================================================
 ! Private module parameters
@@ -286,7 +291,8 @@ subroutine micro_mg_utils_init( kind, rh2o, cpair, tmelt_in, latvap, &
 
   ! Mean ice diameter can not grow bigger than twice the autoconversion
   ! threshold for snow.
-  ice_lambda_bounds = 1._r8/[2._r8*dcs, 10.e-6_r8]
+  ice_lambda_bounds = 1._r8/[2._r8*dcs, 1.e-6_r8]
+
   mg_ice_props = MGHydrometeorProps(rhoi, dsph, &
        ice_lambda_bounds, min_mean_mass_ice)
 

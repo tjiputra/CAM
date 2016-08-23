@@ -98,7 +98,7 @@ fi
 # Override CESM pe layout.
 #
 
-for comp in ATM LND ICE OCN CPL GLC ROF WAV; do
+for comp in ATM LND ICE OCN CPL GLC ROF WAV ESP; do
     echo "./xmlchange -file env_mach_pes.xml -id NTASKS_${comp} -val $CAM_TASKS"
     ./xmlchange -file env_mach_pes.xml -id NTASKS_${comp} -val $CAM_TASKS
 #    echo "./xmlchange DEBUG=TRUE"
