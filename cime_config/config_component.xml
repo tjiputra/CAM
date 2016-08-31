@@ -171,7 +171,7 @@
       <value compset="PIPD_CAM5"        >1850-PD_cam5</value>
       <value compset="2000_CAM%DABIP04" >dabi_p2004</value>
       <value compset="1850_CAM54%PTAERO"  >1850_cam54_ptaero</value>
-      <value compset="1850_CAM55%PTAERO"  >1850_cam55_ptaero</value>
+      <value compset="1850_CAM55%PTAERO"  >1850_cam54_ptaero</value>
       <value compset="2000_CAM54%PTAERO"  >cam54_ptaero_up1</value>
       <value compset="_CAM5%NUDGEPTAERO" >2000_cam5_oslonudge</value>
       <value compset="_CAM5%NUDGEPTAEROUPD1">cam5_nudge_ptaero_up1</value>
