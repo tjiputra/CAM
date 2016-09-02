@@ -50,8 +50,9 @@ module scanslt
   parameter (beglatex   = 1)
   parameter (endlatex   = platd)
 #endif
-  integer :: nlonex(platd)           ! Number of longitudes for each latitude on
+  integer :: nlonex(platd) = huge(1) ! Number of longitudes for each latitude on
                                      ! extended grid
+
   integer, public, parameter :: plondfft = plon + 2
 
   public numbnd, plndlv
@@ -264,7 +265,6 @@ subroutine slt_alloc()
 !-----------------------------------------------------------------------
   use infnan,       only: nan, assignment(=)
 
-  nlonex(:) = huge(1)
   allocate (qfcst(plon,plev,pcnst,beglat:endlat))
   qfcst (:,:,:,:) = nan
 end subroutine slt_alloc

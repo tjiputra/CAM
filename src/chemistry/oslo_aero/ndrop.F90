@@ -387,7 +387,7 @@ end subroutine ndrop_init
 
 subroutine dropmixnuc( &
    state, ptend, dtmicro, pbuf, wsub,          &  ! Input
-   cldn, cldo,                                 &
+   cldn, cldo, cldliqf,                                &
    !++ MH_2015/09/07
    hasAerosol, &
    CProcessModes, f_c, f_bc, f_aq, f_so4_cond, &
@@ -417,6 +417,7 @@ subroutine dropmixnuc( &
    real(r8), intent(in) :: wsub(pcols,pver)    ! subgrid vertical velocity
    real(r8), intent(in) :: cldn(pcols,pver)    ! cloud fraction
    real(r8), intent(in) :: cldo(pcols,pver)    ! cloud fraction on previous time step
+   real(r8), intent(in) :: cldliqf(pcols,pver) ! liquid cloud fraction (liquid / (liquid + ice))
 
 !++ MH_2015/09/07
    logical, intent(in)  :: hasAerosol(pcols, pver, nmodes)
@@ -478,6 +479,8 @@ subroutine dropmixnuc( &
    real(r8) :: arg
    real(r8) :: dtinv
    real(r8) :: dtmin, tinv, dtt
+   real(r8) :: lcldn(pcols,pver)
+   real(r8) :: lcldo(pcols,pver)
 
    real(r8) :: zs(pver) ! inverse of distance between levels (m)
    real(r8) :: qcld(pver) ! cloud droplet number mixing ratio (#/kg)
@@ -609,6 +612,12 @@ subroutine dropmixnuc( &
 
    call pbuf_get_field(pbuf, kvh_idx, kvh)
 
+   ! Create the liquid weighted cloud fractions that were passsed in
+   ! before. This doesn't seem like the best variable, since the cloud could
+   ! have liquid condensate, but the part of it that is changing could be the
+   ! ice portion; however, this is what was done before.
+   lcldo = cldo * cldliqf
+   lcldn = cldn * cldliqf
 
 
    arg = 1.0_r8
@@ -972,24 +981,57 @@ subroutine dropmixnuc( &
       ! grow_shrink_main_k_loop: &
       do k = top_lev, pver
 
-         ! shrinking cloud ......................................................
+         ! This code was designed for liquid clouds, but the cloudbourne
+         ! aerosol can be either from liquid or ice clouds. For the ice clouds,
+         ! we do not do regeneration, but as cloud fraction decreases the
+         ! aerosols should be returned interstitial. The lack of a liquid cloud
+         ! should not mean that all of the aerosol is realease. Therefor a
+         ! section has been added for shrinking ice clouds and checks were added
+         ! to protect ice cloudbourne aerosols from being released when no
+         ! liquid cloud is present.
+
+         ! shrinking ice cloud ......................................................
+         cldo_tmp = cldo(i,k) * (1._r8 - cldliqf(i,k))
+         cldn_tmp = cldn(i,k) * (1._r8 - cldliqf(i,k))
+
+         if (cldn_tmp < cldo_tmp) then
+
+            ! convert activated aerosol to interstitial in decaying cloud
+
+            dumc = (cldn_tmp - cldo_tmp)/cldo_tmp * (1._r8 - cldliqf(i,k))
+            do m = 1, ntot_amode
+               mm = mam_idx(m,0)
+               dact   = raercol_cw(k,mm,nsav)*dumc
+               raercol_cw(k,mm,nsav) = raercol_cw(k,mm,nsav) + dact   ! cloud-borne aerosol
+               raercol(k,mm,nsav)    = raercol(k,mm,nsav) - dact
+               do l = 1, nspec_amode(m)
+                  mm = mam_idx(m,l)
+                  dact    = raercol_cw(k,mm,nsav)*dumc
+                  raercol_cw(k,mm,nsav) = raercol_cw(k,mm,nsav) + dact  ! cloud-borne aerosol
+                  raercol(k,mm,nsav)    = raercol(k,mm,nsav) - dact
+               end do
+            end do
+         end if
+
+         ! shrinking liquid cloud ......................................................
          !    treat the reduction of cloud fraction from when cldn(i,k) < cldo(i,k)
          !    and also dissipate the portion of the cloud that will be regenerated
-         cldo_tmp = cldo(i,k)
-         cldn_tmp = cldn(i,k) * exp( -dtmicro/tau_cld_regenerate )
+         cldo_tmp = lcldo(i,k)
+         cldn_tmp = lcldn(i,k) * exp( -dtmicro/tau_cld_regenerate )
          !    alternate formulation
          !    cldn_tmp = cldn(i,k) * max( 0.0_r8, (1.0_r8-dtmicro/tau_cld_regenerate) )
 
+         ! fraction is also provided. 
          if (cldn_tmp < cldo_tmp) then
             !  droplet loss in decaying cloud
             !++ sungsup
-            nsource(i,k) = nsource(i,k) + qcld(k)*(cldn_tmp - cldo_tmp)/cldo_tmp*dtinv
+            nsource(i,k) = nsource(i,k) + qcld(k)*(cldn_tmp - cldo_tmp)/cldo_tmp*cldliqf(i,k)*dtinv
             qcld(k)      = qcld(k)*(1._r8 + (cldn_tmp - cldo_tmp)/cldo_tmp)
             !-- sungsup
 
             ! convert activated aerosol to interstitial in decaying cloud
 
-            dumc = (cldn_tmp - cldo_tmp)/cldo_tmp
+            dumc = (cldn_tmp - cldo_tmp)/cldo_tmp * cldliqf(i,k)
             do m = 1, ntot_amode
                mm = mam_idx(m,0)
                dact   = raercol_cw(k,mm,nsav)*dumc
@@ -1012,7 +1054,7 @@ subroutine dropmixnuc( &
          !    treat the increase of cloud fraction from when cldn(i,k) > cldo(i,k)
          !    and also regenerate part of the cloud 
          cldo_tmp = cldn_tmp
-         cldn_tmp = cldn(i,k)
+         cldn_tmp = lcldn(i,k)
 
          if (cldn_tmp-cldo_tmp > 0.01_r8) then
 
@@ -1174,7 +1216,7 @@ subroutine dropmixnuc( &
          kp1 = min0(k+1, pver)
          taumix_internal_pver_inv = 0.0_r8
 
-         if (cldn(i,k) > 0.01_r8) then
+         if (lcldn(i,k) > 0.01_r8) then
 
             wdiab = 0._r8
             wmix  = 0._r8                       ! single updraft
@@ -1183,7 +1225,7 @@ subroutine dropmixnuc( &
             wmax  = 10._r8
             wmin  = 0._r8
 
-            if (cldn(i,k) - cldn(i,kp1) > 0.01_r8 .or. k == pver) then
+            if (lcldn(i,k) - lcldn(i,kp1) > 0.01_r8 .or. k == pver) then
 
                ! cloud base
 
@@ -1200,7 +1242,7 @@ subroutine dropmixnuc( &
                !      fluxes calculated in explmix.
                ekd(k) = wbar/zs(k)
 
-               alogarg = max(1.e-20_r8, 1/cldn(i,k) - 1._r8)
+               alogarg = max(1.e-20_r8, 1._r8/lcldn(i,k) - 1._r8)
                wmin    = wbar + wmix*0.25_r8*sq2pi*log(alogarg)
                phase   = 1   ! interstitial
 #ifdef OSLO_AERO
@@ -1266,9 +1308,9 @@ subroutine dropmixnuc( &
             !we are here because there are more clouds above, and some
             !aerosols go into  that layer! ==> calculate additional cloud fraction
                if (k < pver) then
-                  dumc = cldn(i,k) - cldn(i,kp1)
+                  dumc = lcldn(i,k) - lcldn(i,kp1)
                else
-                  dumc = cldn(i,k)
+                  dumc = lcldn(i,k)
                endif
 
 #ifdef OSLO_AERO
@@ -1369,30 +1411,34 @@ subroutine dropmixnuc( &
 
          else  ! i.e: cldn(i,k) < 0.01_r8
 
-            ! no cloud
+            ! no liquid cloud
 
             nsource(i,k) = nsource(i,k) - qcld(k)*dtinv
             qcld(k)      = 0.0_r8
 
+            if (cldn(i,k) < 0.01_r8) then
+               ! no ice cloud either
+
             ! convert activated aerosol to interstitial in decaying cloud
 
-            do m = 1, ntot_amode
-               mm = mam_idx(m,0)
-               raercol(k,mm,nsav)    = raercol(k,mm,nsav) + raercol_cw(k,mm,nsav)  ! cloud-borne aerosol
-               raercol_cw(k,mm,nsav) = 0._r8
-
-               do l = 1, nspec_amode(m)
-                  mm = mam_idx(m,l)
-#ifdef EXTRATESTS
-              if(i.eq.iDebug .and. getTracerIndex(m,l,.false.).eq.lDebug)then
-               print*,"no cloud", k,  raercol(k,mm,nsav) , raercol_cw(k,mm,nsav)
-              endif
-#endif
-                  raercol(k,mm,nsav)    = raercol(k,mm,nsav) + raercol_cw(k,mm,nsav) ! cloud-borne aerosol
+               do m = 1, ntot_amode
+                  mm = mam_idx(m,0)
+                  raercol(k,mm,nsav)    = raercol(k,mm,nsav) + raercol_cw(k,mm,nsav)  ! cloud-borne aerosol
                   raercol_cw(k,mm,nsav) = 0._r8
-               end do
-            end do
 
+                  do l = 1, nspec_amode(m)
+                     mm = mam_idx(m,l)
+#ifdef EXTRATESTS
+                 if(i.eq.iDebug .and. getTracerIndex(m,l,.false.).eq.lDebug)then
+                  print*,"no cloud", k,  raercol(k,mm,nsav) , raercol_cw(k,mm,nsav)
+                 endif
+#endif
+                     raercol(k,mm,nsav)    = raercol(k,mm,nsav) + raercol_cw(k,mm,nsav) ! cloud-borne aerosol
+                     raercol_cw(k,mm,nsav) = 0._r8
+                  end do
+               end do
+
+            end if
          end if
 
       end do  ! old_cloud_main_k_loop
@@ -1696,7 +1742,7 @@ subroutine dropmixnuc( &
 
       do k = top_lev, pver
          if (cldn(i,k) == 0._r8) then
-            ! no cloud
+            ! no ice or liquid cloud
             qcld(k)=0._r8
 
             ! convert activated aerosol to interstitial in decaying cloud
@@ -1994,8 +2040,8 @@ subroutine dropmixnuc( &
       do m = 1, ntot_amode
          do l = 0, nspec_amode(m)
             mm = mam_idx(m,l)
-            call outfld(trim(fieldname(mm)),    coltend(:,mm),    pcols, lchnk)
-            call outfld(trim(fieldname_cw(mm)), coltend_cw(:,mm), pcols, lchnk)
+            call outfld(fieldname(mm),    coltend(:,mm),    pcols, lchnk)
+            call outfld(fieldname_cw(mm), coltend_cw(:,mm), pcols, lchnk)
          end do
       end do
    end if

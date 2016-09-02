@@ -892,7 +892,7 @@ contains
 
        open( unit=unitnumber, file=filepath, iostat=ios, status="OLD")
        if (ios /= 0) then
-          call endrun('not able to open filenames_list file: '//trim(filepath))
+          call endrun('not able to open file: '//trim(filepath))
        endif
 
        !-------------------------------------------------------------------
@@ -1069,6 +1069,7 @@ contains
     if ( .not. times_found ) then
        if (masterproc) then
           write(iulog,*)'FIND_TIMES: Failed to find dates bracketing desired time =', time
+          write(iulog,*) 'filename = '//trim(file%curr_filename)
           write(iulog,*)' datatimem = ',file%datatimem
           write(iulog,*)' datatimep = ',file%datatimep
           write(iulog,*)' all_data_times = ',all_data_times
@@ -1932,7 +1933,7 @@ contains
     if ( present(cyc_yr) .and. present(cyc_ndx_beg) ) then
        if (cyc_ndx_beg < 0) then
           write(iulog,*) 'open_trc_datafile: cycle year not found : ' , cyc_yr
-          call endrun('open_trc_datafile: cycle year not found')
+          call endrun('open_trc_datafile: cycle year not found '//trim(filepath))
        endif
     endif
 

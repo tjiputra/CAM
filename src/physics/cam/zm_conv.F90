@@ -44,7 +44,10 @@ module zm_conv
    real(r8) :: ke           ! Tunable evaporation efficiency set from namelist input zmconv_ke
    real(r8) :: ke_lnd
    real(r8) :: c0_lnd       ! set from namelist input zmconv_c0_lnd
-   real(r8) :: c0_ocn       ! set from namelist input zmconv_c0_ocn
+   real(r8) :: c0_ocn       ! set from namelist input zmconv_c0_ocn 
+   integer  :: num_cin      ! set from namelist input zmconv_num_cin   
+                            ! The number of negative buoyancy regions that are allowed 
+                            ! before the convection top and CAPE calculations are completed.
    logical  :: zm_org
    real(r8) tau   ! convective time scale
    real(r8),parameter :: c1 = 6.112_r8
@@ -73,11 +76,13 @@ contains
 
 
 subroutine zm_convi(limcnv_in, zmconv_c0_lnd, zmconv_c0_ocn, zmconv_ke, zmconv_ke_lnd, &
-                    zmconv_momcu, zmconv_momcd, zmconv_org, no_deep_pbl_in)
+                    zmconv_momcu, zmconv_momcd, zmconv_num_cin, zmconv_org, no_deep_pbl_in)
 
    use dycore,       only: get_resolution
 
    integer, intent(in)           :: limcnv_in       ! top interface level limit for convection
+   integer, intent(in)           :: zmconv_num_cin  ! Number negative buoyancy regions that are allowed 
+                                                    ! before the convection top and CAPE calculations are completed.
    real(r8),intent(in)           :: zmconv_c0_lnd
    real(r8),intent(in)           :: zmconv_c0_ocn
    real(r8),intent(in)           :: zmconv_ke
@@ -101,13 +106,14 @@ subroutine zm_convi(limcnv_in, zmconv_c0_lnd, zmconv_c0_ocn, zmconv_ke, zmconv_k
    grav   = gravit
    cp     = cpres
 
-   c0_lnd = zmconv_c0_lnd 
-   c0_ocn = zmconv_c0_ocn
-   ke     = zmconv_ke
-   ke_lnd = zmconv_ke_lnd
-   zm_org = zmconv_org
-   momcu  = zmconv_momcu
-   momcd  = zmconv_momcd
+   c0_lnd  = zmconv_c0_lnd 
+   c0_ocn  = zmconv_c0_ocn
+   num_cin = zmconv_num_cin 
+   ke      = zmconv_ke
+   ke_lnd  = zmconv_ke_lnd
+   zm_org  = zmconv_org
+   momcu   = zmconv_momcu
+   momcd   = zmconv_momcd
 
    if ( present(no_deep_pbl_in) )  then
       no_deep_pbl = no_deep_pbl_in
@@ -124,6 +130,7 @@ subroutine zm_convi(limcnv_in, zmconv_c0_lnd, zmconv_c0_ocn, zmconv_ke, zmconv_k
    if ( masterproc ) then
       write(iulog,*) 'tuning parameters zm_convi: tau',tau
       write(iulog,*) 'tuning parameters zm_convi: c0_lnd',c0_lnd, ', c0_ocn', c0_ocn 
+      write(iulog,*) 'tuning parameters zm_convi: num_cin', num_cin
       write(iulog,*) 'tuning parameters zm_convi: ke',ke
       write(iulog,*) 'tuning parameters zm_convi: no_deep_pbl',no_deep_pbl
    endif
@@ -1735,7 +1742,7 @@ subroutine buoyan(lchnk   ,ncol    , &
 !
 !--------------------------Local Variables------------------------------
 !
-   real(r8) capeten(pcols,5)     ! provisional value of cape
+   real(r8) capeten(pcols,num_cin)     ! provisional value of cape
    real(r8) tv(pcols,pver)       !
    real(r8) tpv(pcols,pver)      !
    real(r8) buoy(pcols,pver)
@@ -1751,7 +1758,7 @@ subroutine buoyan(lchnk   ,ncol    , &
 
    logical plge600(pcols)
    integer knt(pcols)
-   integer lelten(pcols,5)
+   integer lelten(pcols,num_cin)
 
    real(r8) cp
    real(r8) e
@@ -1770,7 +1777,7 @@ subroutine buoyan(lchnk   ,ncol    , &
 !
 !-----------------------------------------------------------------------
 !
-   do n = 1,5
+   do n = 1,num_cin
       do i = 1,ncol
          lelten(i,n) = pver
          capeten(i,n) = 0._r8
@@ -3209,7 +3216,7 @@ subroutine buoyan_dilute(lchnk   ,ncol    , &
       do i = 1,ncol
          if (k < lcl(i) .and. plge600(i)) then
             if (buoy(i,k+1) > 0._r8 .and. buoy(i,k) <= 0._r8) then
-               knt(i) = min(5,knt(i) + 1)
+               knt(i) = min(num_cin,knt(i) + 1)
                lelten(i,knt(i)) = k
             end if
          end if
@@ -3218,7 +3225,7 @@ subroutine buoyan_dilute(lchnk   ,ncol    , &
 !
 ! calculate convective available potential energy (cape).
 !
-   do n = 1,5
+   do n = 1,num_cin
       do k = msg + 1,pver
          do i = 1,ncol
             if (plge600(i) .and. k <= mx(i) .and. k > lelten(i,n)) then
@@ -3232,7 +3239,7 @@ subroutine buoyan_dilute(lchnk   ,ncol    , &
 ! one sounding,
 ! and use it as the final cape, april 26, 1995
 !
-   do n = 1,5
+   do n = 1,num_cin
       do i = 1,ncol
          if (capeten(i,n) > cape(i)) then
             cape(i) = capeten(i,n)

@@ -22,7 +22,6 @@ contains
 subroutine read_namelist(nlfilename, single_column, scmlat, scmlon)
 
    use cam_initfiles,       only: cam_initfiles_readnl
-   use cam_restart,         only: cam_restart_readnl
    use constituents,        only: cnst_readnl
 
    use phys_grid,           only: phys_grid_readnl
@@ -125,7 +124,6 @@ subroutine read_namelist(nlfilename, single_column, scmlat, scmlon)
 !                   can uncomment the pbuf_readnl line
 !   call pbuf_readnl(nlfilename)
    call cam_initfiles_readnl(nlfilename)
-   call cam_restart_readnl(nlfilename)
    call cnst_readnl(nlfilename)
    call history_readnl(nlfilename)
    call chem_surfvals_readnl(nlfilename)

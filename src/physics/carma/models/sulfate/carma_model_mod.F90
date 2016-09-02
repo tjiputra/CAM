@@ -398,18 +398,20 @@ contains
   !!
   !! @author  Chuck Bardeen
   !! @version May-2009
-  subroutine CARMA_InitializeParticle(carma, ielem, ibin, q, gcid, rc)
+  subroutine CARMA_InitializeParticle(carma, ielem, ibin, latvals, lonvals, mask, q, rc)
     use shr_kind_mod,   only: r8 => shr_kind_r8
     use pmgrid,         only: plat, plev, plon
 
     implicit none
 
-    type(carma_type), intent(in)       :: carma                 !! the carma object
-    integer, intent(in)                :: ielem                 !! element index
-    integer, intent(in)                :: ibin                  !! bin index
-    real(r8), intent(inout)            :: q(:,:)   ! kg tracer/kg dry air (gcol, plev)
-    integer, intent(in)                :: gcid(:)  ! global column id
-    integer, intent(out)               :: rc                    !! return code, negative indicates failure
+    type(carma_type), intent(in)  :: carma      !! the carma object
+    integer,          intent(in)  :: ielem      !! element index
+    integer,          intent(in)  :: ibin       !! bin index
+    real(r8),         intent(in)  :: latvals(:) !! lat in degrees (ncol)
+    real(r8),         intent(in)  :: lonvals(:) !! lon in degrees (ncol)
+    logical,          intent(in)  :: mask(:)    !! Only initialize where .true.
+    real(r8),         intent(out) :: q(:,:)     !! mass mixing ratio (gcol, lev)
+    integer,          intent(out) :: rc         !! return code, negative indicates failure
 
     ! Default return code.
     rc = RC_OK

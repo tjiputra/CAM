@@ -244,6 +244,16 @@
       </test>
     </grid>
   </compset>
+  <compset name="FSDWD">
+    <grid name="f19_f19">
+      <test name="SMS_D_Ln3">
+        <machine compiler="intel" testtype="aux_wcm" testmods="cam/reduced_hist3s">yellowstone</machine>
+      </test>
+      <test name="ERP_Ln9">
+        <machine compiler="intel" testtype="aux_wcm" testmods="cam/outfrq9s">yellowstone</machine>
+      </test>
+    </grid>
+  </compset>
   <compset name="FWSC">
     <grid name="f45_f45">
       <test name="ERP_Ld3">

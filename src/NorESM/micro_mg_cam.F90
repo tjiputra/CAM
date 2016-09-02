@@ -12,13 +12,10 @@ module micro_mg_cam
 ! for adding inputs is as follows:
 !
 ! 1) In addition to any variables you need to declare for the "unpacked"
-!    (CAM format) version, you must declare an allocatable or pointer array
-!    for the "packed" (MG format) version.
+!    (CAM format) version, you must declare an array for the "packed" 
+!    (MG format) version.
 !
-! 2) After micro_mg_get_cols is called, allocate the "packed" array with
-!    size [mgncol, nlev].
-!
-! 3) Add a call similar to the following line (look before the
+! 2) Add a call similar to the following line (look before the
 !    micro_mg_tend calls to see similar lines):
 !
 !      packed_array = packer%pack(original_array)
@@ -35,16 +32,17 @@ module micro_mg_cam
 ! How to add new packed MG outputs to micro_mg_cam_tend:
 !
 ! 1) As with inputs, in addition to the unpacked outputs you must declare
-!    an allocatable or pointer array for packed data. The unpacked and
-!    packed arrays must *also* be targets or pointers (but cannot be both).
+!    an array for packed data. The unpacked and packed arrays must *also* 
+!    be targets or pointers (but cannot be both).
 !
-! 2) Again as for inputs, allocate the packed array using mgncol and nlev,
-!    which are set in micro_mg_get_cols.
-!
-! 3) Add the field to post-processing as in the following line (again,
+! 2) Add the field to post-processing as in the following line (again,
 !    there are many examples before the micro_mg_tend calls):
 !
 !      call post_proc%add_field(p(final_array),p(packed_array))
+!  
+!    *** IMPORTANT ** If the fields are only being passed to a certain version of
+!    MG, you must only add them if that version is being called (see
+!    the "if (micro_mg_version >1)" sections below
 !
 !    This registers the field for post-MG averaging, and to scatter to the
 !    final, unpacked version of the array.
@@ -149,6 +147,8 @@ integer :: &
    nevapr_idx,         &
    wsedl_idx,          &
    rei_idx,            &
+   sadice_idx,         &
+   sadsnow_idx,        &
    rel_idx,            &
    dei_idx,            &
    mu_idx,             &
@@ -202,7 +202,8 @@ integer :: &
 integer :: &
    ast_idx = -1,            &
    cld_idx = -1,            &
-   concld_idx = -1
+   concld_idx = -1,         &
+   qsatfac_idx = -1
 
 ! Pbuf fields needed for subcol_SILHS
 integer :: &
@@ -388,6 +389,8 @@ subroutine micro_mg_cam_register
    call pbuf_add_field('WSEDL',      'physpkg',dtype_r8,(/pcols,pver/), wsedl_idx)
 
    call pbuf_add_field('REI',        'physpkg',dtype_r8,(/pcols,pver/), rei_idx)
+   call pbuf_add_field('SADICE',     'physpkg',dtype_r8,(/pcols,pver/), sadice_idx)
+   call pbuf_add_field('SADSNOW',    'physpkg',dtype_r8,(/pcols,pver/), sadsnow_idx)
    call pbuf_add_field('REL',        'physpkg',dtype_r8,(/pcols,pver/), rel_idx)
 
    ! Mitchell ice effective diameter for radiation
@@ -464,6 +467,8 @@ subroutine micro_mg_cam_register
       call pbuf_register_subcol('WSEDL',       'micro_mg_cam_register', wsedl_idx)
 
       call pbuf_register_subcol('REI',         'micro_mg_cam_register', rei_idx)
+      call pbuf_register_subcol('SADICE',      'micro_mg_cam_register', sadice_idx)
+      call pbuf_register_subcol('SADSNOW',     'micro_mg_cam_register', sadsnow_idx)
       call pbuf_register_subcol('REL',         'micro_mg_cam_register', rel_idx)
 
       ! Mitchell ice effective diameter for radiation
@@ -545,14 +550,16 @@ end function micro_mg_cam_implements_cnst
 
 !===============================================================================
 
-subroutine micro_mg_cam_init_cnst(name, q, gcid)
+subroutine micro_mg_cam_init_cnst(name, latvals, lonvals, mask, q)
 
    ! Initialize the microphysics constituents, if they are
    ! not read from the initial file.
 
-   character(len=*), intent(in)  :: name     ! constituent name
-   real(r8),         intent(out) :: q(:,:)   ! mass mixing ratio (gcol, plev)
-   integer,          intent(in)  :: gcid(:)  ! global column id
+   character(len=*), intent(in)  :: name       ! constituent name
+   real(r8),         intent(in)  :: latvals(:) ! lat in degrees (ncol)
+   real(r8),         intent(in)  :: lonvals(:) ! lon in degrees (ncol)
+   logical,          intent(in)  :: mask(:)    ! Only initialize where .true.
+   real(r8),         intent(out) :: q(:,:)     ! kg tracer/kg dry air (gcol, plev
    !-----------------------------------------------------------------------
 
    if (micro_mg_cam_implements_cnst(name)) q = 0.0_r8
@@ -828,6 +835,8 @@ subroutine micro_mg_cam_init(pbuf2d)
    call addfld ('LS_REFFSNOW', (/ 'lev' /),  'A', 'micron',   'ls stratiform snow effective radius'                               )
    call addfld ('CV_REFFLIQ',  (/ 'lev' /),  'A', 'micron',   'convective cloud liq effective radius'                             )
    call addfld ('CV_REFFICE',  (/ 'lev' /),  'A', 'micron',   'convective cloud ice effective radius'                             )
+   call addfld ('MG_SADICE',   (/ 'lev' /),  'A', 'cm2/cm3',  'MG surface area density ice'                                       )
+   call addfld ('MG_SADSNOW',  (/ 'lev' /),  'A', 'cm2/cm3',  'MG surface area density snow'                                       )
 
    ! diagnostic precip
    call addfld ('QRAIN',       (/ 'lev' /),  'A', 'kg/kg',    'Diagnostic grid-mean rain mixing ratio'                            )
@@ -1040,6 +1049,7 @@ subroutine micro_mg_cam_init(pbuf2d)
    cmeliq_idx = pbuf_get_index('CMELIQ')
 
    ! These fields may have been added, so don't abort if they have not been
+   qsatfac_idx  = pbuf_get_index('QSATFAC', ierr)
    qrain_idx    = pbuf_get_index('QRAIN', ierr)
    qsnow_idx    = pbuf_get_index('QSNOW', ierr)
    nrain_idx    = pbuf_get_index('NRAIN', ierr)
@@ -1178,6 +1188,7 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
    real(r8), pointer :: snow_pcw(:)          ! Sfc flux of snow from microphysics [ m/s ]
 
    real(r8), pointer :: ast(:,:)          ! Relative humidity cloud fraction
+   real(r8), pointer :: qsatfac(:,:)      ! Subgrid cloud water saturation scaling factor.
    real(r8), pointer :: alst_mic(:,:)
    real(r8), pointer :: aist_mic(:,:)
    real(r8), pointer :: cldo(:,:)         ! Old cloud fraction
@@ -1215,6 +1226,8 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
    real(r8), target :: prodsnow(state%psetcols,pver)   ! Local production of snow
    real(r8), target :: cmeice(state%psetcols,pver)     ! Rate of cond-evap of ice within the cloud
    real(r8), target :: qsout(state%psetcols,pver)      ! Snow mixing ratio
+   real(r8), target :: cflx(state%psetcols,pverp)      ! grid-box avg liq condensate flux (kg m^-2 s^-1)
+   real(r8), target :: iflx(state%psetcols,pverp)      ! grid-box avg ice condensate flux (kg m^-2 s^-1)
    real(r8), target :: rflx(state%psetcols,pverp)      ! grid-box average rain flux (kg m^-2 s^-1)
    real(r8), target :: sflx(state%psetcols,pverp)      ! grid-box average snow flux (kg m^-2 s^-1)
    real(r8), target :: qrout(state%psetcols,pver)      ! Rain mixing ratio
@@ -1334,6 +1347,7 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
    real(r8) :: packed_cldn(mgncol,nlev)
    real(r8) :: packed_liqcldf(mgncol,nlev)
    real(r8) :: packed_icecldf(mgncol,nlev)
+   real(r8), allocatable :: packed_qsatfac(:,:)
 
    real(r8) :: packed_naai(mgncol,nlev)
    real(r8) :: packed_npccn(mgncol,nlev)
@@ -1376,6 +1390,8 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
    real(r8), target :: packed_prodsnow(mgncol,nlev)
    real(r8), target :: packed_cmeout(mgncol,nlev)
    real(r8), target :: packed_qsout(mgncol,nlev)
+   real(r8), target :: packed_cflx(mgncol,nlev+1)
+   real(r8), target :: packed_iflx(mgncol,nlev+1)
    real(r8), target :: packed_rflx(mgncol,nlev+1)
    real(r8), target :: packed_sflx(mgncol,nlev+1)
    real(r8), target :: packed_qrout(mgncol,nlev)
@@ -1434,6 +1450,8 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
 
    real(r8), target :: packed_rel(mgncol,nlev)
    real(r8), target :: packed_rei(mgncol,nlev)
+   real(r8), target :: packed_sadice(mgncol,nlev)
+   real(r8), target :: packed_sadsnow(mgncol,nlev)
    real(r8), target :: packed_lambdac(mgncol,nlev)
    real(r8), target :: packed_mu(mgncol,nlev)
    real(r8), target :: packed_des(mgncol,nlev)
@@ -1531,6 +1549,9 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
 
    real(r8), pointer :: rel(:,:)          ! Liquid effective drop radius (microns)
    real(r8), pointer :: rei(:,:)          ! Ice effective drop size (microns)
+   real(r8), pointer :: sadice(:,:)       ! Ice surface area density (cm2/cm3)
+   real(r8), pointer :: sadsnow(:,:)      ! Snow surface area density (cm2/cm3)
+
 
    real(r8), pointer :: cmeliq(:,:)
 
@@ -1612,6 +1633,8 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
    real(r8), pointer :: mu_grid(:,:)
    real(r8), pointer :: rel_grid(:,:)
    real(r8), pointer :: rei_grid(:,:)
+   real(r8), pointer :: sadice_grid(:,:)
+   real(r8), pointer :: sadsnow_grid(:,:)
    real(r8), pointer :: dei_grid(:,:)
    real(r8), pointer :: des_grid(:,:)
    real(r8), pointer :: iclwpst_grid(:,:)
@@ -1754,6 +1777,8 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
       call pbuf_get_field(pbuf, frzdep_idx, frzdep, col_type=col_type, copy_if_needed=use_subcol_microp)
    end if
 
+   if (qsatfac_idx > 0) call pbuf_get_field(pbuf, qsatfac_idx, qsatfac, col_type=col_type, copy_if_needed=use_subcol_microp)
+
    !-----------------------
    ! These physics buffer fields are calculated and set in this parameterization
    ! If subcolumns is turned on, then these fields will be calculated on a subcolumn grid, otherwise they will be a normal grid
@@ -1782,6 +1807,8 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
    call pbuf_get_field(pbuf, icswp_idx,       icswp,       col_type=col_type)
    call pbuf_get_field(pbuf, rel_idx,         rel,         col_type=col_type)
    call pbuf_get_field(pbuf, rei_idx,         rei,         col_type=col_type)
+   call pbuf_get_field(pbuf, sadice_idx,      sadice,      col_type=col_type)
+   call pbuf_get_field(pbuf, sadsnow_idx,     sadsnow,     col_type=col_type)
    call pbuf_get_field(pbuf, wsedl_idx,       wsedl,       col_type=col_type)
    call pbuf_get_field(pbuf, qme_idx,         qme,         col_type=col_type)
 
@@ -1832,6 +1859,8 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
       call pbuf_get_field(pbuf, icswp_idx,       icswp_grid)
       call pbuf_get_field(pbuf, rel_idx,         rel_grid)
       call pbuf_get_field(pbuf, rei_idx,         rei_grid)
+      call pbuf_get_field(pbuf, sadice_idx,      sadice_grid)
+      call pbuf_get_field(pbuf, sadsnow_idx,     sadsnow_grid)
       call pbuf_get_field(pbuf, wsedl_idx,       wsedl_grid)
       call pbuf_get_field(pbuf, qme_idx,         qme_grid)
 
@@ -1929,6 +1958,8 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
       call post_proc%add_field(p(nsten), p(packed_nstend))
       call post_proc%add_field(p(umr), p(packed_umr))
       call post_proc%add_field(p(ums), p(packed_ums))
+      call post_proc%add_field(p(cflx), p(packed_cflx))
+      call post_proc%add_field(p(iflx), p(packed_iflx))
    end if
 
       call post_proc%add_field(p(am_evp_st), p(packed_am_evp_st))
@@ -2044,6 +2075,10 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
         fillvalue=10._r8, accum_method=accum_null)
    call post_proc%add_field(p(rei), p(packed_rei), &
         fillvalue=25._r8, accum_method=accum_null)
+   call post_proc%add_field(p(sadice), p(packed_sadice), &
+        accum_method=accum_null)
+   call post_proc%add_field(p(sadsnow), p(packed_sadsnow), &
+        accum_method=accum_null)
    call post_proc%add_field(p(lambdac), p(packed_lambdac), &
         accum_method=accum_null)
    call post_proc%add_field(p(mu), p(packed_mu), &
@@ -2067,7 +2102,12 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
    packed_cldn = packer%pack(ast)
    packed_liqcldf = packer%pack(alst_mic)
    packed_icecldf = packer%pack(aist_mic)
-
+   allocate(packed_qsatfac(mgncol,nlev))
+   if (qsatfac_idx > 0) then
+      packed_qsatfac = packer%pack(qsatfac)
+   else
+      packed_qsatfac = 1._r8
+   endif
    packed_naai = packer%pack(naai)
    packed_npccn = packer%pack(npccn)
 
@@ -2132,7 +2172,7 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
                  packed_ncai, packed_ncal, packed_qrout2, packed_qsout2, packed_nrout2,              &
                  packed_nsout2, drout_dum, dsout2_dum, packed_freqs,packed_freqr,            &
                  packed_nfice, packed_prer_evap, do_cldice, errstring,                      &
-		 packed_tnd_qsnow, packed_tnd_nsnow, packed_re_ice,             &
+                 packed_tnd_qsnow, packed_tnd_nsnow, packed_re_ice,             &
                  packed_frzimm, packed_frzcnt, packed_frzdep, &
 !AL
          packed_nnuccco, packed_nnuccto, packed_npsacwso, packed_nsubco, packed_nprao,       &
@@ -2200,7 +2240,7 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
                  packed_nr,              packed_ns,              &
                  packed_relvar,          packed_accre_enhan,     &
                  packed_p,               packed_pdel,            &
-                 packed_cldn,    packed_liqcldf, packed_icecldf, &
+                 packed_cldn, packed_liqcldf, packed_icecldf, packed_qsatfac, &
                  packed_rate1ord_cw2pr_st,                       &
                  packed_naai,            packed_npccn,           &
                  packed_rndst,           packed_nacon,           &
@@ -2210,6 +2250,7 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
                  packed_qrtend,          packed_qstend,          &
                  packed_nrtend,          packed_nstend,          &
                  packed_rel,     rel_fn_dum,     packed_rei,     &
+                 packed_sadice,          packed_sadsnow,         &
                  packed_prect,           packed_preci,           &
                  packed_nevapr,          packed_evapsnow,        &
                  packed_am_evp_st,                               &
@@ -2217,6 +2258,7 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
                  packed_cmeout,          packed_dei,             &
                  packed_mu,              packed_lambdac,         &
                  packed_qsout,           packed_des,             &
+                 packed_cflx,    packed_iflx,                    &
                  packed_rflx,    packed_sflx,    packed_qrout,   &
                  reff_rain_dum,          reff_snow_dum,          &
                  packed_qcsevap, packed_qisevap, packed_qvres,   &
@@ -2344,6 +2386,13 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
 
    mgflxprc(:ncol,top_lev:pverp) = rflx(:ncol,top_lev:pverp) + sflx(:ncol,top_lev:pverp)
    mgflxsnw(:ncol,top_lev:pverp) = sflx(:ncol,top_lev:pverp)
+
+   !add condensate fluxes for MG2 (ice and snow already added for MG1)
+   if (micro_mg_version >= 2) then
+      mgflxprc(:ncol,top_lev:pverp) = mgflxprc(:ncol,top_lev:pverp)+ iflx(:ncol,top_lev:pverp) + cflx(:ncol,top_lev:pverp)
+      mgflxsnw(:ncol,top_lev:pverp) = mgflxsnw(:ncol,top_lev:pverp) + iflx(:ncol,top_lev:pverp)
+   end if
+
 
    mgmrprc(:ncol,top_lev:pver) = qrout(:ncol,top_lev:pver) + qsout(:ncol,top_lev:pver)
    mgmrsnw(:ncol,top_lev:pver) = qsout(:ncol,top_lev:pver)
@@ -2517,6 +2566,8 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
       mu_grid         => mu
       rel_grid        => rel
       rei_grid        => rei
+      sadice_grid     => sadice
+      sadsnow_grid    => sadsnow
       dei_grid        => dei
       des_grid        => des
 
@@ -3139,6 +3190,8 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
    call outfld('CDNUMC',      cdnumc_grid,      pcols, lchnk)
    call outfld('REL',         rel_grid,         pcols, lchnk)
    call outfld('REI',         rei_grid,         pcols, lchnk)
+   call outfld('MG_SADICE',   sadice_grid,      pcols, lchnk)
+   call outfld('MG_SADSNOW',  sadsnow_grid,     pcols, lchnk)
    call outfld('ICIMRST',     icimrst_grid_out, pcols, lchnk)
    call outfld('ICWMRST',     icwmrst_grid_out, pcols, lchnk)
    call outfld('CMEIOUT',     cmeiout_grid,     pcols, lchnk)

@@ -10,6 +10,7 @@
 
       use cam_abortutils,   only: endrun
       use cam_logfile,      only: iulog
+      use cam_history,      only: addfld, horiz_only, outfld
 
       implicit none
 
@@ -18,34 +19,28 @@
 
       save
 
-      integer                :: msis_frq = 1                          ! step frequency of msis retrieval
-      integer                :: stepsize                              ! timestep size (s)
       integer                :: ndx_n, ndx_h, ndx_o, ndx_o2           ! n, h, o, o2 spc indicies
       integer                :: msis_cnt = 0                          ! count of msis species in simulation
       integer                :: ndx(pcnst) = -1
       real(r8), allocatable  :: msis_ubc(:,:,:)                       ! module array for msis ub values (kg/kg)
-      real(r8)               :: r2d
+
       logical                :: zonal_average         = .false.       ! use zonal averaged tgcm values
 
       contains
 
-      subroutine msis_ubc_inti( zonal_avg, freq )
+      subroutine msis_ubc_inti( zonal_avg )
 !------------------------------------------------------------------
 !	... initialize upper boundary values
 !------------------------------------------------------------------
 
       use ppgrid,        only : pcols, begchunk, endchunk
       use constituents,  only : cnst_get_ind, cnst_fixed_ubc
-      use time_manager,  only : get_step_size
-      use physconst,     only : pi
 
       implicit none
 
 !------------------------------------------------------------------
 !	... dummy args
 !------------------------------------------------------------------
-      integer, intent(in) :: &
-        freq                 ! frequency of msis retrieval
       logical, intent(in) :: &
         zonal_avg            ! zonal averaging switch        
 
@@ -56,7 +51,6 @@
       real(r8) :: msis_switches(25) = 1._r8
 
       zonal_average = zonal_avg
-      msis_frq      = max( freq,1 )
 !------------------------------------------------------------------
 !	... check for msis species in simuation
 !------------------------------------------------------------------
@@ -105,8 +99,10 @@
 !------------------------------------------------------------------
       call tselec( msis_switches )
 
-      r2d      = 180._r8/pi
-      stepsize = get_step_size()
+      call addfld( 'MSIS_T', horiz_only, 'A', 'K',     'T upper boundary condition from MSIS')
+      call addfld( 'MSIS_H', horiz_only, 'A', 'kg/kg', 'H upper boundary condition from MSIS')
+      call addfld( 'MSIS_O', horiz_only, 'A', 'kg/kg', 'O upper boundary condition from MSIS')
+      call addfld( 'MSIS_O2',horiz_only, 'A', 'kg/kg', 'O2 upper boundary condition from MSIS')
 
       end subroutine msis_ubc_inti
 
@@ -116,13 +112,13 @@
 !--------------------------------------------------------------------
 
       use ppgrid,       only : pcols, begchunk, endchunk
-      use pmgrid,       only : plev, plevp
       use constituents, only : cnst_mw
-      use time_manager, only : get_curr_date, get_nstep, get_curr_calday, &
-			       get_calday, is_first_step, is_first_restart_step
+      use time_manager, only : get_curr_date, get_calday
+      use time_manager, only : is_first_step, is_first_restart_step, is_end_curr_day
       use phys_grid,    only : get_ncols_p, get_rlon_all_p, get_rlat_all_p
       use ref_pres,     only : ptop_ref
       use spmd_utils,   only : masterproc
+      use physconst,    only : pi
 
       implicit none
 
@@ -139,12 +135,12 @@
       real(r8), parameter :: mass_switch = 48._r8
       real(r8), parameter :: pa2mb       = 1.e-2_r8       ! pascal to mb
       real(r8), parameter :: amu_fac     = 1.65979e-24_r8 ! g/amu
+      real(r8), parameter :: r2d         = 180._r8/pi
       integer  ::  i, c, ncol
-      integer  ::  yr, mon, day, tod, nstep
+      integer  ::  yr, mon, day, tod
       integer  ::  yrday
       integer  ::  date
-      integer  ::  offset
-      real(r8) ::  alt, latitude, longitude, solar_time, ut, rtod, doy
+      real(r8) ::  alt, solar_time, ut, rtod, doy
       real(r8) ::  msis_press
       real(r8) ::  msis_ap(7)
       real(r8) ::  msis_temp(2)
@@ -154,18 +150,13 @@
       real(r8) ::  dnom(pcols)
       real(r8) ::  pint(pcols)       ! top interface pressure (Pa)
 
-
-      nstep = get_nstep()
 !--------------------------------------------------------------------
 !	... get values from msis
 !--------------------------------------------------------------------
 msis_retrieval : &
-      if( is_first_step() .or. is_first_restart_step() .or. mod( nstep,msis_frq ) == 0 ) then
-	 offset = mod( nstep,msis_frq )
-	 if( offset /= 0 ) then
-	    offset = -offset*stepsize
-	 end if
-         call get_curr_date( yr, mon, day, tod, offset )
+      if( is_first_step() .or. is_first_restart_step() .or. is_end_curr_day() ) then
+         call get_curr_date( yr, mon, day, tod )
+         tod = 0
          rtod       = tod
          ut         = rtod/3600._r8
 	 date       = 10000*yr + 100*mon + day
@@ -177,7 +168,7 @@ msis_retrieval : &
 	 if( masterproc ) then
 	    write(iulog,*) '===================================='
 	    write(iulog,*) 'msis_timestep_init: diagnostics'
-	    write(iulog,*) 'nstep,yr,mon,day,tod,date,ut,doy,offset,msis_frq = ',nstep, yr, mon, day, tod, date, ut, doy, offset, msis_frq
+	    write(iulog,*) 'yr,mon,day,tod,date,ut,doy = ', yr, mon, day, tod, date, ut, doy
 	    write(iulog,*) '===================================='
 	 end if
 #endif
@@ -259,6 +250,12 @@ column_loop : &
 !	... set model ubc values from msis
 !--------------------------------------------------------------------
       temp(:ncol) = msis_ubc(:ncol,1,lchunk)
+
+      call outfld( 'MSIS_T', msis_ubc(:ncol,1,lchunk), ncol, lchunk)
+      call outfld( 'MSIS_H', msis_ubc(:ncol,2,lchunk), ncol, lchunk)
+      call outfld( 'MSIS_O', msis_ubc(:ncol,3,lchunk), ncol, lchunk)
+      call outfld( 'MSIS_O2',msis_ubc(:ncol,4,lchunk), ncol, lchunk)
+
       if( msis_cnt > 0 ) then
          if( ndx(ndx_h) > 0 ) then
             mmr(:ncol,ndx_h) = msis_ubc(:ncol,2,lchunk)

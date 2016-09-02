@@ -35,12 +35,11 @@ module pmgrid
 !JPE: i1 and j1, nxpt, jintmx are defined as placeholders - these values are needed
 !     to satisfy code in advection/slt 
 !
-#ifndef STAGGERED
    integer, parameter :: nxpt=0
    integer, parameter :: jintmx=0
    integer, parameter :: i1     = 1 
    integer, parameter :: j1     = 1 
-#endif
+
    integer, parameter :: numbnd = 0          ! no.of latitudes passed N and S of forecast lat
 
    integer :: beglat     ! beg. index for latitudes owned by a given proc
@@ -49,12 +48,11 @@ module pmgrid
    integer :: endlatex   ! extended grid endlat
    integer :: numlats    ! number of latitudes owned by a given proc
 
-#if ( ! defined SPMD )
    parameter (beglat   = 1)
    parameter (endlat   = plat)
    parameter (numlats  = plat)
    integer, parameter :: iam      = 0
    logical, parameter :: masterproc = .true.
-#endif
+
 end module pmgrid
 

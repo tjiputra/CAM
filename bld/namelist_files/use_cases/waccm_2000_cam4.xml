@@ -4,6 +4,8 @@
 
 <start_ymd>00010101</start_ymd>
 
+<fixed_geomag_year>2000</fixed_geomag_year>
+
 <!-- Solar data from Lean (via Caspar Ammann) -->
 <solar_data_file>atm/cam/solar/spectral_irradiance_Lean_1610-2009_ann_c100405.nc</solar_data_file>
 <solar_data_ymd>20000101</solar_data_ymd>
@@ -23,7 +25,7 @@
 <!--Species IC -->
 <ncdata dyn="fv"  hgrid="1.9x2.5" >atm/waccm/ic/f2000.e10r02.2deg.waccm.005.cam2.i.0017-01-01-00000.nc</ncdata>
 <ncdata dyn="fv"  hgrid="4x5"     >atm/waccm/ic/f40.2000.track1.4deg.001.cam2.i.0013-01-01-00000.nc</ncdata>
-<ncdata dyn="fv"  hgrid="4x5"     chem="waccm_mozart_sulfur">atm/waccm/ic/f40.2000.4deg.wcm.carma.sulf.004.cam2.i.0008-01-01-00000.nc</ncdata>
+<ncdata dyn="fv"  hgrid="4x5"     chem="waccm_ma_sulfur">atm/waccm/ic/f40.2000.4deg.wcm.carma.sulf.004.cam2.i.0008-01-01-00000.nc</ncdata>
 
 <!-- Deposition Velocities : DEFAULTS okay -->
 
@@ -83,8 +85,8 @@
   'HNO3_GAS', 'NO_Aircraft', 'NO_Lightning', 'QNO', 'QRS_AUR', 'QRS_CO2NIR', 'QRS_EUV', 
   'SAD_ICE', 'SAD_LNAT', 'SAD_SULFC', 'T', 'TREFHT', 
   'TTGW', 'U', 'UTGWORO', 'UTGWSPEC', 'V', 'VERT', 'VTGWORO', 'VTGWSPEC', 'Z3', 'O2_1S', 
-  'O2_1D', 'NOX', 'NOY', 'CLOX', 'CLOY', 'BROX', 'BROY', 'TCLY', 'TOTH', 'QJOULE', 'UE', 
-  'VE', 'UIONTEND', 'VIONTEND', 'DTCORE', 'T_24_COS',  'T_24_SIN', 'T_12_COS', 'T_12_SIN',
+  'O2_1D', 'NOX', 'NOY', 'CLOX', 'CLOY', 'BROX', 'BROY', 'TCLY', 'TOTH', 'QJOULE', 'UI', 
+  'VI', 'UIONTEND', 'VIONTEND', 'DTCORE', 'T_24_COS',  'T_24_SIN', 'T_12_COS', 'T_12_SIN',
   'OMEGA_24_COS', 'OMEGA_24_SIN', 'OMEGA_12_COS', 'OMEGA_12_SIN',
   'U_24_COS', 'U_24_SIN', 'U_12_COS', 'U_12_SIN', 'V_24_COS', 'V_24_SIN', 'V_12_COS', 
   'V_12_SIN', 'PS_24_COS', 'PS_24_SIN', 'PS_12_COS', 'PS_12_SIN', 'CLDLIQ','CLDICE','CONCLD',
@@ -94,7 +96,7 @@
 </fincl1>
 
 
-<fincl1 chem="waccm_mozart_sulfur">
+<fincl1 chem="waccm_ma_sulfur">
   'AOA1', 'AOA2', 'BR', 'BRCL', 'BRO', 'BRONO2', 'CCL4', 'CF2CLBR', 'CF3BR', 
   'CFC11', 'CFC113', 'CFC12', 'CH2O', 'CH3BR', 'CH3CCL3', 'CH3CL', 'CH3O2', 'CH3OOH', 
   'CH4', 'CL', 'CL2', 'CL2O2', 'CLDHGH', 'CLDLOW', 'CLDMED', 'CLDTOT', 'CLO', 'CLONO2', 
@@ -108,8 +110,8 @@
   'HNO3_GAS', 'NO_Aircraft', 'NO_Lightning', 'QNO', 'QRS_AUR', 'QRS_CO2NIR', 'QRS_EUV', 
   'SAD_ICE', 'SAD_LNAT', 'SAD_SULFC', 'T', 'TREFHT', 
   'TTGW', 'U', 'UTGWORO', 'UTGWSPEC', 'V', 'VERT', 'VTGWORO', 'VTGWSPEC', 'Z3', 'O2_1S', 
-  'O2_1D', 'NOX', 'NOY', 'CLOX', 'CLOY', 'BROX', 'BROY', 'TCLY', 'TOTH', 'QJOULE', 'UE', 
-  'VE', 'UIONTEND', 'VIONTEND', 'DTCORE', 'T_24_COS',  'T_24_SIN', 'T_12_COS', 'T_12_SIN',
+  'O2_1D', 'NOX', 'NOY', 'CLOX', 'CLOY', 'BROX', 'BROY', 'TCLY', 'TOTH', 'QJOULE', 'UI', 
+  'VI', 'UIONTEND', 'VIONTEND', 'DTCORE', 'T_24_COS',  'T_24_SIN', 'T_12_COS', 'T_12_SIN',
   'OMEGA_24_COS', 'OMEGA_24_SIN', 'OMEGA_12_COS', 'OMEGA_12_SIN',
   'U_24_COS', 'U_24_SIN', 'U_12_COS', 'U_12_SIN', 'V_24_COS', 'V_24_SIN', 'V_12_COS', 
   'V_12_SIN', 'PS_24_COS', 'PS_24_SIN', 'PS_12_COS', 'PS_12_SIN', 'CLDLIQ','CLDICE','CONCLD',
@@ -154,7 +156,7 @@
   'PS', 'PSL', 'U', 'V', 'T', 'Z3', 'PHIS','FRONTGF:I', 'OMEGA' 
 </fincl4>
 
-<fincl4 chem="waccm_mozart_sulfur">'PS', 'PSL', 'U', 'V', 'T', 'Z3', 'PHIS', 'FRONTGF:I', 'OMEGA',
+<fincl4 chem="waccm_ma_sulfur">'PS', 'PSL', 'U', 'V', 'T', 'Z3', 'PHIS', 'FRONTGF:I', 'OMEGA',
   'O3', 'OCS', 'S', 'SO', 'SO2', 'SO3', 'HSO3', 'H2SO4',
   'PURSULMR', 'PURSULJN', 'PURSULND', 'PURSULAD', 'PURSULMD', 'PURSULRE', 'PURSUL01', 'PURSUL02',
   'PURSUL03', 'PURSUL04', 'PURSUL05', 'PURSUL06', 'PURSUL07', 'PURSUL08', 'PURSUL09', 'PURSUL10',

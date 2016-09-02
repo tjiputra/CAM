@@ -62,7 +62,6 @@ module physpkg
   logical           :: state_debug_checks  ! Debug physics_state.
   logical           :: clim_modal_aero     ! climate controled by prognostic or prescribed modal aerosols
   logical           :: prog_modal_aero     ! Prognostic modal aerosols present
-  logical           :: micro_do_icesupersat
 
   !  Physics buffer index
   integer ::  teout_idx          = 0  
@@ -145,6 +144,7 @@ subroutine phys_register
     use rad_constituents,   only: rad_cnst_get_info ! Added to query if it is a modal aero sim or not
     use subcol,             only: subcol_register
     use subcol_utils,       only: is_subcol_on
+    use dyn_comp,           only: dyn_register
 
     !---------------------------Local variables-----------------------------
     !
@@ -160,8 +160,7 @@ subroutine phys_register
                       cld_macmic_num_steps_out = cld_macmic_num_steps, &
                       do_clubb_sgs_out         = do_clubb_sgs,     &
                       use_subcol_microp_out    = use_subcol_microp, &
-                      state_debug_checks_out   = state_debug_checks, &
-                      micro_do_icesupersat_out = micro_do_icesupersat)
+                      state_debug_checks_out   = state_debug_checks )
 
     ! Initialize dyn_time_lvls
     call pbuf_init_time()
@@ -310,6 +309,8 @@ subroutine phys_register
 
     ! Register test tracers
     call tracers_register()
+
+    call dyn_register()
 
     ! All tracers registered, check that the dimensions are correct
     call cnst_chk_dim()
@@ -705,11 +706,10 @@ subroutine phys_init( phys_state, phys_tend, pbuf2d, cam_out )
     use subcol,             only: subcol_init
     use qbo,                only: qbo_init
     use iondrag,            only: iondrag_init, do_waccm_ions
-    use spedata,            only: spe_run
-    use mo_apex,            only: mo_apex_init
 #if ( defined OFFLINE_DYN )
     use metdata,            only: metdata_phys_init
 #endif
+    use epp_ionization,     only: epp_ionization_init, epp_ionization_active
     use ionosphere,         only: ionos_init  ! Initialization of ionosphere module (WACCM-X)
     use majorsp_diffusion,  only: mspd_init   ! Initialization of major species diffusion module (WACCM-X)
     use clubb_intr,         only: clubb_ini_cam
@@ -850,8 +850,8 @@ subroutine phys_init( phys_state, phys_tend, pbuf2d, cam_out )
 
     call iondrag_init(pref_mid)
     ! Geomagnetic module -- after iondrag_init
-    if (spe_run .or. do_waccm_ions) then
-      call mo_apex_init(phys_state)
+    if (epp_ionization_active) then
+      call epp_ionization_init()
     endif
 
 #if ( defined OFFLINE_DYN )
@@ -1287,7 +1287,7 @@ subroutine tphysac (ztodt,   cam_in,  &
     use cam_control_mod,    only: aqua_planet 
     use mo_gas_phase_chemdr,only: map2chm
     use clybry_fam,         only: clybry_fam_set
-    use charge_neutrality,  only: charge_fix
+    use charge_neutrality,  only: charge_balance
     use qbo,                only: qbo_relax
     use iondrag,            only: iondrag_calc, do_waccm_ions
     use perf_mod
@@ -1503,7 +1503,7 @@ subroutine tphysac (ztodt,   cam_in,  &
     !---------------------------------------------------------------------------------
     !   ... enforce charge neutrality
     !---------------------------------------------------------------------------------
-    call charge_fix(state, pbuf)
+    call charge_balance(state, pbuf)
      
     !===================================================
     ! Gravity wave drag
@@ -1545,7 +1545,7 @@ subroutine tphysac (ztodt,   cam_in,  &
     ! Enforce charge neutrality after O+ change from ionos_tend
     !---------------------------------------------------------------------------------
     if( waccmx_is('ionosphere') ) then
-       call charge_fix(state, pbuf)
+       call charge_balance(state, pbuf)
     endif
 
     ! Check energy integrals
@@ -2011,21 +2011,6 @@ subroutine tphysbc (ztodt, state,  &
 
        do macmic_it = 1, cld_macmic_num_steps
 
-          if (micro_do_icesupersat) then 
-
-            !===================================================
-            ! Aerosol Activation
-            !===================================================
-            call t_startf('microp_aero_run')
-            call microp_aero_run(state, ptend, cld_macmic_ztodt, pbuf)
-            call t_stopf('microp_aero_run')
-
-            call physics_ptend_scale(ptend, 1._r8/cld_macmic_num_steps, ncol)
-
-            call physics_update(state, ptend, ztodt, tend)
-            call check_energy_chng(state, tend, "mp_aero_tend", nstep, ztodt, zero, zero, zero, zero)      
-
-          endif
           !===================================================
           ! Calculate macrophysical tendency (sedimentation, detrain, cloud fraction)
           !===================================================
@@ -2110,16 +2095,11 @@ subroutine tphysbc (ztodt, state,  &
              call check_energy_timestep_init(state_sc, tend_sc, pbuf, col_type_subcol)
           end if
 
-          if (.not. micro_do_icesupersat) then 
-
-            call t_startf('microp_aero_run')
-            call microp_aero_run(state, ptend_aero, cld_macmic_ztodt, pbuf)
-            call t_stopf('microp_aero_run')
-
-          endif
+          call t_startf('microp_aero_run')
+          call microp_aero_run(state, ptend_aero, cld_macmic_ztodt, pbuf)
+          call t_stopf('microp_aero_run')
 
           call t_startf('microp_tend')
-
 
           if (use_subcol_microp) then
              call microp_driver_tend(state_sc, ptend_sc, cld_macmic_ztodt, pbuf)
@@ -2149,10 +2129,8 @@ subroutine tphysbc (ztodt, state,  &
              call microp_driver_tend(state, ptend, cld_macmic_ztodt, pbuf)
           end if
           ! combine aero and micro tendencies for the grid
-          if (.not. micro_do_icesupersat) then
-             call physics_ptend_sum(ptend_aero, ptend, ncol)
-             call physics_ptend_dealloc(ptend_aero)
-          endif
+          call physics_ptend_sum(ptend_aero, ptend, ncol)
+          call physics_ptend_dealloc(ptend_aero)
 
           ! Have to scale and apply for full timestep to get tend right
           ! (see above note for macrophysics).
@@ -2320,8 +2298,9 @@ subroutine phys_timestep_init(phys_state, cam_in, cam_out, pbuf2d)
   use aerodep_flx,         only: aerodep_flx_adv
   use aircraft_emit,       only: aircraft_emit_adv
   use prescribed_volcaero, only: prescribed_volcaero_adv
-  use prescribed_strataero, only: prescribed_strataero_adv
-
+  use prescribed_strataero,only: prescribed_strataero_adv
+  use mo_apex,             only: mo_apex_init
+  use epp_ionization,      only: epp_ionization_active
 
   implicit none
 
@@ -2334,6 +2313,11 @@ subroutine phys_timestep_init(phys_state, cam_in, cam_out, pbuf2d)
   !-----------------------------------------------------------------------------
 
   if (single_column) call scam_use_iop_srf(cam_in)
+
+  ! update geomagnetic coordinates
+  if (epp_ionization_active .or. do_waccm_ions) then
+     call mo_apex_init(phys_state)
+  endif
 
   ! Chemistry surface values
   call chem_surfvals_set()

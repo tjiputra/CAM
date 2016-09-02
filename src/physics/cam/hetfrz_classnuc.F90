@@ -38,6 +38,30 @@ real(r8) :: mwh2o
 real(r8) :: tmelt
 real(r8) :: pi
 
+!*****************************************************************************
+!                PDF theta model 
+!*****************************************************************************
+! some variables for PDF theta model
+! immersion freezing
+!
+! With the original value of pdf_n_theta set to 101 the dust activation
+! fraction between -15 and 0 C could be overestimated.  This problem was
+! eliminated by increasing pdf_n_theta to 301.  To reduce the expense of
+! computing the dust activation fraction the integral is only evaluated
+! where dim_theta is non-zero.  This was determined to be between
+! dim_theta index values of 53 through 113.  These loop bounds are
+! hardcoded in the variables i1 and i2.
+
+logical            :: pdf_imm_in = .true.
+integer, parameter :: pdf_n_theta = 301
+integer, parameter :: i1 = 53
+integer, parameter :: i2 = 113
+real(r8) :: dim_theta(pdf_n_theta) = 0.0_r8
+real(r8) :: pdf_imm_theta(pdf_n_theta) = 0.0_r8
+real(r8) :: pdf_d_theta
+real(r8) :: dim_f_imm_dust_a1(pdf_n_theta) = 0.0_r8
+real(r8) :: dim_f_imm_dust_a3(pdf_n_theta) = 0.0_r8
+
 integer  :: iulog
 
 !===================================================================================================
@@ -65,6 +89,11 @@ subroutine hetfrz_classnuc_init( &
    tmelt  = tmelt_in
    pi     = pi_in
    iulog  = iulog_in
+
+   ! Initialize all the PDF theta variables:
+   if (pdf_imm_in) then
+      call hetfrz_classnuc_init_pdftheta()
+   end if
 
 end subroutine hetfrz_classnuc_init
 
@@ -129,7 +158,6 @@ subroutine hetfrz_classnuc_calc( &
    real(r8), parameter :: taufrz = 195.435_r8     ! time constant for falloff of freezing rate [s]
    real(r8), parameter :: rhwincloud = 0.98_r8    ! 98% RH in mixed-phase clouds (Korolev & Isaac, JAS 2006)
    real(r8), parameter :: limfacbc = 0.01_r8      ! max. ice nucleating fraction soot
-   real(r8), parameter :: pi = 4._r8*atan(1.0_r8)   
    real(r8) :: tc   
    real(r8) :: vwice   
    real(r8) :: rhoice   
@@ -199,55 +227,12 @@ subroutine hetfrz_classnuc_calc( &
 
    logical :: tot_in = .false.
 
-   !*****************************************************************************
-   !                PDF theta model 
-   !*****************************************************************************
-   ! some variables for PDF theta model
-   ! immersion freezing
-   !
-   ! With the original value of pdf_n_theta set to 101 the dust activation
-   ! fraction between -15 and 0 C could be overestimated.  This problem was
-   ! eliminated by increasing pdf_n_theta to 301.  To reduce the expense of
-   ! computing the dust activation fraction the integral is only evaluated
-   ! where dim_theta is non-zero.  This was determined to be between
-   ! dim_theta index values of 53 through 113.  These loop bounds are
-   ! hardcoded in the variables i1 and i2.
-   !
-   real(r8),parameter :: theta_min = 1._r8/180._r8*pi
-   real(r8),parameter :: theta_max = 179._r8/180._r8*pi
-   real(r8) :: x1_imm
-   real(r8) :: x2_imm
-   real(r8) :: norm_theta_imm
-   real(r8),parameter :: imm_dust_mean_theta = 46.0_r8/180.0_r8*pi 
-   real(r8),parameter :: imm_dust_var_theta = 0.01_r8
-   real(r8) :: pdf_d_theta
-   integer,parameter :: pdf_n_theta = 301
-   integer,parameter :: i1 = 53
-   integer,parameter :: i2 = 113
-   real(r8) :: dim_theta(pdf_n_theta)
-   real(r8) :: dim_f_imm_dust_a1(pdf_n_theta), dim_f_imm_dust_a3(pdf_n_theta)
    real(r8) :: dim_Jimm_dust_a1(pdf_n_theta), dim_Jimm_dust_a3(pdf_n_theta)
-   real(r8) :: pdf_imm_theta(pdf_n_theta)
    real(r8) :: sum_imm_dust_a1, sum_imm_dust_a3
-   logical :: pdf_imm_in = .true.
+
    !------------------------------------------------------------------------------------------------
 
    errstring = ' '
-
-   if (pdf_imm_in) then
-      pdf_d_theta = (179._r8-1._r8)/180._r8*pi/(pdf_n_theta-1)
-      ! calculate the integral in the denominator
-      x1_imm = (LOG(theta_min)-LOG(imm_dust_mean_theta))/(sqrt(2.0_r8)*imm_dust_var_theta)
-      x2_imm = (LOG(theta_max)-LOG(imm_dust_mean_theta))/(sqrt(2.0_r8)*imm_dust_var_theta)
-      norm_theta_imm = (ERF(x2_imm)-ERF(x1_imm))*0.5_r8
-      dim_theta = 0.0_r8
-      pdf_imm_theta = 0.0_r8
-      do i = i1,i2
-         dim_theta(i) = 1._r8/180._r8*pi+(i-1)*pdf_d_theta
-         pdf_imm_theta(i) = exp(-((LOG(dim_theta(i))-LOG(imm_dust_mean_theta))**2._r8)/(2._r8*imm_dust_var_theta**2._r8))/ &
-                                (dim_theta(i)*imm_dust_var_theta*SQRT(2*pi))/norm_theta_imm
-      end do
-   end if
 
    ! get saturation vapor pressures
    eswtr = svp_water(t)  ! 0 for liquid
@@ -348,16 +333,6 @@ subroutine hetfrz_classnuc_calc( &
 
       m = COS(theta_imm_dust*pi/180._r8)
       f_imm_dust_a3 = (2+m)*(1-m)**2/4._r8
-   else 
-      dim_f_imm_dust_a1 = 0.0_r8
-      dim_f_imm_dust_a3 = 0.0_r8
-      do i = i1,i2
-         m = cos(dim_theta(i))
-         dim_f_imm_dust_a1(i) = (2+m)*(1-m)**2/4._r8
-
-         m = cos(dim_theta(i))
-         dim_f_imm_dust_a3(i) = (2+m)*(1-m)**2/4._r8
-      end do
    end if
 
    ! homogeneous energy of germ formation
@@ -712,5 +687,47 @@ end subroutine collkernel
 
 !===================================================================================================
 
+subroutine hetfrz_classnuc_init_pdftheta()
+
+   ! Local variables:
+   real(r8) :: theta_min, theta_max
+   real(r8) :: x1_imm, x2_imm
+   real(r8) :: norm_theta_imm
+   real(r8) :: imm_dust_mean_theta
+   real(r8) :: imm_dust_var_theta
+   integer  :: i
+   real(r8) :: m
+   real(r8) :: temp
+   !----------------------------------------------------------------------------
+
+   theta_min           = pi/180._r8
+   theta_max           = 179._r8/180._r8*pi
+   imm_dust_mean_theta = 46.0_r8/180.0_r8*pi
+   imm_dust_var_theta  = 0.01_r8
+
+   pdf_d_theta = (179._r8-1._r8)/180._r8*pi/(pdf_n_theta-1)
+
+   x1_imm = (LOG(theta_min) - LOG(imm_dust_mean_theta))/(sqrt(2.0_r8)*imm_dust_var_theta)
+   x2_imm = (LOG(theta_max) - LOG(imm_dust_mean_theta))/(sqrt(2.0_r8)*imm_dust_var_theta)
+   norm_theta_imm = (ERF(x2_imm) - ERF(x1_imm))*0.5_r8
+   dim_theta      = 0.0_r8
+   pdf_imm_theta  = 0.0_r8
+   do i = i1, i2
+      dim_theta(i)     = 1._r8/180._r8*pi + (i-1)*pdf_d_theta
+      pdf_imm_theta(i) = exp(-((LOG(dim_theta(i)) - LOG(imm_dust_mean_theta))**2._r8) / &
+                              (2._r8*imm_dust_var_theta**2._r8) ) /                     &
+                         (dim_theta(i)*imm_dust_var_theta*SQRT(2*pi))/norm_theta_imm
+   end do
+
+   do i = i1, i2
+     m = cos(dim_theta(i))
+     temp = (2+m)*(1-m)**2/4._r8
+     dim_f_imm_dust_a1(i) = temp
+     dim_f_imm_dust_a3(i) = temp
+   end do
+
+end subroutine hetfrz_classnuc_init_pdftheta
+
+!===================================================================================================
 
 end module hetfrz_classnuc

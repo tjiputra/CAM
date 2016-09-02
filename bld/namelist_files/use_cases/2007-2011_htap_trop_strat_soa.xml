@@ -13,7 +13,8 @@
 <solar_htng_spctrl_scl>.true.</solar_htng_spctrl_scl>
 
 <!-- Solar Proton Events -->
-<spe_data_file>atm/waccm/solar/spes_1963-2012_c130307.nc</spe_data_file>
+<epp_spe_filepath>atm/waccm/solar/spes_1963-2012_c130307.nc</epp_spe_filepath>
+<epp_spe_varname>'Prod'</epp_spe_varname>
 <noy_ubc_datapath>atm/cam/chem/ubc/noy</noy_ubc_datapath>
 <noy_ubc_datatype>SERIAL</noy_ubc_datatype>
 <noy_ubc_filelist>noy_fileslist_c130906</noy_ubc_filelist>

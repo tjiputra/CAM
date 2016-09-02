@@ -1,104 +1,257 @@
 module dyn_grid
-  !----------------------------------------------------------------------- 
-  ! 
-  ! Purpose: Definition of dynamics computational grid.
-  !
-  ! Method: Variables are private; interface routines used to extract
-  !         information for use in user code. Global column index range
-  !         defined using full (unreduced) grid. 
-  ! 
-  ! Entry points:
-  !      get_block_bounds_d       get first and last indices in global 
-  !                               block ordering
-  !      get_block_gcol_d         get column indices for given block
-  !      get_block_gcol_cnt_d     get number of columns in given block
-  !      get_block_lvl_cnt_d      get number of vertical levels in column
-  !      get_block_levels_d       get vertical levels in column
-  !      get_gcol_block_d         get global block indices and local columns 
-  !                               index for given global column index
-  !      get_gcol_block_cnt_d     get number of blocks containing data
-  !                               from a given global column index
-  !      get_block_owner_d        get process "owning" given block
-  !      get_horiz_grid_d         get horizontal grid coordinates
-  !      get_horiz_grid_dim_d     get horizontal dimensions of dynamics grid
-  !      dyn_grid_get_pref        get reference pressures for the dynamics grid
-  !      dyn_grid_get_elem_coords get coordinates of a specified block element 
-  !                               of the dynamics grid
-  !      dyn_grid_find_gcols      finds nearest column for given lat/lon
-  !      dyn_grid_get_colndx      get element block/column and MPI process indices 
-  !                               corresponding to a specified global column index
-  !
-  ! Author: Jim Edwards and Patrick Worley
-  ! 
-  !-----------------------------------------------------------------------
-  use element_mod,            only: element_t
-  use cam_logfile,            only: iulog
-  use cam_abortutils,         only: endrun
-  use shr_kind_mod,           only: r8 => shr_kind_r8
-  use shr_const_mod,          only: SHR_CONST_PI
-  use cam_grid_support,       only: iMap
-  use fvm_control_volume_mod, only: fvm_struct
+!----------------------------------------------------------------------- 
+! 
+! Define SE computational grid and decomposition.
+!
+! Original code: Jim Edwards and Patrick Worley
+! 
+!-----------------------------------------------------------------------
 
-  implicit none
-  private
-  save
+use shr_kind_mod,           only: r8 => shr_kind_r8
+use spmd_utils,             only: masterproc, iam, mpicom, mstrid=>masterprocid, &
+                                  npes, mpi_integer, mpi_real8, mpi_success
+use physconst,              only: pi
+use cam_initfiles,          only: initial_file_get_id
+use cam_grid_support,       only: iMap
+use cam_logfile,            only: iulog
+use cam_abortutils,         only: endrun
 
-  ! The SE dynamics grid
-  integer, parameter, public :: dyn_decomp = 101
+use pio,                    only: file_desc_t, pio_seterrorhandling, pio_bcast_error, &
+                                  pio_internal_error, pio_noerr, pio_inq_dimid,       &
+                                  pio_inq_dimlen
 
-  integer           :: ngcols_d = 0     ! number of dynamics columns
-  integer, public, parameter :: ptimelevels = 2
-  logical :: gblocks_need_initialized       = .true.
-  real(r8), parameter :: rad2deg = 180.0_r8 / SHR_CONST_PI
+use dimensions_mod,         only: globaluniquecols, nelem, nelemd, nelemdmax, &
+                                  ne, np, npsq, nlev
 
+use domain_mod,             only: domain1d_t
+use element_mod,            only: element_t
+use fvm_control_volume_mod, only: fvm_struct
+use hybvcoord_mod,          only: hvcoord_t
+use prim_driver_mod,        only: prim_init1
+use time_mod,               only: TimeLevel_t
 
-  type block_global_data
-     integer :: UniquePtOffset
-     integer :: NumUniqueP
-     integer :: LocalID
-     integer :: Owner
-  end type block_global_data
+implicit none
+private
+save
 
+integer, parameter :: dyn_decomp = 101 ! The SE dynamics grid
+integer, parameter :: ptimelevels = 2
 
-  type(block_global_data), allocatable :: gblocks(:)
-  type(element_t), public, pointer :: elem(:) => null()
-  type(fvm_struct), public, pointer :: fvm(:) => null()
+type (TimeLevel_t)         :: TimeLevel     ! main time level struct (used by tracers)
+type (domain1d_t), pointer :: dom_mt(:) => null()
+type (hvcoord_t)           :: hvcoord
+type(element_t),   pointer :: elem(:) => null()
+type(fvm_struct),  pointer :: fvm(:) => null()
+real(r8),          pointer :: w(:) => null()        ! weights
 
-  public :: dyn_grid_init, define_cam_grids
-  public :: get_block_owner_d, get_gcol_block_d, get_gcol_block_cnt_d
-  public :: get_block_gcol_cnt_d, get_horiz_grid_dim_d, get_block_levels_d
-  public :: get_block_gcol_d, get_block_bounds_d, get_horiz_grid_d
-  public :: get_block_lvl_cnt_d, set_horiz_grid_cnt_d, get_dyn_grid_parm
-  public :: get_dyn_grid_parm_real2d, get_dyn_grid_parm_real1d
-  public :: dyn_grid_get_pref
-  public :: dyn_grid_get_elem_coords
-  public :: dyn_grid_find_gcols
-  public :: dyn_grid_get_colndx
-  public :: physgrid_copy_attributes_d
+public ::       &
+   dyn_decomp,  &
+   ptimelevels, &
+   timelevel,   &
+   dom_mt,      &
+   hvcoord,     &
+   elem,        &
+   fvm,         &
+   w
 
-  integer(kind=iMap), pointer :: fdofP_local(:,:) => null()
+public :: &
+   dyn_grid_init,            &
+   get_block_owner_d,        & ! get process "owning" given block
+   get_gcol_block_d,         & ! get global block indices and local columns
+                               ! index for given global column index
+   get_gcol_block_cnt_d,     & ! get number of blocks containing data
+                               ! from a given global column index
+   get_horiz_grid_dim_d,     &
+   get_block_gcol_d,         & ! get column indices for given block
+   get_block_bounds_d,       & ! get first and last indices in global block ordering
+   get_block_gcol_cnt_d,     & ! get number of columns in given block
+   get_block_lvl_cnt_d,      & ! get number of vertical levels in column
+   get_block_levels_d,       & ! get vertical levels in column
+   get_horiz_grid_d,         & ! get horizontal grid coordinates
+   set_horiz_grid_cnt_d,     & ! get horizontal dimensions of dynamics grid
+   get_dyn_grid_parm,        &
+   get_dyn_grid_parm_real2d, &
+   get_dyn_grid_parm_real1d, &
+   dyn_grid_get_elem_coords, & ! get coordinates of a specified block element
+   dyn_grid_find_gcols,      & ! finds nearest column for given lat/lon
+   dyn_grid_get_colndx,      & ! get element block/column and MPI process indices
+                               ! corresponding to a specified global column index
+   physgrid_copy_attributes_d
 
-  real(r8), public, pointer :: w(:) => null()        ! weights
+integer(kind=iMap), pointer :: fdofP_local(:,:) => null()
 
-  !! Local lat/lon arrays
-  real(r8), pointer :: pelat_deg(:) => null()  ! pe-local latitudes (degrees)
-  real(r8), pointer :: pelon_deg(:) => null()  ! pe-local longitudes (degrees)
-  real(r8), pointer :: pearea(:) => null()  ! pe-local areas
-  integer(iMap), pointer :: pemap(:) => null()  ! pe-local map for PIO decomp
+!! Local lat/lon arrays
+real(r8), pointer :: pelat_deg(:) => null()  ! pe-local latitudes (degrees)
+real(r8), pointer :: pelon_deg(:) => null()  ! pe-local longitudes (degrees)
+real(r8), pointer :: pearea(:) => null()     ! pe-local areas
+integer(iMap), pointer :: pemap(:) => null() ! pe-local map for PIO decomp
+!! Need lat and lon for constituent initialzation
+public :: pelat_deg, pelon_deg
 
+type block_global_data
+   integer :: UniquePtOffset
+   integer :: NumUniqueP
+   integer :: LocalID
+   integer :: Owner
+end type block_global_data
 
-!========================================================================
+type(block_global_data), allocatable :: gblocks(:)
+logical :: gblocks_need_initialized = .true.
+
+integer :: ngcols_d = 0     ! number of dynamics columns
+
+real(r8), parameter :: rad2deg = 180.0_r8 / pi
+
+!=========================================================================================
 contains
+!=========================================================================================
+
+subroutine dyn_grid_init()
+
+   ! Initialize SE grid, and decomposition.
+
+   use hycoef,         only: hycoef_init, hypi, hypm, nprlev, &
+                             hyam, hybm, hyai, hybi, ps0
+   use ref_pres,       only: ref_pres_init
+   use time_manager,   only: get_nstep, get_step_size
+
+   use thread_mod,     only: nthreads
+   use parallel_mod,   only: par
+   use control_mod,    only: qsplit, rsplit
+   use time_mod,       only: tstep, nsplit
+
+   ! Local variables
+   type(file_desc_t), pointer :: fh_ini
+
+#ifdef _OPENMP    
+   integer :: omp_get_num_threads
+#endif
+
+   integer :: k
+   integer :: ncolid
+   integer :: ncollen
+   integer :: ierr
+   integer :: neltmp(3)
+   integer :: dtime
+
+   character(len=*), parameter :: sub = 'dyn_grid_init'
+   !----------------------------------------------------------------------------
+
+   ! Get file handle for initial file and first consistency check
+   fh_ini => initial_file_get_id()
+
+   call pio_seterrorhandling(fh_ini, pio_bcast_error)
+   ierr = pio_inq_dimid(fh_ini, 'ncol', ncolid)
+   call pio_seterrorhandling(fh_ini, pio_internal_error)
+
+   if (ierr /= pio_noerr) then
+      call endrun(sub//': ERROR: initial dataset not on unstructured grid')
+   else      
+      ierr = pio_inq_dimlen(fh_ini, ncolid, ncollen)
+   end if
+
+   ! Initialize hybrid coordinate arrays
+   call hycoef_init(fh_ini)
+   
+   hvcoord%hyam = hyam
+   hvcoord%hyai = hyai
+   hvcoord%hybm = hybm
+   hvcoord%hybi = hybi
+   hvcoord%ps0  = ps0  
+   do k=1,nlev
+      hvcoord%hybd(k) = hvcoord%hybi(k+1) - hvcoord%hybi(k)
+   end do
+
+   ! Initialize reference pressures
+   call ref_pres_init(hypi, hypm, nprlev)
+
+#ifdef _OPENMP    
+!   Set by driver
+!$omp parallel
+   nthreads = omp_get_num_threads()
+!$omp end parallel
+   if (masterproc) then
+      write(iulog,*) sub//": INFO: number of OpenMP threads = ", nthreads
+   end if
+#if defined (COLUMN_OPENMP)
+   if (masterproc) then
+      write(iulog,*) sub//": INFO: using OpenMP within element instead of across elements"
+   end if
+#endif
+#else
+   nthreads = 1
+   if (masterproc) then
+      write(iulog,*) sub//": INFO: openmp not activated"
+   end if
+#endif
+
+   if (iam < par%nprocs) then
+
+      call prim_init1(elem, fvm, par, dom_mt, TimeLevel)
+
+      ! globaluniquecols set by call to prim_init1
+      if (ncollen /= GlobalUniqueCols) then
+         write(iulog,*) sub//': ERROR: model parameters do not match initial dataset parameters'
+         write(iulog,*)'  Model Parameters:    globaluniquecols = ', globaluniquecols
+         write(iulog,*)'  Dataset Parameters:  ncol             = ', ncollen
+         call endrun(sub//': ERROR: model parameters do not match initial dataset parameters')
+      end if
+
+      call set_horiz_grid_cnt_d(globaluniquecols)
+
+      neltmp(1) = nelemdmax
+      neltmp(2) = nelem
+      neltmp(3) = globaluniquecols
+   else
+      nelemd = 0
+      neltmp(1) = 0
+      neltmp(2) = 0
+      neltmp(3) = 0
+   endif
+
+   if (par%nprocs .lt. npes) then
+
+      ! Broadcast quantities to auxiliary processes
+      call mpi_bcast(neltmp, 3, mpi_integer, mstrid, mpicom, ierr)
+      if (ierr /= mpi_success) then
+         call endrun(sub//': FATAL: mpi_bcast: neltmp')
+      end if
+
+      if (iam .ge. par%nprocs) then
+         nelemdmax = neltmp(1)
+         nelem     = neltmp(2)
+         call set_horiz_grid_cnt_d(neltmp(3))
+      end if
+   end if
+
+   ! Dynamics timestep
+   !
+   !  Note: dtime = progress made in one timestep.  value in namelist
+   !        dtime = the frequency at which physics is called
+   !        tstep = the dynamics timestep:  
+   dtime = get_step_size()
+   if (rsplit==0) then
+      ! non-lagrangian code
+      tstep = dtime/real(nsplit*qsplit,r8)
+      TimeLevel%nstep = get_nstep()*nsplit*qsplit
+   else
+      ! lagrangian code
+      tstep = dtime/real(nsplit*qsplit*rsplit,r8)
+      TimeLevel%nstep = get_nstep()*nsplit*qsplit*rsplit
+   endif
+
+   ! initial SE (subcycled) nstep
+   TimeLevel%nstep0 = 0
+    
+   ! Define the CAM grids.
+   ! Physics-grid will be defined later by phys_grid_init
+   call define_cam_grids()
+
+end subroutine dyn_grid_init
+
 !========================================================================
 
-  subroutine dyn_grid_init()
-
-  end subroutine dyn_grid_init
-
-  !========================================================================
-  !
   subroutine get_block_bounds_d(block_first,block_last)
-    use dimensions_mod, only: nelem
     !----------------------------------------------------------------------- 
     ! 
     !                          
@@ -258,7 +411,6 @@ contains
   !========================================================================
   !
   subroutine get_gcol_block_d(gcol,cnt,blockid,bcid,localblockid)
-    use dimensions_mod, only: nelemd, nelem
     use kinds,          only: int_kind
     use cam_abortutils, only: endrun
     !----------------------------------------------------------------------- 
@@ -457,7 +609,6 @@ end function get_block_owner_d
   !========================================================================
   !
   subroutine set_horiz_grid_cnt_d(NumUniqueCols)
-    use dimensions_mod, only: nelem, nelemd, np, npsq
     use element_mod,    only: index_t
     use dof_mod,        only: UniqueCoords, UniquePoints
     use physconst,      only: pi
@@ -613,7 +764,6 @@ end function get_block_owner_d
   end subroutine get_horiz_grid_d
 
   subroutine define_cam_grids()
-    use dimensions_mod,   only: np, ne
     use cam_grid_support, only: horiz_coord_t, horiz_coord_create
     use cam_grid_support, only: cam_grid_register, cam_grid_attribute_register
 
@@ -671,9 +821,6 @@ end function get_block_owner_d
   end subroutine physgrid_copy_attributes_d
 
   subroutine gblocks_init()
-    use dimensions_mod, only: nelem, nelemd, nelemdmax
-    use spmd_utils,     only: iam, npes, mpi_integer, mpicom
-    use spmd_utils,     only: masterproc
     integer :: ie, p
     integer :: ibuf
     integer :: ierr
@@ -734,9 +881,6 @@ end function get_block_owner_d
 
   subroutine compute_global_area(area_d)
     use dof_mod,        only: UniqueCoords, UniquePoints
-    use dimensions_mod, only: nelemd, nelemdmax, np
-    use spmd_utils,     only: iam, mpi_integer, mpi_real8, mpicom, npes
-    use spmd_utils,     only: masterproc
 
     ! Input variables
     real(r8), pointer           :: area_d(:)
@@ -783,9 +927,6 @@ end function get_block_owner_d
 
   subroutine compute_global_coords (clat, clon, lat_out, lon_out)
     use dof_mod,        only: UniqueCoords, UniquePoints
-    use dimensions_mod, only: nelemd, nelemdmax
-    use spmd_utils,     only: iam, mpi_integer, mpi_real8, mpicom, npes
-    use spmd_utils,     only: masterproc
 
     ! Dummy variables
     real(r8),           intent(out) :: clat(:)
@@ -911,7 +1052,6 @@ end function get_block_owner_d
   !#######################################################################
   integer function get_dyn_grid_parm(name) result(ival)
     use pmgrid,          only: beglat, endlat, plat, plon, plev, plevp
-    use dimensions_mod,  only: ne, np, nelemd, npsq
     use interpolate_mod, only: get_interp_parameter
     character(len=*), intent(in) :: name
 
@@ -958,40 +1098,11 @@ end function get_block_owner_d
 
   !#######################################################################
 
-  subroutine dyn_grid_get_pref(pref_edge, pref_mid, num_pr_lev)
-
-    ! return reference pressures for the dynamics grid
-
-    use pmgrid, only: plev
-    use hycoef, only: hypi, hypm, nprlev
-
-    ! arguments
-    real(r8), intent(out) :: pref_edge(:) ! reference pressure at layer edges (Pa)
-    real(r8), intent(out) :: pref_mid(:)  ! reference pressure at layer midpoints (Pa)
-    integer,  intent(out) :: num_pr_lev   ! number of top levels using pure pressure representation
-
-    integer :: k
-    !-----------------------------------------------------------------------
-
-    do k = 1, plev
-      pref_edge(k) = hypi(k)
-      pref_mid(k)  = hypm(k)
-    end do
-    pref_edge(plev+1) = hypi(plev+1)
-
-    num_pr_lev = nprlev
-
-  end subroutine dyn_grid_get_pref
-
-  !#######################################################################
-
   !-------------------------------------------------------------------------------
   ! This returns the lat/lon information (and corresponding MPI task numbers (owners)) 
   ! of the global model grid columns nearest to the input satellite coordinate (lat,lon)
   !-------------------------------------------------------------------------------
   subroutine dyn_grid_find_gcols( lat, lon, nclosest, owners, col, lbk, rlat, rlon, idyn_dists ) 
-    use spmd_utils,     only: iam
-    use dimensions_mod, only: np
     use shr_const_mod,  only: SHR_CONST_REARTH
 
     real(r8), intent(in) :: lat
@@ -1079,8 +1190,6 @@ end function get_block_owner_d
 
 !#######################################################################
 subroutine dyn_grid_get_colndx( igcol, nclosest, owners, col, lbk ) 
-  use spmd_utils, only: iam
-  use dimensions_mod, only: np
 
   integer, intent(in)  :: nclosest
   integer, intent(in)  :: igcol(nclosest)
@@ -1115,7 +1224,6 @@ end subroutine dyn_grid_get_colndx
   ! this returns coordinates of a specified block element of the dyn grid
   subroutine dyn_grid_get_elem_coords( ie, rlon, rlat, cdex )
     use dof_mod, only: UniqueCoords
-    use dimensions_mod, only: np
 
     integer, intent(in) :: ie ! block element index
 

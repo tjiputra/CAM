@@ -208,18 +208,6 @@ Enables optional filter for intermediate c-grid winds, (courtesy of Bill Putman)
 Default: 0
 </entry>
 
-<entry id="fv_ct_overlap" type="integer"  category="dyn_fv"
-       group="dyn_fv_inparm" valid_values="" >
-Overlapping of trac2d and cd_core subcycles.
-Default: 0
-</entry>
-
-<entry id="fv_trac_decomp" type="integer"  category="dyn_fv"
-       group="dyn_fv_inparm" valid_values="" >
-Size of tracer domain decomposition for trac2d.
-Default: 1
-</entry>
-
 <entry id="fv_fft_flt" type="integer"  category="dyn_fv"
        group="dyn_fv_inparm" valid_values="0,1" >
 1 for FFT filter always, 0 for combined algebraic/FFT filter.  The value 0
@@ -288,7 +276,7 @@ Default: 1
 </entry>
 
 <entry id="modc_sw_dynrun" type="integer"  category="dyn_fv"
-       group="spmd_fv_inparm" valid_values="" >
+       group="spmd_fv_inparm" valid_values="0,1,2" >
 Mod_comm irregular underlying communication method for dyn_run/misc.
 0 for original mp_sendirr/mp_recvirr
 1 for mp_swapirr and a point-to-point implementation of communication pattern
@@ -320,7 +308,7 @@ Default: -1 (so no limit)
 </entry>
 
 <entry id="modc_sw_cdcore" type="integer"  category="dyn_fv"
-       group="spmd_fv_inparm" valid_values="" >
+       group="spmd_fv_inparm" valid_values="0,1,2" >
 Mod_comm irregular underlying communication method for cd_core/geopk
 0 for original mp_sendirr/mp_recvirr
 1 for mp_swapirr and a point-to-point implementation of communication pattern
@@ -352,7 +340,7 @@ Default: -1 (so no limit)
 </entry>
 
 <entry id="modc_sw_gather" type="integer"  category="dyn_fv"
-       group="spmd_fv_inparm" valid_values="" >
+       group="spmd_fv_inparm" valid_values="0,1,2" >
 Mod_comm irregular underlying communication method for gather
 0 for original mp_sendirr/mp_recvirr
 1 for mp_swapirr and a point-to-point implementation of communication pattern
@@ -384,7 +372,7 @@ Default: -1 (so no limit)
 </entry>
 
 <entry id="modc_sw_scatter" type="integer"  category="dyn_fv"
-       group="spmd_fv_inparm" valid_values="" >
+       group="spmd_fv_inparm" valid_values="0,1,2" >
 Mod_comm irregular underlying communication method for scatter
 0 for original mp_sendirr/mp_recvirr
 1 for mp_swapirr and a point-to-point implementation of communication pattern
@@ -425,7 +413,7 @@ Default: 0
 </entry>
 
 <entry id="modc_hs_tracer" type="logical"  category="dyn_fv"
-       group="spmd_fv_inparm" valid_values="" >
+       group="spmd_fv_inparm" valid_values="0,1,2" >
 True for mod_comm irregular communication handshaking for multiple tracers
 Default: .true.
 </entry>
@@ -448,7 +436,7 @@ Default: -1 (so no limit)
 </entry>
 
 <entry id="modc_onetwo" type="integer"  category="dyn_fv"
-       group="spmd_fv_inparm" valid_values="" >
+       group="spmd_fv_inparm" valid_values="1,2" >
 One or two simultaneous mod_comm irregular communications (excl. tracers)
 Default: 1
 </entry>
@@ -460,21 +448,21 @@ Default: 1
 </entry>
 
 <entry id="modcomm_gatscat" type="integer"  category="dyn_fv"
-       group="spmd_fv_inparm" valid_values="0,1,2" >
+       group="spmd_fv_inparm" valid_values="0,1" >
 For mod_comm gather/scatters, 0 for temporary contiguous buffers; 1 for mpi derived
 types.
 Default: 0
 </entry>
 
 <entry id="modcomm_geopk" type="integer"  category="dyn_fv"
-       group="spmd_fv_inparm" valid_values="0,1,2" >
+       group="spmd_fv_inparm" valid_values="0,1" >
 For geopk (geopktrans=1) messages, 0 for temporary contiguous buffers; 1 for mpi derived
 types.
 Default: 0
 </entry>
 
 <entry id="modcomm_transpose" type="integer"  category="dyn_fv"
-       group="spmd_fv_inparm" valid_values="0,1,2" >
+       group="spmd_fv_inparm" valid_values="0,1" >
 For mod_comm transposes, 0 for temporary contiguous buffers; 1 for mpi derived
 types.
 Default: 0
@@ -502,6 +490,18 @@ of XY subdomains (npr_yz(3)*npr_yz(4)).
 
 Default: ntask,1,1,ntask where ntask is the number of MPI tasks.  This is a
 1D decomposition in latitude.
+</entry>
+
+<entry id="fv_ct_overlap" type="integer"  category="dyn_fv"
+       group="spmd_fv_inparm" valid_values="" >
+Overlapping of trac2d and cd_core subcycles.
+Default: 0
+</entry>
+
+<entry id="fv_trac_decomp" type="integer"  category="dyn_fv"
+       group="spmd_fv_inparm" valid_values="" >
+Size of tracer domain decomposition for trac2d.
+Default: 1
 </entry>
 
 <!-- Dynamics: Finite Volume: Offline -->
@@ -836,6 +836,84 @@ Default: set by build-namelist.
 <entry id="effgw_oro" type="real" category="gw_drag"
        group="gw_drag_nl" valid_values="" >
 Efficiency associated with orographic gravity waves.
+Default: set by build-namelist.
+</entry>
+
+<entry id="use_gw_rdg_beta" type="logical" category="gw_drag"
+       group="gw_drag_nl" valid_values="" >
+Whether or not to enable gravity waves produced by meso-Beta Ridges.
+Default: FALSE (set by build-namelist)
+</entry>
+
+<entry id="n_rdg_beta" type="integer" category="gw_drag"
+       group="gw_drag_nl" valid_values="" >
+Number of meso-Beta ridges (per gridbox) to invoke.
+Default: 10 (set by build-namelist)
+</entry>
+
+<entry id="effgw_rdg_beta" type="real" category="gw_drag"
+       group="gw_drag_nl" valid_values="" >
+Efficiency scaling factor associated with anisotropic OGW.
+Default: set by build-namelist.
+</entry>
+
+<entry id="effgw_rdg_beta_max" type="real" category="gw_drag"
+       group="gw_drag_nl" valid_values="" >
+Max efficiency associated with anisotropic OGW.
+Default: 1.0
+</entry>
+
+<entry id="rdg_beta_cd_llb" type="real" category="gw_drag"
+       group="gw_drag_nl" valid_values="" >
+Drag coefficient for obstacles in low-level flow.
+Default: 1.0
+</entry>
+
+<entry id="trpd_leewv_rdg_beta" type="logical" category="gw_drag"
+       group="gw_drag_nl" valid_values="" >
+Whether or not to allow trapping for meso-Beta Ridges.
+Default: FALSE (set by build-namelist)
+</entry>
+
+<entry id="use_gw_rdg_gamma" type="logical" category="gw_drag"
+       group="gw_drag_nl" valid_values="" >
+Whether or not to enable gravity waves produced by meso-gamma Ridges.
+Default: FALSE (set by build-namelist)
+</entry>
+
+<entry id="n_rdg_gamma" type="integer" category="gw_drag"
+       group="gw_drag_nl" valid_values="" >
+Number of meso-gamma ridges (per gridbox) to invoke.
+Default: -1 (set by build-namelist)
+</entry>
+
+<entry id="effgw_rdg_gamma" type="real" category="gw_drag"
+       group="gw_drag_nl" valid_values="" >
+Efficiency scaling factor associated with anisotropic OGW.
+Default: set by build-namelist.
+</entry>
+
+<entry id="effgw_rdg_gamma_max" type="real" category="gw_drag"
+       group="gw_drag_nl" valid_values="" >
+Max efficiency associated with anisotropic OGW.
+Default: 1.0
+</entry>
+
+<entry id="rdg_gamma_cd_llb" type="real" category="gw_drag"
+       group="gw_drag_nl" valid_values="" >
+Drag coefficient for obstacles in low-level flow.
+Default: 1.0
+</entry>
+
+<entry id="trpd_leewv_rdg_gamma" type="logical" category="gw_drag"
+       group="gw_drag_nl" valid_values="" >
+Whether or not to allow trapping for meso-gamma Ridges.
+Default: FALSE (set by build-namelist) 
+</entry>
+
+<entry id="bnd_rdggm" type="char*256" input_pathname="abs" category="gw_drag"
+       group="gw_drag_nl" valid_values="" >
+Full pathname of boundary dataset for meso-gamma ridges.
 Default: set by build-namelist.
 </entry>
 
@@ -1608,6 +1686,13 @@ amount. Only applied for initial simulations.
 Default: 0.0
 </entry>
 
+<entry id="cam_branch_file" type="char*256" category="initial_conditions"
+       group="cam_initfiles_nl" valid_values="">
+Full pathname of master restart file from which to branch. Setting is
+Required for branch run.
+Default: none
+</entry>
+
 <entry id="readtrace" type="logical"  category="initial_conditions"
        group="constituents_nl" valid_values="" >
 If TRUE, try to initialize data for all consituents by reading from the
@@ -2014,6 +2099,26 @@ Subgrid scaling factor for relative humidity in ice nucleation code.
 Default: set by build-namelist
 </entry>
 
+<entry id="nucleate_ice_incloud" type="logical" category="microphys"
+       group="nucleate_ice_nl" valid_values="" >
+Switch to determine whether ice nucleation happens using the incloud (true) or
+the gridbox average (false) relative humidity.  When true, it is assumed that 
+the incloud relative humidity for nucleation is 1.
+Default: set by build-namelist
+</entry>
+
+<entry id="nucleate_ice_strat" type="real" category="microphys"
+       group="nucleate_ice_nl" valid_values="" >
+Fraction of Aitken mode sulfate particles assumed to nucleate ice in the polar
+stratospheric. Provides an increase in homogeneous freezing over the Liu&Penner method.
+Temporary solution to adjust ice surface area density and dehydration in the
+polar stratosphere where there doesn't seem to be enough nucleation. A value of
+zero means Liu&Penner is used.
+Default: set by build-namelist
+</entry>
+
+
+
 
 <!-- hkconv Moist Convection -->
 <entry id="hkconv_cmftau" type="real" category="conv"
@@ -2129,6 +2234,13 @@ rhi at which ice cloud fraction = 1.
 Default: set by build-namelist
 </entry>
 
+<entry id="cldfrc2m_do_subgrid_growth" type="logical" category="conv"
+       group="cldfrc2m_nl" valid_values="" >
+Use cloud fraction to determine whether to do growth of ice clouds below
+RHice of 1 down to RHice = rhmini.
+Default: set by build-namelist
+</entry>
+
 <entry id="zmconv_momcu" type="real" category="conv"
        group="zmconv_nl" valid_values="" >
 Convective momentum transport parameter (upward)
@@ -2170,6 +2282,12 @@ Default: set by build-namelist
        group="zmconv_nl" valid_values="" >
 Include organization parameterization in ZM
 Default: .false.
+</entry>
+
+<entry id="zmconv_num_cin" type="integer" category="conv"
+       group="zmconv_nl" valid_values="" >
+The number of negative buoyancy regions that are allowed before the convection top and CAPE calculations are completed.
+Default: 5
 </entry>
 
 
@@ -2321,6 +2439,12 @@ for CLUBB_SGS; or UNICON which doesn't distinquish shallow and deep.
 Default: set by build-namelist (depends on <varname>eddy_scheme</varname>).
 </entry>
 
+<entry id="do_beljaars" type="logical" category="pbl"
+       group="blj_nl" valid_values="" >
+Logical switch to turn on the beljaars scheme
+Default: set by build-namelist
+</entry>
+
 <entry id="do_tms" type="logical" category="pbl"
        group="tms_nl" valid_values="" >
 Logical switch to turn on turbulent mountain stress calculation in 
@@ -2340,12 +2464,6 @@ Default: 1.0 for CAM, set by build-namelist for WACCM, T31
 Factor determining z_0 from orographic standard deviation [ no unit ] 
 Used when turbulent mountain stress calc is turned on. See <varname>do_tms</varname>.
 set by build-namelist for WACCM, T31
-</entry>
-
-<entry id="micro_do_icesupersat" type="logical"  category="conv"
-       group="phys_ctl_nl" valid_values="" >
-Apply ice supersaturation adjustment code
-Default: .false.
 </entry>
 
 <entry id="eddy_lbulk_max" type="real" category="pbl"
@@ -2472,10 +2590,96 @@ Switch for CLUBB_ADV
 Default: FALSE
 </entry>
 
-<entry id="clubb_do_deep" type="logical" category="pblrad"
-       group="clubbpbl_diff_nl" valid_values="" >
-Switch for CLUBBND_CAM
-Default: FALSE
+<!-- CLUBB parameters -->
+<entry id="clubb_c11" type="real" category="pblrad"
+       group="clubb_params_nl" valid_values="" >
+Low Skewness in C11 Skw. Function
+</entry>
+
+<entry id="clubb_c11b" type="real" category="pblrad"
+       group="clubb_params_nl" valid_values="" >
+High Skewness in C11 Skw. Function
+</entry>
+
+<entry id="clubb_mult_coef" type="real" category="pblrad"
+       group="clubb_params_nl" valid_values="" >
+Coef. applied to log(avg dz/thresh)
+</entry>
+
+<entry id="clubb_gamma_coef" type="real" category="pblrad"
+       group="clubb_params_nl" valid_values="" >
+Low Skw.: gamma coef. Skw. Fnct.
+</entry>
+
+<entry id="clubb_c_K10" type="real" category="pblrad"
+       group="clubb_params_nl" valid_values="" >
+Momentum coefficient of Kh_zm
+</entry>
+
+<entry id="clubb_c_K10h" type="real" category="pblrad"
+       group="clubb_params_nl" valid_values="" >
+Thermo of Kh_zm
+</entry>
+
+<entry id="clubb_beta" type="real" category="pblrad"
+       group="clubb_params_nl" valid_values="" >
+Plume widths for theta_l and rt
+</entry>
+
+<entry id="clubb_C2rt" type="real" category="pblrad"
+       group="clubb_params_nl" valid_values="" >
+C2 coef. for the rtp2_dp1 term
+</entry>
+
+<entry id="clubb_C2thl" type="real" category="pblrad"
+       group="clubb_params_nl" valid_values="" >
+C2 coef. for the thlp2_dp1 term
+</entry>
+
+<entry id="clubb_C2rtthl" type="real" category="pblrad"
+       group="clubb_params_nl" valid_values="" >
+C2 coef. for the rtpthlp_dp1 term
+</entry>
+
+<entry id="clubb_C8" type="real" category="pblrad"
+       group="clubb_params_nl" valid_values="" >
+Coef. #1 in C8 Skewness Equation
+</entry>
+
+<entry id="clubb_C7" type="real" category="pblrad"
+       group="clubb_params_nl" valid_values="" >
+Low Skewness in C7 Skw. Function
+</entry>
+
+<entry id="clubb_C7b" type="real" category="pblrad"
+       group="clubb_params_nl" valid_values="" >
+High Skewness in C7 Skw. Function
+</entry>
+
+<entry id="clubb_Skw_denom_coef" type="real" category="pblrad"
+       group="clubb_params_nl" valid_values="" >
+Factor to decrease sensitivity in the denominator of Skw calculation
+</entry>
+
+<entry id="clubb_lambda0_stability_coef" type="real" category="pblrad"
+       group="clubb_params_nl" valid_values="">
+Intensity of stability correction applied to C1 and C6
+</entry>
+
+<entry id="clubb_l_lscale_plume_centered" type="logical" category="pblrad"
+       group="clubb_params_nl" valid_values="" >
+Uses PDF to compute perturbed values for l_avg_Lscale code
+</entry>
+
+<entry id="clubb_l_use_ice_latent" type="logical" category="pblrad"
+       group="clubb_params_nl" valid_values="" >
+Include the effects of ice latent heating in turbulence terms
+</entry>
+
+<entry id="clubb_do_liqsupersat" type="logical"  category="conv"
+       group="clubb_params_nl" valid_values="" >
+Apply liquid supersaturation adjustment code
+Default: false
 </entry>
 
 <!-- CARMA Sectional Microphysics -->
@@ -3068,8 +3272,8 @@ Default: set by build-namelist
 </entry>
 
 <entry id="cam_chempkg" type="char*32" category="build"
-       group="phys_ctl_nl" valid_values="waccm_mozart,waccmx_mozart,waccm_mozart_mam3,
-                                         waccm_mozart_sulfur,waccm_sc,waccm_sc_mam3,
+       group="phys_ctl_nl" valid_values="waccm_ma,waccmx_ma,waccm_ma_mam3,
+                                         waccm_ma_sulfur,waccm_sc,waccm_sc_mam3,
 					 waccm_tsmlt,waccm_tsmlt_mam4,waccm_tsmlt_sulfur,
 					 trop_mozart,trop_mozart_mam3,trop_mozart_soa,
 					 trop_strat_soa,trop_strat_mam3,trop_strat_mam7,trop_strat_mam4_vbs,
@@ -3493,16 +3697,6 @@ Default: 0.
 Rayleigh friction parameter to determine the approximate value of the decay
 time (days) at model top.  If 0.0 then no Rayleigh friction is applied.
 Default: 0.
-</entry>
-
-
-<!-- Restart (Continuation and Branch) Runs -->
-
-<entry id="cam_branch_file" type="char*256" category="restart"
-       group="cam_restart_nl" valid_values="">
-Full pathname of master restart file from which to branch. Setting is
-Required for branch run.
-Default: none
 </entry>
 
 
@@ -5289,32 +5483,66 @@ TRUE implies qbo package is active.
 Default: FALSE
 </entry>
 
-<entry id="spe_data_file" type="char*256" input_pathname="abs" category="waccm"
-       group="chem_inparm" valid_values="" >
-Filepath for time-variant solar proton ionization dataset.
-Default: Set by build-namelist.
+<entry id="fixed_geomag_year" type="integer" category="waccm"
+       group="geomag_nl" valid_values="" >
+If set this year is used for setting geomagnetic coordinates through out the 
+simulation.  If not set the model simulation year is used.
+Default: none
 </entry>
 
-<entry id="spe_filenames_list" type="char*256" input_pathname="abs" category="waccm"
-       group="chem_inparm" valid_values="" >
-Filepath for file that lists a series of solar proton ionization dataset files.
-Default: Set by build-namelist.
+<entry id="igrf_geomag_coefs_file" type="char*256" input_pathname="abs" category="waccm"
+       group="geomag_nl" valid_values="" >
+International Geomagnetic Reference Field (IGRF) coefficients.
+Default: None.
 </entry>
 
-<entry id="spe_remove_file" type="logical" category="waccm"
-       group="chem_inparm" valid_values="" >
-TRUE implies the offline solar proton ionization data file will be deleted when 
-finished with it.
-Default: FALSE
+<entry id="epp_all_filepath" type="char*256" input_pathname="abs" category="waccm"
+       group="epp_ionization_nl" valid_values="" >
+Filepath input dataset for ionization due to energetic particle precipitation.
+Default: None.
+</entry>
+<entry id="epp_all_varname" type="char*80" category="waccm"
+       group="epp_ionization_nl" valid_values="" >
+Variable name in netCDF file <varname>epp_all_filepath</varname> which contains
+ion pairs production rates.
+Default: None.
 </entry>
 
-<entry id="spe_restart" type="logical" category="waccm"
-       group="chem_inparm" valid_values="" >
-TRUE implies restart (branch) from a previous run with solar proton events.
-Default: TRUE
+<entry id="epp_spe_filepath" type="char*256" input_pathname="abs" category="waccm"
+       group="epp_ionization_nl" valid_values="" >
+Filepath input dataset for ionization due to solar proton events.
+Default: None.
+</entry>
+<entry id="epp_spe_varname" type="char*80" category="waccm"
+       group="epp_ionization_nl" valid_values="" >
+Variable name in netCDF file <varname>epp_spe_filepath</varname> which contains
+ion pairs production rates.
+Default: None.
 </entry>
 
+<entry id="epp_mee_filepath" type="char*256" input_pathname="abs" category="waccm"
+       group="epp_ionization_nl" valid_values="" >
+Filepath input dataset for ionization due to medium energy electrons.
+Default: None.
+</entry>
+<entry id="epp_mee_varname" type="char*80" category="waccm"
+       group="epp_ionization_nl" valid_values="" >
+Variable name in netCDF file <varname>epp_mee_filepath</varname> which contains
+ion pairs production rates.
+Default: None.
+</entry>
 
+<entry id="epp_gcr_filepath" type="char*256" input_pathname="abs" category="waccm"
+       group="epp_ionization_nl" valid_values="" >
+Filepath input dataset for ionization due to galactic cosmic rays.
+Default: None.
+</entry>
+<entry id="epp_gcr_varname" type="char*80" category="waccm"
+       group="epp_ionization_nl" valid_values="" >
+Variable name in netCDF file <varname>epp_gcr_filepath</varname> which contains
+ion pairs production rates.
+Default: None.
+</entry>
 
 <!-- SE dycore -->
 

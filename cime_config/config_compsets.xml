@@ -218,6 +218,10 @@
     <lname>GEOS_CAM5%WTSM_CLM45%CN_CICE%PRES_DOCN%DOM_RTM_SGLC_SWAV</lname>
   </compset>
   <compset>
+    <alias>FSDWD</alias>            
+    <lname>GEOS_CAM5%WCMD_CLM45%CN_CICE%PRES_DOCN%DOM_RTM_SGLC_SWAV</lname>
+  </compset>
+  <compset>
     <alias>FSDWSF</alias>          
     <lname>GEOS_CAM4%WCSF_CLM40%CN_CICE%PRES_DOCN%DOM_RTM_SGLC_SWAV</lname>
   </compset>
@@ -331,9 +335,7 @@
 	<value  compset="5505_CAM[45]"     >1955-01-01</value> 
 	<value  compset="2000_CAM[45]%WCMX">2000-01-01</value>
 	<value  compset="2000_CAM[45]%WCXI">2000-01-01</value>
-	<value  compset="GEOS_CAM[45]%WCCM">2005-01-01</value> 
-	<value  compset="GEOS_CAM5%WTSM"   >1990-01-01</value> 
-	<value  compset="GEOS_CAM[45]%WCSF">2010-01-01</value> 
+	<value  compset="GEOS_CAM[45]%W"   >1990-01-01</value> 
 	<value  compset="GEOS_CAM[45]%TMOZ">2008-01-01</value> 
 	<value  compset="GEOS_CAM[45]%TBAM">2008-01-01</value>
 	<value  compset="GEOS_CAM[45]%S"   >2005-01-01</value>

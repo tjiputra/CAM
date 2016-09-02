@@ -127,6 +127,7 @@ use micro_mg_utils, only: &
      rhows, &
      ac, bc, &
      ai, bi, &
+     aj, bj, &
      ar, br, &
      as, bs, &
      mi0, &
@@ -215,6 +216,8 @@ real(r8) :: gamma_bs_plus1
 real(r8) :: gamma_bs_plus4
 real(r8) :: gamma_bi_plus1
 real(r8) :: gamma_bi_plus4
+real(r8) :: gamma_bj_plus1
+real(r8) :: gamma_bj_plus4
 real(r8) :: xxlv_squared
 real(r8) :: xxls_squared
 
@@ -326,6 +329,9 @@ subroutine micro_mg_init( &
   gamma_bs_plus4=gamma(4._r8+bs)
   gamma_bi_plus1=gamma(1._r8+bi)
   gamma_bi_plus4=gamma(4._r8+bi)
+  gamma_bj_plus1=gamma(1._r8+bj)
+  gamma_bj_plus4=gamma(4._r8+bj)
+
   xxlv_squared=xxlv**2
   xxls_squared=xxls**2
 
@@ -343,7 +349,7 @@ subroutine micro_mg_tend ( &
      nrn,                          nsn,                          &
      relvar,                       accre_enhan,                  &
      p,                            pdel,                         &
-     cldn,               liqcldf,            icecldf,            &
+     cldn,    liqcldf,        icecldf,       qsatfac,            &
      qcsinksum_rate1ord,                                         &
      naai,                         npccn,                        &
      rndst,                        nacon,                        &
@@ -353,6 +359,7 @@ subroutine micro_mg_tend ( &
      qrtend,                       qstend,                       &
      nrtend,                       nstend,                       &
      effc,               effc_fn,            effi,               &
+     sadice,                       sadsnow,                      &
      prect,                        preci,                        &
      nevapr,                       evapsnow,                     &
      am_evp_st,                                                  &
@@ -360,6 +367,7 @@ subroutine micro_mg_tend ( &
      cmeout,                       deffi,                        &
      pgamrad,                      lamcrad,                      &
      qsout,                        dsout,                        &
+     lflx,               iflx,                                   &
      rflx,               sflx,               qrout,              &
      reff_rain,                    reff_snow,                    &
      qcsevap,            qisevap,            qvres,              &
@@ -463,6 +471,8 @@ subroutine micro_mg_tend ( &
   real(r8), intent(in) :: cldn(mgncol,nlev)      ! cloud fraction (no units)
   real(r8), intent(in) :: liqcldf(mgncol,nlev)   ! liquid cloud fraction (no units)
   real(r8), intent(in) :: icecldf(mgncol,nlev)   ! ice cloud fraction (no units)
+  real(r8), intent(in) :: qsatfac(mgncol,nlev)   ! subgrid cloud water saturation scaling factor (no units)
+
   ! used for scavenging
   ! Inputs for aerosol activation
   real(r8), intent(in) :: naai(mgncol,nlev)     ! ice nucleation number (from microp_aero_ts) (1/kg)
@@ -491,6 +501,8 @@ subroutine micro_mg_tend ( &
   real(r8), intent(out) :: effc(mgncol,nlev)         ! droplet effective radius (micron)
   real(r8), intent(out) :: effc_fn(mgncol,nlev)      ! droplet effective radius, assuming nc = 1.e8 kg-1
   real(r8), intent(out) :: effi(mgncol,nlev)         ! cloud ice effective radius (micron)
+  real(r8), intent(out) :: sadice(mgncol,nlev)       ! cloud ice surface area density (cm2/cm3)
+  real(r8), intent(out) :: sadsnow(mgncol,nlev)      ! cloud snow surface area density (cm2/cm3)
   real(r8), intent(out) :: prect(mgncol)             ! surface precip rate (m/s)
   real(r8), intent(out) :: preci(mgncol)             ! cloud ice/snow precip rate (m/s)
   real(r8), intent(out) :: nevapr(mgncol,nlev)       ! evaporation rate of rain + snow (1/s)
@@ -504,6 +516,8 @@ subroutine micro_mg_tend ( &
   real(r8), intent(out) :: lamcrad(mgncol,nlev)      ! slope of droplet distribution for optics (radiation) (1/m)
   real(r8), intent(out) :: qsout(mgncol,nlev)        ! snow mixing ratio (kg/kg)
   real(r8), intent(out) :: dsout(mgncol,nlev)        ! snow diameter (m)
+  real(r8), intent(out) :: lflx(mgncol,nlev+1)       ! grid-box average liquid condensate flux (kg m^-2 s^-1)
+  real(r8), intent(out) :: iflx(mgncol,nlev+1)       ! grid-box average ice condensate flux (kg m^-2 s^-1)
   real(r8), intent(out) :: rflx(mgncol,nlev+1)       ! grid-box average rain flux (kg m^-2 s^-1)
   real(r8), intent(out) :: sflx(mgncol,nlev+1)       ! grid-box average snow flux (kg m^-2 s^-1)
   real(r8), intent(out) :: qrout(mgncol,nlev)        ! grid-box average rain mixing ratio (kg/kg)
@@ -650,6 +664,7 @@ subroutine micro_mg_tend ( &
   real(r8) :: cldm(mgncol,nlev)   ! cloud fraction
   real(r8) :: icldm(mgncol,nlev)  ! ice cloud fraction
   real(r8) :: lcldm(mgncol,nlev)  ! liq cloud fraction
+  real(r8) :: qsfm(mgncol,nlev)   ! subgrid cloud water saturation scaling factor
 
   ! mass mixing ratios
   real(r8) :: qcic(mgncol,nlev)   ! in-cloud cloud liquid
@@ -759,6 +774,7 @@ subroutine micro_mg_tend ( &
   real(r8) :: asn(mgncol,nlev)    ! snow
   real(r8) :: acn(mgncol,nlev)    ! cloud droplet
   real(r8) :: ain(mgncol,nlev)    ! cloud ice
+  real(r8) :: ajn(mgncol,nlev)    ! cloud small ice
 
   ! Mass of liquid droplets used with external heterogeneous freezing.
   real(r8) :: mi0l(mgncol)
@@ -815,6 +831,8 @@ subroutine micro_mg_tend ( &
   real(r8) :: dum
   real(r8) :: dum1
   real(r8) :: dum2
+  real(r8) :: dumni0
+  real(r8) :: dumns0
   ! dummies for checking RH
   real(r8) :: qtmp
   real(r8) :: ttmp
@@ -842,6 +860,10 @@ subroutine micro_mg_tend ( &
   ! number of sub-steps for loops over "n" (for sedimentation)
   integer nstep
   integer mdust
+
+  ! Varaibles to scale fall velocity between small and regular ice regimes.
+  real(r8) :: irad
+  real(r8) :: ifrac
 
   !cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
 
@@ -886,12 +908,14 @@ subroutine micro_mg_tend ( &
      end where
 
      cldm = max(icldm, lcldm)
+     qsfm = 1._r8
 
   else
      ! get cloud fraction, check for minimum
      cldm = max(cldn,mincld)
      lcldm = max(liqcldf,mincld)
      icldm = max(icecldf,mincld)
+     qsfm = qsatfac
   end if
 
   ! Initialize local variables
@@ -912,6 +936,7 @@ subroutine micro_mg_tend ( &
   asn=as*rhof
   acn=g*rhow/(18._r8*mu)
   ain=ai*(rhosu/rho)**0.35_r8
+  ajn=aj*(rhosu/rho)**0.35_r8
 
   !cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
   ! Get humidity and saturation vapor pressures
@@ -927,6 +952,17 @@ subroutine micro_mg_tend ( &
            qvi(i,k)=qvl(i,k)
         else
            call qsat_ice(t(i,k), p(i,k), esi(i,k), qvi(i,k))
+
+           ! Scale the water saturation values to reflect subgrid scale
+           ! ice cloud fraction, where ice clouds begin forming at a
+           ! gridbox average relative humidity of rhmini (not 1).
+           !
+           ! NOTE: For subcolumns and other non-subgrid clouds, qsfm willi
+           ! be 1.
+           qvi(i,k) = qsfm(i,k) * qvi(i,k)
+           esi(i,k) = qsfm(i,k) * esi(i,k)
+           qvl(i,k) = qsfm(i,k) * qvl(i,k)
+           esl(i,k) = qsfm(i,k) * esl(i,k)
         end if
 
      end do
@@ -1010,6 +1046,8 @@ subroutine micro_mg_tend ( &
 
   rflx=0._r8
   sflx=0._r8
+  lflx=0._r8
+  iflx=0._r8
 
   ! initialize precip output
 
@@ -1084,6 +1122,8 @@ subroutine micro_mg_tend ( &
   pgamrad = 0._r8
   effc_fn = 10._r8
   effi = 25._r8
+  sadice = 0._r8
+  sadsnow = 0._r8
   deffi = 50._r8
 
   qrout2 = 0._r8
@@ -1140,11 +1180,17 @@ subroutine micro_mg_tend ( &
   !===============================================
 
   ! ice nucleation if activated nuclei exist at t<-5C AND rhmini + 5%
+  !
+  ! NOTE: If using gridbox average values, condensation will not occur until rh=1,
+  ! so the threshold seems like it should be 1.05 and not rhmini + 0.05. For subgrid
+  ! clouds (using rhmini and qsfacm), the relhum has already been adjusted, and thus
+  ! the nucleation threshold should also be 1.05 and not rhmini + 0.05.
+
   !-------------------------------------------------------
 
   if (do_cldice) then
      where (naai > 0._r8 .and. t < icenuct .and. &
-          relhum*esl/esi > rhmini+0.05_r8)
+          relhum*esl/esi > 1.05_r8)
 
         !if NAAI > 0. then set numice = naai (as before)
         !note: this is gridbox averaged
@@ -2044,13 +2090,6 @@ subroutine micro_mg_tend ( &
   qsout = qs
   nsout = ns * rho
 
-  ! calculate precip fluxes
-  ! calculate the precip flux (kg/m2/s) as mixingratio(kg/kg)*airdensity(kg/m3)*massweightedfallspeed(m/s)
-  ! ---------------------------------------------------------------------
-
-  rflx(:,2:) = rflx(:,2:) + (qric*rho*umr*precip_frac)
-  sflx(:,2:) = sflx(:,2:) + (qsic*rho*ums*precip_frac)
-
   ! calculate n0r and lamr from rain mass and number
   ! divide by precip fraction to get in-precip (local) values of
   ! rain mass and number, divide by rhow to get rain number in kg^-1
@@ -2190,6 +2229,24 @@ subroutine micro_mg_tend ( &
            fi(i,k) = g*rho(i,k)*vtrmi(i,k)
            fni(i,k) = g*rho(i,k)* &
                 min(ain(i,k)*gamma_bi_plus1/lami(i,k)**bi,1.2_r8*rhof(i,k))
+
+           ! adjust the ice fall velocity for smaller (r < 10 um) ice
+           ! particles (blend over 8-12 um)
+           irad = 1.5_r8 / lami(i,k) * 1e6_r8
+           ifrac = min(1._r8, max(0._r8, (irad - 8._r8) / 4._r8))
+ 
+           if (ifrac .lt. 1._r8) then
+              vtrmi(i,k) = ifrac * vtrmi(i,k) + & 
+                 (1._r8 - ifrac) * &
+                 min(ajn(i,k)*gamma_bj_plus4/(6._r8*lami(i,k)**bj), &
+                 1.2_r8*rhof(i,k))
+
+              fi(i,k) = g*rho(i,k)+vtrmi(i,k)
+              fni(i,k) = ifrac * fni(i,k) + & 
+                 (1._r8 - ifrac) * &
+                 g*rho(i,k)* &
+                 min(ajn(i,k)*gamma_bj_plus1/lami(i,k)**bj,1.2_r8*rhof(i,k))
+           end if
         else
            fi(i,k) = 0._r8
            fni(i,k)= 0._r8
@@ -2350,6 +2407,11 @@ subroutine micro_mg_tend ( &
 
         end do
 
+        ! Ice flux
+        do k = 1,nlev
+          iflx(i,k+1) = iflx(i,k+1) + falouti(k) / g / real(nstep)
+        end do
+
         ! units below are m/s
         ! sedimentation flux at surface is added to precip flux at surface
         ! to get total precip (cloud + precip water) rate
@@ -2420,6 +2482,11 @@ subroutine micro_mg_tend ( &
 
         end do
 
+        !Liquid condensate flux here
+        do k = 1,nlev
+           lflx(i,k+1) = lflx(i,k+1) + faloutc(k) / g / real(nstep)
+        end do
+
         prect(i) = prect(i)+faloutc(nlev)/g/real(nstep)/1000._r8
 
      end do
@@ -2469,6 +2536,11 @@ subroutine micro_mg_tend ( &
            dumr(i,k) = dumr(i,k)-faltndr*deltat/real(nstep)
            dumnr(i,k) = dumnr(i,k)-faltndnr*deltat/real(nstep)
 
+        end do
+
+        ! Rain Flux
+        do k = 1,nlev
+           rflx(i,k+1) = rflx(i,k+1) + faloutr(k) / g / real(nstep)
         end do
 
         prect(i) = prect(i)+faloutr(nlev)/g/real(nstep)/1000._r8
@@ -2521,6 +2593,11 @@ subroutine micro_mg_tend ( &
            dumns(i,k) = dumns(i,k)-faltndns*deltat/real(nstep)
 
         end do   !! k loop
+
+        ! Snow Flux
+        do k = 1,nlev
+           sflx(i,k+1) = sflx(i,k+1) + falouts(k) / g / real(nstep)
+        end do
 
         prect(i) = prect(i)+falouts(nlev)/g/real(nstep)/1000._r8
         preci(i) = preci(i)+falouts(nlev)/g/real(nstep)/1000._r8
@@ -2827,7 +2904,7 @@ subroutine micro_mg_tend ( &
 
               dum_2D(i,k) = dumni(i,k)
               call size_dist_param_basic(mg_ice_props, dumi(i,k), dumni(i,k), &
-                   lami(i,k))
+                   lami(i,k), dumni0)
 
               if (dumni(i,k) /=dum_2D(i,k)) then
                  ! adjust number conc if needed to keep mean size in reasonable range
@@ -2841,9 +2918,11 @@ subroutine micro_mg_tend ( &
               end if
 
               effi(i,k) = 1.5_r8/lami(i,k)*1.e6_r8
+              sadice(i,k) = 2._r8*pi*(lami(i,k)**(-3))*dumni0*rho(i,k)*1.e-2_r8  ! m2/m3 -> cm2/cm3
 
            else
               effi(i,k) = 25._r8
+              sadice(i,k) = 0._r8
            end if
 
            ! ice effective diameter for david mitchell's optics
@@ -2857,6 +2936,7 @@ subroutine micro_mg_tend ( &
            ! radius has already been determined from the size distribution.
            effi(i,k) = re_ice(i,k) * 1.e6_r8      ! m -> um
            deffi(i,k)=effi(i,k) * 2._r8
+           sadice(i,k) = 4._r8*pi*(effi(i,k)**2)*ni(i,k)*rho(i,k)*1e-2_r8
         enddo
      enddo
   end if
@@ -2951,12 +3031,14 @@ subroutine micro_mg_tend ( &
            dum = dumns(i,k)
 
            call size_dist_param_basic(mg_snow_props, dums(i,k), dumns(i,k), &
-                lams(i,k))
+                lams(i,k), n0=dumns0)
 
            if (dum /= dumns(i,k)) then
               ! adjust number conc if needed to keep mean size in reasonable range
               nstend(i,k)=(dumns(i,k)*precip_frac(i,k)-ns(i,k))/deltat
            end if
+
+           sadsnow(i,k) = 2._r8*pi*(lams(i,k)**(-3))*dumns0*rho(i,k)*1.e-2_r8  ! m2/m3 -> cm2/cm3
 
         end if
 

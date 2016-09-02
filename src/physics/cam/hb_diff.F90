@@ -208,12 +208,12 @@ end subroutine init_hb_diff
     !
 
     ! virtual temperature
-    thv(:ncol,ntop_turb:) = virtem(th(:ncol,ntop_turb:),q(:ncol,ntop_turb:))
+    call virtem(ncol, (pver-ntop_turb+1), th(:ncol,ntop_turb:),q(:ncol,ntop_turb:), thv(:ncol,ntop_turb:))
 
     ! Compute ustar, Obukhov length, and kinematic surface fluxes.
-    call calc_ustar(t(:ncol,pver),pmid(:ncol,pver),taux(:ncol),tauy(:ncol), &
+    call calc_ustar(ncol, t(:ncol,pver),pmid(:ncol,pver),taux(:ncol),tauy(:ncol), &
          rrho(:ncol),ustar(:ncol))
-    call calc_obklen(th(:ncol,pver), thv(:ncol,pver), qflx(:ncol),  &
+    call calc_obklen(ncol, th(:ncol,pver), thv(:ncol,pver), qflx(:ncol),  &
                      shflx(:ncol),   rrho(:ncol),     ustar(:ncol), &
                      khfs(:ncol),    kqfs(:ncol),     kbfs(:ncol),  &
                      obklen(:ncol))

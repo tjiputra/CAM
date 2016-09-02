@@ -1,7 +1,7 @@
  
       module exbdrift
 !---------------------------------------------------------------------- 
-! description: calculates ExB drift velocities UE,VE,WE
+! description: calculates ExB drift velocities UI,VI,WI
 !     uses the electric field which is calculated in module efield
 !     on a regular magnetic grid (MLT deg/ mag. latitude)
 !
@@ -9,7 +9,7 @@
 !     every timestep and every processor
 !     1. map from magn. grid to geographic grid WACCM (map_mag2geo)
 !     2. rotate e-field (rot_efield)
-!     3. calculate ExB drift velocities  ue,ve,we [m/s] (iondrift)
+!     3. calculate ExB drift velocities  ui,vi,wi [m/s] (iondrift)
 !
 ! input ed1,ed2,    &    ! zonal/meridional elect. field [V/m]
 !      nmlon,nmlat, &    ! dimension of mag. grid 
@@ -18,7 +18,7 @@
 !
 ! ExB electromagnetic drift velocity [m/s] (east,north,upward)
 ! These are output to the physics buffer.
-!      real(r8) ::  ue,ve,we
+!      real(r8) ::  ui,vi,wi
 !
 ! notes: 
 ! - assume regular magnetic grid for the e-field (0:360 MLT/0:90) -> mapping
@@ -30,7 +30,7 @@
       use shr_kind_mod,  only: r8 => shr_kind_r8
       use physconst,      only: pi
       
-      use ppgrid      ,  only: pcols      ! np. of atmospheric columns
+      use ppgrid      ,  only: pcols, pver
       use cam_logfile,   only: iulog
 
       use efield, only : &  ! inputs from efield module
@@ -40,6 +40,7 @@
         dlatm, dlonm, &     ! grid spacing of mag. grid 
         ylatm, ylonm        ! magnetic longitudes,latitudes (deg) (0:nmlat),(0:nmlon)
       use apex, only : apex_subsol, apex_magloctm
+      use cam_history,  only: outfld, addfld, add_default, horiz_only ! for history saves
 
       implicit none
 
@@ -59,7 +60,7 @@
 !---------------------------------------------------------------------- 
 ! Indices to drift velocities in physics buffer:
 !---------------------------------------------------------------------- 
-      integer  :: ndx_ue, ndx_ve, ndx_we
+      integer  :: ndx_ui, ndx_vi, ndx_wi
       real(r8) :: rtd, hr2d
       logical, parameter :: debug =.true.
 
@@ -74,7 +75,6 @@
 ! Author: A. Maute Dec 2003  am 12/30/03    
 !-----------------------------------------------------------------------
 
-   use cam_history,  only: addfld, add_default, horiz_only ! for history saves
    use phys_control, only: phys_getopts
 
    logical :: history_waccm
@@ -84,24 +84,24 @@
 !-----------------------------------------------------------------------
 ! Add mag field output to master field list:
 !-----------------------------------------------------------------------
-   call addfld('UE',      horiz_only,'I','m/s', 'Zonal ExB drift')
-   call addfld('VE',      horiz_only,'I','m/s', 'Meridional ExB drift')
-   call addfld('WE',      horiz_only,'I','m/s', 'Vertical ExB drift')
-!  call addfld('MLT',     horiz_only,'I','hrs', 'mag.local time')
-!  call addfld('EF_EAST', horiz_only,'I','V/m', 'eastward electric field')
-!  call addfld('EF_WEST', horiz_only,'I','V/m', 'northward electric field')
-!  call addfld('EF_UP',   horiz_only,'I','V/m', 'upward electric field')
-!  call addfld('EF1_MAP', horiz_only,'I','V/m', 'map. mag. eastward ef')
-!  call addfld('EF2_MAP', horiz_only,'I','V/m', 'map. mag. northward ef')
+!   call addfld('UE',      horiz_only,'I','m/s', 'Zonal ExB drift')
+!   call addfld('VE',      horiz_only,'I','m/s', 'Meridional ExB drift')
+!   call addfld('WE',      horiz_only,'I','m/s', 'Vertical ExB drift')
+   call addfld('MLT',     horiz_only,'I','hrs', 'mag.local time')
+   call addfld('EF_EAST', horiz_only,'I','V/m', 'eastward electric field')
+   call addfld('EF_WEST', horiz_only,'I','V/m', 'northward electric field')
+   call addfld('EF_UP',   horiz_only,'I','V/m', 'upward electric field')
+   call addfld('EF1_MAP', horiz_only,'I','V/m', 'map. mag. eastward ef')
+   call addfld('EF2_MAP', horiz_only,'I','V/m', 'map. mag. northward ef')
    call addfld('EPOTEN',  horiz_only,'I','V', 'Electric Potential')
 
 !-----------------------------------------------------------------------
 !  Write these fields to WACCM history by default:
 !-----------------------------------------------------------------------
    if (history_waccm) then
-      call add_default ('UE' , 1, ' ')
-      call add_default ('VE' , 1, ' ')	
-      call add_default ('WE' , 1, ' ')	
+!      call add_default ('UE' , 1, ' ')
+!      call add_default ('VE' , 1, ' ')	
+!      call add_default ('WE' , 1, ' ')	
 !     call add_default ('MLT', 1, ' ')
 !     call add_default ('EF_EAST' , 1, ' ')
 !     call add_default ('EF_WEST' , 1, ' ')	
@@ -128,9 +128,9 @@
 ! Indices are saved as module data above.
 !-----------------------------------------------------------------------
 
-      call pbuf_add_field('UE','physpkg',dtype_r8,(/pcols,1/),ndx_ue ) ! zonal
-      call pbuf_add_field('VE','physpkg',dtype_r8,(/pcols,1/),ndx_ve ) ! meridional
-      call pbuf_add_field('WE','physpkg',dtype_r8,(/pcols,1/),ndx_we ) ! vertical
+      call pbuf_add_field("UI", "global", dtype_r8, (/pcols,pver/), ndx_ui)
+      call pbuf_add_field("VI", "global", dtype_r8, (/pcols,pver/), ndx_vi)
+      call pbuf_add_field("WI", "global", dtype_r8, (/pcols,pver/), ndx_wi)
 
       end subroutine exbdrift_register
 
@@ -174,7 +174,7 @@
 !-----------------------------------------------------------------------
       call rot_efield( lchnk, ncol, ed1_geo, ed2_geo, elfld )
 !-----------------------------------------------------------------------
-! calculate ExB drift velocities  ue,ve,we [m/s]
+! calculate ExB drift velocities  ui,vi,wi [m/s]
 !-----------------------------------------------------------------------
       call iondrift( lchnk, ncol, elfld, pbuf)
 
@@ -193,9 +193,7 @@
 ! Author: A.Maute Dec 2003 am 12/17/03 
 !-----------------------------------------------------------------------
 
-   use phys_grid,   only:  get_lat_p, get_lon_p ! latitudes/longitudes of current column (deg)
    use mo_apex,     only:  alatm                ! apex mag latitude at each geographic grid point (radians)
-   use cam_history, only:  outfld
 
 !-----------------------------------------------------------------------
 ! dummy arguments
@@ -252,8 +250,8 @@
         	    (1._r8 - t)*u*	  potent(iphi1,ilam2) 
      end do ! i = 1,pcol
 
-!     call outfld( 'EF1_MAP', ed1_geo, pcol, lchnk)
-!     call outfld( 'EF2_MAP', ed2_geo, pcol, lchnk)
+      call outfld( 'EF1_MAP', ed1_geo, pcol, lchnk)
+      call outfld( 'EF2_MAP', ed2_geo, pcol, lchnk)
       call outfld( 'EPOTEN', epot_geo, pcol, lchnk)
 
      end subroutine map_mag2geo
@@ -269,9 +267,8 @@
 ! Author: A. Maute Dec 2003  am 12/17/03 
 !-----------------------------------------------------------------------
 
-   use mo_apex,     only: d1vec, d2vec ! base vectors (3,pcols,begchunk:endchunk)
-   use cam_history, only: outfld
-      
+   use mo_apex,     only: d1vec, d2vec ! base vectors (3,pcols,begchunk:endchunk)      
+
 !-----------------------------------------------------------------------
 ! dummy arguments
 !-----------------------------------------------------------------------
@@ -292,9 +289,9 @@
      end do
    end do
 
-!   call outfld( 'EF_EAST', elfld(1,:), pcol, lchnk)
-!   call outfld( 'EF_WEST', elfld(2,:), pcol, lchnk)
-!   call outfld( 'EF_UP', elfld(3,:), pcol, lchnk)
+    call outfld( 'EF_EAST', elfld(1,:), pcol, lchnk)
+    call outfld( 'EF_WEST', elfld(2,:), pcol, lchnk)
+    call outfld( 'EF_UP', elfld(3,:), pcol, lchnk)
 
    end subroutine rot_efield
 
@@ -316,9 +313,7 @@
 !-----------------------------------------------------------------------
 
    use mo_apex,     only: beast, bnorth, bdown, bmag ! component of B-field, |B| [Gauss]
-   use cam_history, only: outfld
-   use phys_grid,   only: get_lat_p, get_lon_p       ! latitudes/longitudes of current column (deg)
-   use physics_buffer, only : physics_buffer_desc, pbuf_get_field
+   use physics_buffer, only : physics_buffer_desc, pbuf_get_field, pbuf_get_index
 
 
 !-----------------------------------------------------------------------
@@ -338,36 +333,31 @@
 !-----------------------------------------------------------------------
    integer  :: i
    real(r8) :: fac
-   real(r8), pointer :: ue(:), ve(:), we(:)
+   real(r8), pointer :: ui(:,:), vi(:,:), wi(:,:)
  
 !-----------------------------------------------------------------------
 ! Set local pointers to respective fields in pbuf:
 !-----------------------------------------------------------------------
-   call pbuf_get_field(pbuf, ndx_ue, ue )
-   call pbuf_get_field(pbuf, ndx_ve, ve )
-   call pbuf_get_field(pbuf, ndx_we, we )
+   call pbuf_get_field(pbuf, ndx_ui, ui )
+   call pbuf_get_field(pbuf, ndx_vi, vi )
+   call pbuf_get_field(pbuf, ndx_wi, wi )
 
    do i = 1,pcol    ! number of columns in each chunk
 !-----------------------------------------------------------------------
 ! Magnitude of magnetic field bmag [nT] is from apex module. 
 !-----------------------------------------------------------------------
       fac = 1.e9_r8/bmag(i,lchnk)**2           ! nT to T (nT in denominator)
-      ue(i) =  -(elfld(2,i)*bdown(i,lchnk) + elfld(3,i)*bnorth(i,lchnk))
-      ve(i) =   elfld(3,i)*beast(i,lchnk) + elfld(1,i)*bdown(i,lchnk)
-      we(i) =   elfld(1,i)*bnorth(i,lchnk) - elfld(2,i)*beast(i,lchnk)
-      ue(i) = ue(i)*fac
-      ve(i) = ve(i)*fac
-      we(i) = we(i)*fac
+      ui(i,:) =  -(elfld(2,i)*bdown(i,lchnk) + elfld(3,i)*bnorth(i,lchnk))
+      vi(i,:) =   elfld(3,i)*beast(i,lchnk) + elfld(1,i)*bdown(i,lchnk)
+      wi(i,:) =   elfld(1,i)*bnorth(i,lchnk) - elfld(2,i)*beast(i,lchnk)
+      ui(i,:) = ui(i,:)*fac
+      vi(i,:) = vi(i,:)*fac
+      wi(i,:) = wi(i,:)*fac
    end do ! i = 1,pcol	
 
-   call outfld( 'UE', ue, pcols, lchnk)
-   call outfld( 'VE', ve, pcols, lchnk)
-   call outfld( 'WE', we, pcols, lchnk)
-!  call outfld( 'BNORTH', bnorth(:pcol,lchnk)*1.e-5_r8, pcol, lchnk)
-!  call outfld( 'BEAST', beast(:pcol,lchnk)*1.e-5_r8, pcol, lchnk)
-!  call outfld( 'BDOWN', bdown(:pcol,lchnk)*1.e-5_r8, pcol, lchnk)
-!  call outfld( 'BMAG', bmag(:pcol,lchnk)*1.e-5_r8, pcol, lchnk)
-!  call outfld('WE      ', we, pcol, lchnk)
+   call outfld( 'UI', ui, pcols, lchnk)
+   call outfld( 'VI', vi, pcols, lchnk)
+   call outfld( 'WI', wi, pcols, lchnk)
 
 #ifdef SW_DEBUG
    if( lchnk == 25 ) then
@@ -402,7 +392,6 @@
      colatp,  &  ! geocentric colatitude of geomagnetic dipole north pole (deg)
      elonp	 ! East longitude of geomagnetic dipole north pole (deg)
    use time_manager, only : get_curr_calday, get_curr_date
-   use cam_history,  only: outfld
    use mo_apex, only : geomag_year
 !-------------------------------------------------------------------------------
 !	... dummy arguments
@@ -416,20 +405,16 @@
 !-------------------------------------------------------------------------------
      integer  :: i
      integer  :: iyear, iday, ihr, imn, imo, iday_m, tod 	! time of day [s] 
-     real(r8) :: collonm, sbsllat, sbsllon, sec, ut
+     real(r8) :: collonm, sbsllat, sbsllon, sec
 
 !-------------------------------------------------------------------------------
 ! get current calendar day of year & date components 
 ! valid at end of current timestep
 !-------------------------------------------------------------------------------
      call get_curr_date (iyear,imo,iday_m,tod)  ! year, time of day [sec]
-     iyear = geomag_year
+     iyear = int(geomag_year)
      iday  = get_curr_calday()                  ! day of year
 
-!    ut   = tod/3600._r8			! UT of day [hrs]
-!    ihr  = int(ut)		                ! hours
-!    imn  = int((ut - ihr)*60._r8)	        ! minutes      
-!    sec  = (ut - ihr - imn*60)*3600._r8        ! seconds
      ihr  = tod/3600
      imn  = mod( tod,3600 )/60
      sec  = tod - 60*(ihr*60 + imn)
@@ -446,8 +431,6 @@
        collonm = alonm(i,lchnk)*rtd   ! mag lons (deg)
        call apex_magloctm( collonm, sbsllat, sbsllon, colatp, elonp, mlt(i) )
      end do
-
-!    call outfld('MLT     ', mlt, ncol, lchnk)
 
      end subroutine cal_mlt
 

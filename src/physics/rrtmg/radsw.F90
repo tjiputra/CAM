@@ -33,6 +33,10 @@ public ::&
    radsw_init,      &! initialize constants
    rad_rrtmg_sw      ! driver for solar radiation code
 
+! Flag for cloud overlap method
+! 0=clear, 1=random, 2=maximum-random, 3=maximum
+integer, parameter :: icld = 2
+
 !===============================================================================
 CONTAINS
 !===============================================================================
@@ -186,11 +190,6 @@ subroutine rad_rrtmg_sw(lchnk,ncol       ,rrtmg_levs   ,r_state      , &
 
    real(r8) :: tsfc(pcols)          ! surface temperature
 
-   integer :: inflgsw               ! flag for cloud parameterization method
-   integer :: iceflgsw              ! flag for ice cloud parameterization method
-   integer :: liqflgsw              ! flag for liquid cloud parameterization method
-   integer :: icld                  ! Flag for cloud overlap method
-                                    ! 0=clear, 1=random, 2=maximum/random, 3=maximum
    integer :: dyofyr                ! Set to day of year for Earth/Sun distance calculation in
                                     ! rrtmg_sw, or pass in adjustment directly into adjes
    real(r8) :: solvar(nbndsw)       ! solar irradiance variability in each band
@@ -488,8 +487,6 @@ subroutine rad_rrtmg_sw(lchnk,ncol       ,rrtmg_levs   ,r_state      , &
    ! Call sub-column generator for McICA in radiation
    call t_startf('mcica_subcol_sw')
 
-   ! Select cloud overlap approach (1=random, 2=maximum-random, 3=maximum)
-   icld = 2
    ! Set permute seed (must be offset between LW and SW by at least 140 to insure 
    ! effective randomization)
    permuteseed = 1
@@ -506,19 +503,6 @@ subroutine rad_rrtmg_sw(lchnk,ncol       ,rrtmg_levs   ,r_state      , &
 
    ! Call RRTMG_SW for all layers for daylight columns
 
-   ! Select parameterization of cloud ice and liquid optical depths
-   ! Use CAM shortwave cloud optical properties directly
-   inflgsw = 0 
-   iceflgsw = 0
-   liqflgsw = 0
-   ! Use E&C param for ice to mimic CAM3 for now
-   !   inflgsw = 2 
-   !   iceflgsw = 1
-   !   liqflgsw = 1
-   ! Use merged Fu and E&C params for ice 
-   !   inflgsw = 2 
-   !   iceflgsw = 3
-   !   liqflgsw = 1
 
    ! Set day of year for Earth/Sun distance calculation in rrtmg_sw, or
    ! set to zero and pass E/S adjustment (eccf) directly into array adjes
@@ -533,7 +517,6 @@ subroutine rad_rrtmg_sw(lchnk,ncol       ,rrtmg_levs   ,r_state      , &
                  h2ovmr, o3vmr, co2vmr, ch4vmr, o2vmr, n2ovmr, &
                  asdir, asdif, aldir, aldif, &
                  coszrs, eccf, dyofyr, solvar, &
-                 inflgsw, iceflgsw, liqflgsw, &
                  cld_stosw, tauc_stosw, ssac_stosw, asmc_stosw, fsfc_stosw, &
                  cicewp_stosw, cliqwp_stosw, rei, rel, &
                  tau_aer_sw, ssa_aer_sw, asm_aer_sw, &

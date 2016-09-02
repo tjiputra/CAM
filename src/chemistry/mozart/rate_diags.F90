@@ -4,7 +4,7 @@
 module rate_diags
 
   use shr_kind_mod,     only : r8 => shr_kind_r8
-  use shr_kind_mod,     only : CL => SHR_KIND_CL, CX => SHR_KIND_CX
+  use shr_kind_mod,     only : CX => SHR_KIND_CX
   use cam_history,      only : fieldname_len
   use cam_history,      only : addfld
   use cam_history,      only : outfld
@@ -147,7 +147,7 @@ contains
 
     integer :: ndxs(512)
     integer :: nelem, spc_len, i,j,k, rxt_ndx
-    character(len=CL) :: tmp_str, tmp_name
+    character(len=CX) :: tmp_str, tmp_name
 
     character(len=8) :: xchr ! multipler
     real(r8) :: xdbl

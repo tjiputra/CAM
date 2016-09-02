@@ -1686,12 +1686,14 @@ contains
   !!
   !! @author  Chuck Bardeen
   !! @version May-2009
-  subroutine carma_init_cnst(name, q, gcid)
+  subroutine carma_init_cnst(name, latvals, lonvals, mask, q)
     implicit none
 
-    character(len=*), intent(in) :: name               !! constituent name
-    real(r8), intent(out)        :: q(:,:)             !! mass mixing ratio (gcol, lev)
-    integer, intent(in)          :: gcid(:)            !! global column id
+    character(len=*), intent(in)  :: name       !! constituent name
+    real(r8),         intent(in)  :: latvals(:) !! lat in degrees (ncol)
+    real(r8),         intent(in)  :: lonvals(:) !! lon in degrees (ncol)
+    logical,          intent(in)  :: mask(:)    !! Only initialize where .true.
+    real(r8),         intent(out) :: q(:,:)     !! mass mixing ratio (gcol, lev)
     
     integer                      :: igroup             ! group index
     integer                      :: ielem              ! element index
@@ -1727,7 +1729,7 @@ contains
               ! By default, initialize all constituents to 0.
               q(:, :) = 0.0_r8
               
-              call CARMA_InitializeParticle(carma, ielem, ibin, q, gcid, rc)
+              call CARMA_InitializeParticle(carma, ielem, ibin, latvals, lonvals, mask, q, rc)
               if (rc < 0) call endrun('carma_init_cnst::CARMA_InitializeParticle failed.')
             end if
           end if

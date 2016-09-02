@@ -1718,10 +1718,10 @@ contains
     real(r8) :: dvmrdt(ncol,pver,gas_pcnst)
     real(r8) :: vmrcw(ncol,pver,gas_pcnst)            ! cloud-borne aerosol (vmr)
 
-    real(r8) ::  aqso4(ntot_amode,pver)               ! aqueous phase chemistry
-    real(r8) ::  aqh2so4(ntot_amode,pver)             ! aqueous phase chemistry
-    real(r8) ::  aqso4_h2o2(pver)                     ! SO4 aqueous phase chemistry due to H2O2
-    real(r8) ::  aqso4_o3(pver)                       ! SO4 aqueous phase chemistry due to O3
+    real(r8) ::  aqso4(ncol,ntot_amode)               ! aqueous phase chemistry
+    real(r8) ::  aqh2so4(ncol,ntot_amode)             ! aqueous phase chemistry
+    real(r8) ::  aqso4_h2o2(ncol)                     ! SO4 aqueous phase chemistry due to H2O2
+    real(r8) ::  aqso4_o3(ncol)                       ! SO4 aqueous phase chemistry due to O3
     real(r8) ::  xphlwc(ncol,pver)                    ! pH value multiplied by lwc
 
 
@@ -1790,8 +1790,8 @@ contains
          do n = 1, ntot_amode
             l = lptr_so4_cw_amode(n)
             if (l > 0) then
-               call outfld( trim(cnst_name_cw(l))//'AQSO4',   aqso4(n,:ncol),   ncol, lchnk)
-               call outfld( trim(cnst_name_cw(l))//'AQH2SO4', aqh2so4(n,:ncol), ncol, lchnk)
+               call outfld( trim(cnst_name_cw(l))//'AQSO4',   aqso4(:ncol,n),   ncol, lchnk)
+               call outfld( trim(cnst_name_cw(l))//'AQH2SO4', aqh2so4(:ncol,n), ncol, lchnk)
             end if
          end do
 

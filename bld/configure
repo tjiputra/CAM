@@ -119,14 +119,14 @@ OPTIONS
                           test_tracers, test_tracers2].
                         Default: none.
      -chem <name>       Build CAM with specified prognostic chemistry package 
-                        [ waccm_mozart | waccmx_mozart | waccm_mozart_sulfur | waccm_mozart_mam3 | waccm_mozart_mam4 | 
+                        [ waccm_ma | waccmx_ma | waccm_ma_sulfur | waccm_ma_mam3 | waccm_ma_mam4 | waccm_mad_mam4 |
 			  waccm_sc |waccm_sc_mam3 | waccm_tsmlt | waccm_tsmlt_mam4 | waccm_tsmlt_sulfur |
                           trop_mozart | trop_mozart_mam3 | trop_mozart_soa | trop_strat_soa | trop_ghg | trop_bam |
                           trop_mam3 | trop_mam4 | trop_mam7 | super_fast_llnl | super_fast_llnl_mam3 |
                           trop_strat_soa | trop_strat_mam3 | trop_strat_mam4_vbs | trop_strat_mam7 | none ].  Default: trop_mam3.
      -clubb_sgs         Turns on CLUBB_SGS
      -clubb_opts <list> Comma separated list of CLUBB options to turn on/off.  By default they are all off.  Current
-                        options are: clubb_do_adv(Advect CLUBB moments), clubb_do_deep(CLUBB does the deep convection) 
+                        option is: clubb_do_adv(Advect CLUBB moments)
      -co2_cycle         This option is meant to be used with the -ccsm_seq option.  It modifies the
                         CAM configuration by increasing the number of advected constituents by 4.
      -comp_intf         Specify the component interfaces [mct | esmf] (default: mct).
@@ -832,7 +832,7 @@ EOF
 }
 
 # WACCM includes 4 age of air tracers by default
-if ($chem_pkg =~ /waccm_mozart/ or $chem_pkg =~ /waccmx_mozart/ or $chem_pkg =~ /waccm_tsmlt/) {
+if ($chem_pkg =~ /waccm_ma/ or $chem_pkg =~ /waccmx_ma/ or $chem_pkg =~ /waccm_tsmlt/) {
     $cfg_ref->set('age_of_air_trcs', 1);
 }
 
@@ -962,9 +962,7 @@ if (defined $opts{'clubb_opts'}) {
         $cfg_ref->set("$_", '1');
      }
 }
-my $clubb_do_deep = $cfg_ref->get('clubb_do_deep');
 my $clubb_do_adv = $cfg_ref->get('clubb_do_adv');
-if ($print>=2) { print "clubb_do_deep=',$clubb_do_deep,$eol"; }
 if ($print>=2) { print "clubb_do_adv=',$clubb_do_adv,$eol"; }
 
 #-----------------------------------------------------------------------------------------------
@@ -976,11 +974,6 @@ if (defined $opts{'zmconv_org'}) {
 
 my $zmconv_org = $cfg_ref->get('zmconv_org');
 if ($print>=2) { print "zmconv_org=',$zmconv_org,$eol"; }
-
-# Check if clubb_do_deep and zmconv_org are both set as this is an error
-if ($zmconv_org == 1 and $clubb_do_deep == 1) {
-    die "configure ERROR: May only specify one of zmconv_org and clubb_do_deep, but both were supplied to configure\n";
-}
 
 #-----------------------------------------------------------------------------------------------
 # Macro-physics package
@@ -1997,7 +1990,7 @@ $cfg_cppdefs .= " -DPLON=$nlon -DPLAT=$nlat";
 
 # Parameters for multiple instances
 if (!$ccsm_seq){
-    $cfg_cppdefs .= " -DNUM_COMP_INST_ATM=1 -DNUM_COMP_INST_LND=1 -DNUM_COMP_INST_OCN=1 -DNUM_COMP_INST_ICE=1 -DNUM_COMP_INST_GLC=1 -DNUM_COMP_INST_ROF=1 -DNUM_COMP_INST_WAV=1";
+    $cfg_cppdefs .= " -DNUM_COMP_INST_ATM=1 -DNUM_COMP_INST_LND=1 -DNUM_COMP_INST_OCN=1 -DNUM_COMP_INST_ICE=1 -DNUM_COMP_INST_GLC=1 -DNUM_COMP_INST_ROF=1 -DNUM_COMP_INST_WAV=1 -DNUM_COMP_INST_ESP=1";
 }
 
 # Resolution parameters for spectral element cubed sphere grids.
@@ -2027,9 +2020,6 @@ my $trm = $cfg_ref->get('trm');
 my $trn = $cfg_ref->get('trn');
 my $trk = $cfg_ref->get('trk');
 $cfg_cppdefs .= " -DPTRM=$trm -DPTRN=$trn -DPTRK=$trk";
-
-# FV dycore
-if ($dyn_pkg eq 'fv') { $cfg_cppdefs .= " -DSTAGGERED "; }
 
 # offline driver for FV dycore
 if ($offline_dyn) { $cfg_cppdefs .= ' -DOFFLINE_DYN'; }
@@ -2073,10 +2063,6 @@ if ($clubb_sgs == 1) {
     $cfg_cppdefs .= ' -DCLUBB_CAM';
     $cfg_cppdefs .= ' -DNO_LAPACK_ISNAN';
     $cfg_cppdefs .= " -DCLUBB_REAL_TYPE=dp";
-}
-
-if ($clubb_do_deep == 1) {
-  $cfg_cppdefs .= ' -DCLUBBND_CAM';
 }
 
 # UNICON
@@ -2938,12 +2924,8 @@ sub write_filepath
     print $fh "$camsrcdir/cam/src/chemistry/utils\n";
 
     if ($rad eq 'rrtmg') {
-	# These directories need to precede physics/cam/ to replace
-	# the CAM3 radiation package with RRTMG
 	print $fh "$camsrcdir/cam/src/physics/rrtmg\n";
-	print $fh "$camsrcdir/cam/src/physics/rrtmg/ext/rrtmg_mcica\n";
-	print $fh "$camsrcdir/cam/src/physics/rrtmg/ext/rrtmg_lw\n";
-	print $fh "$camsrcdir/cam/src/physics/rrtmg/ext/rrtmg_sw\n";
+	print $fh "$camsrcdir/cam/src/physics/rrtmg/aer_src\n";
     }
     else {
         # Until we implement a 'none' option use camrt as the default.
@@ -3039,6 +3021,9 @@ sub write_filepath
 
 	# Land ice package
 	print $fh "$cam_root/cime/components/stub_comps/sglc/cpl\n";
+
+        # include stub ESP component
+	print $fh "$cam_root/cime/components/stub_comps/sesp/cpl/\n";
 
         # Runoff package
         if ($rof eq 'rtm') {

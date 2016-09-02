@@ -36,14 +36,16 @@
 <tgcm_ubc_file>atm/waccm/ub/tgcm_ubc_1850-2100_c100204.nc</tgcm_ubc_file>
 <tgcm_ubc_data_type>INTERP_MISSING_MONTHS</tgcm_ubc_data_type>
 
-<!-- Sulfate Aerosols: DEFAULTS okay for sulf_file -->
-<prescribed_strataero_type>SERIAL</prescribed_strataero_type>
-
 <!-- QBO settings --> 
 <qbo_cyclic>.false.</qbo_cyclic>
 <qbo_forcing_file>atm/waccm/qbo/qbocoefficients_c091230.nc'</qbo_forcing_file>
 <qbo_use_forcing>.true.</qbo_use_forcing>
 
+<!-- volcanic aerosol heating -->
+<prescribed_strataero_feedback>.true.</prescribed_strataero_feedback> 
+<prescribed_strataero_type>SERIAL</prescribed_strataero_type>
+<prescribed_strataero_file>CESM_1849_2100_sad_V2_c140307.nc</prescribed_strataero_file>
+<prescribed_strataero_datapath>atm/waccm/sulf</prescribed_strataero_datapath>
 <!-- volcanic aerosol heating -->
 <prescribed_strataero_feedback>.true.</prescribed_strataero_feedback> 
 
@@ -84,8 +86,8 @@
   'HNO3_GAS', 'NO_Aircraft', 'NO_Lightning', 'QNO', 'QRS_AUR', 'QRS_CO2NIR', 'QRS_EUV', 
   'SAD_ICE', 'SAD_LNAT', 'SAD_SULFC', 'T', 'TREFHT', 
   'TTGW', 'U', 'UTGWORO', 'UTGWSPEC', 'V', 'VERT', 'VTGWORO', 'VTGWSPEC', 'Z3', 'O2_1S', 
-  'O2_1D', 'NOX', 'NOY', 'CLOX', 'CLOY', 'BROX', 'BROY', 'TCLY', 'TOTH', 'QJOULE', 'UE', 
-  'VE', 'UIONTEND', 'VIONTEND', 'DTCORE', 'T_24_COS',  'T_24_SIN', 'T_12_COS', 'T_12_SIN',
+  'O2_1D', 'NOX', 'NOY', 'CLOX', 'CLOY', 'BROX', 'BROY', 'TCLY', 'TOTH', 'QJOULE', 'UI', 
+  'VI', 'UIONTEND', 'VIONTEND', 'DTCORE', 'T_24_COS',  'T_24_SIN', 'T_12_COS', 'T_12_SIN',
   'OMEGA_24_COS', 'OMEGA_24_SIN', 'OMEGA_12_COS', 'OMEGA_12_SIN',
   'U_24_COS', 'U_24_SIN', 'U_12_COS', 'U_12_SIN', 'V_24_COS', 'V_24_SIN', 'V_12_COS', 
   'V_12_SIN', 'PS_24_COS', 'PS_24_SIN', 'PS_12_COS', 'PS_12_SIN', 'CLDLIQ','CLDICE','CONCLD',

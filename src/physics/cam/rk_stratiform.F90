@@ -203,7 +203,7 @@ end function rk_stratiform_implements_cnst
 
 !===============================================================================
 
-subroutine rk_stratiform_init_cnst(name, q, gcid)
+subroutine rk_stratiform_init_cnst(name, latvals, lonvals, mask, q)
 
    !----------------------------------------------------------------------- !
    !                                                                        !
@@ -212,9 +212,11 @@ subroutine rk_stratiform_init_cnst(name, q, gcid)
    !                                                                        !
    !----------------------------------------------------------------------- !
 
-   character(len=*), intent(in)  :: name     ! constituent name
-   real(r8),         intent(out) :: q(:,:)   ! mass mixing ratio (gcol, plev)
-   integer,          intent(in)  :: gcid(:)  ! global column id
+   character(len=*), intent(in)  :: name       ! constituent name
+   real(r8),         intent(in)  :: latvals(:) ! lat in degrees (ncol)
+   real(r8),         intent(in)  :: lonvals(:) ! lon in degrees (ncol)
+   logical,          intent(in)  :: mask(:)    ! Only initialize where .true.
+   real(r8),         intent(out) :: q(:,:)     ! kg tracer/kg dry air (gcol, plev
    !-----------------------------------------------------------------------
 
    if (any(name == cnst_names)) q = 0.0_r8

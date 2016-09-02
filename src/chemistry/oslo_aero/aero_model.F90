@@ -556,10 +556,10 @@ end subroutine aero_model_init
     real(r8) :: mmr_tend_pcols(pcols, pver, gas_pcnst)
 
     integer  :: cond_vap_idx
-    real(r8) ::  aqso4(nmodes_aq_chem,pcols)               ! aqueous phase chemistry
-    real(r8) ::  aqh2so4(nmodes_aq_chem,pcols)             ! aqueous phase chemistry
-    real(r8) ::  aqso4_h2o2(pcols)                     ! SO4 aqueous phase chemistry due to H2O2
-    real(r8) ::  aqso4_o3(pcols)                       ! SO4 aqueous phase chemistry due to O3
+    real(r8) ::  aqso4(ncol,nmodes_aq_chem)           ! aqueous phase chemistry
+    real(r8) ::  aqh2so4(ncol,nmodes_aq_chem)         ! aqueous phase chemistry
+    real(r8) ::  aqso4_h2o2(ncol)                     ! SO4 aqueous phase chemistry due to H2O2
+    real(r8) ::  aqso4_o3(ncol)                       ! SO4 aqueous phase chemistry due to O3
     real(r8) ::  xphlwc(ncol,pver)                    ! pH value multiplied by lwc
     real(r8) ::  delt_inverse                         ! 1 / timestep
 

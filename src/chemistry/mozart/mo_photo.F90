@@ -73,6 +73,8 @@ module mo_photo
   integer :: jhno3a_ndx, jno3a_ndx, jpana_ndx, jmpana_ndx, jho2no2a_ndx 
   integer :: jonitra_ndx
 
+  integer :: jppi_ndx, jepn1_ndx, jepn2_ndx, jepn3_ndx, jepn4_ndx, jepn6_ndx
+  integer :: jepn7_ndx, jpni1_ndx, jpni2_ndx, jpni3_ndx, jpni4_ndx, jpni5_ndx
   logical :: do_jeuv = .false.
   logical :: do_jshort = .false.
 #ifdef DEBUG
@@ -240,7 +242,19 @@ contains
     jho2no2_ndx  = get_rxt_ndx( 'jho2no2' )
     jonitr_ndx = get_rxt_ndx( 'jonitr' )
 
-
+    jppi_ndx = get_rxt_ndx( 'jppi' )
+    jepn1_ndx = get_rxt_ndx( 'jepn1' )
+    jepn2_ndx = get_rxt_ndx( 'jepn2' )
+    jepn3_ndx = get_rxt_ndx( 'jepn3' )
+    jepn4_ndx = get_rxt_ndx( 'jepn4' )
+    jepn6_ndx = get_rxt_ndx( 'jepn6' )
+    jepn7_ndx = get_rxt_ndx( 'jepn7' )
+    jpni1_ndx = get_rxt_ndx( 'jpni1' )
+    jpni2_ndx = get_rxt_ndx( 'jpni2' )
+    jpni3_ndx = get_rxt_ndx( 'jpni3' )
+    jpni4_ndx = get_rxt_ndx( 'jpni4' )
+    ! added to v02
+    jpni5_ndx = get_rxt_ndx( 'jpni5' )
     ox_ndx     = get_spc_ndx( 'OX' )
     if( ox_ndx < 1 ) then
        ox_ndx  = get_spc_ndx( 'O3' )
@@ -773,6 +787,21 @@ contains
 
           zarg(p1:p2) = zmid(i,:pver)
 
+         if ( ptop_ref > 10._r8 ) then
+            if (jppi_ndx > 0 )  photos(i,:,jppi_ndx) = photos(i,:,jppi_ndx) +  esfact * 0.42_r8
+            if (jepn1_ndx > 0 ) photos(i,:,jepn1_ndx) = photos(i,:,jepn1_ndx) + esfact * 1.4_r8
+            if (jepn2_ndx > 0 ) photos(i,:,jepn2_ndx) = photos(i,:,jepn2_ndx) + esfact * 3.8e-1_r8
+            if (jepn3_ndx > 0 ) photos(i,:,jepn3_ndx) = photos(i,:,jepn3_ndx) + esfact * 4.7e-2_r8
+            if (jepn4_ndx > 0 ) photos(i,:,jepn4_ndx) = photos(i,:,jepn4_ndx) + esfact * 1.1_r8
+            if (jepn6_ndx > 0 ) photos(i,:,jepn6_ndx) = photos(i,:,jepn6_ndx) + esfact * 8.0e-4_r8
+            if (jepn7_ndx > 0 ) photos(i,:,jepn7_ndx) = photos(i,:,jepn7_ndx) + esfact * 5.2e-2_r8
+            if (jpni1_ndx > 0 ) photos(i,:,jpni1_ndx) = photos(i,:,jpni1_ndx) + esfact * 0.47_r8
+            if (jpni2_ndx > 0 ) photos(i,:,jpni2_ndx) = photos(i,:,jpni2_ndx) + esfact * 0.24_r8
+            if (jpni3_ndx > 0 ) photos(i,:,jpni3_ndx) = photos(i,:,jpni3_ndx) + esfact * 0.15_r8
+            if (jpni4_ndx > 0 ) photos(i,:,jpni4_ndx) = photos(i,:,jpni4_ndx) + esfact * 6.2e-3_r8
+            ! added to v02
+            if (jpni5_ndx > 0 ) photos(i,:,jpni5_ndx) = photos(i,:,jpni5_ndx) + esfact * 1.0_r8 
+        endif
           if (do_jshort) then
              if ( ptop_ref > 10._r8 ) then
                 !-----------------------------------------------------------------

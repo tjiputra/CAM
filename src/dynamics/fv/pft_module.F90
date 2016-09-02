@@ -1,104 +1,74 @@
 module pft_module
-!BOP
-!
-! !MODULE: pft_module --- polar filters
-!
-! !USES:
 
- use shr_kind_mod,   only: r8 => shr_kind_r8
- use fv_control_mod, only: fft_flt
-
-#ifdef NO_R16
-   integer,parameter :: r16= selected_real_kind(12) ! 8 byte real
-#else
-   integer,parameter :: r16= selected_real_kind(24) ! 16 byte real
-#endif
-
+! This module provides fast-Fourier transforms
 !
-! !PUBLIC MEMBER FUNCTIONS:
-      public pft2d, pft_cf, fftfax, pftinit, fftrans
-!
-! !DESCRIPTION:
-!
-!      This module provides fast-Fourier transforms
-!
-!      \begin{tabular}{|l|l|} \hline \hline
-!         pftinit   &  \\ \hline
-!         pft2d     &  \\ \hline
-!         pft\_cf   &  \\ \hline
-!         fftfax    &  \\ \hline
-!         fftrans   &  \\ \hline
-!                                \hline
-!      \end{tabular}
-!
-! !REVISION HISTORY:
+! REVISION HISTORY:
 !   01.01.30   Lin        Integrated into this module
-!   01.03.26   Sawyer     Added ProTeX documentation
 !   05.05.25   Sawyer     Merged CAM and GEOS5 versions (CAM vectorization)
 !   05.07.26   Worley     Revised module using for Cray X1 version
-!   06.09.08   Sawyer     Magic numbers isolated in F90 parameters
-!
-!EOP
-!-----------------------------------------------------------------------
-      private
-      real(r8), parameter ::  D0_0                    =  0.0_r8
-      real(r8), parameter ::  D1EM20                  =  1.0e-20_r8
-      real(r8), parameter ::  D0_5                    =  0.5_r8
-      real(r8), parameter ::  D1_0                    =  1.0_r8
-      real(r8), parameter ::  D1_01                   =  1.01_r8
-      real(r8), parameter ::  D2_0                    =  2.0_r8
-      real(r8), parameter ::  D4_0                    =  4.0_r8
-      real(r8), parameter ::  D8_0                    =  8.0_r8
-      real(r8), parameter ::  D180_0                  =180.0_r8
 
-      integer, save :: ifax(13)                      !ECMWF fft
-      real(r8), allocatable, save :: trigs(:)        ! reentrant code??
 
-CONTAINS
+use shr_kind_mod,   only: r8 => shr_kind_r8
 
-!-----------------------------------------------------------------------
-!BOP
-! !IROUTINE: pftinit --- Two-dimensional FFT initialization
-!
-! !INTERFACE:
- subroutine pftinit(im)
+implicit none
+private
+save
 
-! !USES:
- implicit none
-
-! !INPUT PARAMETERS:
-      integer im                   ! Total X dimension
-
-! !DESCRIPTION:
-!
-!   Perform a two-dimensional FFT initialization
-!
-! !REVISION HISTORY:
-!   05.05.15   Mirin        Put into this module
-!
-!EOP
-!-----------------------------------------------------------------------
-!BOC
-!
-! !LOCAL VARIABLES:
-      integer icffta
-      real(r8) rcffta
-
-#if defined( LIBSCI_FFT )
-          allocate( trigs(2*im+100) )
-          icffta = 0
-          rcffta = D0_0
-          call dzfftm(0, im, icffta, rcffta, rcffta, icffta,     &
-               rcffta, icffta, trigs, rcffta, icffta)
+#ifdef NO_R16
+integer, parameter :: r16= selected_real_kind(12) ! 8 byte real
 #else
-          allocate( trigs(3*im/2+1) )
-          call fftfax(im, ifax, trigs)
+integer, parameter :: r16= selected_real_kind(24) ! 16 byte real
 #endif
 
-      return
-!EOC
- end subroutine pftinit
-!-----------------------------------------------------------------------
+public :: pft2d, pft_cf, fftfax, pftinit, fftrans
+
+real(r8), parameter ::  D0_0                    =  0.0_r8
+real(r8), parameter ::  D1EM20                  =  1.0e-20_r8
+real(r8), parameter ::  D0_5                    =  0.5_r8
+real(r8), parameter ::  D1_0                    =  1.0_r8
+real(r8), parameter ::  D1_01                   =  1.01_r8
+real(r8), parameter ::  D2_0                    =  2.0_r8
+real(r8), parameter ::  D4_0                    =  4.0_r8
+real(r8), parameter ::  D8_0                    =  8.0_r8
+real(r8), parameter ::  D180_0                  =180.0_r8
+
+integer :: ifax(13)                      !ECMWF fft
+real(r8), allocatable :: trigs(:)        ! reentrant code??
+
+integer :: fft_flt  ! 0 => FFT/algebraic filter; 1 => FFT filter
+
+!=========================================================================================
+CONTAINS
+!=========================================================================================
+
+subroutine pftinit(im, fft_flt_in)
+
+   ! Two-dimensional FFT initialization
+
+   ! arguments
+   integer, intent(in) :: im                   ! Total X dimension
+   integer, intent(in) :: fft_flt_in
+
+   ! local variables
+   integer  :: icffta
+   real(r8) :: rcffta
+   !----------------------------------------------------------------------------
+   
+   fft_flt = fft_flt_in
+
+#if defined( LIBSCI_FFT )
+   allocate( trigs(2*im+100) )
+   icffta = 0
+   rcffta = D0_0
+   call dzfftm(0, im, icffta, rcffta, rcffta, icffta,     &
+               rcffta, icffta, trigs, rcffta, icffta)
+#else
+   allocate( trigs(3*im/2+1) )
+   call fftfax(im, ifax, trigs)
+#endif
+
+end subroutine pftinit
+
 
 !-----------------------------------------------------------------------
 !BOP

@@ -1,6 +1,6 @@
 -spmd -smp
 -debug
--chem waccm_mozart
+-chem waccm_ma
 -age_of_air_trcs
 -dyn fv
 -res 4x5

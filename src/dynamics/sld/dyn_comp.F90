@@ -5,28 +5,46 @@ module dyn_comp
 !
 !-----------------------------------------------------------------------
 
-use shr_kind_mod,    only: r8 => shr_kind_r8
-use spmd_utils,      only: masterproc
-use ppgrid,          only: pver, pverp
-use pmgrid,          only: plev, plevp
-use constituents,    only: pcnst, cnst_name, cnst_longname
-use constituents,    only: tendnam, fixcnam, tottnam, hadvnam, vadvnam
-use hycoef,          only: hycoef_init
-use sld_control_mod, only: dif2, dif4, divdampn, eps, kmxhdc
+use shr_kind_mod,    only: r8=>shr_kind_r8
+
+use spmd_utils,      only: masterproc, npes, mpicom, mpir8
+
+use physconst,       only: rair
+use pmgrid,          only: plon, plat, plev, plevp, plnlv, beglat, endlat
+use dyn_grid,        only: ptimelevels
+
+use prognostics,     only: ps, u3, v3, t3, tm, tl, q3, qm, ql, qm1, div, &
+                           phis, phism, phisl, dpsm, dpsl, ed1
+
+use cam_control_mod, only: initial_run, ideal_phys, aqua_planet, moist_physics, adiabatic
+use constituents,    only: pcnst, cnst_name, cnst_longname, cnst_read_iv, qmin, &
+                           tendnam, fixcnam, tottnam, hadvnam, vadvnam
+use cam_initfiles,   only: initial_file_get_id, topo_file_get_id, pertlim
 use cam_history,     only: addfld, add_default, horiz_only
-use pio,             only: file_desc_t
-use cam_abortutils,  only: endrun
-use cam_logfile,     only: iulog
+
+use sld_control_mod, only: dif2, dif4, divdampn, eps, kmxhdc
+
+use cam_pio_utils,   only: clean_iodesc_list
+use pio,             only: file_desc_t, pio_noerr, pio_inq_attlen, pio_get_att, pio_inq_varid, &
+                           pio_seterrorhandling, pio_bcast_error, pio_internal_error
 
 #if (defined SPMD)
-use spmd_dyn,        only: spmd_readnl, spmdinit_dyn
+use spmd_dyn,        only: spmd_readnl
 #endif
+
+use cam_abortutils,  only: endrun
+use cam_logfile,     only: iulog
 
 implicit none
 private
 save
 
-public :: dyn_readnl, dyn_init, dyn_import_t, dyn_export_t
+public :: &
+   dyn_import_t, &
+   dyn_export_t, &
+   dyn_readnl,   &
+   dyn_register, &
+   dyn_init
 
 ! these structures are not used in this dycore, but are included
 ! for source code compatibility.  
@@ -37,6 +55,15 @@ end type dyn_import_t
 type dyn_export_t
    integer :: placeholder
 end type dyn_export_t
+
+real(r8), allocatable :: ps_tmp  (:,:  )
+real(r8), allocatable :: phis_tmp(:,:  )
+real(r8), allocatable :: q3_tmp  (:,:,:)
+real(r8), allocatable :: t3_tmp  (:,:,:)
+real(r8), allocatable :: arr3d_a (:,:,:)
+real(r8), allocatable :: arr3d_b (:,:,:)
+
+logical readvar            ! inquiry flag:  true => variable exists on netCDF file
 
 !=============================================================================================
 contains
@@ -134,31 +161,47 @@ subroutine dyn_readnl(nlfile)
 
 end subroutine dyn_readnl
 
-!=============================================================================================
+!=========================================================================================
 
-subroutine dyn_init(file)
+subroutine dyn_register()
+end subroutine dyn_register
 
+!=========================================================================================
+
+subroutine dyn_init(dyn_in, dyn_out)
+
+   use prognostics,         only: initialize_prognostics
+   use scanslt,             only: slt_alloc
    use phys_control,        only: phys_getopts
-   use dyn_grid,            only: define_cam_grids
-
-   ! ARGUMENTS:
-   type(file_desc_t), intent(in) :: file       ! PIO file handle for initial or restart file
-
-   logical :: history_amwg       ! output for AMWG diagnostics
-   ! Local workspace
-   integer m
-
-   call trunc()
 
 #if (defined SPMD)
-   call spmdinit_dyn()
-#endif 
+   use spmd_dyn,            only: spmdbuf
+#endif
 
-   ! Initialize hybrid coordinate arrays
-   call hycoef_init(file)
+   ! Arguments are not used in this dycore, included for compatibility
+   type(dyn_import_t), intent(out) :: dyn_in
+   type(dyn_export_t), intent(out) :: dyn_out
 
-   ! Define the CAM grids (must be before addfld calls)
-   call define_cam_grids()
+   ! Local variables
+
+   logical :: history_amwg       ! output for AMWG diagnostics
+   integer m
+   !----------------------------------------------------------------------------
+
+   ! Initialize prognostics variables
+   call initialize_prognostics
+   call slt_alloc()
+
+#if (defined SPMD)
+   ! Allocate communication buffers for collective communications in realloc
+   ! routines and in dp_coupling
+   call spmdbuf ()
+#endif
+
+   if (initial_run) then
+      call read_inidat()
+      call clean_iodesc_list()
+   end if
 
    call addfld ('ETADOT',(/ 'ilev' /),'A','1/s','Vertical (eta) velocity',gridname='gauss_grid')
    call addfld ('U&IC',  (/ 'lev' /), 'I','m/s','Zonal wind',             gridname='gauss_grid' )
@@ -202,86 +245,606 @@ subroutine dyn_init(file)
 
 end subroutine dyn_init
 
-!#######################################################################
+!=========================================================================================
 ! Private routines
-!#######################################################################
+!=========================================================================================
 
-subroutine trunc()
+subroutine read_inidat()
 
-! Check consistency of truncation parameters and evaluate pointers
-! and displacements for spectral arrays
-!
-! Original version:  CCM1
+   ! Read initial dataset and spectrally truncate as appropriate.
+   ! Read and process the fields one at a time to minimize 
+   ! memory usage.
 
-  use shr_kind_mod,   only: r8 => shr_kind_r8
-  use pspect,         only: ptrm, ptrn, ptrk, pmax, pmmax
-  use comspe,         only: ncoefi, nalp, nco2, nm, nstart, nlen, ncutoff, locm
-  use cam_abortutils, only: endrun
+   use cam_pio_utils,    only: cam_pio_get_var
 
-  implicit none
+   ! Local variables
 
-!---------------------------Local variables-----------------------------
-!
-  integer n              ! Loop index over diagonals
-  integer ik2            ! K+2
-  integer m              ! loop index
-!
-!-----------------------------------------------------------------------
-!
-! trunc first evaluates truncation parameters for a general pentagonal 
-! truncation for which the following parameter relationships are true
-!
-! 0 .le. |m| .le. ptrm
-!
-! |m| .le. n .le. |m|+ptrn for |m| .le. ptrk-ptrn
-!
-! |m| .le. n .le. ptrk     for (ptrk-ptrn) .le. |m| .le. ptrm
-!
-! Most commonly utilized truncations include:
-!  1: triangular  truncation for which ptrk=ptrm=ptrn
-!  2: rhomboidal  truncation for which ptrk=ptrm+ptrn
-!  3: trapezoidal truncation for which ptrn=ptrk .gt. ptrm
-!
-! Simple sanity check
-! It is necessary that ptrm .ge. ptrk-ptrn .ge. 0
-!
-  if (ptrm.lt.(ptrk-ptrn)) then
-     call endrun ('TRUNC: Error in truncation parameters. ntrm.lt.(ptrk-ptrn)')
-  end if
-  if (ptrk.lt.ptrn) then
-     call endrun ('TRUNC: Error in truncation parameters. ptrk.lt.ptrn')
-  end if
-!
-! Evaluate pointers and displacement info based on truncation params
-!
-  ncoefi(1) = 1
-  ik2 = ptrk + 2
-  do n=1,pmax
-     ncoefi(n+1) = ncoefi(n) + min0(pmmax,ik2-n)
-     nalp(n) = ncoefi(n) - 1
-     nco2(n) = ncoefi(n)*2
-     nm(n) = ncoefi(n+1) - ncoefi(n)
-  end do
-  nstart(1) = 0
-  nlen(1) = ptrn + 1
-  do m=2,pmmax
-     nstart(m) = nstart(m-1) + nlen(m-1)
-     nlen(m) = min0(ptrn+1,ptrk+2-m)
-  end do
-!
-! Define break-even point for vector lengths in GRCALC.  Don't implement
-! for non-PVM machines
-!
-  ncutoff = pmax
-!
-! Assign wavenumbers if not SPMD.
-!
-#if ( ! defined SPMD )
-   do m=1,pmmax
-      locm(m,0) = m
-   enddo
+   integer i,c,m,n                         ! indices
+   integer ncol
+
+   type(file_desc_t), pointer :: fh_ini, fh_topo
+
+   real(r8), pointer, dimension(:,:,:)   :: convptr_2d
+   real(r8), pointer, dimension(:,:,:,:) :: convptr_3d
+   real(r8), pointer, dimension(:,:,:,:) :: cldptr
+   real(r8), pointer, dimension(:,:    ) :: arr2d_tmp
+   real(r8), pointer, dimension(:,:    ) :: arr2d
+   character(len=3), parameter :: arraydims3(3) = (/ 'lon', 'lev', 'lat' /)
+   character(len=3), parameter :: arraydims2(2) = (/ 'lon', 'lat' /)
+   character(len=16) fieldname                  ! field name
+
+   character(len=*), parameter :: sub='read_inidat'
+   !----------------------------------------------------------------------------
+
+   fh_ini  => initial_file_get_id()
+   fh_topo => topo_file_get_id()
+
+   allocate ( ps_tmp  (plon,plat     ) )
+   allocate ( phis_tmp(plon,plat     ) )
+   allocate ( q3_tmp  (plon,plev,plat) )
+   allocate ( t3_tmp  (plon,plev,plat) )
+
+   !---------------------
+   ! Read required fields
+   !---------------------
+
+   !-----------
+   ! 3-D fields
+   !-----------
+
+   allocate(arr3d_a(plon,plev,plat))
+   allocate(arr3d_b(plon,plev,plat))
+
+   fieldname = 'U'
+   call cam_pio_get_var(fieldname, fh_ini, arraydims3, arr3d_a, found=readvar)
+   if (.not. readvar) then
+      call endrun(sub//': ERROR: reading '//trim(fieldname))
+   end if
+
+   fieldname = 'V'
+   call cam_pio_get_var(fieldname, fh_ini, arraydims3, arr3d_b, found=readvar)
+   if (.not. readvar) then
+      call endrun(sub//': ERROR: reading '//trim(fieldname))
+   end if
+
+   call process_inidat('UV')
+    
+
+   fieldname = 'T'
+   call cam_pio_get_var(fieldname, fh_ini, arraydims3, t3_tmp, found=readvar)
+   if (.not. readvar) then
+      call endrun(sub//': ERROR: reading '//trim(fieldname))
+   end if
+   call process_inidat('T')
+
+   ! Constituents (read and process one at a time)
+
+   do m = 1, pcnst
+
+      readvar   = .false.
+      fieldname = cnst_name(m)
+      if (cnst_read_iv(m)) &
+         call cam_pio_get_var(fieldname, fh_ini, arraydims3, arr3d_a, found=readvar)
+      call process_inidat('CONSTS', m_cnst=m, fh=fh_ini)
+
+   end do
+
+   deallocate ( arr3d_a  )
+   deallocate ( arr3d_b  )
+
+   !-----------
+   ! 2-D fields
+   !-----------
+    
+   fieldname = 'PHIS'
+   readvar   = .false.
+   if (ideal_phys .or. aqua_planet .or. .not. associated(fh_topo)) then
+      phis_tmp(:,:) = 0._r8
+   else
+      call cam_pio_get_var(fieldname, fh_topo, arraydims2, phis_tmp, found=readvar)
+      if (.not. readvar) then
+         call endrun(sub//': ERROR: reading '//trim(fieldname))
+      end if
+   end if
+   call process_inidat('PHIS', fh=fh_topo)
+
+   fieldname = 'PS'
+   call cam_pio_get_var(fieldname, fh_ini, arraydims2, ps_tmp, found=readvar)
+   if (.not. readvar) then
+      call endrun(sub//': ERROR: reading '//trim(fieldname))
+   end if
+   call process_inidat('PS')
+
+   ! Integrals of mass, moisture and geopotential height
+   ! (fix mass of moisture as well)
+   call global_int
+
+   deallocate ( ps_tmp   )
+   deallocate ( phis_tmp )
+
+   ! Initialization of other misc. required fields (this could be moved elsewhere)
+   ed1(:,:,:) = 0._r8
+
+   deallocate ( q3_tmp  )
+   deallocate ( t3_tmp  )
+
+   call copytimelevels()
+
+end subroutine read_inidat
+
+!=========================================================================================
+
+subroutine process_inidat(fieldname, m_cnst, fh)
+
+   ! Post-process input fields
+
+   use pspect,       only: psp
+   use commap
+   use comspe
+   use spetru,       only: spetru_phis, spetru_ps, spetru_3d_scalar, spetru_uv
+   use const_init,          only: cnst_init_default
+
+#if ( defined SPMD )
+   use spmd_dyn, only: compute_gsfactors
 #endif
 
-end subroutine trunc
+   ! arguments
+   character(len=*),  intent(in)              :: fieldname ! fields to be processed
+   integer,           intent(in),    optional :: m_cnst    ! constituent index
+   type(file_desc_t), intent(inout), optional :: fh
+
+   !---------------------------Local workspace-----------------------------
+
+   integer i,ii,j,k,n,lat,irow            ! grid and constituent indices
+   real(r8) pertval                       ! perturbation value
+   real(r8) tmp1                          ! tmp space
+   real(r8) phi(2,psp/2)                  ! used in spectral truncation of phis
+                                          ! using "B" part of hybrid grid only
+   integer  varid                         ! netCDF variable id
+   integer  ret, attlen                   ! netcdf return values
+   logical  phis_hires                    ! true => PHIS came from hi res topo
+   character*256 text
+   character*256 trunits                  ! tracer untis
+
+   real(r8), pointer, dimension(:,:,:) :: q_tmp
+   real(r8), pointer, dimension(:,:,:) :: tmp3d_a, tmp3d_b, tmp3d_c, tmp3d_extend
+   real(r8), pointer, dimension(:,:  ) :: tmp2d_a, tmp2d_b
+
+#if ( defined SPMD )
+   integer :: numperlat                   ! number of values per latitude band
+   integer :: numsend(0:npes-1)           ! number of items to be sent
+   integer :: numrecv                     ! number of items to be received
+   integer :: displs(0:npes-1)            ! displacement array
+#endif
+
+   character(len=*), parameter :: sub='process_inidat'
+   !---------------------------------------------------------------------------
+
+   select case (fieldname)
+
+   !------------
+   ! Process U/V
+   !------------
+
+   case ('UV')
+
+      allocate(tmp3d_a(plon,plev,plat))
+
+      ! Spectral truncation
+
+      call spetru_uv(arr3d_a, arr3d_b, div=tmp3d_a)
+
+#if ( defined SPMD )
+      numperlat = plnlv
+      call compute_gsfactors(numperlat, numrecv, numsend, displs)
+      call mpiscatterv(arr3d_a, numsend, displs, mpir8, u3 (:,:,beglat:endlat,1), numrecv, mpir8,0,mpicom)
+      call mpiscatterv(arr3d_b, numsend, displs, mpir8, v3 (:,:,beglat:endlat,1), numrecv, mpir8,0,mpicom)
+      call mpiscatterv(tmp3d_a, numsend, displs, mpir8, div(:,:,beglat:endlat,1), numrecv, mpir8,0,mpicom)
+#else
+      u3    (:,:,:,1) = arr3d_a(:plon,:plev,:plat)
+      v3    (:,:,:,1) = arr3d_b(:plon,:plev,:plat)
+      div   (:,:,:,1) = tmp3d_a(:,:,:)
+#endif
+
+      deallocate(tmp3d_a)
+
+   !----------
+   ! Process T
+   !----------
+
+   case ('T')
+
+      allocate ( tmp3d_a(plon,plev,plat) )
+      allocate ( tmp3d_b(plon,plev,plat) )
+
+      ! Add random perturbation to temperature if required
+
+      if (pertlim .ne. 0.0_r8) then
+         if (masterproc) write(iulog,*) sub//': INFO:  Adding random perturbation bounded by +/-', &
+            pertlim,' to initial temperature field'
+         do lat = 1, plat
+            do k = 1, plev
+               do i = 1, plon
+                  call random_number (pertval)
+                  pertval = 2._r8*pertlim*(0.5_r8 - pertval)
+                  t3_tmp(i,k,lat) = t3_tmp(i,k,lat)*(1._r8 + pertval)
+               end do
+            end do
+         end do
+      end if
+
+      ! Spectral truncation
+
+      call spetru_3d_scalar(t3_tmp, dl=tmp3d_a, dm=tmp3d_b)
+
+#if ( defined SPMD )
+      numperlat = plnlv
+      call compute_gsfactors(numperlat, numrecv, numsend, displs)
+      call mpiscatterv(t3_tmp,  numsend, displs, mpir8, t3(:,:,beglat:endlat,1) ,numrecv, mpir8,0,mpicom)
+      call mpiscatterv(tmp3d_a, numsend, displs, mpir8, tl(:,:,beglat:endlat) ,numrecv, mpir8,0,mpicom)
+      call mpiscatterv(tmp3d_b, numsend, displs, mpir8, tm(:,:,beglat:endlat) ,numrecv, mpir8,0,mpicom)
+#else
+      t3(:,:,:,1) = t3_tmp(:,:,:)
+      tl(:,:,:)   = tmp3d_a(:,:,:)
+      tm(:,:,:)   = tmp3d_b(:,:,:)
+#endif
+
+      deallocate ( tmp3d_a )
+      deallocate ( tmp3d_b )
+
+   !---------------------
+   ! Process Constituents
+   !---------------------
+
+   case ('CONSTS')
+
+      if (.not. present(m_cnst)) then
+         call endrun(sub//': ERROR:  m_cnst needs to be present in the'// &
+                      ' argument list')
+      end if
+
+      allocate(tmp3d_extend(plon,plev,beglat:endlat))
+
+      ! If "Q", then allocate extra space for spectral truncation
+      if (m_cnst == 1) then
+         allocate(tmp3d_a(plon,plev,plat))
+         allocate(tmp3d_b(plon,plev,plat))
+         allocate(tmp3d_c(plon,plev,plat))
+      end if
+
+      if (readvar) then
+
+         ! Check that all tracer units are in mass mixing ratios
+         ret = pio_inq_varid(fh, cnst_name(m_cnst), varid)
+         ret = pio_get_att(fh, varid, 'units', trunits)
+         if (trunits(1:5) .ne. 'KG/KG' .and. trunits(1:5) .ne. 'kg/kg') then
+            call endrun(sub//': ERROR:  Units for tracer ' &
+                  //trim(cnst_name(m_cnst))//' must be in KG/KG')
+         end if
+
+      else
+          ! Constituents not read from initial file are initialized by the package that implements them.
+
+         if (m_cnst == 1 .and. moist_physics) then
+            call endrun(sub//': ERROR:  Q must be on Initial File')
+         end if
+
+         call cnst_init_default(m_cnst, latdeg, londeg(:,1), arr3d_a)
+      end if
+
+!$omp parallel do private(lat)
+      do lat = 1,plat
+         call qneg3(sub, lat   , plon, plon   ,plev    , &
+            m_cnst, m_cnst, qmin(m_cnst) ,arr3d_a(1,1,lat))
+      end do
+
+      ! if "Q", "CLDLIQ", or "CLDICE", save off for later use
+      if (m_cnst == 1) q3_tmp(:plon,:,:) = arr3d_a(:plon,:,:)
+
+      ! Spectral truncation of "Q" (only to get spectral derivatives)
+
+      if (m_cnst == 1) then
+         tmp3d_a(:plon,:,:) = arr3d_a(:plon,:,:)
+         call spetru_3d_scalar(tmp3d_a, dl=tmp3d_b, dm=tmp3d_c)
+      end if
+
+
+#if ( defined SPMD )
+      numperlat = plnlv
+      call compute_gsfactors(numperlat, numrecv, numsend, displs)
+      call mpiscatterv (arr3d_a, numsend, displs, mpir8, tmp3d_extend, numrecv, mpir8,0,mpicom)
+      q3(:,:,m_cnst,beglat:endlat,1) = tmp3d_extend(:,:,beglat:endlat)
+      if (m_cnst == 1) then
+         call mpiscatterv(tmp3d_b, numsend, displs, mpir8, ql, numrecv, mpir8,0,mpicom)
+         call mpiscatterv(tmp3d_c, numsend, displs, mpir8, qm, numrecv, mpir8,0,mpicom)
+      end if
+#else
+      q3(:plon,:plev,m_cnst,:plat,1) = arr3d_a(:plon,:plev,:plat)
+      if (m_cnst == 1) then
+         ql(:,:,:) = tmp3d_b(:,:,:)
+         qm(:,:,:) = tmp3d_c(:,:,:)
+      end if
+#endif
+      deallocate(tmp3d_extend)
+      if (m_cnst == 1) then
+         deallocate(tmp3d_a)
+         deallocate(tmp3d_b)
+         deallocate(tmp3d_c)
+      end if
+
+   !-----------
+   ! Process PS
+   !-----------
+
+   case ('PS')
+
+      allocate ( tmp2d_a(plon,plat) )
+      allocate ( tmp2d_b(plon,plat) )
+
+      ! Spectral truncation
+      call spetru_ps(ps_tmp, tmp2d_a, tmp2d_b)
+
+#if ( defined SPMD )
+      numperlat = plon
+      call compute_gsfactors(numperlat, numrecv, numsend, displs)
+      call mpiscatterv(tmp2d_a, numsend, displs, mpir8, dpsl, numrecv, mpir8,0,mpicom)
+      call mpiscatterv(tmp2d_b, numsend, displs, mpir8, dpsm, numrecv, mpir8,0,mpicom)
+#else
+      dpsl(:,:) = tmp2d_a(:,:)
+      dpsm(:,:) = tmp2d_b(:,:)
+#endif
+
+      deallocate ( tmp2d_a )
+      deallocate ( tmp2d_b )
+
+   !-------------
+   ! Process PHIS
+   !-------------
+
+   case ('PHIS')
+
+      allocate ( tmp2d_a(plon,plat) )
+      allocate ( tmp2d_b(plon,plat) )
+
+      ! Check for presence of 'from_hires' attribute to decide whether to filter
+
+      if (readvar) then
+         ret = pio_inq_varid (fh, 'PHIS', varid)
+         call pio_seterrorhandling(fh, PIO_BCAST_ERROR)
+
+         ret = pio_inq_attlen (fh, varid, 'from_hires', attlen)
+         if (ret.eq.PIO_NOERR .and. attlen.gt.256) then
+            call endrun(sub//': ERROR:  from_hires attribute length is too long')
+         end if
+         ret = pio_get_att (fh, varid, 'from_hires', text)
+         if (ret.eq.PIO_NOERR .and. text(1:4).eq.'true') then
+            phis_hires = .true.
+            if (masterproc) write(iulog,*) sub//': INFO: Will filter input PHIS: attribute from_hires is true'
+         else
+            phis_hires = .false.
+            if (masterproc) write(iulog,*) sub//': INFO: Will not filter input PHIS: attribute ', &
+                  'from_hires is either false or not present'
+         end if
+         call pio_seterrorhandling(fh, PIO_INTERNAL_ERROR)
+
+      else
+         phis_hires = .false.
+      end if
+
+      ! Spectral truncation
+      call spetru_phis(phis_tmp, phis_hires, phisl=tmp2d_a, phism=tmp2d_b, phi_out=phi)
+
+      ! Compute ln(Ps*) (Ritchie & Tanguay, 1995) in spectral space
+      tmp1 = 1._r8/(rair*t0(plev))
+      do ii = 1,psp/2
+         i = 2*ii - 1
+         lnpstar(i  ) = -phi(1,ii)*tmp1
+         lnpstar(i+1) = -phi(2,ii)*tmp1
+      end do
+          
+#if ( defined SPMD )
+      call mpibcast(lnpstar, psp, mpir8, 0, mpicom)
+      numperlat = plon
+      call compute_gsfactors(numperlat, numrecv, numsend, displs)
+      call mpiscatterv(phis_tmp, numsend, displs, mpir8, phis,  numrecv, mpir8,0,mpicom)
+      call mpiscatterv(tmp2d_a,  numsend, displs, mpir8, phisl, numrecv, mpir8,0,mpicom)
+      call mpiscatterv(tmp2d_b,  numsend, displs, mpir8, phism, numrecv, mpir8,0,mpicom)
+#else
+      phis  = phis_tmp
+      phisl = tmp2d_a
+      phism = tmp2d_b
+#endif
+
+      deallocate ( tmp2d_a )
+      deallocate ( tmp2d_b )
+
+   end select
+
+end subroutine process_inidat
+
+!=========================================================================================
+
+subroutine global_int()
+
+! Compute global integrals of mass, moisture and geopotential height
+! and fix mass of atmosphere
+
+   use commap
+   use physconst,       only: gravit
+   use hycoef,          only: hyai, ps0
+#if ( defined SPMD )
+   use mpishorthand
+   use spmd_dyn,        only: compute_gsfactors
+#endif
+   use sld_control_mod, only: pdela, tmassf, fixmas, qmass1, qmass2, &
+                              qmassf, zgsint, tmass0
+
+   !---------------------------Local workspace-----------------------------
+
+   integer i,k,lat,ihem,irow  ! grid indices
+   real(r8) pdelb(plon,plev)  ! pressure diff between interfaces
+                               ! using "B" part of hybrid grid only
+   real(r8) pssum             ! surface pressure sum
+   real(r8) dotproda          ! dot product
+   real(r8) dotprodb          ! dot product
+   real(r8) zgssum            ! partial sums of phis
+   real(r8) hyad (plev)       ! del (A)
+   real(r8) tmassf_tmp        ! Global mass integral
+   real(r8) qmass1_tmp        ! Partial Global moisture mass integral
+   real(r8) qmass2_tmp        ! Partial Global moisture mass integral
+   real(r8) qmassf_tmp        ! Global moisture mass integral
+   real(r8) zgsint_tmp        ! Geopotential integral
+
+#if ( defined SPMD )
+   integer :: numperlat         ! number of values per latitude band
+   integer :: numsend(0:npes-1) ! number of items to be sent
+   integer :: numrecv           ! number of items to be received
+   integer :: displs(0:npes-1)  ! displacement array
+#endif
+   character(len=*), parameter :: sub='global_int'
+   !-----------------------------------------------------------------------
+
+   if (masterproc) then
+
+      ! Initialize mass and moisture integrals for summation
+      ! in a third calculation loop (assures bit-for-bit compare
+      ! with non-random history tape).
+
+      tmassf_tmp = 0._r8
+      qmass1_tmp = 0._r8
+      qmass2_tmp = 0._r8
+      zgsint_tmp = 0._r8
+
+      ! Compute pdel from "A" portion of hybrid vertical grid for later use in global integrals
+      do k = 1, plev
+         hyad(k) = hyai(k+1) - hyai(k)
+      end do
+      do k = 1, plev
+         do i = 1, plon
+            pdela(i,k) = hyad(k)*ps0
+         end do
+      end do
+
+      ! Compute integrals of mass, moisture, and geopotential height
+      do irow = 1, plat/2
+         do ihem = 1, 2
+            if (ihem == 1) then
+               lat = irow
+            else
+               lat = plat - irow + 1
+            end if
+
+            ! Accumulate average mass of atmosphere
+            call pdelb0(ps_tmp(1,lat), pdelb, plon)
+            pssum  = 0._r8
+            zgssum = 0._r8
+            do i = 1, plon
+               pssum  = pssum  + ps_tmp  (i,lat)
+               zgssum = zgssum + phis_tmp(i,lat)
+            end do
+            tmassf_tmp = tmassf_tmp + w(irow)*pssum/plon
+            zgsint_tmp = zgsint_tmp + w(irow)*zgssum/plon
+
+            ! Calculate global integrals needed for water vapor adjustment
+            do k = 1, plev
+               dotproda = 0._r8
+               dotprodb = 0._r8
+               do i = 1, plon
+                  dotproda = dotproda + q3_tmp(i,k,lat)*pdela(i,k)
+                  dotprodb = dotprodb + q3_tmp(i,k,lat)*pdelb(i,k)
+               end do
+               qmass1_tmp = qmass1_tmp + w(irow)*dotproda/plon
+               qmass2_tmp = qmass2_tmp + w(irow)*dotprodb/plon
+            end do
+         end do
+      end do
+
+      ! Normalize average mass, height
+      tmassf_tmp = tmassf_tmp*.5_r8/gravit
+      qmass1_tmp = qmass1_tmp*.5_r8/gravit
+      qmass2_tmp = qmass2_tmp*.5_r8/gravit
+      zgsint_tmp = zgsint_tmp*.5_r8/gravit
+      qmassf_tmp = qmass1_tmp + qmass2_tmp
+
+      ! Globally avgd sfc. partial pressure of dry air (i.e. global dry mass):
+      tmass0 = 98222._r8/gravit
+      if (adiabatic)   tmass0 =  tmassf_tmp
+      if (ideal_phys ) tmass0 =  100000._r8/gravit
+      if (aqua_planet) tmass0 = (101325._r8-245._r8)/gravit
+
+      if (masterproc) then
+         write(iulog,*) sub//': INFO:'
+         write(iulog,*) '  Mass of initial data before correction      = ', tmassf_tmp
+         write(iulog,*) '  Dry mass will be held at                    = ', tmass0
+         write(iulog,*) '  Mass of moisture after removal of negatives = ', qmassf_tmp
+         write(iulog,*) '  Globally averaged geopotential height (m)   = ', zgsint_tmp
+      end if
+
+      ! Compute and apply an initial mass fix factor which preserves horizontal
+      ! gradients of ln(ps).
+      if (.not. moist_physics) then
+         fixmas = tmass0/tmassf_tmp
+      else
+         fixmas = (tmass0 + qmass1_tmp)/(tmassf_tmp - qmass2_tmp)
+      end if
+      do lat = 1,plat
+         do i = 1, plon
+            ps_tmp(i,lat) = ps_tmp(i,lat)*fixmas
+         end do
+      end do
+
+      ! Global integerals
+      tmassf = tmassf_tmp
+      qmass1 = qmass1_tmp
+      qmass2 = qmass2_tmp
+      qmassf = qmassf_tmp
+      zgsint = zgsint_tmp
+
+   end if   ! end of if-masterproc
+
+#if ( defined SPMD )
+   call mpibcast (tmass0,1,mpir8,0,mpicom)
+   call mpibcast (tmassf,1,mpir8,0,mpicom)
+   call mpibcast (qmass1,1,mpir8,0,mpicom)
+   call mpibcast (qmass2,1,mpir8,0,mpicom)
+   call mpibcast (qmassf,1,mpir8,0,mpicom)
+   call mpibcast (zgsint,1,mpir8,0,mpicom)
+
+   numperlat = plon
+   call compute_gsfactors(numperlat, numrecv, numsend, displs)
+   call mpiscatterv(ps_tmp, numsend, displs, mpir8, ps(:,beglat:endlat,1), numrecv, &
+                    mpir8, 0, mpicom)
+#else
+   ps(:,:,1) = ps_tmp(:,:)
+#endif
+
+end subroutine global_int
+
+!=========================================================================================
+
+subroutine copytimelevels()
+
+
+   ! Local variables
+
+   integer :: n
+   !----------------------------------------------------------------------------
+
+   ! Make all time levels of prognostics contain identical data.
+   ! Fields to be convectively adjusted only *require* n3 time
+   ! level since copy gets done in linems.
+   do n = 2, ptimelevels
+      ps(:,:,n)     = ps(:,:,1)
+      u3(:,:,:,n)   = u3(:,:,:,1)
+      v3(:,:,:,n)   = v3(:,:,:,1)
+      t3(:,:,:,n)   = t3(:,:,:,1)
+      q3(:,:,:,:,n) = q3(:,:,:,:,1)
+      div(:,:,:,n)  = div(:,:,:,1)
+   end do
+   qm1(:,:,:,:) = q3(:,:,:,:,1)
+
+end subroutine copytimelevels
+
+!=========================================================================================
 
 end module dyn_comp
