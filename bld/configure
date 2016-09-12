@@ -2726,7 +2726,7 @@ EOF
 #-----------------------------------------------------------------------------------------------
 
 my $fp_filename      = 'Filepath';             # name of output filepath file
-my $cpp_filename     = 'CCSM_cppdefs';         # name of output file for cam's cppdefs in ccsm
+my $cpp_filename     = 'CESM_cppdefs';         # name of output file for cam's cppdefs in ccsm
 
 # Write the filepath file.
 write_filepath("$cam_bld/$fp_filename", $cfg_ref);

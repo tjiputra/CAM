@@ -152,6 +152,7 @@ if [ "\$CAM_FC" = "PGI" ]; then
   module load netcdf/4.2
   module load pnetcdf/1.3.0
   module load perlmods
+  module load python
   export CFG_STRING=" -cc mpicc -fc_type pgi -fc mpif90 -cppdefs -DNO_MPI2 -cppdefs -DNO_MPIMOD "
 else
   module load intel/15.0.3
@@ -162,6 +163,7 @@ else
   module load pnetcdf/1.3.0
   module load mkl/11.0.1
   module load perlmods
+  module load python
   export CFG_STRING="-cc mpicc -fc mpif90 -fc_type intel "
 fi
 
@@ -227,6 +229,7 @@ if [ "\$CAM_FC" = "PGI" ]; then
   module load netcdf
   module load pnetcdf
   module load perlmods
+  module load python
   export CFG_STRING=" -cc mpicc -fc_type pgi -fc mpif90 -cppdefs -DNO_MPI2 -cppdefs -DNO_MPIMOD "
 else
   module load intel/15.0.1
@@ -237,6 +240,7 @@ else
   module load pnetcdf/1.3.0
   module load mkl/11.0.1
   module load perlmods
+  module load python
   export CFG_STRING="-cc mpicc -fc mpif90 -fc_type intel "
 fi
 

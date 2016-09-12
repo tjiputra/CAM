@@ -1,5 +1,225 @@
 ===============================================================
 
+Tag name: cam5_4_another
+Originator(s): cfischer
+Date:  09-12-2016
+One-line Summary: Fix FW5 compset
+
+Purpose of changes:
+
+Bugs fixed (include bugzilla ID):
+
+Describe any changes made to build system:
+
+Describe any changes made to the namelist:
+
+List any changes to the defaults for the boundary datasets:
+
+Describe any substantial timing or memory changes:
+
+Code reviewed by:
+
+List all subroutines eliminated:
+
+List all subroutines added and what they do:
+
+List all existing files that have been modified, and describe the changes:
+cime_config/config_compset.xml
+
+If there were any failures reported from running test_driver.sh on any test
+platform, and checkin with these failures has been OK'd by the gatekeeper,
+then copy the lines from the td.*.status files for the failed tests to the
+appropriate machine below.  All failed tests must be justified.
+
+yellowstone/intel:
+
+hobart/nag:
+
+hobart/pgi or jaguar/pgi:
+
+CAM tag used for the baseline comparison tests if different than previous
+tag:
+
+Summarize any changes to answers, i.e.,
+- what code configurations:
+- what platforms/compilers:
+- nature of change (roundoff; larger than roundoff but same climate; new
+  climate):
+
+  If bitwise differences were observed, how did you show they were no worse
+  than roundoff?
+
+  If this tag changes climate describe the run(s) done to evaluate the new
+  climate in enough detail that it(they) could be reproduced, i.e.,
+  - source tag (all code used must be in the repository):
+  - platform/compilers:
+  - configure commandline:
+  - build-namelist command (or complete namelist):
+  - MSS location of output:
+
+  MSS location of control simulations used to validate new climate:
+
+  URL for AMWG diagnostics output used to validate new climate:
+
+  ===============================================================
+===============================================================
+
+Tag name: cam5_4_somethingelse
+Originator(s): jedwards
+Date:  07-19-2016
+One-line Summary: change CAM55 to CAM60
+
+Purpose of changes:
+
+Bugs fixed (include bugzilla ID):
+
+Describe any changes made to build system:
+
+Describe any changes made to the namelist:
+
+List any changes to the defaults for the boundary datasets:
+
+Describe any substantial timing or memory changes:
+
+Code reviewed by:
+
+List all subroutines eliminated:
+
+List all subroutines added and what they do:
+
+List all existing files that have been modified, and describe the changes:
+cime_config/config_component.xml
+cime_config/config_compset.xml
+
+If there were any failures reported from running test_driver.sh on any test
+platform, and checkin with these failures has been OK'd by the gatekeeper,
+then copy the lines from the td.*.status files for the failed tests to the
+appropriate machine below.  All failed tests must be justified.
+
+yellowstone/intel:
+
+hobart/nag:
+
+hobart/pgi or jaguar/pgi:
+
+CAM tag used for the baseline comparison tests if different than previous
+tag:
+
+Summarize any changes to answers, i.e.,
+- what code configurations:
+- what platforms/compilers:
+- nature of change (roundoff; larger than roundoff but same climate; new
+  climate):
+
+If bitwise differences were observed, how did you show they were no worse
+than roundoff?
+
+If this tag changes climate describe the run(s) done to evaluate the new
+climate in enough detail that it(they) could be reproduced, i.e.,
+- source tag (all code used must be in the repository):
+- platform/compilers:
+- configure commandline:
+- build-namelist command (or complete namelist):
+- MSS location of output:
+
+MSS location of control simulations used to validate new climate:
+
+URL for AMWG diagnostics output used to validate new climate:
+
+===============================================================
+===============================================================
+
+Tag name: cam5_4_something
+Originator(s): mvertens, santos
+Date: Some time
+One-line Summary: ESMCI CIME port
+
+Purpose of changes:
+
+- Updates necessary to work with the new version of CIME.
+
+Bugs fixed (include bugzilla ID): N/A
+
+Describe any changes made to build system: N/A (except configure for CIME)
+
+Describe any changes made to the namelist: N/A
+
+List any changes to the defaults for the boundary datasets: N/A
+
+Describe any substantial timing or memory changes: N/A
+
+Code reviewed by:
+
+List all subroutines eliminated: N/A
+
+List all subroutines added and what they do: N/A
+
+List all existing files that have been modified, and describe the changes:
+
+M       components/cam/bld/configure
+        - The CIME/CESM scripts now look for a file called "CESM_cppdefs"
+          instead of "CCSM_cppdefs", so configure has to output to that file.
+
+M       components/cam/cime_config/buildlib
+M       components/cam/cime_config/buildnml
+        - These CIME scripts are translated from Perl to Python.
+        - Queries to XML files now use CIME Python modules rather than xmlquery,
+          which substantially improves buildnml timing in CIME.
+
+M       components/cam/cime_config/config_component.xml
+M       components/cam/cime_config/config_compsets.xml
+        - Compatibility fixes for new CIME scripts.
+        - Compset long names always use two version numbers for CAM (i.e. CAM40,
+          CAM50, and CAM55).
+        - WACCM+CLUBB compsets are now specified by using CAM55%WC*, so the
+          %WCCB modifier is removed.
+
+M       components/cam/test/system/TSM_ccsm.sh
+        - The CIMEROOT environment variable must be specified when running the
+          CIME run script.
+
+M       components/cam/test/system/test_driver.sh
+        - The Python module must be loaded on yellowstone so that Python 2.7 is
+          available for the CIME scripts.
+
+If there were any failures reported from running test_driver.sh on any test
+platform, and checkin with these failures has been OK'd by the gatekeeper,
+then copy the lines from the td.*.status files for the failed tests to the
+appropriate machine below.  All failed tests must be justified.
+
+yellowstone/intel:
+
+hobart/nag:
+
+hobart/pgi or jaguar/pgi:
+
+CAM tag used for the baseline comparison tests if different than previous
+tag: N/A
+
+Summarize any changes to answers, i.e.,
+- what code configurations: N/A
+- what platforms/compilers: N/A
+- nature of change (roundoff; larger than roundoff but same climate; new
+  climate): N/A
+
+If bitwise differences were observed, how did you show they were no worse
+than roundoff? N/A
+
+If this tag changes climate describe the run(s) done to evaluate the new
+climate in enough detail that it(they) could be reproduced, i.e.,
+- source tag (all code used must be in the repository): N/A
+- platform/compilers: N/A
+- configure commandline: N/A
+- build-namelist command (or complete namelist): N/A
+- MSS location of output: N/A
+
+MSS location of control simulations used to validate new climate: N/A
+
+URL for AMWG diagnostics output used to validate new climate: N/A
+
+===============================================================
+===============================================================
+
 Tag name: cam5_4_75
 Originator(s): goldy
 Date: 2016-06-18
@@ -476,7 +696,7 @@ hobart/pgi:
 068 bl011 TBL.sh f4c5portdm outfrq24h_port 2d .................................................FAIL! rc= 7 at Tue Jun 14 13:59:05 MDT 2016
 
  Baseline failures are expected due to a correction to shr_orb_cosz (in cime4.5.11)
- 
+
 ===============================================================
 ===============================================================
 
@@ -563,7 +783,7 @@ Bugs fixed (include bugzilla ID): none
 
 Describe any changes made to build system: none
 
-Describe any changes made to the namelist: 
+Describe any changes made to the namelist:
 . move cam_branch_file to group cam_initfiles_nl
 . move ct_overlap, trac_decomp from dyn_fv_inparm to spmd_fv_inparm
 
@@ -586,7 +806,7 @@ components/cam/src/dynamics/eul/inidat.F90
 
 components/cam/src/dynamcis/eul/inital.F90
 . eliminate the cam_initial interface and call dyn_init directly from
-  cam_init. 
+  cam_init.
 
 components/cam/src/dynamics/eul/initcom.F90
 . functionality moved to dyn_grid_init
@@ -600,7 +820,7 @@ components/cam/src/dynamics/fv/inidat.F90
 
 components/cam/src/dynamcis/fv/inital.F90
 . eliminate the cam_initial interface and call dyn_init directly from
-  cam_init. 
+  cam_init.
 
 components/cam/src/dynamics/fv/initcom.F90
 . functionality moved to dyn_grid_init
@@ -610,7 +830,7 @@ components/cam/src/dynamics/se/inidat.F90
 
 components/cam/src/dynamcis/se/inital.F90
 . eliminate the cam_initial interface and call dyn_init directly from
-  cam_init. 
+  cam_init.
 
 components/cam/src/dynamics/se/initcom.F90
 . this was a stub module that's no longer needed
@@ -653,7 +873,7 @@ components/cam/src/control/cam_initfiles.F90
   files are opened here this module will do consistency check on caseid in
   case of branch run.  Also is responsible for providing this name to the
   component interface as long as the separate surface restart file is
-  needed. 
+  needed.
 . add the get_restcase and get_restartdir methods.  This module is now
   responsible for the data that those accessor functions provide.
 . remove call to read_initial from cam_initfiles_open.  Functionality moved
@@ -684,7 +904,7 @@ components/cam/src/cpl/atm_comp_mct.F90
 components/cam/src/dynamics/eul/dyn_comp.F90
 . dyn_init
   - move subroutine trunc() to module dyn_grid
-  - remove calls to trunc, spmdinit_dyn, hycoef_init (moved to dyn_grid_init) 
+  - remove calls to trunc, spmdinit_dyn, hycoef_init (moved to dyn_grid_init)
   - add calls to initialize_prognostics, scanslt_alloc, spmdbuf, and
     initial_conds.  The initial_conds call will be replaces by a
     read_inidat call which must be inside a conditional to only be called
@@ -721,16 +941,16 @@ components/cam/src/dynamics/fv/dyn_comp.F90
 . dyn_init
   - move hycoef_init call to dyn_grid_init
   - move setting of namelist values in t_fvdycore_state object into
-    dyn_readnl 
+    dyn_readnl
   - move spmdinit_dyn call to dyn_grid_init
   - clean up after moving all the grid initialization to dyn_grid_init.
   - remove unused arg fh and replace the dyn_state arg by local pointer
     and get state using get_dyn_state
 . dyn_run
   - access ct_overlap, trac_decomp from grid object rather than
-    fv_control_mod. 
+    fv_control_mod.
   - access div24del2flag, del2coef from dyn_state and pass through cd_core
-    interface. 
+    interface.
 
 components/cam/src/dynamics/fv/dyn_grid.F90
 . change default module access to private
@@ -748,7 +968,7 @@ components/cam/src/dynamics/fv/dyn_grid.F90
   - move call to define_cam_grids here (from dyn_comp::dyn_init)
   - pass fft_flt through pftinit arg list
 . fix use associations of pmgrid (most values now live only in grid
-  object). 
+  object).
 
 components/cam/src/dynamics/fv/dynamics_vars.F90
 . remove the dynamics_init subroutine.  It's functionality is replaced by
@@ -781,7 +1001,7 @@ components/cam/src/dynamics/fv/metdata.F90
 . add only qualifier to pmgrid use statement
 
 components/cam/src/dynamics/fv/pft_module.F90
-. change fft_flt to be module data rather than access via fv_control_mod 
+. change fft_flt to be module data rather than access via fv_control_mod
 . pftinit
   - add fft_flt as input arg for initializing module data
 
@@ -857,7 +1077,7 @@ components/cam/src/dynamics/sld/dyn_comp.F90
 . dyn_init
   - add dyn_in and dyn_out as intent(out) dummy args
   - remove calls to trunc, spmdinit_dyn, hycoef_init, and define_cam_grids
-    (moved to dyn_grid_init) 
+    (moved to dyn_grid_init)
 
 components/cam/src/dynamics/sld/dyn_grid.F90
 . add private attribute
@@ -1234,8 +1454,8 @@ One-line Summary: Bug fixes for use_cases (including 1850_cam55), cosp simulator
 
 Purpose of changes:
   - Use case fixes for 1850 CAM5.5 and a number of WACCM use cases
-  - Correct estimation of diagnostic precipitation flux calculations to exactly 
-    track precipitation in MG1 and MG2. Affects LS_FLXPRC and LS_FLXSNW used for 
+  - Correct estimation of diagnostic precipitation flux calculations to exactly
+    track precipitation in MG1 and MG2. Affects LS_FLXPRC and LS_FLXSNW used for
     COSP simulator. Adds LS_FLXICE and LS_FLXLIQ for MG2 to be consistent with its methods.
   - unpack sadice and sadsnow for MG_SADICE and MG_SADSNOW diagnostics
 
@@ -1359,11 +1579,11 @@ Purpose of changes:
     turned on it replaces the existing turbulent mountain stress
     parameterization, i.e., if do_beljaars is true then do_tms must be
     false.
-  
+
 . Add generation of gravity waves from ridges.
   - This option is controlled by the namelist variable use_gw_rdg_beta.
   - Code was also added for gamma ridges, but this option is not yet
-    validated. 
+    validated.
 
 Bugs fixed (include bugzilla ID): none
 
@@ -1382,7 +1602,7 @@ Code reviewed by: eaton
 
 List all subroutines eliminated: none
 
-List all subroutines added and what they do: 
+List all subroutines added and what they do:
 
 components/cam/src/physics/cam/beljaars_drag.F90
 . portable implementation of Beljaars scheme.
@@ -1400,7 +1620,7 @@ components/cam/bld/build-namelist
 . add defaults for use_gw_rdg_beta and use_gw_rdg_gamma
 . modify default for gw_prndl when beta ridges are being used
 . add defaults for new vars depending on use_gw_rdg_beta and
-  use_gw_rdg_gamma 
+  use_gw_rdg_gamma
 
 components/cam/bld/namelist_files/namelist_defaults_cam.xml
 . set default for do_beljaars to false
@@ -1422,7 +1642,7 @@ components/cam/bld/namelist_files/namelist_definition.xml
   - trpd_leewv_rdg_gamma
   - bnd_rdggm
 . add do_beljaars to switch the beljaars scheme
-  
+
 components/cam/src/physics/cam/diffusion_solver.F90
 . add intent(in) arg dragblg to compute_vdiff
 . modify calcs of tauresx and tauresy
@@ -1446,7 +1666,7 @@ components/cam/src/physics/cam/gw_common.F90
     . if not present the lapply_effgw=.true.  This applies efficiency to
       completed stress profile.
     . lapply_effgw replaces apply_tndmax.  it also replaces
-      (.not. limit_tau_without_eff) 
+      (.not. limit_tau_without_eff)
 
 components/cam/src/physics/cam/gw_drag.F90
 . Add option for ridge scheme
@@ -1555,7 +1775,7 @@ M    components/cam/src/physics/cam/physpkg.F90
  - removed micro_do_icesupersat code block
 
 M    components/cam/src/physics/cam/cldfrc2m.F90
-  - Introduce subgrid scale saturation factor (qsatfac) to allow ice growth beginning at 
+  - Introduce subgrid scale saturation factor (qsatfac) to allow ice growth beginning at
     rhmini if cldfrc2m_do_subgrid_growth is true
 
 M    components/cam/src/physics/cam/micro_mg_utils.F90
@@ -1690,16 +1910,16 @@ https://acomstaff.acom.ucar.edu/bardeenc/waccm55/f2000c55_test05f-f2000c55_contr
 Tag name: cam5_4_62
 Originator(s): bogensch, cacraig
 Date: May 18, 2016
-One-line Summary: Introduced CLUBB liquid supersat, new CLUBB heat diffusivity 
+One-line Summary: Introduced CLUBB liquid supersat, new CLUBB heat diffusivity
                   namelist param and updated CLUBB/MG namelist defaults
 
 Purpose of changes:
-  - Update CLUBB svn external to head of UWM trunk.  
-  - Introduces liquid supersaturation closure after the 2nd PDF call to 
-    avoid relative humidities greater than 100% before CLUBB's equations 
-    are advanced.  
+  - Update CLUBB svn external to head of UWM trunk.
+  - Introduces liquid supersaturation closure after the 2nd PDF call to
+    avoid relative humidities greater than 100% before CLUBB's equations
+    are advanced.
   - Introduces tunable parameter for the diffusivities of heat in CLUBB.
-  - Sets the CLUBB/MG namelist default parameters to what Cecile is using 
+  - Sets the CLUBB/MG namelist default parameters to what Cecile is using
     in her current pre-CAM6 "62" testing
 
 Bugs fixed (include bugzilla ID):
@@ -1760,10 +1980,10 @@ Summarize any changes to answers, i.e.,
 - what code configurations: All configurations which use CLUBB
 - what platforms/compilers: all
 - nature of change (roundoff; larger than roundoff but same climate; new
-  climate): new climate 
+  climate): new climate
 
-This is part of the modifications which are leading up to CAM6 and has not 
-been tested independently, but rather as a group with the next several 
+This is part of the modifications which are leading up to CAM6 and has not
+been tested independently, but rather as a group with the next several
 upcoming tags.
 
 ===============================================================
@@ -1775,9 +1995,9 @@ Date: May 12, 2016
 One-line Summary: Add namelist var zmconv_num_cin and cleanup clubb_intr
 
 Purpose of changes:
- -- Added namelist var zmconv_num_cin to control the number of negative buoyancy regions 
+ -- Added namelist var zmconv_num_cin to control the number of negative buoyancy regions
     that are allowed before the convection top and CAPE calculations are completed
- -- When CAM was run on cori, it core dumped with a floating point exception in clubb.  
+ -- When CAM was run on cori, it core dumped with a floating point exception in clubb.
     Removed the on-the-fly arithmetic for outfld calls which operated on all columns
     in the array, even undefined ones.
  -- Removed unused variables in clubb_intr.F90
@@ -1805,10 +2025,10 @@ M       components/cam/bld/namelist_files/namelist_definition.xml
 M       components/cam/bld/build-namelist
 M       components/cam/src/physics/cam/zm_conv_intr.F90
 M       components/cam/src/physics/cam/zm_conv.F90
-          -- Added zmconv_num_cin to namelist 
+          -- Added zmconv_num_cin to namelist
 
 M       components/cam/src/physics/cam/clubb_intr.F90
-          -- outfld calls had on-the-fly arithmetic being done on the 
+          -- outfld calls had on-the-fly arithmetic being done on the
              entire array, regardless of how many columns were being used.
              Scaled variables before passing to outfld
           -- Removed unused variables
@@ -1833,9 +2053,9 @@ Date: May 9, 2016
 One-line Summary: Remove all references to fortran elementals for performance improvement
 
 Purpose of changes:
-- All elementals within the CAM code were removed and according to performance 
+- All elementals within the CAM code were removed and according to performance
   testing by John Dennis' group, this speeds up CAM by 1.2%
-- scalar and vector versions of these routines are provided with a single 
+- scalar and vector versions of these routines are provided with a single
   interface via fortran overloading
 
 Bugs fixed (include bugzilla ID):
@@ -2277,8 +2497,8 @@ Originator(s): chris.kerr.llc@gmail.com, cacraig
 Date: March 31, 2016
 One-line Summary: optimized MG2
 
-Purpose of changes: 
- - Improve performance of microphysics routines. A 7-8% improvement 
+Purpose of changes:
+ - Improve performance of microphysics routines. A 7-8% improvement
    in microphysics is seen with this optimization.
 
 Bugs fixed (include bugzilla ID):
@@ -2305,7 +2525,7 @@ M       components/cam/src/physics/cam/micro_mg2_0.F90
 
 M       components/cam/src/physics/cam/micro_mg_cam.F90
           - all allocations are removed and arrays are now automatic arrays
-          - micro_mg_cam_tend simply calls micro_mg_get_cols and micro_mg_cam_tend_pack 
+          - micro_mg_cam_tend simply calls micro_mg_get_cols and micro_mg_cam_tend_pack
           - micro_mg_cam_tend_pack is basically the old micro_mg_cam_tend without
             the calls to micro_mg_get_cols.
 
@@ -2551,7 +2771,7 @@ Date: March 21, 2016
 One-line Summary: Added alternative autoconversion scheme
 
 Purpose of changes:
- - New switch to use alternative autoconversion scheme in MG2 (following Seifert and 
+ - New switch to use alternative autoconversion scheme in MG2 (following Seifert and
    Behang 2001).   Currently this is not turned on
 
 Bugs fixed (include bugzilla ID):
@@ -2559,7 +2779,7 @@ Bugs fixed (include bugzilla ID):
 Describe any changes made to build system:
 
 Describe any changes made to the namelist:
-- added logical micro_do_sb_physics which turns on/off the Seifert and Behang autoconversion.  
+- added logical micro_do_sb_physics which turns on/off the Seifert and Behang autoconversion.
 
 List any changes to the defaults for the boundary datasets:
 
@@ -2756,7 +2976,7 @@ M       components/cam/cime_config/testdefs/testlist_cam.xml
 M       components/cam/test/system/tests_pretag_yellowstone
             - removed a number of unnecessary CAM regression tests
 
-Since there were no code changes, and no new CAM regression tests were introduced, the CAM 
+Since there were no code changes, and no new CAM regression tests were introduced, the CAM
 regression testing was not run for this tag.
 
 All variations of yellowstone and hobart compilers and prealpha/prebeta were run through the CESM script
@@ -2773,7 +2993,7 @@ One-line Summary: Revert iulog assignment back to what it was in cam5_4_42
 Purpose of changes:
  - A request had been made to have QNEG3 lines not be directed to unit 6 (which is used by the CESM log).  An mpi_bcast
    was introduced in cam5_4_43 to broadcast the CAM iulog to all tasks, but that had issues with the gnu compiler during
-   FLUSH.  After extensive investigation, it was determined that master should really be the only task which routinely 
+   FLUSH.  After extensive investigation, it was determined that master should really be the only task which routinely
    writes to iulog.  This tag reverst the change made in cam5_4_43 and a future tage will create statistics for QNEG3
    that masterproc can write out.
 
