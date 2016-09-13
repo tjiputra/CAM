@@ -34,7 +34,8 @@
       <value compset="_CAM4"          >-phys cam4</value>              
       <value compset="_CAM5"          >-phys cam5</value> 
       <value compset="_CAM55"         >-phys cam5.4 -clubb_sgs</value>
-      <value compset="_CAM54"         >-phys cam5.4</value>  
+      <value compset="_CAM54"         >-phys cam5.4</value>
+      <value compset="_CAM55%NCLB"    >-phys cam5.4</value>  
       <value compset="_CAM5%CLB"      >-clubb_sgs</value>
       <value compset="_CAM5%WCCB"     >-clubb_sgs</value>
       <value compset="_CAM4%TBAM"     >-chem trop_bam</value>
@@ -350,7 +351,9 @@
     <desc compset="_CAM4_"			>CAM cam4 physics:</desc>
     <desc compset="_CAM5_"			>CAM cam5 physics:</desc>
     <desc compset="_CAM55_"		        >CAM cam5.5 physics:</desc>
+    <desc compset="_CAM55_"		        >CAM cam5.5 physics, not clubb:</desc>
     <desc compset="%CLB[%_]"			>CAM CLUBB:</desc>
+    <desc compset="%NCLB[%_]"			>Turn off CAM CLUBB:</desc>
     <desc compset="%PM[%_]"			>CAM prescribed modal aerosols:</desc>
     <desc compset="%WCCM[%_]"		        >CAM WACCM with daily solar data and SPEs:</desc>
     <desc compset="%WCMX[%_]"		        >CAM WACCM-X:</desc>

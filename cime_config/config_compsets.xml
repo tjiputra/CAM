@@ -122,6 +122,10 @@
     <lname>2000_CAM55%CLB_CLM45%SP_CICE%PRES_DOCN%DOM_RTM_SGLC_SWAV</lname>
   </compset>
   <compset>
+    <alias>FC54</alias>        
+    <lname>2000_CAM54%NCLB_CLM45%SP_CICE%PRES_DOCN%DOM_RTM_SGLC_SWAV</lname>
+  </compset>
+  <compset>
     <alias>F1850C5PM</alias>       
     <lname>1850_CAM5%PM_CLM40%SP_CICE%PRES_DOCN%DOM_RTM_SGLC_SWAV</lname>
   </compset>
@@ -277,7 +281,7 @@
   </compset>
   <compset>
    <alias>NFPTAERO54</alias>
-   <lname>2000_CAM54%PTAERO_CLM50%SP_CICE%PRES_DOCN%DOM_RTM_SGLC_SWAV</lname>
+   <lname>2000_CAM54%PTAERO_CLM40%SP_CICE%PRES_DOCN%DOM_RTM_SGLC_SWAV</lname>
   </compset>
   <compset>
    <alias>NFAMIPNUDGEPTAEROUPD1</alias>
