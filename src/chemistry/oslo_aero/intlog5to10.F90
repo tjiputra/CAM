@@ -11,7 +11,8 @@ contains
 !best lognormal fit approximation of the aerosol size distribution. 
 !This because the aerosol activation routine (developed by Abdul-Razzak & Ghan,
 !2000) requires the size distribution to be described by lognormal modes.
-!Changed by Alf Kirkevaag September 2015 (coded using common sub-routines).
+!Rewritten by Alf Kirkevaag September 2015 to a more generalized for for 
+!interpolations using common subroutines interpol*dim.
 
       use shr_kind_mod, only: r8 => shr_kind_r8
       use ppgrid, only :  pcols
@@ -42,13 +43,11 @@ contains
         ict1, ict2, ifac1, ifac2, &
         ifbc1, ifbc2, ifaq1, ifaq2
 
-!soa
       real(r8) t_fac1, t_fac2, t_xfac, t_xct, t_cat1, t_cat2, &
         t_faq1, t_faq2, t_xfaq, t_fbc1, t_fbc2, t_xfbc 
       real(r8) r1, r2, s1, s2, tmp, e
       real(r8) d2mx(4), dxm1(4), invd(4)
       real(r8) sizepar4d(2,2,2,2)
-!soa
 
        real(r8), parameter :: eps=1.0e-10_r8
 
@@ -114,7 +113,6 @@ contains
 	ifaq1=ifaq
 	ifaq2=ifaq+1
 
-!soa
 !      Collect all the vector elements into temporary storage
 !      to avoid cache conflicts and excessive cross-referencing
       t_cat1 = cat(kcomp,ict1)

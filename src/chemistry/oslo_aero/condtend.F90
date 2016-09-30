@@ -417,7 +417,7 @@ contains
 
             coagulationSink(i,k) =   &                                                ![1/s]
                coagulationSink(i,k) + &                                               ![1/] previous value
-               normalizedCoagulationSink(modeIndexReceiverCoag,MODE_IDX_SO4SOA_NUC) & ![m3/#/s] 
+               normalizedCoagulationSink(modeIndexReceiverCoag,MODE_IDX_SO4SOA_AIT) & ![m3/#/s] 
                               * numberConcentration(modeIndexReceiverCoag)            !numberConcentration (#/m3) 
          end do    !coagulation sink
 

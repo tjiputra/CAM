@@ -28,6 +28,7 @@ begin
                                      ; 3 => TOA LW direct radiative forcing as ERF + dn also
                                      ; 4 => TOA LW Cloud radiative forcing as ERF  + dn also
                                      ; 5 => TOA LW Surface albedo forcing as ERF   + dn also
+                                     ; 6 => total TOA LW ERF (sun of 0 to 5)
   end if
  if (.not. isvar("format")) then        ; is format on command line?
   format = "ps"
@@ -120,6 +121,17 @@ begin
  forc_I=-((/(f1PD_I[:]->FLNTCDRF)/)-(/(f1PI_I[:]->FLNTCDRF)/))  ; variable to be plotted from I
  end if
  forc_II=-((/(f1PD_II[:]->FLNTCDRF)/)-(/(f1PI_II[:]->FLNTCDRF)/))  ; variable to be plotted from II
+ else if (plot_type.eq.6) then
+ var="total_ERF"               ; name of input-variable and plot
+ varname="Total SW + LW ERF (TOA)"             ; variable name used in text string:
+ if(ModI.eq."CAM4-Oslo") then
+;    forc_I=(/(f1PD_I[:]->FSNT_DRF)/)-(/(f1PI_I[:]->FSNT_DRF)/)+(/(f1PD_I[:]->FSNT_AIE)/)-(/(f1PI_I[:]->FSNT_AIE)/)-((/(f1PD_I[:]->FLNT_AIE)/)-(/(f1PI_I[:]->FLNT_AIE)/)) 
+ forc_I=(/(f1PD_I[:]->FSNT)/)-(/(f1PI_I[:]->FSNT)/)-((/(f1PD_I[:]->FLNT)/)-(/(f1PI_I[:]->FLNT)/))
+ else
+ forc_I=(/(f1PD_I[:]->FSNT)/)-(/(f1PI_I[:]->FSNT)/)-((/(f1PD_I[:]->FLNT)/)-(/(f1PI_I[:]->FLNT)/))
+ end if
+ forc_II=(/(f1PD_II[:]->FSNT)/)-(/(f1PI_II[:]->FSNT)/)-((/(f1PD_II[:]->FLNT)/)-(/(f1PI_II[:]->FLNT)/))
+ end if
  end if
  end if
  end if
@@ -151,7 +163,8 @@ begin
 ; Defining color scales for each forcing variable
 if (var .eq. "direct_ERF") then
  digg=(/-2,-1,-0.5,-0.25,-0.1,0,0.1,0.25,0.5,1,2/)
- else if (var .eq. "cloud_ERF") then
+; else if (var .eq. "cloud_ERF") then
+ else if (var .eq. "cloud_ERF" .or. var .eq. "total_ERF") then
   digg=(/-10,-5,-3,-1,-0.5,0,0.5,1,3,5/)
   else if (var .eq. "surfalb_ERF") then
    digg=(/-2,-1,-0.5,-0.25,-0.1,0,0.1,0.25,0.5,1,2/)

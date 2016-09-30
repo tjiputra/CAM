@@ -6,6 +6,8 @@ subroutine initlogn
 !  Updated for new kcomp1.out including condensed SOA - Alf Kirkevaag, May 2013
 !  Updated for reading inout files with extra header info - Alf Kirkevaag, May 2015,
 !  and for new tables including SOA September 2015.
+!  Modified for optimized added masses and mass fractions for concentrations from 
+!  condensation, coagulation or cloud-processing - Alf Kirkevaag, May 2016. 
 
    use shr_kind_mod, only: r8 => shr_kind_r8
    use aerosoldef
@@ -19,6 +21,8 @@ subroutine initlogn
    integer kcomp, ictot, ifac, ifbc, ifaq, irk, istdv
    integer ic, ifil, lin
    character(len=dir_string_length) :: aerotab_table_dir
+   real(r8) :: eps2 = 1.e-2_r8
+   real(r8) :: eps4 = 1.e-4_r8
 
        write(iulog,*)'b4 nlog open ok' 
 
@@ -61,16 +65,15 @@ subroutine initlogn
 !       fombg (SOA fraction in the background) for mode 1. 
 !  ************************************************************************
 
-         do ifil = 1,3
-!soa          do lin = 1,16   ! 16 entries   
+!         do ifil = 1,3
+         do ifil = 1,2
           do lin = 1,96   ! 16*6 entries   
-!soa           read(19+ifil,993) kcomp, calog1to3(ifil,lin), rk1to3(ifil,lin), &
-!soa             stdv1to3(ifil,lin) 
            read(19+ifil,993) kcomp, calog1to3(ifil,lin), fraclog1to3 (ifil, lin), &
              rk1to3(ifil,lin), stdv1to3(ifil,lin) 
 
 	do ic=1,16
-	 if(calog1to3(ifil,lin).eq.cate(kcomp,ic)) then
+!	 if(calog1to3(ifil,lin).eq.cate(kcomp,ic)) then
+         if(abs((calog1to3(ifil,lin)-cate(kcomp,ic))/cate(kcomp,ic))<eps2) then
 	  ictot=ic
 	  goto 71
 	 endif
@@ -78,7 +81,8 @@ subroutine initlogn
    71 continue
 
 	do ic=1,6
-	 if(fraclog1to3(ifil,lin).eq.fac(ic)) then
+!	 if(fraclog1to3(ifil,lin).eq.fac(ic)) then
+         if(abs(fraclog1to3(ifil,lin)-fac(ic))<eps4) then
 	  ifac=ic
 	  goto 81
 	 endif
@@ -91,7 +95,18 @@ subroutine initlogn
           end do   ! lin
          end do    ! ifil
 
-    do kcomp=1,3
+!    Prescribed dummy values for kcomp=3
+     kcomp=3
+     do ictot=1,16
+       do ifac=1,6
+          sss1to3(kcomp,ictot,ifac)=1.0_r8
+          rrr1to3(kcomp,ictot,ifac)=1.0_r8
+       enddo
+     enddo
+       
+
+!    do kcomp=1,3
+    do kcomp=1,2
     do ictot=1,16
     do ifac=1,6
      if(sss1to3(kcomp,ictot,ifac)<=0.0_r8) then
@@ -121,8 +136,9 @@ subroutine initlogn
              ,fraclog4(lin), fraqlog4(lin), rk4(lin), stdv4(lin)
 
 	do ic=1,16
-	 if(calog4(lin).gt.0.9999_r8*cate(kcomp,ic).and. &
-	    calog4(lin).lt.1.0001_r8*cate(kcomp,ic)) then
+!	 if(calog4(lin).gt.0.9999_r8*cate(kcomp,ic).and. &
+!	    calog4(lin).lt.1.0001_r8*cate(kcomp,ic)) then
+         if(abs((calog4(lin)-cate(kcomp,ic))/cate(kcomp,ic))<eps2) then
 	  ictot=ic
 	  goto 91
 	 endif
@@ -130,7 +146,8 @@ subroutine initlogn
    91 continue
 
 	do ic=1,6
-	 if(fraclog4(lin).eq.fac(ic)) then
+!	 if(fraclog4(lin).eq.fac(ic)) then
+         if(abs(fraclog4(lin)-fac(ic))<eps4) then
 	  ifac=ic
 	  goto 101
 	 endif
@@ -138,7 +155,8 @@ subroutine initlogn
   101 continue
 
 	do ic=1,6
-	 if(fraqlog4(lin).eq.faq(ic)) then
+!	 if(fraqlog4(lin).eq.faq(ic)) then
+	 if(abs(fraqlog4(lin)-faq(ic))<eps4) then
           ifaq=ic
           goto 111
 	 endif
@@ -182,7 +200,8 @@ subroutine initlogn
              ,rk5to10(ifil,lin), stdv5to10(ifil,lin)
 
 	do ic=1,6
-	 if(calog(ifil,lin).eq.cat(kcomp,ic)) then
+!	 if(calog(ifil,lin).eq.cat(kcomp,ic)) then
+         if(abs((calog(ifil,lin)-cat(kcomp,ic))/cat(kcomp,ic))<eps2) then
 	  ictot=ic
 	  goto 21
 	 endif
@@ -190,7 +209,8 @@ subroutine initlogn
    21 continue
 
 	do ic=1,6
-	 if(fraclog5to10(ifil,lin).eq.fac(ic)) then
+!	 if(fraclog5to10(ifil,lin).eq.fac(ic)) then
+         if(abs(fraclog5to10(ifil,lin)-fac(ic))<eps4) then
 	  ifac=ic
 	  goto 31
 	 endif
@@ -199,7 +219,8 @@ subroutine initlogn
    31 continue
 
 	do ic=1,6
-	 if(fabclog5to10(ifil,lin).eq.fbc(ic)) then
+!	 if(fabclog5to10(ifil,lin).eq.fbc(ic)) then
+         if(abs((fabclog5to10(ifil,lin)-fbc(ic))/fbc(ic))<eps2) then
 	  ifbc=ic
 	  goto 41
 	 endif
@@ -208,7 +229,8 @@ subroutine initlogn
    41 continue
 
 	do ic=1,6
-	 if(fraqlog5to10(ifil,lin).eq.faq(ic)) then
+!	 if(fraqlog5to10(ifil,lin).eq.faq(ic)) then
+	 if(abs(fraqlog5to10(ifil,lin)-faq(ic))<eps4) then
 	  ifaq=ic
 	  goto 51
 	 endif
@@ -250,7 +272,6 @@ subroutine initlogn
         end do 
 
 
-!soa  993 format(I3,3(x,e12.5))
   993 format(I3,4(x,e12.5))
   994 format(I3,5(x,e12.5))
   995 format(I3,6(x,e12.5))

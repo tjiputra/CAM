@@ -27,6 +27,7 @@ begin
                                      ; 4 => SS  load
                                      ; 5 => DU  load
                                      ; 6 => H2O load
+                                     ; 7 => Excess look-up table load
  end if 
  if (.not. isvar("format")) then        ; is format on command line?
   format = "ps"
@@ -132,6 +133,12 @@ begin
  varname="Condensed H2O"   ; variable name used in text string:
  load_I=(/(f1_I[:]->DAERH2O)/)       ; variable to be plotted from I
  load_II=(/(f1_II[:]->DAERH2O)/)     ; variable to be plotted from II 
+ else if (plot_type.eq.7) then
+ var="AKCXS"             ; name of input-variable and plot
+ varname="AKCXS"   ; variable name used in text string:
+ load_I=(/(f1_I[:]->AKCXS)/)       ; variable to be plotted from I
+ load_II=(/(f1_II[:]->AKCXS)/)     ; variable to be plotted from II 
+ end if
  end if
  end if
  end if
@@ -164,6 +171,7 @@ begin
 ; Defining color scales for each load variable
 if (var .eq. "C_SO2" .or.  var .eq. "C_SO4") then
  digg=(/0.1,0.2,0.3,0.5,1,2,3,5,10,20/)                      ; C_SO2 & C_SO4
+; else if (var .eq. "C_BC") then
  else if (var .eq. "C_BC") then
   digg=(/0.03,0.05,0.1,0.2,0.3,0.5,1,2,3,5/)                 ; C_BC
   else if (var .eq. "C_POM" .or. var .eq. "C_SS") then
@@ -172,8 +180,8 @@ if (var .eq. "C_SO2" .or.  var .eq. "C_SO4") then
     digg=(/0.5,1,2.5,5,10,25,50,100,250,500/)                ; C_DUST
     else if (var .eq. "DAERH2O") then
      digg=(/0.5,1,2.5,5,10,25,50,100,250,500/)               ; C_H2O
-    else
-     digg=(/0.0,1.0/)                         ; Replace with error message
+    else  ; AKCXS
+     digg=(/0.01,0.02,0.03,0.05,.1,.2,.3,.5/)                         ; Replace with error message
     end if
    end if
   end if
@@ -227,8 +235,11 @@ end if
 ;  res@tiMainString   = "CAM4-Oslo"
 if (var .eq. "C_SO2" .or.  var .eq. "C_SO4") then
   res@gsnRightString   = "avg = "+sprintf("%4.2f",(sum(dim_avg_n(load_Ia,0))/area1))+" mg S m~S~-2~N~"
+else if (var .eq. "AKCXS") then
+  res@gsnRightString  = "avg = "+sprintf("%6.4f",(sum(dim_avg_n(load_Ia,0))/area1))+" mg m~S~-2~N~"
 else
   res@gsnRightString   = "avg = "+sprintf("%4.2f",(sum(dim_avg_n(load_Ia,0))/area1))+" mg m~S~-2~N~"
+end if
 end if
   res@gsnLeftString   = varname + " column burden"
   plot(0) = gsn_csm_contour_map_ce(wks,dim_avg_n_Wrap(load_I,0),res)    ; create the plot
@@ -238,8 +249,11 @@ if (var .eq. "C_SO2") then
   res@gsnRightString  = "avg = "+sprintf("%4.2f",(sum(dim_avg_n(load_IIa,0))/area1))+" mg S m~S~-2~N~"
 else if (var .eq. "C_SO4") then
   res@gsnRightString  = "avg = "+sprintf("%4.2f",(sum(dim_avg_n(load_IIa,0))/area1))+" mg S m~S~-2~N~"
+else if (var .eq. "AKCXS") then
+  res@gsnRightString  = "avg = "+sprintf("%6.4f",(sum(dim_avg_n(load_IIa,0))/area1))+" mg m~S~-2~N~"
 else
   res@gsnRightString  = "avg = "+sprintf("%4.2f",(sum(dim_avg_n(load_IIa,0))/area1))+" mg m~S~-2~N~"
+end if
 end if
 end if
   res@gsnLeftString   = varname + " column burden"

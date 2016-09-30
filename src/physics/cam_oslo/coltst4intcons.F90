@@ -30,7 +30,7 @@ subroutine coltst4intcons (lchnk, ncol, qm1, deltah_km, rhoda, fnbc, &
 ! COLRSULA = 0.9857506 ;
 !
 ! with regional variations within 0.01 for all tracers except for the 
-! externally mixed tracers sp4_na (COLRSUL5 = 1.01 - 1.04) and so4_pr 
+! externally mixed tracers so4_na (COLRSUL5 = 1.01 - 1.04) and so4_pr 
 ! (COLRSUL5 = 1.035 - 1.039) and the internally mixed bc_ac (COLRBCAC 
 !  = 0.74 - 1.0006) and "om_ac + soa_a1" (COLROCAC = 0.81 - 0.93). The 
 ! COLROCAC values are suspiciously low and should be checked more closely.

@@ -33,10 +33,11 @@ subroutine intaeropt1 (lchnk, ncol, xrh, irh1, irh2, mplus10,          &
    real(r8), intent(in) :: xfacsoain(pcols,pver)    ! OC/(SO4+OC) added to the background mode
 !
 ! Output arguments: Modal total and absorption extiction coefficients (for AeroCom)
-!old: for 550nm (1) and 865nm (2), and for r<1um (lt1) and r>1um (gt1).
 ! for 440nm, 500nm, 550nm, 670nm and 870nm, and for d<1um (lt1) and d>1um (gt1).
 ! March 2009: + backscatter coefficient, backsc550 (km-1 sr-1).
-!
+! Rewritten by Alf Kirkevaag September 2015 to a more generalized for for 
+! interpolations using common subroutines interpol*dim.
+
    real(r8), intent(out) :: &
      bext440(pcols,pver,0:nbmodes), babs440(pcols,pver,0:nbmodes), &
      bext500(pcols,pver,0:nbmodes), babs500(pcols,pver,0:nbmodes), &
@@ -218,7 +219,6 @@ subroutine intaeropt1 (lchnk, ncol, xrh, irh1, irh2, mplus10,          &
         do k=1,pver 
           do icol=1,ncol
          
-!x           if(Nnatk(icol,k,kcomp).gt.0) then
            if(Nnatk(icol,k,kc10).gt.0) then
 
 !      Collect all the vector elements into temporary storage
@@ -356,6 +356,7 @@ subroutine intaeropt1 (lchnk, ncol, xrh, irh1, irh2, mplus10,          &
         end do  ! kcomp
 
       return
+
 end subroutine intaeropt1
 
 

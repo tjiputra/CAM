@@ -556,6 +556,14 @@ Relaxation time (hours) applied to specified meteorology.
 Default: 0.0
 </entry>
 
+<entry id="met_nudge_only_uvps" type="logical"  category="dyn_fv_off"
+       group="metdata_nl" valid_values="" >
+if true, nudge only u, v and ps. If false, nudge other fields as well
+(T, Q, TS, SHOWH, TAUX, TAUY, SHFLX, QFLX)
+Default: true
+</entry>
+
+
 <entry id="met_fix_mass" type="logical"  category="dyn_fv_off"
        group="metdata_nl" valid_values="" >
 switch to turn on/off mass fixer for offline driver 

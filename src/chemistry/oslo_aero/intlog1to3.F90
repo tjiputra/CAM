@@ -3,7 +3,6 @@ module intlog1to3
 contains
 
 	subroutine intlog1to3_sub (ncol, ind, kcomp, xctin, &
-!soa                             Nnat, cxs, xstdv, xrk)
                                  Nnat, xfacin, cxs, xstdv, xrk)
 
 !	Created by Trude Storelvmo, fall 2007. This subroutine gives as output   
@@ -12,9 +11,8 @@ contains
 !       the aerosol size distribution. This because the aerosol activation routine
 !       (developed by Abdul-Razzak & Ghan, 2000) requiers the size distribution to be 
 !       described by lognormal modes.
-!       Changed by Alf Kirkevåg to take into account condensation of SOA, September 2015.
-
-! NB: Can be simplified if no xcs calculations are necessary (i.e. with no lumping) !!!!!!!!!!!!!!!!!!!!!!!
+!       Changed by Alf Kirkevåg to take into account condensation of SOA, September 2015, 
+       
 
       use shr_kind_mod, only: r8 => shr_kind_r8
       use ppgrid, only: pcols
@@ -28,28 +26,22 @@ contains
       integer, intent(in) :: kcomp
       real(r8), intent(in) :: Nnat(pcols)        ! Modal number concentration
       real(r8), intent(in) :: xctin(pcols)	 ! total internally mixed conc. (ug/m3)	
-!soa
       real(r8), intent(in) :: xfacin(pcols)         ! SOA/(SOA+H2SO4) for condensated mass 
-!soa
       real(r8), intent(out) :: xstdv(pcols)      ! log10 of standard deviation for lognormal fit
       real(r8), intent(out) :: xrk(pcols)        ! Modal radius for lognormal fit
       real(r8), intent(out) :: cxs(pcols)   ! excess (modal) internally mixed conc.
 
       real(r8) camdiff
       real(r8), dimension(pcols) ::  xct
-!soa
       real(r8) xfac(ncol) 
-!soa
       integer lon, long
 
       integer i, ictot, ict1, ict2
       real(r8) r1, r2, s1, s2
-!soa
       integer ifac, ifac1, ifac2
       real(r8) t_fac1, t_fac2, t_xfac, t_xct, t_cat1, t_cat2
       real(r8) r11, r12, r21, r22, s11, s12, s21, s22
       real(r8) d2mx(2), dxm1(2), invd(2)
-!soa
 
       real(r8) esssf10, ess
 
@@ -68,9 +60,7 @@ contains
        xrk(lon) = 0._r8
 
 	xct(lon)  = min(max(xctin(lon)/(Nnat(lon)+eps),cate(kcomp,1)),cate(kcomp,16))
-!soa
 	xfac(lon) = min(max(xfacin(lon),fac(1)),fac(6))
-!soa
         camdiff   = xctin(lon)-xct(lon)*(Nnat(lon)+eps)
 
         cxs(lon)  = max(0.0_r8,camdiff)
@@ -84,7 +74,6 @@ contains
 	ict1=ictot
 	ict2=ictot+1
 
-!soa
 	ifac=1
 	ess = xfac(lon)
 	do while (ifac.lt.5.and.(ess.lt.fac(ifac).or. &
@@ -138,11 +127,11 @@ contains
 
       xstdv(lon) = (d2mx(1)*s1+dxm1(1)*s2)*invd(2)*invd(1)
 
-!soa
-	
+
       end do   ! lon
 
       return
       end subroutine intlog1to3_sub
+
 end module intlog1to3
 

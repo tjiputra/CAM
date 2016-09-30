@@ -761,7 +761,6 @@ subroutine get_aer_num(qaerpt, qaercwpt, rhoair,           &   ! input
     
     real(r8) :: bc_num                                    ! bc number in accumulation mode
     real(r8) :: dst1_num, dst3_num                        ! dust number in accumulation and corase mode
-    real(r8) :: as_acm, as_condm
     real(r8) :: dst1_num_imm, dst3_num_imm, bc_num_imm
     real(r8) :: fac_volsfc_bc, fac_volsfc_dust_a1, fac_volsfc_dust_a3
     
@@ -776,8 +775,6 @@ subroutine get_aer_num(qaerpt, qaercwpt, rhoair,           &   ! input
     num_dst1_idx = MODE_IDX_DST_A2
     num_dst3_idx = MODE_IDX_DST_A3
 
-    as_acm = f_acm(num_dst1_idx)
-    as_condm = f_condm(num_dst1_idx)
 
 !*****************************************************************************
 !                calculate intersitial aerosol 
@@ -851,7 +848,7 @@ subroutine get_aer_num(qaerpt, qaercwpt, rhoair,           &   ! input
         awcam(2) = 0._r8
     end if
     if (awcam(2) >0._r8) then
-        awfacm(2) = qaerpt(num_dst1_idx)*(as_acm)/(as_acm+as_condm)
+        awfacm(2) = f_acm(num_dst1_idx)
     else
         awfacm(2) = 0._r8
     end if
@@ -862,7 +859,11 @@ subroutine get_aer_num(qaerpt, qaercwpt, rhoair,           &   ! input
     else
         awcam(3) = 0._r8
     end if
-    awfacm(3) = 0._r8
+    if (awcam(3) >0._r8) then
+      awfacm(3) = f_acm(num_dst3_idx)
+    else 
+       awfacm(3) = 0._r8
+    end if
         
         
     ! accumulation mode for bc
@@ -871,7 +872,11 @@ subroutine get_aer_num(qaerpt, qaercwpt, rhoair,           &   ! input
     else
         awcam(1) = 0._r8
     end if
-    awfacm(1) = awfacm(2)
+    if (awcam(1) >0._r8) then
+      awfacm(1) = f_acm(num_bc_idx)
+    else
+      awfacm(1) = 0.0_r8
+    end if
 
 
 !*****************************************************************************

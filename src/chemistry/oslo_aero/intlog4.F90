@@ -10,9 +10,9 @@ contains
 !   the aerosol size distribution. This because the aerosol activation routine
 !   (developed by Abdul-Razzak & Ghan, 2000) requires the size distribution 
 !   to be described by lognormal modes.
-!   Changed by Alf Kirkevåg to take into account condensation of SOA, September 2015.
-
-! NB: Can be simplified if no xcs calculations are necessary (i.e. with no lumping) !!!!!!!!!!!!!!!!!!!!!!!
+!   Changed by Alf Kirkevåg to take into account condensation of SOA, September 
+!   2015, and also rewritten to a more generalized for for interpolations using 
+!   common subroutines interpol*dim.
 
       use shr_kind_mod, only: r8 => shr_kind_r8
       use ppgrid, only: pcols
@@ -102,7 +102,6 @@ contains
 	ifaq1=ifaq
 	ifaq2=ifaq+1
 
-!soa
 !      Collect all the vector elements into temporary storage
 !      to avoid cache conflicts and excessive cross-referencing
       t_cat1 = cate(kcomp,ict1)
@@ -162,7 +161,7 @@ contains
 
 !     finally, interpolation in the cate dimension
       xstdv(lon)=(d2mx(1)*s1+dxm1(1)*s2)*invd(1)
-!soa
+
       end do   ! lon
 
       return

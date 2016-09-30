@@ -1,16 +1,21 @@
 subroutine initaeropt
 
+!Purpose: To read in the AeroCom look-up tables for aerosol optical properties. 
+!     The grid for discrete input-values in the look-up tables is defined in opptab. 
+
 !     Tabulating the 'aerocomk'-files to save computing time.
 !     Updated for new kcomp1.out including condensed SOA - Alf Kirkevåg, May 2013
 !     Extended for new SOA treatment - Alf Kirkevaag, September 2015.
+!     Modified for optimized added masses and mass fractions for 
+!     concentrations from condensation, coagulation or cloud-processing 
+!     - Alf Kirkevaag, May 2016. 
+!     Modified for optimized added masses and mass fractions for concentrations from 
+!     condensation, coagulation or cloud-processing - Alf Kirkevaag, May 2016. 
 
    use oslo_control, only: oslo_getopts, dir_string_length
    use shr_kind_mod, only: r8 => shr_kind_r8
-!   use aerosoldef, only: nmodes, nbmodes
    use commondefinitions, only: nmodes, nbmodes
-!soa   use opttab,   only: cate, cat, fac, faq, fbc, rh
    use opttab,   only: cate, cat, fac, faq, fbc, rh, fombg, fbcbg
-!soa
    use cam_logfile,  only: iulog
 
    implicit none
@@ -20,8 +25,7 @@ subroutine initaeropt
 
       integer kcomp, irelh, ictot, ifac, ifbc, ifaq
       integer ifombg, ifbcbg
-      integer ic, ifil, lin
-!soa      real(r8) catot, relh, frac, fabc, fraq,                  & 
+      integer ic, ifil, lin, iv
       real(r8) catot, relh, frombg, frbcbg, frac, fabc, fraq,  & 
                bext440, babs440, bext500, babs500, babs550,    &
                bext670, babs670, bext870, babs870,             &
@@ -37,7 +41,6 @@ subroutine initaeropt
                beoc550lt1, beoc550gt1, besu550lt1, besu550gt1, &
                backscat550
 
-!soa      real(r8) rh2(10)
       real(r8) :: eps2 = 1.e-2_r8
       real(r8) :: eps4 = 1.e-4_r8
       real(r8) :: eps6 = 1.e-6_r8
@@ -49,8 +52,6 @@ subroutine initaeropt
 
 !ccccccccc1ccccccccc2ccccccccc3ccccccccc4ccccccccc5ccccccccc6ccccccccc7cc
 
-!soa      open(10,file=trim(aerotab_table_dir)//'/aerocomk1noSOA.out'  &    ! Read in but not used now
-!soa             ,form='formatted',status='old')
       open(11,file=trim(aerotab_table_dir)//'/aerocomk2.out'  &
              ,form='formatted',status='old')
       open(12,file=trim(aerotab_table_dir)//'/aerocomk3.out'  &
@@ -71,13 +72,10 @@ subroutine initaeropt
              ,form='formatted',status='old')
       open(20,file=trim(aerotab_table_dir)//'/aerocomk0.out' &
              ,form='formatted',status='old')
-!SOA  replaces aerocomk1noSOA.out above:
       open(21,file=trim(aerotab_table_dir)//'/aerocomk1.out' &
              ,form='formatted',status='old')
-!SOA
 
 !     Skipping the header-text in all input files (Later: use it to check AeroTab - CAM5-Oslo consistency!)
-!soa      do ifil = 10,21
       do ifil = 11,21
         call checkTableHeader (ifil)
       enddo
@@ -107,10 +105,8 @@ subroutine initaeropt
 !ccccccccc1ccccccccc2ccccccccc3ccccccccc4ccccccccc5ccccccccc6ccccccccc7cc
 
         ifil = 1
-!soa        do lin = 1,960     ! 10x16x6
         do lin = 1,5760     ! 10x6x16x6
 
-!soa          read(20+ifil,997) kcomp, relh, catot, frac, &
           read(20+ifil,997) kcomp, relh, frombg, catot, frac, &
            bext440, bext500, bext670, bext870,             &
            bebg440, bebg500, bebg670, bebg870,             &
@@ -130,7 +126,6 @@ subroutine initaeropt
 	  end do
    50     continue
 
-!soa
  	  do ic=1,6
 	   if(abs(frombg-fombg(ic))<eps4) then
 	    ifombg=ic
@@ -138,9 +133,10 @@ subroutine initaeropt
 	   endif
 	  end do
    52     continue
-!soa
+
  	  do ic=1,16
-	   if(abs(catot-cate(kcomp,ic))<eps7) then
+! 	   if(abs(catot-cate(kcomp,ic))<eps7) then
+	   if(abs((catot-cate(kcomp,ic))/cate(kcomp,ic))<eps2) then
 	    ictot=ic
 	    goto 53
 	   endif
@@ -197,7 +193,7 @@ subroutine initaeropt
         end do  ! lin
 
     do irelh=1,10
-    do ifombg=1,6   !soa
+    do ifombg=1,6
     do ictot=1,16
     do ifac=1,6
      if(bep1(1,irelh,ifombg,ictot,ifac)<=0.0_r8) then
@@ -216,11 +212,10 @@ subroutine initaeropt
 !       Modes 2 to 3 (BC/OC + condesate from H2SO4 and SOA)
 !ccccccccc1ccccccccc2ccccccccc3ccccccccc4ccccccccc5ccccccccc6ccccccccc7cc
 
-      do ifil = 2,3
-!soa        do lin = 1,160     ! 10x16
+!      do ifil = 2,3
+      do ifil = 2,2
         do lin = 1,960     ! 10x16x6
 
-!soa          read(9+ifil,994) kcomp, relh, catot, &
           read(9+ifil,994) kcomp, relh, catot, frac, &
            bext440, bext500, bext670, bext870,             &
            bebg440, bebg500, bebg670, bebg870,             &
@@ -242,7 +237,8 @@ subroutine initaeropt
    61     continue
 
  	  do ic=1,16
-	   if(abs(catot-cate(kcomp,ic))<eps7) then
+!	   if(abs(catot-cate(kcomp,ic))<eps7) then
+	   if(abs((catot-cate(kcomp,ic))/cate(kcomp,ic))<eps2) then
 	    ictot=ic
 	    goto 71
 	   endif
@@ -299,6 +295,18 @@ subroutine initaeropt
         end do
       end do
 
+!   Prescribed dummy values for unused kcomp=3
+    kcomp=3
+    do irelh=1,10
+    do ictot=1,16
+    do ifac=1,6
+    do iv=1,38
+        bep2to3(iv,irelh,ictot,ifac,kcomp)=1.0_r8
+    enddo
+    enddo
+    enddo
+    enddo
+
     do kcomp=2,3
     do irelh=1,10
     do ictot=1,16
@@ -316,15 +324,12 @@ subroutine initaeropt
         write(iulog,*)'aerocom mode 2-3 ok' 
 
 !ccccccccc1ccccccccc2ccccccccc3ccccccccc4ccccccccc5ccccccccc6ccccccccc7cc
-!soa       Mode 4 (BC&OC + condesate from H2SO4 + wetphase (NH4)2SO4)
 !       Mode 4 (BC&OC + condesate from H2SO4 and SOA + wetphase (NH4)2SO4)
 !ccccccccc1ccccccccc2ccccccccc3ccccccccc4ccccccccc5ccccccccc6ccccccccc7cc
 
         ifil = 4
-!soa        do lin = 1,5760     ! 10x16x6x6
         do lin = 1,34560     ! 10x16x6x6x6
 
-!soa          read(9+ifil,995) kcomp, relh, catot, frac, fraq, &
           read(9+ifil,995) kcomp, relh, frbcbg, catot, frac, fraq, &
            bext440, bext500, bext670, bext870,             &
            bebg440, bebg500, bebg670, bebg870,             &
@@ -346,7 +351,9 @@ subroutine initaeropt
    81     continue
 
  	  do ic=1,6
-	   if(abs(frbcbg-fbcbg(ic))<eps4) then
+!	   if(abs(frbcbg-fbcbg(ic))<eps4) then
+!	   if(abs(frbcbg-fbcbg(ic))<eps3) then
+	   if(abs((frbcbg-fbcbg(ic))/fbcbg(ic))<eps2) then
 	    ifbcbg=ic
 	    goto 86
 	   endif
@@ -419,7 +426,7 @@ subroutine initaeropt
         end do
 
     do irelh=1,10
-    do ifbcbg=1,6   !soa
+    do ifbcbg=1,6
     do ictot=1,16
     do ifac=1,6
     do ifaq=1,6
@@ -464,7 +471,8 @@ subroutine initaeropt
    11     continue
 
  	  do ic=1,6
-	   if(abs(catot-cat(kcomp,ic))<eps6) then
+!	   if(abs(catot-cat(kcomp,ic))<eps6) then
+	   if(abs((catot-cat(kcomp,ic))/cat(kcomp,ic))<eps2) then
 	    ictot=ic
 	    goto 21
 	   endif
@@ -480,7 +488,8 @@ subroutine initaeropt
    31     continue
 
  	  do ic=1,6
-	   if(abs(fabc-fbc(ic))<eps4) then
+!	   if(abs(fabc-fbc(ic))<eps4) then
+	   if(abs((fabc-fbc(ic))/fbc(ic))<eps2) then
 	    ifbc=ic
 	    goto 41
 	   endif
@@ -557,21 +566,12 @@ subroutine initaeropt
         write(iulog,*)'aerocom mode 5-10 ok'
 
 
-
   993 format(I2,f6.3,3e10.3,f5.2,38e10.3)
-!soa  994 format(I2,f6.3,e10.3,38e10.3)
-994 format(I2,f6.3,2e10.3,38e10.3)
-
-!soa 995 format(I2,f6.3,3e10.3,38e10.3)
+  994 format(I2,f6.3,2e10.3,38e10.3)
   995 format(I2,f6.3,3e10.3,f5.2,38e10.3)
-
   996 format(I2,f6.3,12e11.4)
-!SOA
-!soa  997 format(I2,f6.3,2e10.3,38e10.3)
   997 format(I2,f6.3,3e10.3,38e10.3)
-!SOA
 
-!SOA      do ifil=10,20
       do ifil=10,21
         close (ifil)
       end do 

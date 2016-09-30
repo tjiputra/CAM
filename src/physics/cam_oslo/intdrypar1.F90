@@ -198,6 +198,9 @@ subroutine intdrypar1 (lchnk, ncol, Nnatk, xfombgin, Camk, xfacsoain,      &
 !     finally, interpolation in the fombg dimension 
       opt = (d2mx(1)*opt1+dxm1(1)*opt2)*invd(1)
 
+!      if(k.eq.1) write(*,*) 'opt1 =', opt
+
+
 !      write(*,*) 'Before array'
 
        if(iv==1) then

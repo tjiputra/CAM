@@ -36,7 +36,9 @@ subroutine intaeropt2to3 (lchnk, ncol, xrh, irh1, irh2, mplus10, Nnatk, Camk, xf
 !old: for 550nm (1) and 865nm (2), and for r<1um (lt1) and r>1um (gt1).
 ! for 440nm, 500nm, 550nm, 670nm and 870nm, and for d<1um (lt1) and d>1um (gt1).
 ! March 2009: + backscatter coefficient, backsc550 (km-1 sr-1).
-!
+! Rewritten by Alf Kirkevaag September 2015 to a more generalized for for 
+! interpolations using common subroutines interpol*dim.
+
    real(r8), intent(out) :: &
      bext440(pcols,pver,0:nbmodes), babs440(pcols,pver,0:nbmodes), &
      bext500(pcols,pver,0:nbmodes), babs500(pcols,pver,0:nbmodes), &
@@ -163,6 +165,10 @@ subroutine intaeropt2to3 (lchnk, ncol, xrh, irh1, irh2, mplus10, Nnatk, Camk, xf
          backsc550(icol,k,kcomp)=0.0_r8 
         end do
       end do
+
+        end do ! kcomp
+
+        do kcomp=2,2     ! kcomp=3 is not used        
 
            if(mplus10==0) then
              kc10=kcomp
