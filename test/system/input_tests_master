@@ -41,6 +41,8 @@ sm210 TSM.sh f4c4wtssoadh outfrq3s_sd+2004-2100_ccmi_refc2_rcp45_trop_strat_soa 
 sm211 TSM.sh f4c4wtssoadm outfrq3s_sd+1950-2010_ccmi_refc1_trop_strat_soa 9s
 sm212 TSM.sh f4c4wmdh outfrq3s+1950-2100_ccmi_refc2_rcp85_waccm_ma 9s
 
+sm221 TSM.sh f10c5spcamsm outfrq3s 9s
+
 sm311 TSM.sh f10c5t5mdm ttrac 9s
 sm312 TSM.sh f2.5c5dm ghgrmp 9s
 sm313 TSM.sh f10c3aqdm outfrq3s+aquaplanet_cam3 3s 
@@ -171,7 +173,7 @@ sm480 TSM.sh f1.9c5wscmam3dh outfrq3s 9s
 sm482 TSM.sh f1.9c5wscmam3dh outfrq3s_2005+waccm_sc_1955-2005_cam5 9s
 sm483 TSM.sh f10c5wscmam3dm outfrq3s 9s
 sm484 TSM.sh f1.9c5wscmam3dm outfrq3s 9s
-sm485 TSM.sh f1.9c5.5wtmam4h outfrq3s+waccm_tsmlt_2000_cam55 9s
+sm485 TSM.sh f1.9c5.5wtmam4h outfrq3s_megan+waccm_tsmlt_2000_cam55 9s
 
 sm486 TSM.sh fsd1.9c5.4wmdionh outfrq3s_sd+sd_waccm5_mad_geos5 9s
 sm487 TSM.sh f10c5wmdiondm outfrq3s 9s
@@ -265,6 +267,8 @@ er209 TER.sh fsd1.9c4wtssoah outfrq3s_sd+sd_1975-2010_ccmi_refc1_trop_strat_soa 
 er210 TER.sh f4c4wtssoadh outfrq3s_sd+2004-2100_ccmi_refc2_rcp45_trop_strat_soa 4+5s
 er211 TER.sh f4c4wtssoadm outfrq3s_sd+1950-2010_ccmi_refc1_trop_strat_soa 4+5s
 er212 TER.sh f4c4wmdh outfrq3s+1950-2100_ccmi_refc2_rcp85_waccm_ma 4+5s
+
+er221 TER.sh f10c5spcamsm outfrq3s 4+5s
 
 er311 TER.sh f10c5t5mdm ttrac 4+5s
 er312 TER.sh f2.5c5dm ghgrmp 4+5s
@@ -387,7 +391,7 @@ er480 TER.sh f1.9c5wscmam3dh outfrq3s 4+5s
 er482 TER.sh f1.9c5wscmam3dh outfrq3s_2005+waccm_sc_1955-2005_cam5 4+5s
 er483 TER.sh f10c5wscmam3dm outfrq3s 4+5s
 er484 TER.sh f1.9c5wscmam3dm outfrq3s 4+5s
-er485 TER.sh f1.9c5.5wtmam4h outfrq3s+waccm_tsmlt_2000_cam55 4+5s
+er485 TER.sh f1.9c5.5wtmam4h outfrq3s_megan+waccm_tsmlt_2000_cam55 4+5s
 
 er486 TER.sh fsd1.9c5.4wmdionh outfrq3s_sd+sd_waccm5_mad_geos5 4+5s
 er487 TER.sh f10c5wmdiondm outfrq3s 4+5s
@@ -469,6 +473,8 @@ br209 TBR.sh fsd1.9c4wtssoah outfrq3s_sd+sd_1975-2010_ccmi_refc1_trop_strat_soa 
 br210 TBR.sh f4c4wtssoadh outfrq3s_sd+2004-2100_ccmi_refc2_rcp45_trop_strat_soa 6+3s
 br211 TBR.sh f4c4wtssoadm outfrq3s_sd+1950-2010_ccmi_refc1_trop_strat_soa 6+3s
 br212 TBR.sh f4c4wmdh outfrq3s+1950-2100_ccmi_refc2_rcp85_waccm_ma 6+3s
+
+br221 TBR.sh f10c5spcamsm outfrq3s 6+3s
 
 br311 TBR.sh f10c5t5mdm ttrac 6+3s
 
@@ -592,6 +598,8 @@ bl209 TBL.sh fsd1.9c4wtssoah outfrq3s_sd+sd_1975-2010_ccmi_refc1_trop_strat_soa 
 bl210 TBL.sh f4c4wtssoadh outfrq3s_sd+2004-2100_ccmi_refc2_rcp45_trop_strat_soa 9s
 bl211 TBL.sh f4c4wtssoadm outfrq3s_sd+1950-2010_ccmi_refc1_trop_strat_soa 9s
 bl212 TBL.sh f4c4wmdh outfrq3s+1950-2100_ccmi_refc2_rcp85_waccm_ma 9s
+
+bl221 TBL.sh f10c5spcamsm outfrq3s 9s
 
 bl311 TBL.sh f10c5t5mdm ttrac 9s
 bl312 TBL.sh f2.5c5dm ghgrmp 9s
@@ -722,7 +730,7 @@ bl480 TBL.sh f1.9c5wscmam3dh outfrq3s 9s
 bl482 TBL.sh f1.9c5wscmam3dh outfrq3s_2005+waccm_sc_1955-2005_cam5 9s
 bl483 TBL.sh f10c5wscmam3dm outfrq3s 9s
 bl484 TBL.sh f1.9c5wscmam3dm outfrq3s 9s
-bl485 TBL.sh f1.9c5.5wtmam4h outfrq3s+waccm_tsmlt_2000_cam55 9s
+bl485 TBL.sh f1.9c5.5wtmam4h outfrq3s_megan+waccm_tsmlt_2000_cam55 9s
 
 bl486 TBL.sh fsd1.9c5.4wmdionh outfrq3s_sd+sd_waccm5_mad_geos5 9s
 bl487 TBL.sh f10c5wmdiondm outfrq3s 9s

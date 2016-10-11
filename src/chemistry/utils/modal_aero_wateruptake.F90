@@ -24,6 +24,7 @@ save
 public :: &
    modal_aero_wateruptake_init, &
    modal_aero_wateruptake_dr,   &
+   modal_aero_wateruptake_sub,  &
    modal_aero_kohler
 
 public :: modal_aero_wateruptake_reg
@@ -39,6 +40,13 @@ integer :: dgnumwet_idx   = 0
 integer :: sulfeq_idx     = 0
 integer :: wetdens_ap_idx = 0
 integer :: qaerwat_idx    = 0
+integer :: hygro_idx      = 0
+integer :: dryvol_idx     = 0
+integer :: dryrad_idx     = 0
+integer :: drymass_idx    = 0
+integer :: so4dryvol_idx  = 0
+integer :: naer_idx       = 0
+
 
 logical, public :: modal_strat_sulfate = .false.   ! If .true. then MAM sulfate surface area density used in stratospheric heterogeneous chemistry
 
@@ -59,9 +67,11 @@ subroutine modal_aero_wateruptake_reg()
 
    ! 1st order rate for direct conversion of strat. cloud water to precip (1/s)
    call pbuf_add_field('QAERWAT',    'physpkg', dtype_r8, (/pcols, pver, nmodes/), qaerwat_idx)  
+
    if (modal_strat_sulfate) then
-     call pbuf_add_field('MAMH2SO4EQ', 'global',  dtype_r8, (/pcols, pver, nmodes/), sulfeq_idx)
+      call pbuf_add_field('MAMH2SO4EQ', 'global',  dtype_r8, (/pcols, pver, nmodes/), sulfeq_idx)
    end if
+
 
 end subroutine modal_aero_wateruptake_reg
 
@@ -86,6 +96,13 @@ subroutine modal_aero_wateruptake_init(pbuf2d)
     
    cld_idx        = pbuf_get_index('CLD')    
    dgnum_idx      = pbuf_get_index('DGNUM')    
+
+   hygro_idx      = pbuf_get_index('HYGRO')    
+   dryvol_idx     = pbuf_get_index('DRYVOL')    
+   dryrad_idx     = pbuf_get_index('DRYRAD')    
+   drymass_idx    = pbuf_get_index('DRYMASS')    
+   so4dryvol_idx  = pbuf_get_index('SO4DRYVOL')    
+   naer_idx       = pbuf_get_index('NAER')    
 
    ! assume for now that will compute wateruptake for climate list modes only
 
@@ -127,7 +144,8 @@ end subroutine modal_aero_wateruptake_init
 
 
 subroutine modal_aero_wateruptake_dr(state, pbuf, list_idx_in, dgnumdry_m, dgnumwet_m, &
-                                     qaerwat_m, wetdens_m)
+                                     qaerwat_m, wetdens_m, hygro_m, dryvol_m, dryrad_m, drymass_m,&
+                                     so4dryvol_m, naer_m)
 !-----------------------------------------------------------------------
 !
 ! CAM specific driver for modal aerosol water uptake code.
@@ -150,6 +168,12 @@ subroutine modal_aero_wateruptake_dr(state, pbuf, list_idx_in, dgnumdry_m, dgnum
    real(r8), optional,          pointer       :: dgnumwet_m(:,:,:)
    real(r8), optional,          pointer       :: qaerwat_m(:,:,:)
    real(r8), optional,          pointer       :: wetdens_m(:,:,:)
+   real(r8), optional,          pointer       :: hygro_m(:,:,:)
+   real(r8), optional,          pointer       :: dryvol_m(:,:,:)
+   real(r8), optional,          pointer       :: dryrad_m(:,:,:)
+   real(r8), optional,          pointer       :: drymass_m(:,:,:)
+   real(r8), optional,          pointer       :: so4dryvol_m(:,:,:)
+   real(r8), optional,          pointer       :: naer_m(:,:,:)
 
    ! local variables
 
@@ -169,7 +193,6 @@ subroutine modal_aero_wateruptake_dr(state, pbuf, list_idx_in, dgnumdry_m, dgnum
    real(r8), pointer :: h2ommr(:,:) ! specific humidity
    real(r8), pointer :: t(:,:)      ! temperatures (K)
    real(r8), pointer :: pmid(:,:)   ! layer pressure (Pa)
-   real(r8), pointer :: raer(:,:)   ! aerosol species MRs (kg/kg and #/kg)
 
    real(r8), pointer :: cldn(:,:)      ! layer cloud fraction (0-1)
    real(r8), pointer :: dgncur_a(:,:,:)
@@ -177,13 +200,13 @@ subroutine modal_aero_wateruptake_dr(state, pbuf, list_idx_in, dgnumdry_m, dgnum
    real(r8), pointer :: wetdens(:,:,:)
    real(r8), pointer :: qaerwat(:,:,:)
 
-   real(r8), allocatable :: maer(:,:,:)      ! aerosol wet mass MR (including water) (kg/kg-air)
-   real(r8), allocatable :: hygro(:,:,:)     ! volume-weighted mean hygroscopicity (--)
-   real(r8), allocatable :: naer(:,:,:)      ! aerosol number MR (bounded!) (#/kg-air)
-   real(r8), allocatable :: dryvol(:,:,:)    ! single-particle-mean dry volume (m3)
-   real(r8), allocatable :: so4dryvol(:,:,:) ! single-particle-mean so4 dry volume (m3)
-   real(r8), allocatable :: drymass(:,:,:)   ! single-particle-mean dry mass  (kg)
-   real(r8), allocatable :: dryrad(:,:,:)    ! dry volume mean radius of aerosol (m)
+   real(r8), pointer :: maer(:,:,:)      ! aerosol wet mass MR (including water) (kg/kg-air)
+   real(r8), pointer :: hygro(:,:,:)     ! volume-weighted mean hygroscopicity (--)
+   real(r8), pointer :: naer(:,:,:)      ! aerosol number MR (bounded!) (#/kg-air)
+   real(r8), pointer :: dryvol(:,:,:)    ! single-particle-mean dry volume (m3)
+   real(r8), pointer :: so4dryvol(:,:,:) ! single-particle-mean so4 dry volume (m3)
+   real(r8), pointer :: drymass(:,:,:)   ! single-particle-mean dry mass  (kg)
+   real(r8), pointer :: dryrad(:,:,:)    ! dry volume mean radius of aerosol (m)
 
    real(r8), allocatable :: wetrad(:,:,:)    ! wet radius of aerosol (m)
    real(r8), allocatable :: wetvol(:,:,:)    ! single-particle-mean wet volume (m3)
@@ -197,15 +220,9 @@ subroutine modal_aero_wateruptake_dr(state, pbuf, list_idx_in, dgnumdry_m, dgnum
    real(r8), allocatable :: wtpct(:,:,:)  ! sulfate aerosol composition, weight % H2SO4
    real(r8), allocatable :: sulden(:,:,:) ! sulfate aerosol mass density (g/cm3)
    
-   real(r8) :: dryvolmr(pcols,pver)          ! volume MR for aerosol mode (m3/kg)
-   real(r8) :: so4dryvolmr(pcols,pver)       ! volume MR for sulfate aerosol in mode (m3/kg)
    real(r8) :: specdens, so4specdens
-   real(r8) :: spechygro, spechygro_1
-   real(r8) :: duma, dumb
    real(r8) :: sigmag
    real(r8) :: alnsg
-   real(r8) :: v2ncur_a
-   real(r8) :: drydens               ! dry particle density  (kg/m^3)
    real(r8) :: rh(pcols,pver)        ! relative humidity (0-1)
    real(r8) :: dmean, qh2so4_equilib, wtpct_mode, sulden_mode
 
@@ -213,7 +230,7 @@ subroutine modal_aero_wateruptake_dr(state, pbuf, list_idx_in, dgnumdry_m, dgnum
    real(r8) :: qs(pcols)             ! saturation specific humidity
 
    character(len=3) :: trnum       ! used to hold mode number (as characters)
-   character(len=32) :: spectype           
+   character(len=32) :: spectype
    !-----------------------------------------------------------------------
 
    lchnk = state%lchnk
@@ -236,23 +253,21 @@ subroutine modal_aero_wateruptake_dr(state, pbuf, list_idx_in, dgnumdry_m, dgnum
          call endrun('modal_aero_wateruptake_dr called for'// &
                      'diagnostic list but required args not associated')
       end if
+
+      if (modal_strat_sulfate) then
+         call endrun('modal_aero_wateruptake_dr cannot be called with optional arguments and'// &
+                     ' having modal_strat_sulfate set to true')
+      end if
    end if
 
    ! loop over all aerosol modes
    call rad_cnst_get_info(list_idx, nmodes=nmodes)
 
    if (modal_strat_sulfate) then
-     call pbuf_get_field(pbuf, sulfeq_idx, sulfeq ) 
+     call pbuf_get_field(pbuf,  sulfeq_idx, sulfeq ) 
    endif
 
    allocate( &
-      maer(pcols,pver,nmodes),     &
-      hygro(pcols,pver,nmodes),    &
-      naer(pcols,pver,nmodes),     &
-      dryvol(pcols,pver,nmodes),   &
-      so4dryvol(pcols,pver,nmodes),&
-      drymass(pcols,pver,nmodes),  &
-      dryrad(pcols,pver,nmodes),   &
       wetrad(pcols,pver,nmodes),   &
       wetvol(pcols,pver,nmodes),   &
       wtrvol(pcols,pver,nmodes),   &
@@ -262,9 +277,6 @@ subroutine modal_aero_wateruptake_dr(state, pbuf, list_idx_in, dgnumdry_m, dgnum
       rhdeliques(nmodes),          &
       specdens_1(nmodes)           )
 
-   maer(:,:,:)      = 0._r8
-   hygro(:,:,:)     = 0._r8
-   so4dryvol(:,:,:) = 0._r8
    wtpct(:,:,:)     = 75._r8
    sulden(:,:,:)    = 1.923_r8
 
@@ -273,6 +285,13 @@ subroutine modal_aero_wateruptake_dr(state, pbuf, list_idx_in, dgnumdry_m, dgnum
       call pbuf_get_field(pbuf, dgnumwet_idx,   dgncur_awet )
       call pbuf_get_field(pbuf, wetdens_ap_idx, wetdens)
       call pbuf_get_field(pbuf, qaerwat_idx,    qaerwat)
+      call pbuf_get_field(pbuf, hygro_idx,       hygro)
+      call pbuf_get_field(pbuf, dryvol_idx,      dryvol)
+      call pbuf_get_field(pbuf, dryrad_idx,      dryrad)
+      call pbuf_get_field(pbuf, drymass_idx,     drymass)
+      call pbuf_get_field(pbuf, so4dryvol_idx,   so4dryvol)
+      call pbuf_get_field(pbuf, naer_idx,        naer)
+
       if (is_first_step()) then
          dgncur_awet(:,:,:) = dgncur_a(:,:,:)
       end if
@@ -281,6 +300,12 @@ subroutine modal_aero_wateruptake_dr(state, pbuf, list_idx_in, dgnumdry_m, dgnum
       dgncur_awet => dgnumwet_m
       qaerwat     => qaerwat_m
       wetdens     => wetdens_m
+      hygro       => hygro_m
+      dryvol      => dryvol_m
+      dryrad      => dryrad_m
+      drymass     => drymass_m
+      so4dryvol   => so4dryvol_m
+      naer        => naer_m
    end if
 
    if (modal_strat_sulfate) then
@@ -294,11 +319,7 @@ subroutine modal_aero_wateruptake_dr(state, pbuf, list_idx_in, dgnumdry_m, dgnum
 
    do m = 1, nmodes
 
-      dryvolmr(:,:) = 0._r8
-      so4dryvolmr(:,:) = 0._r8
-
-      ! get mode properties
-      call rad_cnst_get_mode_props(list_idx, m, sigmag=sigmag,  &
+      call rad_cnst_get_mode_props(list_idx, m, sigmag=sigmag, &
          rhcrystal=rhcrystal(m), rhdeliques=rhdeliques(m))
 
       ! get mode info
@@ -307,76 +328,25 @@ subroutine modal_aero_wateruptake_dr(state, pbuf, list_idx_in, dgnumdry_m, dgnum
       do l = 1, nspec
 
          ! get species interstitial mixing ratio ('a')
-         call rad_cnst_get_aer_mmr(list_idx, m, l, 'a', state, pbuf, raer)
          call rad_cnst_get_aer_props(list_idx, m, l, density_aer=specdens, &
-                                     hygro_aer=spechygro, spectype=spectype)
-                                     
+                                     spectype=spectype)
+
          if (modal_strat_sulfate .and. (trim(spectype).eq.'sulfate')) then
             so4specdens=specdens
          end if
-                                     
 
          if (l == 1) then
             ! save off these values to be used as defaults
-            specdens_1(m)  = specdens
-            spechygro_1    = spechygro
+            specdens_1(m) = specdens
          end if
 
-         do k = top_lev, pver
-            do i = 1, ncol
-               duma          = raer(i,k)     ! kg/kg air
-               maer(i,k,m)   = maer(i,k,m) + duma
-               dumb          = duma/specdens ! m3/kg air
-               dryvolmr(i,k) = dryvolmr(i,k) + dumb
-               if (modal_strat_sulfate .and. (trim(spectype).eq.'sulfate')) then
-                  so4dryvolmr(i,k) = so4dryvolmr(i,k) + dumb
-               end if
-               hygro(i,k,m)  = hygro(i,k,m) + dumb*spechygro
-            end do
-         end do
       end do
 
       alnsg = log(sigmag)
 
-      do k = top_lev, pver
-         do i = 1, ncol
-
-            if (dryvolmr(i,k) > 1.0e-30_r8) then
-               hygro(i,k,m) = hygro(i,k,m)/dryvolmr(i,k)
-            else
-               hygro(i,k,m) = spechygro_1
-            end if
-
-            ! dry aerosol properties
-
-            v2ncur_a = 1._r8 / ( (pi/6._r8)*(dgncur_a(i,k,m)**3._r8)*exp(4.5_r8*alnsg**2._r8) )
-            ! naer = aerosol number (#/kg)
-            naer(i,k,m) = dryvolmr(i,k)*v2ncur_a
-
-            ! compute mean (1 particle) dry volume and mass for each mode
-            ! old coding is replaced because the new (1/v2ncur_a) is equal to
-            ! the mean particle volume
-            ! also moletomass forces maer >= 1.0e-30, so (maer/dryvolmr)
-            ! should never cause problems (but check for maer < 1.0e-31 anyway)
-            if (maer(i,k,m) .gt. 1.0e-31_r8) then
-               drydens = maer(i,k,m)/dryvolmr(i,k)        ! kg/m3 aerosol
-            else
-               drydens = 1.0_r8
-            end if
-            dryvol(i,k,m)   = 1.0_r8/v2ncur_a             ! m3/particle
-            drymass(i,k,m)  = drydens*dryvol(i,k,m)       ! kg/particle
-            dryrad(i,k,m)   = (dryvol(i,k,m)/pi43)**third ! m
-         end do    ! i = 1, ncol
-      end do    ! k = top_lev, pver
-
       if (modal_strat_sulfate) then
          do k = top_lev, pver
             do i = 1, ncol
-               if (so4dryvolmr(i,k) .gt. 1.0e-31_r8) then
-                  so4dryvol(i,k,m) = dryvol(i,k,m)*so4dryvolmr(i,k)/dryvolmr(i,k)
-               else
-                  so4dryvol(i,k,m) = 0.0_r8
-               end if
                dmean = dgncur_awet(i,k,m)*exp(1.5_r8*alnsg**2)
                call calc_h2so4_equilib_mixrat( t(i,k), pmid(i,k), h2ommr(i,k), dmean, &
                                                qh2so4_equilib, wtpct_mode, sulden_mode )
@@ -385,22 +355,22 @@ subroutine modal_aero_wateruptake_dr(state, pbuf, list_idx_in, dgnumdry_m, dgnum
                sulden(i,k,m)  = sulden_mode                        
             end do    ! i = 1, ncol
          end do    ! k = top_lev, pver
-
-         fieldname = ' '
-         write(fieldname,fmt='(a,i1)') 'wtpct_a',m
-         call outfld(fieldname,wtpct(1:ncol,1:pver,m), ncol, lchnk )
-
-         fieldname = ' '
-         write(fieldname,fmt='(a,i1)') 'sulfeq_a',m
-         call outfld(fieldname,sulfeq(1:ncol,1:pver,m), ncol, lchnk )
-
-         fieldname = ' '
-         write(fieldname,fmt='(a,i1)') 'sulden_a',m
-         call outfld(fieldname,sulden(1:ncol,1:pver,m), ncol, lchnk )
-
-      end if
+ 
+          fieldname = ' '
+          write(fieldname,fmt='(a,i1)') 'wtpct_a',m
+          call outfld(fieldname,wtpct(1:ncol,1:pver,m), ncol, lchnk )
+ 
+          fieldname = ' '
+          write(fieldname,fmt='(a,i1)') 'sulfeq_a',m
+          call outfld(fieldname,sulfeq(1:ncol,1:pver,m), ncol, lchnk )
+ 
+          fieldname = ' '
+          write(fieldname,fmt='(a,i1)') 'sulden_a',m
+          call outfld(fieldname,sulden(1:ncol,1:pver,m), ncol, lchnk )
+ 
+       end if
       
-   end do    ! m = 1, nmodes
+    end do    ! m = 1, nmodes
 
    ! relative humidity calc
 
@@ -428,6 +398,8 @@ subroutine modal_aero_wateruptake_dr(state, pbuf, list_idx_in, dgnumdry_m, dgnum
       ncol, nmodes, rhcrystal, rhdeliques, dryrad, &
       hygro, rh, dryvol, so4dryvol, so4specdens, tropLev, &
       wetrad, wetvol, wtrvol, sulden, wtpct)
+
+   qaerwat = 0.0_r8
 
    do m = 1, nmodes
 
@@ -461,9 +433,7 @@ subroutine modal_aero_wateruptake_dr(state, pbuf, list_idx_in, dgnumdry_m, dgnum
    end if
    
    deallocate( &
-      maer,   hygro,  naer,   dryvol,    so4dryvol, drymass,    dryrad, &
       wetrad, wetvol, wtrvol, wtpct, sulden, rhcrystal, rhdeliques, specdens_1 )
-
 end subroutine modal_aero_wateruptake_dr
 
 !===============================================================================

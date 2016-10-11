@@ -1,5 +1,13 @@
 <?xml version="1.0"?>
 <testlist>
+  <compset name="F2000_DONOTUSE">
+    <grid name="f09_f09">
+      <test name="ERP_Ln9">
+        <machine compiler="intel" testtype="prealpha" testmods="cam/outfrq9s">yellowstone</machine>
+        <machine compiler="intel" testtype="aux_cam" testmods="cam/outfrq9s">yellowstone</machine>
+      </test>
+    </grid>
+  </compset>
   <compset name="F1850C5">
     <grid name="ne120_ne120">
       <test name="ERP_Ln9">
@@ -101,6 +109,19 @@
     <grid name="f19_f19">
       <test name="ERP_Ln9">
         <machine compiler="intel" testtype="prealpha" testmods="cam/outfrq9s">yellowstone</machine>
+      </test>
+    </grid>
+  </compset>
+  <compset name="FSPCAMS">
+    <grid name="f19_f19">
+      <test name="ERP_Ln9">
+        <machine compiler="intel" testtype="aux_spcam" testmods="cam/outfrq9s">yellowstone</machine>
+      </test>
+    </grid>
+    <grid name="f10_f10">
+      <test name="ERP_Ln9">
+        <machine compiler="nag" testtype="aux_spcam" testmods="cam/outfrq9s">hobart</machine>
+        <machine compiler="pgi" testtype="aux_spcam" testmods="cam/outfrq9s">hobart</machine>
       </test>
     </grid>
   </compset>

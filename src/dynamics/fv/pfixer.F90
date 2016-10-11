@@ -463,6 +463,7 @@ contains
     real(r8)    :: mmf(grid%jm+1)
     real(r8)    :: fxintegral(grid%im+1)
     real(r8)    :: xcolmass_fix(grid%im,grid%jfirst:grid%jlast)
+    real(r8)    :: temp(grid%jfirst:grid%jlast)
 
     integer     :: im, jm, km, jfirst, jlast, kfirst, klast
 
@@ -488,7 +489,8 @@ contains
 
 #ifdef SPMD
     call compute_gsfactors( 1, cnt, numrecv, displs )
-    call mpi_allgatherv( dpresslat(jfirst:jlast), cnt, mpi_double_precision, &
+    temp(jfirst:jlast) = dpresslat(jfirst:jlast)
+    call mpi_allgatherv( temp(jfirst:jlast), cnt, mpi_double_precision, &
                          dpresslat, numrecv,   displs, mpi_double_precision, mpicom, ierr )
     if( ierr /= mpi_success ) then
        write(iulog,*) 'do_press_fix_llnl: mpi_allgatherv failed; error code = ',ierr
@@ -516,7 +518,8 @@ contains
 
 #ifdef SPMD
     cnt = jlast - jfirst + 1
-    call mpi_allgatherv( mmfd(jfirst:jlast), cnt, mpi_double_precision, &
+    temp(jfirst:jlast) = mmfd(jfirst:jlast)
+    call mpi_allgatherv( temp(jfirst:jlast), cnt, mpi_double_precision, &
          mmfd, numrecv, displs, mpi_double_precision, mpicom, ierr )
     if( ierr /= mpi_success ) then
        write(iulog,*) 'do_press_fix_llnl: mpi_allgatherv failed; error code = ',ierr

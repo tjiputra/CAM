@@ -33,7 +33,6 @@
     <values modifier='additive'>
       <value compset="_CAM40">-phys cam4</value>
       <value compset="_CAM50">-phys cam5</value>
-      <value compset="_CAM54">-phys cam5.4</value>
       <value compset="_CAM60">-phys cam5.4 -clubb_sgs</value>
       <value compset="_CAM50%CLB">-clubb_sgs</value>
       <value compset="_CAM40%TBAM">-chem trop_bam</value>
@@ -50,9 +49,8 @@
       <!-- Later settings of "-chem" take precedence over earlier ones. -->
       <value compset="_CAM40%WC">-chem waccm_ma</value>
       <value compset="_CAM50%WC">-chem waccm_ma_mam3</value>
-      <value compset="_CAM54%WC">-chem waccm_ma_mam4</value>
       <value compset="_CAM60%WC">-chem waccm_ma_mam4</value>
-      <value compset="_(CAM50|CAM54|CAM60)%WCMD">-chem waccm_mad_mam4</value>
+      <value compset="_(CAM50|CAM60)%WCMD">-chem waccm_mad_mam4</value>
       <value compset="_CAM40%WCSC">-chem waccm_sc</value>
       <value compset="_CAM50%WCSCM3">-chem waccm_sc_mam3</value>
       <value compset="_CAM40%WTSM">-chem waccm_tsmlt</value>
@@ -71,12 +69,14 @@
       <value compset="_CAM.*_BGC%B">-co2_cycle</value>
       <value compset="_(CAM40|CAM50|CAM60)%SCAM">-dyn eul -scam</value>
 
-      <value compset="_CAM%IDEAL">-phys ideal</value>
+      <value compset="_(CAM40|CAM50|CAM60).%L60"      >-nlev 60</value>
+      <value compset="_CAM%HS94">-phys held_suarez</value>
       <value compset="_CAM%ADIAB">-phys adiabatic</value>
       <value compset="_CAM%DABIP04">-phys adiabatic</value>
       <value compset="_AQUAP">-ocn aquaplanet</value>
 
       <value compset="%PORT">-offline_drv rad</value>
+      <value compset="%SPCAMS"        >-rad camrt -chem trop_bam -spcam_nx 16 -spcam_ny 1 -spcam_dx 4000 -spcam_dt 20 -phys spcam_sam1mom </value>              
     </values>
     <group>build_component_cam</group>
     <file>env_build.xml</file>
@@ -95,6 +95,7 @@
     <valid_values></valid_values>
     <default_value>UNSET</default_value>
     <values>
+      <value compset="2000_CAM60"        >2000_cam6</value>
       <value compset="2000_CAM40%TMOZ"   >2000_cam4_trop_chem</value>
       <value compset="1850_CAM40"        >1850_cam4</value>
       <value compset="1850_CAM50"        >1850_cam5</value>
@@ -165,6 +166,7 @@
       <value compset="AR97_CAM[45]"     >scam_arm97</value>
       <value compset="PIPD_CAM50"        >1850-PD_cam5</value>
       <value compset="2000_CAM%DABIP04" >dabi_p2004</value>
+      <value compset="CAM%HS94"         >held_suarez_1994</value>
     </values>
     <group>run_component_cam</group>
     <file>env_run.xml</file>
@@ -223,13 +225,14 @@
     <desc compset="%SMA7[%_]"		        >CAM trop_strat_mam7 chemistry:</desc>
     <desc compset="%SSOA[%_]"		        >CAM trop_strat_soa chemistry: </desc>
     <desc compset="%RCO2[%_]"		        >CAM CO2 ramp: </desc>
+    <desc compset="%SPCAMS"	        	>CAM super-parameterized CAM one moment SAM microphysics </desc>
     <desc compset="AR95_CAM[45]%SCAM"          >CAM stand-alone single column CAM ARM95 IOP test case:</desc>
     <desc compset="AR97_CAM[45]%SCAM"          >CAM stand-alone single column CAM ARM97 IOP test case:</desc>
     <desc compset="GEOS_CAM[45]%([^W]|W[^C])"  >CAM winds and temperature driven by GEOS5 meteorology:</desc>
     <desc compset="GEOS_CAM[45]%WC"            >CAM WACCM winds and temperature nudged toward GEOS5 meteorology each time step:</desc>
     <desc compset="%ADIAB"			>CAM adiabatic physics:</desc>
     <desc compset="%DABIP04"			>CAM dry adiabatic baroclinic instability (Polvani 2004):</desc>
-    <desc compset="%IDEAL"			>CAM ideal physics:</desc>
+    <desc compset="%HS94"                       >CAM Held-Suarez forcing:</desc>
     <desc compset="%AQUAP"			>CAM atmosphere in aquaplanet mode: </desc>
     <desc compset="%PORT"			>CAM Parallel Offline Radiation Tool:</desc>
     <desc compset="_CAM.%L60"			>CAM 60 layers and full gravity wave spectrum:</desc>

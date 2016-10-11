@@ -111,8 +111,6 @@ CONTAINS
     character(len=cl) :: caseid    ! case ID
     character(len=cl) :: ctitle    ! case title
 
-    logical :: adiabatic         ! true => no physics
-    logical :: ideal_phys        ! true => run "idealized" model configuration
     logical :: aqua_planet       ! Flag to run model in "aqua planet" mode
     logical :: brnch_retain_casename ! true => branch run may use same caseid as
                                      !         the run being branched from
@@ -192,8 +190,6 @@ CONTAINS
        call seq_infodata_GetData( infodata,                                           &
             case_name=caseid, case_desc=ctitle,                                       &
             start_type=starttype,                                                     &
-            atm_adiabatic=adiabatic,                                                  &
-            atm_ideal_phys=ideal_phys,                                                &
             aqua_planet=aqua_planet,                                                  &
             brnch_retain_casename=brnch_retain_casename,                              &
             single_column=single_column, scmlat=scmlat, scmlon=scmlon,                &
@@ -208,7 +204,7 @@ CONTAINS
        !
        call cam_init(EClock, &
           caseid, ctitle, starttype, brnch_retain_casename, &
-          adiabatic, ideal_phys, aqua_planet, &
+          aqua_planet, &
           single_column, scmlat, scmlon, &
           eccen, obliqr, lambm0, mvelpp,  &
           perpetual_run, perpetual_ymd, &

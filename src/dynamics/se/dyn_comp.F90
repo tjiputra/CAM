@@ -836,6 +836,8 @@ subroutine read_inidat(dyn_in)
             do i = 1, np
                if (mask(indx+((ie-1)*npsq))) then
                   elem(ie)%state%Q(i,j,:,m_cnst) = max(tmp(indx,:,ie), qmin(m_cnst))
+                else
+                  elem(ie)%state%Q(i,j,:,m_cnst) = 0.0_r8
                end if
                indx = indx + 1
             end do

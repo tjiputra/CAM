@@ -13,9 +13,9 @@ module gas_wetdep_opts
 
   implicit none
 
-  character(len=8) :: gas_wetdep_list(pcnst) = ' '
-  character(len=3) :: gas_wetdep_method = 'MOZ'
-  integer :: gas_wetdep_cnt = 0
+  character(len=8), protected :: gas_wetdep_list(pcnst) = ' '
+  character(len=3), protected :: gas_wetdep_method = 'MOZ'
+  integer,          protected :: gas_wetdep_cnt = 0
 
 contains
 
@@ -66,7 +66,8 @@ contains
        endif
     enddo
 
-    if (( gas_wetdep_cnt>0 ).and.( .not.(gas_wetdep_method=='MOZ' .or. gas_wetdep_method=='NEU') )) then
+    if (( gas_wetdep_cnt>0 ).and.( .not.(gas_wetdep_method=='MOZ' .or. gas_wetdep_method=='NEU' &
+         .or. gas_wetdep_method=='OFF') )) then
        call endrun('gas_wetdep_readnl; gas_wetdep_method must be set to either MOZ or NEU')
     endif
 

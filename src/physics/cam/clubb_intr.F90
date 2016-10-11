@@ -92,6 +92,7 @@ module clubb_intr
 
   real(r8) :: clubb_c11 = unset_r8
   real(r8) :: clubb_c11b = unset_r8
+  real(r8) :: clubb_c14 = unset_r8
   real(r8) :: clubb_gamma_coef = unset_r8
   real(r8) :: clubb_c_K10 = unset_r8
   real(r8) :: clubb_c_K10h = unset_r8
@@ -368,7 +369,7 @@ end subroutine clubb_init_cnst
     namelist /clubbpbl_diff_nl/ clubb_cloudtop_cooling, clubb_rainevap_turb, clubb_expldiff, &
                                 clubb_do_adv, clubb_timestep, clubb_stabcorrect, &
                                 clubb_rnevap_effic
-    namelist /clubb_params_nl/ clubb_c11, clubb_c11b, clubb_mult_coef, clubb_gamma_coef, &
+    namelist /clubb_params_nl/ clubb_c11, clubb_c11b, clubb_c14, clubb_mult_coef, clubb_gamma_coef, &
                                clubb_c_K10, clubb_c_K10h, clubb_beta, clubb_C2rt, clubb_C2thl, &
 			       clubb_C2rtthl, clubb_C8, clubb_C7, clubb_C7b, clubb_Skw_denom_coef, &
                                clubb_lambda0_stability_coef, clubb_l_lscale_plume_centered, &
@@ -446,6 +447,8 @@ end subroutine clubb_init_cnst
     if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: clubb_c11")
     call mpi_bcast(clubb_c11b,                   1, mpi_real8,   mstrid, mpicom, ierr)
     if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: clubb_c11b")
+    call mpi_bcast(clubb_c14,                    1, mpi_real8,   mstrid, mpicom, ierr)
+    if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: clubb_c14")
     call mpi_bcast(clubb_mult_coef,              1, mpi_real8,   mstrid, mpicom, ierr)
     if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: clubb_mult_coef")
     call mpi_bcast(clubb_gamma_coef,             1, mpi_real8,   mstrid, mpicom, ierr)
@@ -476,6 +479,8 @@ end subroutine clubb_init_cnst
     if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: clubb_l_lscale_plume_centered")
     call mpi_bcast(clubb_l_use_ice_latent,       1, mpi_logical, mstrid, mpicom, ierr)
     if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: clubb_l_use_ice_latent")
+    call mpi_bcast(clubb_do_liqsupersat,         1, mpi_logical, mstrid, mpicom, ierr)
+    if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: clubb_do_liqsupersat")
 
     !  Overwrite defaults if they are true
     if (clubb_history) l_stats = .true.
@@ -554,7 +559,7 @@ end subroutine clubb_init_cnst
     ! These are needed to set parameters
     use clubb_api_module, only: &
          ilambda0_stability_coef, ic_K10, ic_K10h, iC2rtthl, iC7, iC7b, iC8, iC11, iC11b, &
-         igamma_coef, imult_coef, ilmin_coef, iSkw_denom_coef, ibeta, &
+         iC14, igamma_coef, imult_coef, ilmin_coef, iSkw_denom_coef, ibeta, &
          iC2rt, iC2thl, iC2rtthl, l_do_expldiff_rtm_thlm, l_Lscale_plume_centered, &
          l_use_ice_latent
 
@@ -731,6 +736,7 @@ end subroutine clubb_init_cnst
     clubb_params(iC8) = clubb_C8
     clubb_params(iC11) = clubb_c11
     clubb_params(iC11b) = clubb_c11b
+    clubb_params(iC14) = clubb_c14
     clubb_params(igamma_coef) = clubb_gamma_coef
     clubb_params(imult_coef) = clubb_mult_coef
     clubb_params(iSkw_denom_coef) = clubb_Skw_denom_coef

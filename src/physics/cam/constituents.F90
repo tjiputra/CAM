@@ -24,6 +24,7 @@ public :: &
    cnst_read_iv,        &! query whether constituent initial values are read from initial file
    cnst_chk_dim,        &! check that number of constituents added equals dimensions (pcnst)
    cnst_cam_outfld,     &! Returns true if default CAM output was specified in the cnst_add calls.
+   cnst_set_spec_class, &! Sets the type of species class
    cnst_set_convtran2    ! Override for convtran2 values set by the cnst_add routine
 
 ! Public data
@@ -36,7 +37,17 @@ character(len=128),public, protected :: cnst_longname(pcnst) ! long name of cons
 ! Namelist variables
 logical, public, protected :: readtrace = .true.  ! true => obtain initial tracer data from IC file
 
+integer, public, parameter :: cnst_spec_class_undefined   = 0
+integer, public, parameter :: cnst_spec_class_cldphysics  = 1
+integer, public, parameter :: cnst_spec_class_aerosol     = 2
+integer, public, parameter :: cnst_spec_class_gas         = 3
+integer, public, parameter :: cnst_spec_class_other       = 4
+
+!
 ! Constants for each tracer
+
+integer, public, protected :: cnst_species_class(pcnst) = cnst_spec_class_undefined  ! indicates species class &
+                                                                                       ! (cldphysics, aerosol, gas )
 real(r8),    public :: cnst_cp  (pcnst)          ! specific heat at constant pressure (J/kg/K)
 real(r8),    public :: cnst_cv  (pcnst)          ! specific heat at constant volume (J/kg/K)
 real(r8),    public :: cnst_mw  (pcnst)          ! molecular weight (kg/kmole)
@@ -118,10 +129,10 @@ end subroutine cnst_readnl
 
 !=========================================================================================
 
-subroutine cnst_add( &
-   name, mwc, cpc, qminc, ind, &
-   longname, readiv, mixtype, molectype, cam_outfld, &
-   fixed_ubc, fixed_ubflx, is_convtran1, is_convtran2)
+
+subroutine cnst_add (name, mwc, cpc, qminc, &
+                     ind, longname, readiv, mixtype, molectype, cam_outfld, &
+                     fixed_ubc, fixed_ubflx, is_convtran1, is_convtran2, cnst_spec_class)
 
    ! Register a constituent.
 
@@ -151,6 +162,8 @@ subroutine cnst_add( &
       is_convtran1 ! true => convective transport in convtran1
    logical,          intent(in), optional :: &
       is_convtran2 ! true => convective transport in convtran2
+   integer,          intent(in), optional :: &
+      cnst_spec_class ! type of species class
 
    character(len=*), parameter :: sub='cnst_add'
    character(len=128) :: errmsg
@@ -236,10 +249,16 @@ subroutine cnst_add( &
       call endrun(sub//': FATAL: cannot set both cnst_is_convtran1 and cnst_is_convtran2 to TRUE')
    end if
 
+   ! Set type for species class
+   if ( present(cnst_spec_class) ) then
+      cnst_species_class(ind) = cnst_spec_class
+   else
+      cnst_species_class(ind) = cnst_spec_class_undefined
+   end if
+
    cnst_cp  (ind) = cpc
    cnst_mw  (ind) = mwc
    qmin     (ind) = qminc
-
    if (ind == 1) then
       ! qmincg for water vapor set to zero
       qmincg(ind) = 0._r8
@@ -282,6 +301,39 @@ subroutine cnst_set_convtran2(ind, is_convtran2)
    end if
 
 end subroutine cnst_set_convtran2
+
+!----------------------------------------------------------------------------------------------
+
+subroutine cnst_set_spec_class(ind, cnst_spec_class_in)
+
+   ! Allow user to override the value of cnst_spec_class set by a previous cnst_add call.
+
+   integer, intent(in) :: ind                ! global constituent index (in q array)
+   integer, intent(in) :: cnst_spec_class_in ! species class designator
+
+   character(len=*), parameter :: subname = 'cnst_set_spec_class'
+   !-----------------------------------------------------------------------
+
+   ! check index
+    if (ind <= 0 .or. ind > padv) then
+       write(iulog,*) subname//': illegal tracer index: padv, ind = ', padv, ind
+       call endrun(subname//': illegal tracer index')
+    end if
+    
+    ! Check designator
+    if (cnst_spec_class_in /= cnst_spec_class_undefined  .and. &
+        cnst_spec_class_in /= cnst_spec_class_cldphysics .and. &
+        cnst_spec_class_in /= cnst_spec_class_aerosol    .and. &
+        cnst_spec_class_in /= cnst_spec_class_gas        .and. &
+        cnst_spec_class_in /= cnst_spec_class_other ) then
+          write(iulog,*) subname//': trying to use invalid cnst_spec_class designator', cnst_spec_class_in
+          call endrun(subname//': invalid cnst_spec_class designator')
+    end if
+
+    ! Set flag for convective transport after wetdep (phase 2).
+    cnst_species_class(ind) = cnst_spec_class_in
+
+ end subroutine cnst_set_spec_class
 
 !==============================================================================
 

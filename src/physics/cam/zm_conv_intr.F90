@@ -116,6 +116,12 @@ subroutine zm_conv_register
 ! deep gbm cloud liquid water (kg/kg)    
    call pbuf_add_field('DP_CLDICE','global',dtype_r8,(/pcols,pver/), dp_cldice_idx)  
 
+   call pbuf_add_field('ICWMRDP',    'physpkg',dtype_r8,(/pcols,pver/),icwmrdp_idx)
+   call pbuf_add_field('RPRDDP',     'physpkg',dtype_r8,(/pcols,pver/),rprddp_idx)
+   call pbuf_add_field('NEVAPR_DPCU','physpkg',dtype_r8,(/pcols,pver/),nevapr_dpcu_idx)
+   call pbuf_add_field('PREC_DP',    'physpkg',dtype_r8,(/pcols/),     prec_dp_idx)
+   call pbuf_add_field('SNOW_DP',   'physpkg',dtype_r8,(/pcols/),      snow_dp_idx)
+
    if (zmconv_org) then
       call cnst_add('ZM_ORG',0._r8,0._r8,0._r8,ixorg,longname='organization parameter')
    endif
@@ -306,12 +312,7 @@ subroutine zm_conv_init(pref_edge)
                   zmconv_momcu, zmconv_momcd, zmconv_num_cin, zmconv_org, no_deep_pbl_in = no_deep_pbl)
 
     cld_idx         = pbuf_get_index('CLD')
-    icwmrdp_idx     = pbuf_get_index('ICWMRDP')
-    rprddp_idx      = pbuf_get_index('RPRDDP')
     fracis_idx      = pbuf_get_index('FRACIS')
-    nevapr_dpcu_idx = pbuf_get_index('NEVAPR_DPCU')
-    prec_dp_idx     = pbuf_get_index('PREC_DP')
-    snow_dp_idx     = pbuf_get_index('SNOW_DP')
 
 end subroutine zm_conv_init
 !=========================================================================================

@@ -15,8 +15,18 @@ module unit_driver
 
   public :: unit_driver_run
   public :: unit_driver_init
+  public :: unit_driver_reg
 
 contains
+
+!================================================================================
+!================================================================================
+  subroutine unit_driver_reg
+    use radiation_data, only: rad_data_enable
+
+    call rad_data_enable()
+
+  end subroutine unit_driver_reg
 
 !================================================================================
 !================================================================================

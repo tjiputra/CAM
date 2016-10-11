@@ -93,12 +93,6 @@ subroutine convect_deep_register
      call zm_conv_register
   end select
 
-  call pbuf_add_field('ICWMRDP',    'physpkg',dtype_r8,(/pcols,pver/),icwmrdp_idx)
-  call pbuf_add_field('RPRDDP',     'physpkg',dtype_r8,(/pcols,pver/),rprddp_idx)
-  call pbuf_add_field('NEVAPR_DPCU','physpkg',dtype_r8,(/pcols,pver/),nevapr_dpcu_idx)
-  call pbuf_add_field('PREC_DP',    'physpkg',dtype_r8,(/pcols/),     prec_dp_idx)
-  call pbuf_add_field('SNOW_DP',   'physpkg',dtype_r8,(/pcols/),      snow_dp_idx)
-
   ! If gravity waves from deep convection are on, output this field.
   if (use_gw_convect_dp .and. deep_scheme == 'ZM') then
      call pbuf_add_field('TTEND_DP','physpkg',dtype_r8,(/pcols,pver/),ttend_dp_idx)
@@ -138,9 +132,18 @@ subroutine convect_deep_init(pref_edge)
      call zm_conv_init(pref_edge)
   case('UNICON')
      if (masterproc) write(iulog,*)'convect_deep: deep convection done by UNICON'
+  case('SPCAM')
+     if (masterproc) write(iulog,*)'convect_deep: deep convection done by SPCAM'
+     return
   case default
      if (masterproc) write(iulog,*)'WARNING: convect_deep: no deep convection scheme. May fail.'
   end select
+
+  icwmrdp_idx     = pbuf_get_index('ICWMRDP')
+  rprddp_idx      = pbuf_get_index('RPRDDP')
+  nevapr_dpcu_idx = pbuf_get_index('NEVAPR_DPCU')
+  prec_dp_idx     = pbuf_get_index('PREC_DP')
+  snow_dp_idx     = pbuf_get_index('SNOW_DP')
 
   cldtop_idx = pbuf_get_index('CLDTOP')
   cldbot_idx = pbuf_get_index('CLDBOT')

@@ -596,7 +596,7 @@ ifeq ($(FC_TYPE), nag)
   # Bit of a pain: MPI functions are overloaded, so must specify
   # not to check them. -mismatch_all is alternative, but less
   # targeted option.
-  nag_mismatch_flag := -wmismatch=mpi_send,mpi_recv,mpi_bcast,mpi_allreduce,mpi_reduce,mpi_isend,mpi_irecv,mpi_irsend,mpi_rsend,mpi_gatherv,mpi_scatterv,mpi_allgather,mpi_alltoallv,mpibcast,mpiscatterv
+  nag_mismatch_flag := -wmismatch=mpi_send,mpi_recv,mpi_bcast,mpi_allreduce,mpi_reduce,mpi_isend,mpi_irecv,mpi_irsend,mpi_rsend,mpi_gatherv,mpi_scatterv,mpi_allgather,mpi_alltoallv,mpi_alltoallw,mpibcast,mpiscatterv
   FC_FLAGS      := $(nag_mismatch_flag) -Wp,-macro=no_com
   FC_FLAGS_NOOPT:= $(FC_FLAGS)
 

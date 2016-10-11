@@ -61,7 +61,7 @@ contains
 
 subroutine cam_init(EClock, &
    caseid, ctitle, start_type, brnch_retain_casename, &
-   adiabatic, ideal_phys, aqua_planet, &
+   aqua_planet, &
    single_column, scmlat, scmlon, &
    eccen, obliqr, lambm0, mvelpp,  &
    perpetual_run, perpetual_ymd, &
@@ -101,8 +101,6 @@ subroutine cam_init(EClock, &
    character(len=cs), intent(in) :: start_type            ! start type: initial, restart, or branch
    logical,           intent(in) :: brnch_retain_casename ! Flag to allow a branch to use the same
                                                           ! caseid as the run being branched from.
-   logical,           intent(in) :: adiabatic             ! true => no physics
-   logical,           intent(in) :: ideal_phys            ! true => run "idealized" model configuration
    logical,           intent(in) :: aqua_planet           ! Flag to run model in "aqua planet" mode
 
    logical,           intent(in) :: single_column
@@ -138,7 +136,7 @@ subroutine cam_init(EClock, &
 
    ! Initializations using data passed from coupler.
    call cam_ctrl_init( &
-      caseid, ctitle, start_type, adiabatic, ideal_phys, &
+      caseid, ctitle, start_type,  &
       aqua_planet, brnch_retain_casename)
 
    call cam_ctrl_set_orbit(eccen, obliqr, lambm0, mvelpp)

@@ -70,7 +70,15 @@
     <lname>2000_CAM50_CLM40%SP_CICE%PRES_DOCN%DOM_RTM_SGLC_SWAV</lname>
   </compset>
   <compset>
-    <alias>FAMIP</alias>
+    <alias>F2000_DONOTUSE</alias>
+    <lname>2000_CAM60_CLM50%BGC_CICE%PRES_DOCN%DOM_MOSART_CISM1%NOEVOLVE_SWAV</lname>
+  </compset>
+  <compset>
+    <alias>FSPCAMS</alias>
+    <lname>2000_CAM40%SPCAMS_CLM40%SP_CICE%PRES_DOCN%DOM_RTM_SGLC_SWAV</lname>
+  </compset>
+  <compset>
+    <alias>FAMIP</alias>           
     <lname>AMIP_CAM40_CLM40%SP_CICE%PRES_DOCN%DOM_RTM_SGLC_SWAV</lname>
   </compset>
   <compset>
@@ -159,7 +167,7 @@
   </compset>
   <compset>
     <alias>FW5</alias>
-    <lname>2000_CAM50%WCCM_CLM45%SP_CICE%PRES_DOCN%DOM_RTM_SGLC_SWAV</lname>
+    <lname>2000_CAM60%WCCM_CLM45%SP_CICE%PRES_DOCN%DOM_RTM_SGLC_SWAV</lname>
   </compset>
   <compset>
     <alias>FW5CLUBB</alias>
@@ -259,8 +267,8 @@
     <lname>2000_CAM50_SLND_SICE_AQUAP_SROF_SGLC_SWAV</lname>
   </compset>
   <compset>
-    <alias>FIDEAL</alias>
-    <lname>2000_CAM%IDEAL_SLND_SICE_SOCN_SROF_SGLC_SWAV</lname>
+    <alias>FHS94</alias>   
+    <lname>2000_CAM%HS94_SLND_SICE_SOCN_SROF_SGLC_SWAV</lname>
   </compset>
   <compset>
     <alias>FADIAB</alias>
@@ -271,26 +279,26 @@
     <lname>2000_CAM%DABIP04_SLND_SICE_SOCN_SROF_SGLC_SWAV</lname>
   </compset>
 
-  <!-- FG compsets -->
+<!-- FG compsets -->
 
-  <compset>
-    <alias>FGCN</alias>           grid="gland"
+  <compset grid="g%gland">
+    <alias>FGCN</alias>           
     <lname>2000_CAM40_CLM40%CN_CICE%PRES_DOCN%DOM_RTM_CISM1_SWAV</lname>
   </compset>
-  <compset>
-    <alias>FGC5L45BGC</alias>     grid="gland"
+  <compset grid="g%gland">
+    <alias>FGC5L45BGC</alias>     
     <lname>2000_CAM50_CLM45%BGC_CICE%PRES_DOCN%DOM_RTM_CISM1_SWAV</lname>
   </compset>
-  <compset>
-    <alias>FG1850CN</alias>       grid="gland"
+  <compset grid="g%gland">
+    <alias>FG1850CN</alias>       
     <lname>1850_CAM40_CLM40%CN_CICE%PRES_DOCN%DOM_RTM_CISM1_SWAV</lname>
   </compset>
-  <compset>
-    <alias>FG1850C5L45BGC</alias> grid="gland"
+  <compset grid="g%gland">
+    <alias>FG1850C5L45BGC</alias> 
     <lname>1850_CAM50_CLM45%BGC_CICE%PRES_DOCN%DOM_RTM_CISM1_SWAV</lname>
   </compset>
-  <compset>
-    <alias>FGHISTC5L45BGC</alias> grid="gland"
+  <compset grid="g%gland">
+    <alias>FGHISTC5L45BGC</alias> 
     <lname>HIST_CAM50_CLM45%BGC_CICE%PRES_DOCN%DOM_RTM_CISM1_SWAV</lname>
   </compset>
 
@@ -353,6 +361,7 @@
 	<value grid="a%0.9x1.25_l%0.9x1.25_oi%0.9x1.25_r%r05_m%gx1v6"	compset="AMIP_CAM40_CLM40%SP_CICE%PRES_DOCN%DOM_RTM_SGLC_SWAV"	 >hybrid</value>
 	<value grid="a%1.9x2.5_l%1.9x2.5_oi%1.9x2.5_r%r05_m%gx1v6"	compset="AMIP_CAM50_CLM40%SP_CICE%PRES_DOCN%DOM_RTM_SGLC_SWAV"	 >hybrid</value>
 	<value grid="a%1.9x2.5_l%1.9x2.5_oi%1.9x2.5_r%r05_m%gx1v6"	compset="AMIP_CAM40_CLM40%CN_CICE%PRES_DOCN%DOM_RTM_SGLC_SWAV"	 >hybrid</value>
+	<value grid="a%0.9x1.25_l%0.9x1.25_oi%0.9_1.25_r%r05_m%gx1v6"   compset="2000_CAM60_CLM50%BGC_CICE%PRES_DOCN%DOM_MOSART_CISM1%NOEVOLVE_SWAV">hybrid</value>
       </values>
     </entry>
 
@@ -366,6 +375,7 @@
 	<value grid="a%0.9x1.25_l%0.9x1.25_oi%0.9x1.25_r%r05_m%gx1v6"	compset="AMIP_CAM40_CLM40%SP_CICE%PRES_DOCN%DOM_RTM_SGLC_SWAV"	 >b40.20th.track1.1deg.004</value>
 	<value grid="a%1.9x2.5_l%1.9x2.5_oi%1.9x2.5_r%r05_m%gx1v6"	compset="AMIP_CAM50_CLM40%SP_CICE%PRES_DOCN%DOM_RTM_SGLC_SWAV"	 >b40_20th_2d_r07c5cn_161jp</value>
 	<value grid="a%1.9x2.5_l%1.9x2.5_oi%1.9x2.5_r%r05_m%gx1v6"	compset="AMIP_CAM40_CLM40%CN_CICE%PRES_DOCN%DOM_RTM_SGLC_SWAV"	 >b40.20th.track1.2deg.001</value >
+	<value grid="a%0.9x1.25_l%0.9x1.25_oi%0.9_1.25_r%r05_m%gx1v6"   compset="2000_CAM60_CLM50%BGC_CICE%PRES_DOCN%DOM_MOSART_CISM1%NOEVOLVE_SWAV">b.e16.B1850_WW3.f09_g16.lang_redi_2hr_frz_chl.003</value>
       </values>
     </entry>
 
@@ -379,6 +389,7 @@
 	<value grid="a%0.9x1.25_l%0.9x1.25_oi%0.9x1.25_r%r05_m%gx1v6"	compset="AMIP_CAM40_CLM40%SP_CICE%PRES_DOCN%DOM_RTM_SGLC_SWAV"	 >1979-01-01</value>
 	<value grid="a%1.9x2.5_l%1.9x2.5_oi%1.9x2.5_r%r05_m%gx1v6"	compset="AMIP_CAM50_CLM40%SP_CICE%PRES_DOCN%DOM_RTM_SGLC_SWAV"	 >1979-01-01</value>
 	<value grid="a%1.9x2.5_l%1.9x2.5_oi%1.9x2.5_r%r05_m%gx1v6"	compset="AMIP_CAM40_CLM40%CN_CICE%PRES_DOCN%DOM_RTM_SGLC_SWAV"	 >1979-01-01</value>
+	<value grid="a%0.9x1.25_l%0.9x1.25_oi%0.9_1.25_r%r05_m%gx1v6"   compset="2000_CAM60_CLM50%BGC_CICE%PRES_DOCN%DOM_MOSART_CISM1%NOEVOLVE_SWAV">0097-01-01</value>
       </values>
     </entry>
 
@@ -406,6 +417,61 @@
 	<value compset="AR95_CAM">2</value>
       </values>
     </entry>
+
+    <entry id="NTHRDS_ATM">
+      <values>
+        <value compset="SPCAMS">1</value>
+      </values>
+    </entry>
+
+    <entry id="NTHRDS_CPL">
+      <values>
+        <value compset="SPCAMS">1</value>
+      </values>
+    </entry>
+
+    <entry id="NTHRDS_ESP">
+      <values>
+        <value compset="SPCAMS">1</value>
+      </values>
+    </entry>
+
+    <entry id="NTHRDS_GLC">
+      <values>
+        <value compset="SPCAMS">1</value>
+      </values>
+    </entry>
+
+    <entry id="NTHRDS_ICE">
+      <values>
+        <value compset="SPCAMS">1</value>
+      </values>
+    </entry>
+
+    <entry id="NTHRDS_LND">
+      <values>
+        <value compset="SPCAMS">1</value>
+      </values>
+    </entry>
+
+    <entry id="NTHRDS_OCN">
+      <values>
+        <value compset="SPCAMS">1</value>
+      </values>
+    </entry>
+
+    <entry id="NTHRDS_ROF">
+      <values>
+        <value compset="SPCAMS">1</value>
+      </values>
+    </entry>
+
+    <entry id="NTHRDS_WAV">
+      <values>
+        <value compset="SPCAMS">1</value>
+      </values>
+    </entry>
+
 
   </entries>
 

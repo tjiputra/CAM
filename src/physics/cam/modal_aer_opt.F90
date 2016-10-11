@@ -349,6 +349,12 @@ subroutine modal_aero_sw(list_idx, state, pbuf, nnite, idxnite, &
    real(r8), pointer :: dgnumwet_m(:,:,:) ! number mode wet diameter for all modes
    real(r8), pointer :: qaerwat_m(:,:,:)  ! aerosol water (g/g) for all modes
    real(r8), pointer :: wetdens_m(:,:,:)  ! 
+   real(r8), pointer :: hygro_m(:,:,:)  ! 
+   real(r8), pointer :: dryvol_m(:,:,:)  ! 
+   real(r8), pointer :: dryrad_m(:,:,:)  ! 
+   real(r8), pointer :: drymass_m(:,:,:)  ! 
+   real(r8), pointer :: so4dryvol_m(:,:,:)  ! 
+   real(r8), pointer :: naer_m(:,:,:)  ! 
 
    real(r8) :: sigma_logr_aer         ! geometric standard deviation of number distribution
    real(r8) :: radsurf(pcols,pver)    ! aerosol surface mode radius
@@ -496,14 +502,19 @@ subroutine modal_aero_sw(list_idx, state, pbuf, nnite, idxnite, &
    else
       ! If doing a diagnostic calculation then need to calculate the wet radius
       ! and water uptake for the diagnostic modes
-      allocate(dgnumdry_m(pcols,pver,nmodes), dgnumwet_m(pcols,pver,nmodes), &
-               qaerwat_m(pcols,pver,nmodes),  wetdens_m(pcols,pver,nmodes), stat=istat)
+      allocate(dgnumdry_m(pcols,pver,nmodes),  dgnumwet_m(pcols,pver,nmodes), &
+               qaerwat_m(pcols,pver,nmodes),   wetdens_m(pcols,pver,nmodes), &
+               hygro_m(pcols,pver,nmodes),     dryvol_m(pcols,pver,nmodes), &
+               dryrad_m(pcols,pver,nmodes),    drymass_m(pcols,pver,nmodes),  &
+               so4dryvol_m(pcols,pver,nmodes), naer_m(pcols,pver,nmodes),     stat=istat)
       if (istat > 0) then
          call endrun('modal_aero_sw: allocation FAILURE: arrays for diagnostic calcs')
       end if
-      call modal_aero_calcsize_diag(state, pbuf, list_idx, dgnumdry_m)  
+      call modal_aero_calcsize_diag(state, pbuf, list_idx, dgnumdry_m, hygro_m, &
+                                    dryvol_m, dryrad_m, drymass_m, so4dryvol_m, naer_m)  
       call modal_aero_wateruptake_dr(state, pbuf, list_idx, dgnumdry_m, dgnumwet_m, &
-                                     qaerwat_m, wetdens_m)
+                                     qaerwat_m, wetdens_m,  hygro_m, dryvol_m, dryrad_m, &
+                                     drymass_m, so4dryvol_m, naer_m)
    endif
 
    do m = 1, nmodes
@@ -875,6 +886,12 @@ subroutine modal_aero_sw(list_idx, state, pbuf, nnite, idxnite, &
       deallocate(dgnumwet_m)
       deallocate(qaerwat_m)
       deallocate(wetdens_m)
+      deallocate(hygro_m)
+      deallocate(dryvol_m)
+      deallocate(dryrad_m)
+      deallocate(drymass_m)
+      deallocate(so4dryvol_m)
+      deallocate(naer_m)
    end if
 
    ! Output visible band diagnostics for quantities summed over the modes
@@ -986,6 +1003,12 @@ subroutine modal_aero_lw(list_idx, state, pbuf, tauxar)
    real(r8), pointer :: dgnumwet_m(:,:,:) ! number mode wet diameter for all modes
    real(r8), pointer :: qaerwat_m(:,:,:)  ! aerosol water (g/g) for all modes
    real(r8), pointer :: wetdens_m(:,:,:)  ! 
+   real(r8), pointer :: hygro_m(:,:,:)  !
+   real(r8), pointer :: dryvol_m(:,:,:)  !
+   real(r8), pointer :: dryrad_m(:,:,:)  !
+   real(r8), pointer :: drymass_m(:,:,:)  !
+   real(r8), pointer :: so4dryvol_m(:,:,:)  !
+   real(r8), pointer :: naer_m(:,:,:)  !
 
    real(r8) :: sigma_logr_aer          ! geometric standard deviation of number distribution
    real(r8) :: alnsg_amode             ! log of geometric standard deviation of number distribution
@@ -1041,14 +1064,20 @@ subroutine modal_aero_lw(list_idx, state, pbuf, tauxar)
    else
       ! If doing a diagnostic calculation then need to calculate the wet radius
       ! and water uptake for the diagnostic modes
-      allocate(dgnumdry_m(pcols,pver,nmodes), dgnumwet_m(pcols,pver,nmodes), &
-               qaerwat_m(pcols,pver,nmodes),  wetdens_m(pcols,pver,nmodes), stat=istat)
+      allocate(dgnumdry_m(pcols,pver,nmodes),  dgnumwet_m(pcols,pver,nmodes), &
+               qaerwat_m(pcols,pver,nmodes),   wetdens_m(pcols,pver,nmodes), &
+               hygro_m(pcols,pver,nmodes),     dryvol_m(pcols,pver,nmodes), &
+               dryrad_m(pcols,pver,nmodes),    drymass_m(pcols,pver,nmodes),  &
+               so4dryvol_m(pcols,pver,nmodes), naer_m(pcols,pver,nmodes),     stat=istat)
+
       if (istat > 0) then
          call endrun('modal_aero_lw: allocation FAILURE: arrays for diagnostic calcs')
       end if
-      call modal_aero_calcsize_diag(state, pbuf, list_idx, dgnumdry_m)  
+      call modal_aero_calcsize_diag(state, pbuf, list_idx, dgnumdry_m, hygro_m, &
+                                    dryvol_m, dryrad_m, drymass_m, so4dryvol_m, naer_m)  
       call modal_aero_wateruptake_dr(state, pbuf, list_idx, dgnumdry_m, dgnumwet_m, &
-                                     qaerwat_m, wetdens_m)
+                                     qaerwat_m, wetdens_m,  hygro_m, dryvol_m, dryrad_m, &
+                                     drymass_m, so4dryvol_m, naer_m)
    endif
 
    do m = 1, nmodes
@@ -1194,6 +1223,12 @@ subroutine modal_aero_lw(list_idx, state, pbuf, tauxar)
       deallocate(dgnumwet_m)
       deallocate(qaerwat_m)
       deallocate(wetdens_m)
+      deallocate(hygro_m)
+      deallocate(dryvol_m)
+      deallocate(dryrad_m)
+      deallocate(drymass_m)
+      deallocate(so4dryvol_m)
+      deallocate(naer_m)
    end if
 
 end subroutine modal_aero_lw
