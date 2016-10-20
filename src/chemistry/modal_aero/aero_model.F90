@@ -5,7 +5,7 @@ module aero_model
   use shr_kind_mod,   only: r8 => shr_kind_r8
   use constituents,   only: pcnst, cnst_name, cnst_get_ind
   use ppgrid,         only: pcols, pver, pverp
-  use phys_control,   only: phys_getopts
+  use phys_control,   only: phys_getopts, cam_physpkg_is
   use cam_abortutils, only: endrun
   use cam_logfile,    only: iulog
   use perf_mod,       only: t_startf, t_stopf
@@ -43,7 +43,13 @@ module aero_model
   public :: aero_model_surfarea  ! tropopspheric aerosol wet surface area for chemistry
   public :: aero_model_strat_surfarea ! stratospheric aerosol wet surface area for chemistry
 
- ! Misc private data 
+  public :: calc_1_impact_rate
+  public :: nimptblgrow_mind, nimptblgrow_maxd
+
+  ! Accessor functions 
+  public ::  get_scavimptblvol, get_scavimptblnum, get_dlndg_nimptblgrow
+
+  ! Misc private data 
 
   ! number of modes
   integer :: nmodes
@@ -1728,6 +1734,10 @@ contains
     real(r8), pointer :: fldcw(:,:)
     real(r8), pointer :: sulfeq(:,:,:)
 
+    logical :: is_spcam_m2005
+
+    is_spcam_m2005   = cam_physpkg_is('spcam_m2005')
+
     call pbuf_get_field(pbuf, dgnum_idx,      dgnum)
     call pbuf_get_field(pbuf, dgnumwet_idx,   dgnumwet )
     call pbuf_get_field(pbuf, wetdens_ap_idx, wetdens )
@@ -1758,6 +1768,7 @@ contains
 !
     call qqcw2vmr( lchnk, vmrcw, mbar, ncol, loffset, pbuf )
 
+    if (.not. is_spcam_m2005) then  ! regular CAM
       dvmrdt(:ncol,:,:) = vmr(:ncol,:,:)
       dvmrcwdt(:ncol,:,:) = vmrcw(:ncol,:,:)
 
@@ -1812,6 +1823,15 @@ contains
       name = 'AQ_'//trim(solsym(m))
       call outfld( name, wrk(:ncol), ncol, lchnk )
     enddo
+
+   else if (is_spcam_m2005) then  ! SPCAM ECPP
+! when ECPP is used, aqueous chemistry is done in ECPP,
+! and not updated here.
+! Minghuai Wang, 2010-02 (Minghuai.Wang@pnl.gov)
+!
+      dvmrdt = 0.0_r8
+      dvmrcwdt = 0.0_r8
+   endif
 
 ! do gas-aerosol exchange (h2so4, msa, nh3 condensation)
 
@@ -2691,5 +2711,20 @@ contains
     end do
 
   end subroutine vmr2qqcw
+
+  function get_dlndg_nimptblgrow() result (dlndg_nimptblgrow_ret)
+    real(r8) ::  dlndg_nimptblgrow_ret 
+    dlndg_nimptblgrow_ret =  dlndg_nimptblgrow
+  end function get_dlndg_nimptblgrow
+
+  function get_scavimptblvol() result (scavimptblvol_ret)
+    real(r8) :: scavimptblvol_ret(nimptblgrow_mind:nimptblgrow_maxd, ntot_amode)
+    scavimptblvol_ret = scavimptblvol
+  end function get_scavimptblvol
+
+  function get_scavimptblnum() result (scavimptblnum_ret)
+    real(r8) :: scavimptblnum_ret(nimptblgrow_mind:nimptblgrow_maxd, ntot_amode)
+    scavimptblnum_ret = scavimptblnum
+  end function get_scavimptblnum
 
 end module aero_model

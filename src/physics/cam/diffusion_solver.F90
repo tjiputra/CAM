@@ -160,6 +160,8 @@
     ! FIXME: This should not be needed
     use physconst, only: rairv
   
+    use phys_control,        only : phys_getopts 
+ 
   ! Modification : Ideally, we should diffuse 'liquid-ice static energy' (sl), not the dry static energy.
   !                Also, vertical diffusion of cloud droplet number concentration and aerosol number
   !                concentration should be done very carefully in the future version.
@@ -358,6 +360,8 @@
     ! Combined molecular and eddy diffusion.
     real(r8) :: kv_total(pcols,pver+1)
 
+    logical  :: use_spcam
+
     !--------------------------------
     ! Variables needed for WACCM-X
     !--------------------------------
@@ -376,6 +380,8 @@
     ! ----------------------- !
     ! Main Computation Begins !
     ! ----------------------- !
+
+    call phys_getopts(use_spcam_out = use_spcam)
 
     errstring = ''
     if( ( diffuse(fieldlist,'u') .or. diffuse(fieldlist,'v') ) .and. .not. diffuse(fieldlist,'s') ) then
@@ -671,17 +677,17 @@
   !                moist static energy,not the dry static energy.
 
     if( diffuse(fieldlist,'s') ) then
+      if (.not. use_spcam) then
 
-      ! Add counter-gradient to input static energy profiles
+       ! Add counter-gradient to input static energy profiles
 
-        do k = 1, pver
-           dse(:ncol,k) = dse(:ncol,k) + ztodt * p%rdel(:,k) * gravit  * &
-                                       ( rhoi(:ncol,k+1) * kvh(:ncol,k+1) * cgh(:ncol,k+1) &
-                                       - rhoi(:ncol,k  ) * kvh(:ncol,k  ) * cgh(:ncol,k  ) )
-       end do
-
-     ! Add the explicit surface fluxes to the lowest layer
-
+         do k = 1, pver
+            dse(:ncol,k) = dse(:ncol,k) + ztodt * p%rdel(:,k) * gravit  *                &
+                                        ( rhoi(:ncol,k+1) * kvh(:ncol,k+1) * cgh(:ncol,k+1) &
+                                        - rhoi(:ncol,k  ) * kvh(:ncol,k  ) * cgh(:ncol,k  ) )
+         end do
+       endif
+       ! Add the explicit surface fluxes to the lowest layer
        dse(:ncol,pver) = dse(:ncol,pver) + tmp1(:ncol) * shflx(:ncol)
 
      ! Diffuse dry static energy
@@ -701,8 +707,10 @@
                coef_q_diff=kvh(:ncol,:)*dpidz_sq, &
                upper_bndry=interface_boundary)
 
-          call decomp%left_div(dse(:ncol,:), &
-               l_cond=BoundaryData(dse_top(:ncol)))
+          if (.not. use_spcam) then
+           call decomp%left_div(dse(:ncol,:), &
+                l_cond=BoundaryData(dse_top(:ncol)))
+          endif
 
           call decomp%finalize()
 
@@ -721,7 +729,9 @@
           ttemp = ttemp0
 
           ! upper boundary is zero flux for extended model
-          call decomp%left_div(ttemp)
+          if (.not. use_spcam) then
+             call decomp%left_div(ttemp)
+          end if
 
           call decomp%finalize()
 
@@ -747,8 +757,10 @@
                coef_q_diff=kv_total(:ncol,:)*dpidz_sq, &
                upper_bndry=interface_boundary)
 
-          call decomp%left_div(dse(:ncol,:), &
-               l_cond=BoundaryData(dse_top(:ncol)))
+          if (.not. use_spcam) then
+             call decomp%left_div(dse(:ncol,:), &
+                  l_cond=BoundaryData(dse_top(:ncol)))
+          end if
 
           call decomp%finalize()
 
@@ -782,25 +794,27 @@
     do m = 1, ncnst
 
        if( diffuse(fieldlist,'q',m) ) then
+           if (.not. use_spcam) then
 
-           ! Add the nonlocal transport terms to constituents in the PBL.
-           ! Check for neg q's in each constituent and put the original vertical
-           ! profile back if a neg value is found. A neg value implies that the
-           ! quasi-equilibrium conditions assumed for the countergradient term are
-           ! strongly violated.
-
-           qtm(:ncol,:pver) = q(:ncol,:pver,m)
-
-           do k = 1, pver
-              q(:ncol,k,m) = q(:ncol,k,m) + &
-                             ztodt * p%rdel(:,k) * gravit  * ( cflx(:ncol,m) * rrho(:ncol) ) * &
-                           ( rhoi(:ncol,k+1) * kvh(:ncol,k+1) * cgs(:ncol,k+1)                 &
-                           - rhoi(:ncol,k  ) * kvh(:ncol,k  ) * cgs(:ncol,k  ) )
-           end do
-           lqtst(:ncol) = all(q(:ncol,1:pver,m) >= qmincg(m), 2)
-           do k = 1, pver
-              q(:ncol,k,m) = merge( q(:ncol,k,m), qtm(:ncol,k), lqtst(:ncol) )
-           end do
+              ! Add the nonlocal transport terms to constituents in the PBL.
+              ! Check for neg q's in each constituent and put the original vertical
+              ! profile back if a neg value is found. A neg value implies that the
+              ! quasi-equilibrium conditions assumed for the countergradient term are
+              ! strongly violated.
+   
+              qtm(:ncol,:pver) = q(:ncol,:pver,m)
+   
+              do k = 1, pver
+                 q(:ncol,k,m) = q(:ncol,k,m) + &
+                                ztodt * p%rdel(:,k) * gravit  * ( cflx(:ncol,m) * rrho(:ncol) ) * &
+                              ( rhoi(:ncol,k+1) * kvh(:ncol,k+1) * cgs(:ncol,k+1)                 &
+                              - rhoi(:ncol,k  ) * kvh(:ncol,k  ) * cgs(:ncol,k  ) )
+              end do
+              lqtst(:ncol) = all(q(:ncol,1:pver,m) >= qmincg(m), 2)
+              do k = 1, pver
+                 q(:ncol,k,m) = merge( q(:ncol,k,m), qtm(:ncol,k), lqtst(:ncol) )
+              end do
+           endif
 
            ! Add the explicit surface fluxes to the lowest layer
 
@@ -841,9 +855,11 @@
 
            else
 
-              ! Currently, no ubc for constituents without molecular
-              ! diffusion (they cannot diffuse out the top of the model).
-              call no_molec_decomp%left_div(q(:ncol,:,m))
+              if (.not. use_spcam) then
+                 ! Currently, no ubc for constituents without molecular
+                 ! diffusion (they cannot diffuse out the top of the model).
+                 call no_molec_decomp%left_div(q(:ncol,:,m))
+              end if
 
            end if
 

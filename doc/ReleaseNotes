@@ -199,6 +199,17 @@ New features in CAM-5.4
 
 ## SCAM
 
+## SPCAM
+*  Super-parameterized CAM (SPCAM) implements a 2D cloud resolving model (the
+   System for Atmospheric Modeling SAM, version 6.8.2) in CAM.  When it is turned on,
+   it replaces CAM's parameterization for moist convection and large-scale condensation
+   with this alternate model.
+
+* The SPCAM package allows CLUBB to be used or not.  It is important to note that there is
+   a SPCAM-specific version of CLUBB within the CRM package and it is not the same CLUBB being
+   used by CAM
+
+
 -------------------------------------------------
 CODE CLEANUP AND REFACTORING
 -------------------------------------------------

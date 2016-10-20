@@ -3218,6 +3218,7 @@ if ($clubb_sgs  =~ /$TRUE/io) {
 
    add_default($nl, 'clubb_c11');
    add_default($nl, 'clubb_c11b');
+   add_default($nl, 'clubb_c14');
    add_default($nl, 'clubb_mult_coef');
    add_default($nl, 'clubb_gamma_coef');
    add_default($nl, 'clubb_c_K10');
@@ -3329,7 +3330,7 @@ if ($cfg->get('microphys') eq 'rk') {
 add_default($nl, 'trop_cloud_top_press');
 
 # Eddy Diffusivity Adjustments
-if ($cfg->get('pbl') eq "uw") {
+if ($cfg->get('pbl') eq "uw" or $cfg->get('pbl') eq "spcam_m2005") {
     add_default($nl, 'kv_top_pressure');
     add_default($nl, 'kv_top_scale');
     add_default($nl, 'kv_freetrop_scale');
@@ -3690,6 +3691,11 @@ if ($offline_drv ne 'stub') {
     }
 }
 
+if ($phys eq 'spcam_sam1mom' or $phys eq 'spcam_m2005') {
+    add_default($nl, 'iradsw', 'val'=>'1');
+    add_default($nl, 'iradlw', 'val'=>'1');
+}
+
 #-----------------------------------------------------------------------------------------------
 # Add defaults for the CAM specific ocn model DOM.
 
@@ -3915,7 +3921,7 @@ if ($ice_comp eq 'cice' and $cam_build and $ice_active) {
 
     # For phys pkg <=cam4 send the variable "cam4=.true." to get correct defaults for several
     # cice parameters.
-    if ($phys eq 'cam4' or $phys eq 'cam3') {
+    if ($phys eq 'cam4' or $phys eq 'cam3' or $phys eq 'spcam_sam1mom') {
         $cice_nl .= "cam4=.true. \n";
     }
 

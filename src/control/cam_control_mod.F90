@@ -22,6 +22,7 @@ save
 !
 !   cam_ctrl_init
 !   cam_ctrl_set_orbit
+!   cam_ctrl_set_physics_type
 
 character(len=cl), protected :: caseid  ! case ID
 character(len=cl), protected :: ctitle  ! case title
@@ -51,18 +52,15 @@ contains
 !================================================================================================
 
 subroutine cam_ctrl_init( &
-   caseid_in, ctitle_in, start_type, adiabatic_in, ideal_phys_in, &
+   caseid_in, ctitle_in, start_type, &
    aqua_planet_in, brnch_retain_casename_in)
 
    character(len=cl), intent(in) :: caseid_in            ! case ID
    character(len=cl), intent(in) :: ctitle_in            ! case title
    character(len=cs), intent(in) :: start_type           ! start type: initial, restart, or branch
-   logical,           intent(in) :: adiabatic_in         ! true => no physics
-   logical,           intent(in) :: ideal_phys_in        ! true => run "idealized" model configuration
    logical,           intent(in) :: aqua_planet_in       ! Flag to run model in "aqua planet" mode
    logical,           intent(in) :: brnch_retain_casename_in ! Flag to allow a branch to use the same
                                                              ! caseid as the run being branched from.
-   integer :: nphyspkg
    integer :: unitn, ierr
 
    character(len=*), parameter :: sub='cam_ctrl_init'
@@ -87,19 +85,7 @@ subroutine cam_ctrl_init( &
       call endrun(errmsg)
    end select
 
-   adiabatic   = adiabatic_in
-   ideal_phys  = ideal_phys_in
    aqua_planet = aqua_planet_in
-
-   nphyspkg = 0
-   if (adiabatic)   nphyspkg = nphyspkg + 1
-   if (ideal_phys)  nphyspkg = nphyspkg + 1
-   if (aqua_planet) nphyspkg = nphyspkg + 1
-   if (nphyspkg > 1) then
-      call endrun (sub//': FATAL: Only one of ADIABATIC, IDEAL_PHYS, or AQUA_PLANET can be .true.')
-   end if
-
-   moist_physics = (.not. adiabatic) .and. (.not. ideal_phys)
 
    brnch_retain_casename = brnch_retain_casename_in
 
@@ -119,8 +105,6 @@ subroutine cam_ctrl_init( &
       write(iulog,'(1x,a)') ctitle
 
 
-      if (adiabatic)   write(iulog,*) 'Run model ADIABATICALLY (i.e. no physics)'
-      if (ideal_phys)  write(iulog,*) 'Run model with IDEAL physics (Held-Suarez)'
       if (aqua_planet) write(iulog,*) 'Run model in "AQUA_PLANET" mode'
 
    end if
@@ -142,5 +126,33 @@ subroutine cam_ctrl_set_orbit(eccen_in, obliqr_in, lambm0_in, mvelpp_in)
    mvelpp = mvelpp_in
 
 end subroutine cam_ctrl_set_orbit
+
+subroutine cam_ctrl_set_physics_type(phys_package)
+  ! Dummy argument
+  character(len=*), intent(in) :: phys_package
+  ! Local variable
+  character(len=*), parameter :: subname = 'cam_ctrl_set_physics_type'
+
+  adiabatic = trim(phys_package) == 'adiabatic'
+  ideal_phys = trim(phys_package) == 'held_suarez'
+  moist_physics = .not. (adiabatic .or. ideal_phys)
+  if (adiabatic .and. ideal_phys) then
+    call endrun (subname//': FATAL: Only one of ADIABATIC or HELD_SUAREZ can be .true.')
+  end if
+
+  if ((.not. moist_physics) .and. aqua_planet) then
+    call endrun (subname//': FATAL: AQUA_PLANET not compatible with dry physics package, ('//trim(phys_package)//')')
+  end if
+
+  if (masterproc) then
+    if (adiabatic) then
+      write(iulog,*) 'Run model ADIABATICALLY (i.e. no physics)'
+    end if
+    if (ideal_phys) then
+      write(iulog,*) 'Run model with Held-Suarez physics forcing'
+    end if
+  end if
+
+end subroutine cam_ctrl_set_physics_type
 
 end module cam_control_mod

@@ -195,7 +195,7 @@ subroutine vd_readnl(nlfile)
   ! Beljaars reads its own namelist.
   call beljaars_drag_readnl(nlfile)
 
-  if (eddy_scheme == 'diag_TKE') call eddy_diff_readnl(nlfile)
+  if (eddy_scheme == 'diag_TKE' .or. eddy_scheme == 'SPCAM_m2005' ) call eddy_diff_readnl(nlfile)
 
 end subroutine vd_readnl
 
@@ -239,7 +239,7 @@ subroutine vd_register()
   end if
 
   ! diag_TKE fields
-  if (eddy_scheme == 'diag_TKE') then
+  if (eddy_scheme == 'diag_TKE' .or. eddy_scheme == 'SPCAM_m2005') then
      call eddy_diff_register()
   end if
 
@@ -401,11 +401,11 @@ subroutine vertical_diffusion_init(pbuf2d)
    if (masterproc) write(iulog, fmt='(a,i3,5x,a,i3)') 'NTOP_EDDY  =', ntop_eddy, 'NBOT_EDDY  =', nbot_eddy
 
     select case ( eddy_scheme )
-    case ( 'diag_TKE' ) 
+    case ( 'diag_TKE', 'SPCAM_m2005' )
         if( masterproc ) write(iulog,*) &
              'vertical_diffusion_init: eddy_diffusivity scheme: UW Moist Turbulence Scheme by Bretherton and Park'
      call eddy_diff_init(pbuf2d, ntop_eddy, nbot_eddy)
-    case ( 'HB', 'HBR')
+    case ( 'HB', 'HBR', 'SPCAM_sam1mom')
         if( masterproc ) write(iulog,*) 'vertical_diffusion_init: eddy_diffusivity scheme:  Holtslag and Boville'
         call init_hb_diff(gravit, cpair, ntop_eddy, nbot_eddy, pref_mid, &
                           karman, eddy_scheme)
@@ -967,8 +967,8 @@ subroutine vertical_diffusion_tend( &
   ! Get potential temperature.
   th(:ncol,:pver) = state%t(:ncol,:pver) * state%exner(:ncol,:pver)
 
-    select case (eddy_scheme)
-    case ( 'diag_TKE' ) 
+  select case (eddy_scheme)
+  case ( 'diag_TKE', 'SPCAM_m2005' )
 
      call eddy_diff_tend(state, pbuf, cam_in, &
           ztodt, p, tint, rhoi, cldn, wstarent, &
@@ -984,7 +984,7 @@ subroutine vertical_diffusion_tend( &
                         khfs(:ncol),    kqfs(:ncol), kbfs(:ncol),   obklen(:ncol))
 
 
-    case ( 'HB', 'HBR' )
+  case ( 'HB', 'HBR', 'SPCAM_sam1mom' )
 
        ! Modification : We may need to use 'taux' instead of 'tautotx' here, for
        !                consistency with the previous HB scheme.
@@ -1303,7 +1303,7 @@ subroutine vertical_diffusion_tend( &
     !                                                             !
   ! ------------------------------------------------------------ !
 
-    if( eddy_scheme .eq. 'diag_TKE' .and. do_pseudocon_diff ) then
+    if( (eddy_scheme .eq. 'diag_TKE' .or. eddy_scheme .eq. 'SPCAM_m2005') .and. do_pseudocon_diff ) then
 
          ptend%q(:ncol,:pver,1) = qtten(:ncol,:pver)
          ptend%s(:ncol,:pver)   = slten(:ncol,:pver)

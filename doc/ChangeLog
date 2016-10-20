@@ -1,3 +1,1234 @@
+
+===============================================================
+
+Tag name: cam5_4_85
+Originator(s): fvitt, erik, cacraig
+Date: 21 Sep 2016
+One-line Summary: Update build-namelist use cases with updated MEGAN emissions factors and update CLM
+
+Purpose of changes:
+
+ Update build-namelist use cases used in CLM50 compsets with MEGAN active
+ to include emission factors for 79 PFTs
+
+ Update CLM external to include MEGAN model for 79 PFTs used in clm45 and clm50
+ for CIME testing
+
+ Change the aux_cam CIME smoke test to a restart test (ERP)
+
+Bugs fixed (include bugzilla ID):
+
+Describe any changes made to build system:
+
+Describe any changes made to the namelist:
+
+ When using clm45 and clm50 the megan_factors_file needs to be set to
+  $INPUTDATA/atm/cam/chem/trop_mozart/emis/megan21_emis_factors_79pft_c20150518.nc
+
+List any changes to the defaults for the boundary datasets:
+
+Describe any substantial timing or memory changes:
+
+Code reviewed by:
+
+List all subroutines eliminated:
+
+List all subroutines added and what they do:
+
+A    components/cam/test/system/nl_files/outfrq3s_megan
+ - overrides megan_factors_file with an appropriate input file for clm4 used in cam regression tests
+
+List all existing files that have been modified, and describe the changes:
+
+M    SVN_EXTERNAL_DIRECTORIES
+  - update CLM external to esmciport_n06_clm4_5_12_r194 which has updates to
+    MEGAN for clm45 and clm50
+
+M    components/cam/bld/namelist_files/use_cases/waccm_tsmlt_2000_cam55.xml
+M    components/cam/bld/namelist_files/use_cases/volc_waccm_tsmlt_megan_cam5.xml
+M    components/cam/bld/namelist_files/use_cases/waccm_tsmlt_amip_cam55.xml
+M    components/cam/bld/namelist_files/use_cases/rcp6.0_waccm_tsmlt_nomegan_cam5.xml
+M    components/cam/bld/namelist_files/use_cases/waccm_tsmlt_1850_cam55.xml
+M    components/cam/bld/namelist_files/use_cases/sd_cam5_trop_strat_mam3.xml
+  - update megan_factors_file in these use cases to include 79 PFTs
+
+M    components/cam/bld/namelist_files/namelist_defaults_cam.xml
+  - update the default megan_factors_file to include 79 PFTs
+
+M    components/cam/cime_config/testdefs/testmods_dirs/cam/outfrq9s/shell_commands
+M    components/cam/cime_config/testdefs/testlist_cam.xml
+ - mods for aux_cam test -- workaround for the glc model issue when the test is less than 1 day
+
+M    components/cam/test/system/input_tests_master
+ - use outfrq3s_megan in waccm5.5 test
+
+If there were any failures reported from running test_driver.sh on any test
+platform, and checkin with these failures has been OK'd by the gatekeeper,
+then copy the lines from the td.*.status files for the failed tests to the
+appropriate machine below.  All failed tests must be justified.
+
+yellowstone/intel:
+027 bl485 TBL.sh f1.9c5.5wtmam4h outfrq3s_megan+waccm_tsmlt_2000_cam55 9s .....................FAIL! rc= 7 at Wed Sep 21 09:00:31 MDT 2016
+ - this is actually bit-for-bit -- change "outfrq3s" to "outfrq3s_megan" caused this baseline to fail
+
+yellowstone/intel/aux_cam:
+PASS ERP_Ln9.f09_f09.F2000_DONOTUSE.yellowstone_intel.cam-outfrq9s CREATE_NEWCASE
+PASS ERP_Ln9.f09_f09.F2000_DONOTUSE.yellowstone_intel.cam-outfrq9s XML
+FAIL ERP_Ln9.f09_f09.F2000_DONOTUSE.yellowstone_intel.cam-outfrq9s NLCOMP
+PASS ERP_Ln9.f09_f09.F2000_DONOTUSE.yellowstone_intel.cam-outfrq9s SHAREDLIB_BUILD time=579
+PASS ERP_Ln9.f09_f09.F2000_DONOTUSE.yellowstone_intel.cam-outfrq9s MODEL_BUILD time=674
+PASS ERP_Ln9.f09_f09.F2000_DONOTUSE.yellowstone_intel.cam-outfrq9s RUN time=431
+PASS ERP_Ln9.f09_f09.F2000_DONOTUSE.yellowstone_intel.cam-outfrq9s COMPARE_base_rest
+PASS ERP_Ln9.f09_f09.F2000_DONOTUSE.yellowstone_intel.cam-outfrq9s GENERATE
+FAIL ERP_Ln9.f09_f09.F2000_DONOTUSE.yellowstone_intel.cam-outfrq9s COMPARE_baseline
+PASS ERP_Ln9.f09_f09.F2000_DONOTUSE.yellowstone_intel.cam-outfrq9s MEMLEAK insuffiencient data for memleak test
+  - this baseline is expected to fail -- clm50 has changed answers
+
+hobart/nag: all pass
+
+jaguar/pgi: all pass
+
+===============================================================
+===============================================================
+
+Tag name: cam5_4_84
+Originator(s): cacraig, bogensh, hannay, fvitt
+Date: Sept 19, 2016
+One-line Summary: Add namelist parameter for CLUBB C14 and fix clubb_do_liqsupersat bug
+
+Purpose of changes:
+  - Add C14 tuning parameter for CLUBB to the namelist.  Change its default value from
+    1. to 1.83
+  - Add missing mpi_bcast for clubb_do_liqsupersat
+
+Bugs fixed (include bugzilla ID):
+  - Fix bug which was causing CESM ERP tests using clubb to not be BFB
+    clubb_do_liqsupersat needed to be mpi_bcast to all MPI tasks
+
+Describe any changes made to build system:
+
+Describe any changes made to the namelist:
+  - Add namelist clubb_c14 (constant for u'^2 and v'^2 terms)
+
+List any changes to the defaults for the boundary datasets:
+
+Describe any substantial timing or memory changes:
+
+Code reviewed by:
+
+List all subroutines eliminated:
+
+List all subroutines added and what they do:
+
+List all existing files that have been modified, and describe the changes:
+
+M       components/cam/bld/build-namelist
+M       components/cam/bld/namelist_files/namelist_definition.xml
+          - Add clubb_c14 tuning namelist parameter
+
+M       components/cam/bld/namelist_files/namelist_defaults_cam.xml
+          - Change default value for clubb_c14 from 1. to 1.83
+
+M       components/cam/src/physics/cam/clubb_intr.F90
+          - Add clubb_c14 tuning namelist parameter
+          - Fix bug where clubb_do_liqsupersat was not being broadcast to all mpi tasks
+
+If there were any failures reported from running test_driver.sh on any test
+platform, and checkin with these failures has been OK'd by the gatekeeper,
+then copy the lines from the td.*.status files for the failed tests to the
+appropriate machine below.  All failed tests must be justified.
+
+yellowstone/intel: all BFB except:
+015 bl357 TBL.sh f1.9c5.5h outfrq3s+1850_cam55 9s .............................................FAIL! rc= 7 at Fri Sep 16 17:00:48 MDT 2016
+018 bl366 TBL.sh f1.9c5clbdh outfrq3s_clubb 9s ................................................FAIL! rc= 7 at Fri Sep 16 17:12:46 MDT 2016
+027 bl485 TBL.sh f1.9c5.5wtmam4h outfrq3s+waccm_tsmlt_2000_cam55 9s ...........................FAIL! rc= 7 at Fri Sep 16 17:52:47 MDT 2016
+047 bl470 TBL.sh fsd1.9c5.4wtclbh outfrq3s_sd+sd_waccm5_geos5 9s ..............................FAIL! rc= 7 at Fri Sep 16 19:10:06 MDT 2016
+
+
+yellowstone/intel/aux_cam:
+FAIL SMS_Ln9.f09_f09.F2000_DONOTUSE.yellowstone_intel.cam-outfrq9s NLCOMP
+       - added new namelist parameter
+
+FAIL SMS_Ln9.f09_f09.F2000_DONOTUSE.yellowstone_intel.cam-outfrq9s COMPARE_baseline
+       - expect the answers to change with the tuned parameter
+
+hobart/nag: all BFB except:
+055 bl356 TBL.sh fsd1.9c5clbdm off1.9x2.5 9s ..................................................FAIL! rc= 7 at Fri Sep 16 15:13:46 MDT 2016
+061 bl369 TBL.sh f1.9c5clbdm outfrq3s_clubb 9s ................................................FAIL! rc= 7 at Fri Sep 16 15:40:51 MDT 2016
+
+hobart/pgi or jaguar/pgi: all BFB (no CLUBB tests included in this testlist)
+
+CAM tag used for the baseline comparison tests if different than previous
+tag:
+
+Summarize any changes to answers, i.e.,
+- what code configurations: all runs which use CLUBB (including ones which use CAM5.5)
+- what platforms/compilers: all
+- nature of change (roundoff; larger than roundoff but same climate; new
+  climate): new climate
+
+If this tag changes climate describe the run(s) done to evaluate the new
+climate in enough detail that it(they) could be reproduced, i.e.,
+
+Case directories:
+/glade/p/cesmdata/cseg/runs/cesm1_5/f.e15.F2000.f09_f09.pd.114_cam5_4_75
+and:
+/glade/p/cesmdata/cseg/runs/cesm1_5/f.e15.F2000.f09_f09.pd.114_cam5_4_75_C14
+
+Output data:
+/glade/p/cesm0005/archive/f.e15.F2000.f09_f09.pd.114_cam5_4_75
+and
+/glade/p/cesm0005/archive/f.e15.F2000.f09_f09.pd.114_cam5_4_75_C14
+
+- MSS location of output
+  MSS location of control simulations used to validate new climate:
+    - Not stored on HPSS
+
+URL for AMWG diagnostics output used to validate new climate:
+http://webext.cgd.ucar.edu/FCLIMO/f.e15.F2000.f09_f09.pd.114_cam5_4_75/atm/f.e15.F2000.f09_f09.pd.114_cam5_4_75-f.e15.F2000.f09_f09.pd.114_cam5_4_75_C14/
+
+===============================================================
+===============================================================
+
+Tag name: cam5_4_83
+Originator(s): eaton, mvr, hannay, cacraig
+Date: Sept 15, 2016
+One-line Summary: radiation bugfix
+
+Purpose of changes:
+ - Mods were needed due to some refactoring in cloud_rad_props.F90.  The fix provided by Mat 
+   went into subroutine interpolate_ice_optics_lw and consequently needed to be applied to both 
+   snow and ice cloud optics and not just to the snow optics as in the original mod.  
+ - Changes were merged in from:  https://svn-ccsm-models.cgd.ucar.edu/cam1/branch_tags/rrtmg_tags/rrtmg01_cam5_4_79
+   These changes were identical to the ones that Cecile used in her testing
+ - added abs() to time_period_freq when the nhtfrq is negative (when specifying hours)
+
+Bugs fixed (include bugzilla ID):
+
+Describe any changes made to build system:
+
+Describe any changes made to the namelist:
+
+List any changes to the defaults for the boundary datasets:
+
+Describe any substantial timing or memory changes:
+
+Code reviewed by:
+
+List all subroutines eliminated:
+
+List all subroutines added and what they do:
+
+List all existing files that have been modified, and describe the changes:
+M       components/cam/src/control/cam_history.F90
+         - added abs() to nhtfrq when it is negative 
+
+M       components/cam/src/physics/cam/micro_mg_cam.F90
+         - replace '.lt.' by '.le.' at line 2248
+
+M       components/cam/src/physics/rrtmg/aer_src/rrtmg_lw_rtrnmc.f90
+         - fix the case where the diffusivity angle was going negative under very 
+           moist conditions
+         - the code has been changed so the interpolation for the lw ice optics has
+           been factored out and is now used for for the ice and snow cloud optics.
+           So the mod to limit the ice optical depths is now applied to both ice and
+           snow clouds.
+
+M       components/cam/src/physics/rrtmg/cloud_rad_props.F90
+         - Limit the snow/ice optical depths fix the case where there are large masses 
+           of snow at high altitudes
+
+If there were any failures reported from running test_driver.sh on any test
+platform, and checkin with these failures has been OK'd by the gatekeeper,
+then copy the lines from the td.*.status files for the failed tests to the
+appropriate machine below.  All failed tests must be justified.
+
+yellowstone/intel:
+011 bl353 TBL.sh f1.9c5.4dh outfrq3s 9s .......................................................FAIL! rc= 7 at Tue Sep 13 17:52:12 MDT 2016
+015 bl357 TBL.sh f1.9c5.5h outfrq3s+1850_cam55 9s .............................................FAIL! rc= 7 at Tue Sep 13 17:57:15 MDT 2016
+018 bl366 TBL.sh f1.9c5clbdh outfrq3s_clubb 9s ................................................FAIL! rc= 7 at Tue Sep 13 18:09:18 MDT 2016
+024 bl375 TBL.sh f1.9c5m volc+1850-2005_cam5 2d ...............................................FAIL! rc= 7 at Tue Sep 13 18:27:05 MDT 2016
+027 bl485 TBL.sh f1.9c5.5wtmam4h outfrq3s+waccm_tsmlt_2000_cam55 9s ...........................FAIL! rc= 7 at Tue Sep 13 18:47:22 MDT 2016
+036 bl421 TBL.sh f1.9c5mam4dh outfrq3s 9s .....................................................FAIL! rc= 7 at Tue Sep 13 19:09:05 MDT 2016
+041 bl430 TBL.sh f1.9c5mzmam3dh outfrq3s_NEUwetdep 9s .........................................FAIL! rc= 7 at Tue Sep 13 19:25:45 MDT 2016
+047 bl470 TBL.sh fsd1.9c5.4wtclbh outfrq3s_sd+sd_waccm5_geos5 9s ..............................FAIL! rc= 7 at Tue Sep 13 20:03:40 MDT 2016
+050 bl482 TBL.sh f1.9c5wscmam3dh outfrq3s_2005+waccm_sc_1955-2005_cam5 9s .....................FAIL! rc= 7 at Tue Sep 13 20:38:48 MDT 2016
+063 bl735 TBL.sh h16c5aqdm outfrq3s+aquaplanet_cam5 9s ........................................FAIL! rc= 7 at Tue Sep 13 21:03:18 MDT 2016
+068 bl740 TBL.sh h30c5h outfrq3s_lb0 9s .......................................................FAIL! rc= 7 at Tue Sep 13 21:07:52 MDT 2016
+
+yellowstone/intel/aux_cam:
+FAIL SMS_Ln9.f09_f09.F2000_DONOTUSE.yellowstone_intel.cam-outfrq9s COMPARE_baseline
+
+hobart/nag:
+005 bl111 TBL.sh e8c5t5mdm ttrac 9s ...........................................................FAIL! rc= 7 at Tue Sep 13 15:27:37 MD
+T 2016
+010 bl112 TBL.sh e8c5dm ghgrmp_e8 9s ..........................................................FAIL! rc= 7 at Tue Sep 13 15:31:46 MD
+T 2016
+014 bl114 TBL.sh e8c5dm co2rmp 9s .............................................................FAIL! rc= 7 at Tue Sep 13 15:35:19 MD
+T 2016
+021 bl311 TBL.sh f10c5t5mdm ttrac 9s ..........................................................FAIL! rc= 7 at Tue Sep 13 15:47:52 MD
+T 2016
+034 bl316 TBL.sh f10c5paqdm aqpgro+aquaplanet_cam5 3s .........................................FAIL! rc= 7 at Tue Sep 13 15:59:51 MD
+T 2016
+040 bl324 TBL.sh f4c4rrtmgdm outfrq3s 9s ......................................................FAIL! rc= 7 at Tue Sep 13 16:08:47 MD
+T 2016
+043 bl325 TBL.sh f10c5t5mdmsc outfrq3s_subcol 9s ..............................................FAIL! rc= 7 at Tue Sep 13 16:13:04 MD
+T 2016
+049 bl338 TBL.sh f10c5dm rad_diag_mam 9s ......................................................FAIL! rc= 7 at Tue Sep 13 16:16:40 MD
+T 2016
+052 bl354 TBL.sh f1.9c5.4dm outfrq3s_npryz 9s .................................................FAIL! rc= 7 at Tue Sep 13 16:29:12 MD
+T 2016
+055 bl356 TBL.sh fsd1.9c5clbdm off1.9x2.5 9s ..................................................FAIL! rc= 7 at Tue Sep 13 16:51:48 MD
+T 2016
+058 bl368 TBL.sh f1.9c5mg2dm outfrq3s_macmic2_classnuc 9s .....................................FAIL! rc= 7 at Tue Sep 13 17:03:56 MD
+T 2016
+061 bl369 TBL.sh f1.9c5clbdm outfrq3s_clubb 9s ................................................FAIL! rc= 7 at Tue Sep 13 17:19:11 MD
+T 2016
+064 bl734 TBL.sh h16c5naqdm outfrq3s_bam+aquaplanet_cam5 9s ...................................FAIL! rc= 7 at Tue Sep 13 17:26:15 MDT 2016
+067 bl422 TBL.sh f4c5mam4dm outfrq3s 9s .......................................................FAIL! rc= 7 at Tue Sep 13 17:31:31 MDT 2016
+073 bl471 TBL.sh f10c5wmam3dm outfrq3s_modalstrat 9s ..........................................FAIL! rc= 7 at Tue Sep 13 17:46:16 MDT 2016
+076 bl805 TBL.sh f4c5carmtt1dm outfrq3s_carma 9s ..............................................FAIL! rc= 7 at Tue Sep 13 18:01:57 MDT 2016
+079 bl011 TBL.sh f4c5portdm outfrq24h_port 2d .................................................FAIL! rc= 7 at Tue Sep 13 18:07:20 MDT 2016
+
+hobart/pgi or jaguar/pgi:
+005 bl111 TBL.sh e8c5t5mdm ttrac 9s ...........................................................FAIL! rc= 7 at Tue Sep 13 15:31:34 MDT 2016
+010 bl112 TBL.sh e8c5dm ghgrmp_e8 9s ..........................................................FAIL! rc= 7 at Tue Sep 13 15:39:34 MDT 2016
+012 bl113 TBL.sh e8c5paqdm aqpgro+aquaplanet_cam5 3s ..........................................FAIL! rc= 7 at Tue Sep 13 15:45:51 MDT 2016
+016 bl114 TBL.sh e8c5dm co2rmp 9s .............................................................FAIL! rc= 7 at Tue Sep 13 15:48:35 MDT 2016
+023 bl311 TBL.sh f10c5t5mdm ttrac 9s ..........................................................FAIL! rc= 7 at Tue Sep 13 16:01:56 MDT 2016
+038 bl316 TBL.sh f10c5paqdm aqpgro+aquaplanet_cam5 3s .........................................FAIL! rc= 7 at Tue Sep 13 16:35:51 MDT 2016
+041 bl317 TBL.sh f10c5cdm outfrq3s 9s .........................................................FAIL! rc= 7 at Tue Sep 13 16:44:56 MDT 2016
+045 bl319 TBL.sh f10c5nonedm outfrq3s_bam 9s ..................................................FAIL! rc= 7 at Tue Sep 13 16:51:58 MDT 2016
+048 bl320 TBL.sh f10c5nonedm rad_diag 9s ......................................................FAIL! rc= 7 at Tue Sep 13 16:53:39 MDT 2016
+051 bl321 TBL.sh f10c5cdm atrain 9s ...........................................................FAIL! rc= 7 at Tue Sep 13 16:56:58 MDT 2016
+054 bl334 TBL.sh f10c5udm outfrq3s 9s .........................................................FAIL! rc= 7 at Tue Sep 13 17:05:15 MDT 2016
+057 bl354 TBL.sh f1.9c5.4dm outfrq3s_npryz 9s .................................................FAIL! rc= 7 at Tue Sep 13 17:25:06 MDT 2016
+060 bl420 TBL.sh f4c5mam7dm outfrq3s 9s .......................................................FAIL! rc= 7 at Tue Sep 13 17:36:01 MDT 2016
+063 bl422 TBL.sh f4c5mam4dm outfrq3s 9s .......................................................FAIL! rc= 7 at Tue Sep 13 17:46:07 MDT 2016
+066 bl734 TBL.sh h16c5naqdm outfrq3s_bam+aquaplanet_cam5 9s ...................................FAIL! rc= 7 at Tue Sep 13 17:58:34 MDT 2016
+068 bl011 TBL.sh f4c5portdm outfrq24h_port 2d .................................................FAIL! rc= 7 at Tue Sep 13 18:05:53 MDT 2016
+
+CAM tag used for the baseline comparison tests if different than previous
+tag:
+
+Summarize any changes to answers, i.e.,
+- what code configurations: all which use rrtmg radiation
+- what platforms/compilers: all
+- nature of change (roundoff; larger than roundoff but same climate; new
+  climate): larger than roundoff, but not climate changing
+
+URL for AMWG diagnostics output:
+http://webext.cgd.ucar.edu/FCLIMO/f.e15.F2000.f09_f09.pd.100_rrtmg_cam5_4_79/atm/f.e15.F2000.f09_f09.pd.100_rrtmg_cam5_4_79-f.e15.F2000.f09_f09.pd.100_cam5_4_79/
+
+===============================================================
+===============================================================
+
+Tag name: cam5_4_82
+Originator(s): cacraig, aliceb, mvertens, fvitt, mmills
+Date: September 13, 2016
+One-line Summary: Update to cime5.0.11 and other misc changes
+
+Purpose of changes:
+ - Update to cime5.0.11 to eliminate problem with --generate flag
+   on create_test
+ - Received from aliceb, bug fix for time_period_freq 
+ - Received from mvertens, bug fix for config_compsets
+ - Changed CAM54 to CAM60 in WACCM FW5 compset (per fvitt and mmills)
+
+Bugs fixed (include bugzilla ID):
+   - bug fix for time_period_freq in cam_history.F90
+   - bug fix in config_compsets when specifying grid=gland
+
+Describe any changes made to build system:
+
+Describe any changes made to the namelist:
+
+List any changes to the defaults for the boundary datasets:
+
+Describe any substantial timing or memory changes:
+
+Code reviewed by:
+
+List all subroutines eliminated:
+
+List all subroutines added and what they do:
+
+List all existing files that have been modified, and describe the changes:
+ M      .
+M       SVN_EXTERNAL_DIRECTORIES
+           - update to cime5.0.11 as cime5.0.8 had answer changes when using 
+             the --generate flag in create_test
+
+M       components/cam/cime_config/config_component.xml
+           - removed CAM54 
+
+M       components/cam/cime_config/config_compsets.xml
+           - changed the CAM54 reference in FW5 to CAM60
+           - grid=gland is now specified properly
+
+M       components/cam/src/control/cam_history.F90
+           - when calculating time_period_freq, convert nhtfrq to always be in seconds 
+             (when it is negative it is the number of hours)
+
+If there were any failures reported from running test_driver.sh on any test
+platform, and checkin with these failures has been OK'd by the gatekeeper,
+then copy the lines from the td.*.status files for the failed tests to the
+appropriate machine below.  All failed tests must be justified.
+
+yellowstone/intel: all BFB
+
+yellowstone/intel/aux_cam: (compared with cam5_4_80 as cam5_4_81 had differences due to a bug in cime)
+FAIL SMS_Ln9.f09_f09.F2000_DONOTUSE.yellowstone_intel.cam-outfrq9s COMPARE_baseline
+      - As discovered in cam5_4_81, the two files which had differences were the clm2.h0 and cpl.hi files.
+        In both cases, the only two fields which had differences (and they were roundoff level)
+        were VOLR and VOLRMCH (and the coupler versions of these fields).  Bill Sacks said that 
+        these two fields can exhibit roundoff level differences and CLM has learned to ignore them.
+
+hobart/nag: all BFB
+
+hobart/pgi or jaguar/pgi: all BFB
+
+CAM tag used for the baseline comparison tests if different than previous
+tag: cam5_4_80 - cam5_4_81 was BFB with cam5_4_80 but had answer differences in the aux_cam test due to
+     a bug in cime.  For convenience, used cam5_4_80 for all the baseline comparisons
+
+===============================================================
+===============================================================
+
+Tag name: cam5_4_81
+Originator(s): mvertens, santos, jedwards, cacraig
+Date: August 19, 2016
+One-line Summary: Update to CESM2 beta01 externals (cime5)
+
+Purpose of changes:
+  - Updates necessary to work with the new version of CIME.
+
+Bugs fixed (include bugzilla ID):
+
+Describe any changes made to build system:
+
+Describe any changes made to the namelist:
+
+List any changes to the defaults for the boundary datasets:
+
+Describe any substantial timing or memory changes:
+
+Code reviewed by:
+
+List all subroutines eliminated:
+
+List all subroutines added and what they do:
+
+List all existing files that have been modified, and describe the changes:
+
+ M      .
+M       SVN_EXTERNAL_DIRECTORIES
+        - Update the externals to match CESM beta01
+
+M       components/cam/bld/configure
+        - The CIME/CESM scripts now look for a file called "CESM_cppdefs"
+          instead of "CCSM_cppdefs", so configure has to output to that file.
+
+M       components/cam/cime_config/buildlib
+M       components/cam/cime_config/buildnml
+        - These CIME scripts are translated from Perl to Python.
+        - Queries to XML files now use CIME Python modules rather than xmlquery,
+          which substantially improves buildnml timing in CIME.
+
+M       components/cam/cime_config/config_component.xml
+M       components/cam/cime_config/config_compsets.xml
+        - Compatibility fixes for new CIME scripts.
+        - Compset long names always use two version numbers for CAM (i.e. CAM40,
+          CAM50, and CAM55).
+        - WACCM+CLUBB compsets are now specified by using CAM55%WC*, so the
+          %WCCB modifier is removed.
+
+M       components/cam/test/system/TSM_ccsm.sh
+        - The CIMEROOT environment variable must be specified when running the
+          CIME run script.
+
+M       components/cam/test/system/test_driver.sh
+        - added CAM_TAG which is used in the aux_cam create_testcase to generate
+          the automatic baseline files for the CESM test(s)
+        - The Python module must be loaded on yellowstone so that Python 2.7 is
+          available for the CIME scripts.
+
+M       components/cam/cime_config/testdefs/testmods_dirs/cam/chemproc/shell_commands
+M       components/cam/cime_config/testdefs/testmods_dirs/cam/cosp/shell_commands
+M       components/cam/cime_config/testdefs/testmods_dirs/cam/outfrq1d/shell_commands
+M       components/cam/cime_config/testdefs/testmods_dirs/cam/outfrq3d/shell_commands
+M       components/cam/cime_config/testdefs/testmods_dirs/cam/outfrq9s/shell_commands
+M       components/cam/cime_config/testdefs/testmods_dirs/cam/outfrq9s_sat_hist/shell_commands
+M       components/cam/cime_config/testdefs/testmods_dirs/cam/outfrq9s_wse/shell_commands
+        - cleaned up shell commands
+
+M       components/cam/cime_config/config_pes.xml
+        - change WACCM pe layouts to be for any version, not just cam4 or cam5
+
+If there were any failures reported from running test_driver.sh on any test
+platform, and checkin with these failures has been OK'd by the gatekeeper,
+then copy the lines from the td.*.status files for the failed tests to the
+appropriate machine below.  All failed tests must be justified.
+
+yellowstone/intel: all BFB
+
+yellowstone/intel/aux_cam:
+FAIL SMS_Ln9.f09_f09.F2000_DONOTUSE.yellowstone_intel.cam-outfrq9s COMPARE_baseline
+      - Upon further investigation, the two files which had differences were the clm2.h0 and cpl.hi files.
+        In both cases, the only two fields which had differences (and they were roundoff level)
+        were VOLR and VOLRMCH (and the coupler versions of these fields).  Bill Sacks said that 
+        these two fields can exhibit roundoff level differences and CLM has learned to ignore them.
+
+hobart/nag: all BFB
+
+hobart/pgi or jaguar/pgi: all BFB
+
+===============================================================
+===============================================================
+
+Tag name: cam5_4_80
+Originator(s): goldy
+Date: 2016-08-17
+One-line Summary: Create separate package for simple physics options
+
+Purpose of changes: Create a new physics package for adiabatic and
+        Held-Suarez simulations in order to enable incorporation of other
+        idealized or simplified physics parameterizations.
+
+Bugs fixed (include bugzilla ID): NA
+
+Describe any changes made to build system: NA
+
+Describe any changes made to the namelist: NA
+
+List any changes to the defaults for the boundary datasets:
+ - New default datasets for Eulerian Held-Suarez simulations
+   HS1994.128x256.L30_c062216.nc
+   HS1994.128x256.L60_c061516.nc
+   HS1994.64x128.L30_c061616.nc
+
+Describe any substantial timing or memory changes: NA
+
+Code reviewed by: Eaton, Craig, Vitt
+
+List all subroutines eliminated:
+ - phys_run1_adiabatic_or_ideal -- replaced with simple/physpkg
+ - tphysidl -- replace with proper Held-Suarez parameterization
+
+List all subroutines added and what they do:
+A  +    components/cam/bld/namelist_files/use_cases/held_suarez_1994.xml
+ - Use cases for Held-Suarez runs for Simpler Models project
+A  +    components/cam/src/physics/simple
+ - New directory to hold various simplified physics options
+A  +    components/cam/src/physics/simple/physpkg.F90
+ - Separate physpkg interfaces for simplified physics options
+A       components/cam/src/physics/simple/held_suarez.F90
+ - Portable layer Held-Suarez tendency calculation
+A       components/cam/src/physics/simple/held_suarez_cam.F90
+ - CAM interface layer for Held-Suarez parameterization
+M       components/cam/src/control/cam_control_mod.F90
+ - cam_ctrl_set_physics_type: Set physics type after namelist read
+
+List all existing files that have been modified, and describe the changes:
+M       components/cam/bld/config_files/definition.xml
+ - Changed name of ideal physics package to held_suarez
+M       components/cam/bld/configure
+ - Changed name of ideal physics package to held_suarez. Added simple_phys
+    variable to help keep track of new simple physics options.
+ - Removed trailing spaces.
+M       components/cam/bld/namelist_files/namelist_definition.xml
+ - Fix some history documentation (the max number of history files is larger)
+M       components/cam/cime_config/config_component.xml
+ - Change IDEAL to HS94 for the -phys held_suarez configuration option
+M       components/cam/cime_config/config_compsets.xml
+ - Change the FIDEAL compset to FHS94
+M       components/cam/cime_config/config_pes.xml
+ - Took out redundant EOS entry at request of jedwards.
+M       components/cam/doc/ChangeLog
+ - Had Watson fill out cam5_4_80 entry
+M       components/cam/src/control/cam_comp.F90
+ - cam_init no longer takes adiabatic or ideal_phys inputs
+M       components/cam/src/control/cam_control_mod.F90
+ - cam_ctrl_init no longer takes adiabatic or ideal_phys inputs
+ - new subroutine, cam_ctrl_set_physics_type (see above)
+M       components/cam/src/control/cam_history.F90
+ - Remove SPMD and use real MPI calls
+M       components/cam/src/control/camsrfexch.F90
+ - Make wet pbuf fields optional
+M       components/cam/src/cpl/atm_comp_mct.F90
+ - No longer look for adiabatic or ideal_phys in infodata
+M       components/cam/src/dynamics/eul/tfilt_massfix.F90
+ - Skip energy fixer for Held-Suarez simulations
+M       components/cam/src/physics/cam/cam_diagnostics.F90
+ - Separated code into dry and moist sections. Moist sections are only
+    called for moist physics runs
+M       components/cam/src/physics/cam/microp_driver.F90
+ - Include name of microp_scheme if unrecognized
+M       components/cam/src/physics/cam/phys_control.F90
+ - Call cam_ctrl_set_physics_type to set physics type after namelist read
+ - Replace MPI shorthand with real MPI
+M       components/cam/src/physics/cam/physics_buffer.F90.in
+ - Improved endrun message for out of range error in pbuf_get_field
+M       components/cam/src/physics/cam/physpkg.F90
+ - Removed simple physics options (adiabatic and Held-Suarez)
+ - Replace MPI shorthand with real MPI
+M       components/cam/test/system/config_files/e48idh
+M       components/cam/test/system/config_files/e8idm
+M       components/cam/test/system/config_files/f10idm
+M       components/cam/test/system/config_files/f4idm
+M       components/cam/test/system/config_files/s32idh
+M       components/cam/test/system/config_files/s48idh
+M       components/cam/test/system/config_files/s64idh
+ - Replaced '-phys ideal' with '-phys held_suarez'
+M       components/cam/test/system/nl_files/idphys
+ - Added a second history file with U,V,T,TTEND_TOT,DTCORE
+M       components/cam/test/system/test_driver.sh
+ - Add an option (-e) to email test summary to USER (or at least try)
+ - Create test summary and add to cam_test_summaries (and maybe also email)
+ - Added code to run CAM AUX tests but need CIME 5 to get working.
+
+If there were any failures reported from running test_driver.sh on any test
+platform, and checkin with these failures has been OK'd by the gatekeeper,
+then copy the lines from the td.*.status files for the failed tests to the
+appropriate machine below.  All failed tests must be justified.
+
+yellowstone/intel: All Pass
+
+yellowstone/intel/aux_cam: All Pass
+
+hobart/nag: Timestep relaxation filter removed from Held-Suarez parameterization
+047 bl335 TBL.sh f10idm idphys 9s .............................................................FAIL! rc= 7 at Wed Aug 17 17:21:46 MDT 2016
+
+hobart/pgi: Timestep relaxation filter removed from Held-Suarez parameterization
+019 bl115 TBL.sh e8idm idphys 9s ..............................................................FAIL! rc= 7 at Wed Aug 17 16:55:29 MDT 2016
+
+CAM tag used for the baseline comparison tests if different than previous
+tag:
+
+Summarize any changes to answers, i.e.,
+- what code configurations:
+- what platforms/compilers:
+- nature of change (roundoff; larger than roundoff but same climate; new
+  climate): Held-Suarez tests are larget than roundoff due to removal of
+	model timestep-based relaxation (parameterization matches original
+	1994 paper). Also, QRS diagnostic is purely the temperature
+	tendency from the heating rate (previous version also included
+	dycore energy fix).
+
+If bitwise differences were observed, how did you show they were no worse
+than roundoff?
+
+If this tag changes climate describe the run(s) done to evaluate the new
+climate in enough detail that it(they) could be reproduced, i.e.,
+- source tag (all code used must be in the repository):
+- platform/compilers: Long runs were conducted per 1994 paper. Evaluation
+	is on Simpler Models page (https://www2.cesm.ucar.edu/models/simpler-models/dynamical-core-test/adiabatic).
+
+MSS location of control simulations used to validate new climate: NA
+
+URL for AMWG diagnostics output used to validate new climate: NA
+
+===============================================================
+===============================================================
+
+Tag name: cam5_4_79
+Originator(s): cacraig, hannay
+Date: Aug 10, 2016
+One-line Summary: Add F2000_DONOTUSE compset
+
+Purpose of changes:
+- In preparation for the release, the compset F2000_DONOTUSE has been created.
+  This compset will be modified as directed by Cecile to mimic her setups.
+  NOTE--THIS COMPSET IS NOT TO BE USED BY OTHER DEVELOPERS AT THIS TIME
+
+Bugs fixed (include bugzilla ID):
+
+Describe any changes made to build system:
+
+Describe any changes made to the namelist:
+
+List any changes to the defaults for the boundary datasets:
+
+Describe any substantial timing or memory changes:
+
+Code reviewed by:
+
+List all subroutines eliminated:
+
+List all subroutines added and what they do:
+A       components/cam/bld/namelist_files/use_cases/2000_cam6.xml
+          - Preliminary use_case for F2000 CAM6 setup 
+           **   THIS USE_CASE MAY BE MODIFIED UP UNTIL THE CESM2 RELEASE
+
+List all existing files that have been modified, and describe the changes:
+ M      .
+M       SVN_EXTERNAL_DIRECTORIES
+          - added cism, ww3, and mosart libraries, so that F2000 runs may
+            be made with CAM checkout
+
+M       components/cam/cime_config/config_component.xml
+          - add use_case for current 2000_cam55
+
+M       components/cam/cime_config/config_compsets.xml
+          - added F2000_DONOTUSE compset information
+
+M       components/cam/cime_config/testdefs/testlist_cam.xml
+          - add yellowstone, intel F2000_DONOTUSE regression test
+
+M       components/cam/doc/ChangeLog_template
+          - added new yellowstone aux_cam test reporting
+
+If there were any failures reported from running test_driver.sh on any test
+platform, and checkin with these failures has been OK'd by the gatekeeper,
+then copy the lines from the td.*.status files for the failed tests to the
+appropriate machine below.  All failed tests must be justified.
+
+yellowstone/intel:
+
+yellowstone/intel/aux_cam: new test - no baseline to compare against
+   To run the new aux_cam tests (inside cime/scripts):
+     ./create_test -xml_mach yellowstone -xml_compiler intel -xml_category aux_cam -testid cam5_4_79 -generate cam5_4_79
+     The summary can be seen in the file TestStatus
+
+ -- ran the F2000_DONOTUSE test by hand and compared F2000_DONOTUSE results with cam5_4_70 
+    and it was BFB
+
+hobart/nag:
+
+hobart/pgi or jaguar/pgi:
+
+CAM tag used for the baseline comparison tests if different than previous
+tag:
+
+Summarize any changes to answers, i.e.,
+- what code configurations:
+- what platforms/compilers:
+- nature of change (roundoff; larger than roundoff but same climate; new
+  climate):
+
+If bitwise differences were observed, how did you show they were no worse
+than roundoff?
+
+If this tag changes climate describe the run(s) done to evaluate the new
+climate in enough detail that it(they) could be reproduced, i.e.,
+- source tag (all code used must be in the repository):
+- platform/compilers:
+- configure commandline:
+- build-namelist command (or complete namelist):
+- MSS location of output:
+
+MSS location of control simulations used to validate new climate:
+
+URL for AMWG diagnostics output used to validate new climate:
+
+===============================================================
+===============================================================
+
+Tag name: cam5_4_78
+Originator(s): goldy
+Date: 2016-08-01
+One-line Summary: New Hobart environment + small fixes
+
+Purpose of changes:
+ - Modify test_driver for new Hobart environment (NAG 6.1)
+ - Small fix to makefile
+ - Adjust SPCAM regression test
+
+Bugs fixed (include bugzilla ID): NA
+
+Describe any changes made to build system: NAG 6.1 plus update mismatch flag
+
+Describe any changes made to the namelist: NA
+
+List any changes to the defaults for the boundary datasets: NA
+
+Describe any substantial timing or memory changes: NA
+
+Code reviewed by: goldy, cacraig
+
+List all subroutines eliminated: NA
+
+List all subroutines added and what they do: NA
+
+List all existing files that have been modified, and describe the changes:
+M       components/cam/bld/Makefile.in
+ - Added mpi_alltoallw to the NAG mismatch flags (-wmismatch)
+M       components/cam/bld/namelist_files/namelist_defaults_cam.xml
+ - Corrected the default value of eul_hdif_coef for T85 and T42 cases
+M       components/cam/doc/ChangeLog
+ - Dusted off the old template filling auto-bot
+M       components/cam/src/dynamics/fv/pfixer.F90
+ - Corrected incorrect usage of mpi_allgatherv (overlapping send and dest)
+M       components/cam/test/system/config_files/f10c5spcamsm
+ - Modified spcam_nx to be 32
+M       components/cam/test/system/test_driver.sh
+ - Updated NAG compiler to 6.1
+ - Do not separately load an MPI library (only compiler module load).
+
+If there were any failures reported from running test_driver.sh on any test
+platform, and checkin with these failures has been OK'd by the gatekeeper,
+then copy the lines from the td.*.status files for the failed tests to the
+appropriate machine below.  All failed tests must be justified.
+
+yellowstone/intel: All PASS
+
+hobart/nag: Roundoff-level changes due to compiler update
+005 bl111 TBL.sh e8c5t5mdm ttrac 9s ...........................................................FAIL! rc= 7 at Mon Aug  1 13:12:57 MDT 2016
+010 bl112 TBL.sh e8c5dm ghgrmp_e8 9s ..........................................................FAIL! rc= 7 at Mon Aug  1 13:18:10 MDT 2016
+014 bl114 TBL.sh e8c5dm co2rmp 9s .............................................................FAIL! rc= 7 at Mon Aug  1 13:22:43 MDT 2016
+017 bl221 TBL.sh f10c5spcamsm outfrq3s 9s .....................................................FAIL! rc= 7 at Mon Aug  1 13:30:09 MDT 2016
+021 bl311 TBL.sh f10c5t5mdm ttrac 9s ..........................................................FAIL! rc= 7 at Mon Aug  1 13:36:31 MDT 2016
+034 bl316 TBL.sh f10c5paqdm aqpgro+aquaplanet_cam5 3s .........................................FAIL! rc= 7 at Mon Aug  1 13:50:01 MDT 2016
+040 bl324 TBL.sh f4c4rrtmgdm outfrq3s 9s ......................................................FAIL! rc= 7 at Mon Aug  1 13:59:39 MDT 2016
+043 bl325 TBL.sh f10c5t5mdmsc outfrq3s_subcol 9s ..............................................FAIL! rc= 7 at Mon Aug  1 14:04:11 MDT 2016
+049 bl338 TBL.sh f10c5dm rad_diag_mam 9s ......................................................FAIL! rc= 7 at Mon Aug  1 14:08:44 MDT 2016
+052 bl354 TBL.sh f1.9c5.4dm outfrq3s_npryz 9s .................................................FAIL! rc= 7 at Mon Aug  1 14:21:07 MDT 2016
+055 bl356 TBL.sh fsd1.9c5clbdm off1.9x2.5 9s ..................................................FAIL! rc= 7 at Mon Aug  1 14:43:05 MDT 2016
+058 bl368 TBL.sh f1.9c5mg2dm outfrq3s_macmic2_classnuc 9s .....................................FAIL! rc= 7 at Mon Aug  1 14:54:56 MDT 2016
+061 bl369 TBL.sh f1.9c5clbdm outfrq3s_clubb 9s ................................................FAIL! rc= 7 at Mon Aug  1 15:09:49 MDT 2016
+064 bl734 TBL.sh h16c5naqdm outfrq3s_bam+aquaplanet_cam5 9s ...................................FAIL! rc= 7 at Mon Aug  1 15:16:31 MDT 2016
+067 bl422 TBL.sh f4c5mam4dm outfrq3s 9s .......................................................FAIL! rc= 7 at Mon Aug  1 15:21:34 MDT 2016
+070 bl426 TBL.sh f10c4wmxdm outfrq3s_ionos 9s .................................................FAIL! rc= 7 at Mon Aug  1 15:28:29 MDT 2016
+073 bl471 TBL.sh f10c5wmam3dm outfrq3s_modalstrat 9s ..........................................FAIL! rc= 7 at Mon Aug  1 15:36:22 MDT 2016
+076 bl805 TBL.sh f4c5carmtt1dm outfrq3s_carma 9s ..............................................FAIL! rc= 7 at Mon Aug  1 15:52:15 MDT 2016
+079 bl011 TBL.sh f4c5portdm outfrq24h_port 2d .................................................FAIL! rc= 7 at Mon Aug  1 15:57:46 MDT 2016
+
+hobart/pgi: ALL PASS
+
+CAM tag used for the baseline comparison tests if different than previous
+tag:
+
+Summarize any changes to answers, i.e.,
+- what code configurations:
+- what platforms/compilers:
+- nature of change (roundoff; larger than roundoff but same climate; new
+  climate): roundoff level diffs in some NAG baseline tests
+
+If bitwise differences were observed, how did you show they were no worse
+than roundoff?
+ - Hand examine cprnc output
+
+If this tag changes climate describe the run(s) done to evaluate the new
+climate in enough detail that it(they) could be reproduced, i.e.,
+- source tag (all code used must be in the repository): NA
+
+MSS location of control simulations used to validate new climate: NA
+
+URL for AMWG diagnostics output used to validate new climate: NA
+
+===============================================================
+===============================================================
+
+Tag name: cam5_4_77
+Originator(s): goldy
+Date: 2016-07-09
+One-line Summary: Fix default constant initialization bug
+
+Purpose of changes: Fix default constant initialization bug in SE
+
+Bugs fixed (include bugzilla ID): NA
+
+Describe any changes made to build system: NA
+
+Describe any changes made to the namelist: NA
+
+List any changes to the defaults for the boundary datasets: NA
+
+Describe any substantial timing or memory changes: NA
+
+Code reviewed by: goldy
+
+List all subroutines eliminated: NA
+
+List all subroutines added and what they do: NA
+
+List all existing files that have been modified, and describe the changes:
+M       components/cam/doc/ChangeLog
+ - Adding yet another wall of shame
+M       components/cam/src/dynamics/se/dyn_comp.F90
+ - Set redundant tracer points to zero before boundary exchange
+A         f10c5spcamsm
+ - Config file for testing SPCAM (should have been added to cam5_4_76)
+
+If there were any failures reported from running test_driver.sh on any test
+platform, and checkin with these failures has been OK'd by the gatekeeper,
+then copy the lines from the td.*.status files for the failed tests to the
+appropriate machine below.  All failed tests must be justified.
+
+yellowstone/intel: All PASS
+
+hobart/nag: All PASS
+
+hobart/pgi: All PASS
+
+CAM tag used for the baseline comparison tests if different than previous
+tag: NA
+
+Summarize any changes to answers, i.e.,
+- what code configurations:
+- what platforms/compilers:
+- nature of change (roundoff; larger than roundoff but same climate; new
+  climate): NA
+
+If bitwise differences were observed, how did you show they were no worse
+than roundoff? NA
+
+If this tag changes climate describe the run(s) done to evaluate the new
+climate in enough detail that it(they) could be reproduced, i.e.,
+- source tag (all code used must be in the repository): NA
+
+===============================================================
+===============================================================
+
+Tag name: cam5_4_76
+Originator(s): cacraig, mark@atmos.colostate.edu, minghuai.wang@nju.edu.cn
+Date: July 8, 2016
+One-line Summary: super-parameterized CAM (SPCAM)
+
+Purpose of changes:
+ - Super-parameterized CAM (SPCAM) implements a 2D cloud resolving model (the
+   System for Atmospheric Modeling SAM, version 6.8.2) in CAM.  When it is turned on,
+   it replaces CAM's parameterization for moist convection and large-scale condensation
+   with this alternate model.
+ - At this time, only the sam1mom (One moment SAM microphysics) version of SPCAM is allowed.
+   The m2005 version (two moment microphysics) is awaiting scientific verification before will be enabled.
+ - The SPCAM package allows CLUBB to be used or not.  It is important to note that there is
+   a SPCAM-specific version of CLUBB within the CRM package and it is not the same CLUBB being
+   used by CAM.
+
+Bugs fixed (include bugzilla ID):
+
+Describe any changes made to build system:
+  - introduced two new options to -phys:  sam1mom and m2005 (though m2005 is not currently enabled)
+  - New configure options:
+     spcam_clubb_sgs: turns on the SPCAM version of CLUBB
+     spcam_nx:        SPCAM's x-grid.  defaults to 4
+     spcam_ny:        SPCAM's y-grid
+     spcam_dx:        SPCAM's horizontal grid spacing
+     spcam_dt         SPCAM's timestep
+
+Describe any changes made to the namelist:
+
+List any changes to the defaults for the boundary datasets:
+
+Describe any substantial timing or memory changes:
+
+Code reviewed by: eaton and CAM softwared engineering team
+
+List all subroutines eliminated:
+
+List all subroutines added and what they do:
+A       components/cam/src/physics/cam/spcam_drivers.F90
+         - driver interface routines between CAM and SPCAM
+
+A       components/cam/src/physics/spcam/crm_physics.F90
+         - wrapper routines around the CRM package
+
+A       components/cam/src/physics/spcam/crmclouds_camaerosols.F90
+         - subroutines to use cloud fields from the CRM model within CAM
+
+A       components/cam/src/physics/spcam/crmdims.F90
+         - module to setup crm dimensions
+
+A       components/cam/src/physics/spcam
+A       components/cam/src/physics/spcam/crm
+A       components/cam/src/physics/spcam/crm/ADV_MPDATA
+A       components/cam/src/physics/spcam/crm/ADV_MPDATA/crmx_advect_scalar.F90
+A       components/cam/src/physics/spcam/crm/ADV_MPDATA/crmx_advect_scalar2D.F90
+A       components/cam/src/physics/spcam/crm/ADV_MPDATA/crmx_advect_scalar3D.F90
+A       components/cam/src/physics/spcam/crm/ADV_MPDATA/crmx_advection.F90
+A       components/cam/src/physics/spcam/crm/CLUBB
+A       components/cam/src/physics/spcam/crm/CLUBB/crmx_Skw_module.F90
+A       components/cam/src/physics/spcam/crm/CLUBB/crmx_T_in_K_module.F90
+A       components/cam/src/physics/spcam/crm/CLUBB/crmx_advance_helper_module.F90
+A       components/cam/src/physics/spcam/crm/CLUBB/crmx_advance_windm_edsclrm_module.F90
+A       components/cam/src/physics/spcam/crm/CLUBB/crmx_advance_wp2_wp3_module.F90
+A       components/cam/src/physics/spcam/crm/CLUBB/crmx_advance_xm_wpxp_module.F90
+A       components/cam/src/physics/spcam/crm/CLUBB/crmx_advance_xp2_xpyp_module.F90
+A       components/cam/src/physics/spcam/crm/CLUBB/crmx_anl_erf.F90
+A       components/cam/src/physics/spcam/crm/CLUBB/crmx_array_index.F90
+A       components/cam/src/physics/spcam/crm/CLUBB/crmx_calendar.F90
+A       components/cam/src/physics/spcam/crm/CLUBB/crmx_clip_explicit.F90
+A       components/cam/src/physics/spcam/crm/CLUBB/crmx_clip_semi_implicit.F90
+A       components/cam/src/physics/spcam/crm/CLUBB/crmx_clubb_core.F90
+A       components/cam/src/physics/spcam/crm/CLUBB/crmx_clubb_precision.F90
+A       components/cam/src/physics/spcam/crm/CLUBB/crmx_constants_clubb.F90
+A       components/cam/src/physics/spcam/crm/CLUBB/crmx_corr_matrix_module.F90
+A       components/cam/src/physics/spcam/crm/CLUBB/crmx_csr_matrix_class_3array.F90
+A       components/cam/src/physics/spcam/crm/CLUBB/crmx_diagnose_correlation_module.f90
+A       components/cam/src/physics/spcam/crm/CLUBB/crmx_diffusion.F90
+A       components/cam/src/physics/spcam/crm/CLUBB/crmx_endian.F90
+A       components/cam/src/physics/spcam/crm/CLUBB/crmx_error_code.F90
+A       components/cam/src/physics/spcam/crm/CLUBB/crmx_extrapolation.F90
+A       components/cam/src/physics/spcam/crm/CLUBB/crmx_file_functions.F90
+A       components/cam/src/physics/spcam/crm/CLUBB/crmx_fill_holes.F90
+A       components/cam/src/physics/spcam/crm/CLUBB/crmx_gmres_cache.F90
+A       components/cam/src/physics/spcam/crm/CLUBB/crmx_gmres_wrap.F90
+A       components/cam/src/physics/spcam/crm/CLUBB/crmx_grid_class.F90
+A       components/cam/src/physics/spcam/crm/CLUBB/crmx_hydrostatic_module.F90
+A       components/cam/src/physics/spcam/crm/CLUBB/crmx_hyper_diffusion_4th_ord.F90
+A       components/cam/src/physics/spcam/crm/CLUBB/crmx_input_names.F90
+A       components/cam/src/physics/spcam/crm/CLUBB/crmx_input_reader.F90
+A       components/cam/src/physics/spcam/crm/CLUBB/crmx_interpolation.F90
+A       components/cam/src/physics/spcam/crm/CLUBB/crmx_lapack_wrap.F90
+A       components/cam/src/physics/spcam/crm/CLUBB/crmx_matrix_operations.F90
+A       components/cam/src/physics/spcam/crm/CLUBB/crmx_mean_adv.F90
+A       components/cam/src/physics/spcam/crm/CLUBB/crmx_mixing_length.F90
+A       components/cam/src/physics/spcam/crm/CLUBB/crmx_model_flags.F90
+A       components/cam/src/physics/spcam/crm/CLUBB/crmx_mono_flux_limiter.F90
+A       components/cam/src/physics/spcam/crm/CLUBB/crmx_mt95.f90
+A       components/cam/src/physics/spcam/crm/CLUBB/crmx_numerical_check.F90
+A       components/cam/src/physics/spcam/crm/CLUBB/crmx_output_grads.F90
+A       components/cam/src/physics/spcam/crm/CLUBB/crmx_output_netcdf.F90
+A       components/cam/src/physics/spcam/crm/CLUBB/crmx_parameter_indices.F90
+A       components/cam/src/physics/spcam/crm/CLUBB/crmx_parameters_microphys.F90
+A       components/cam/src/physics/spcam/crm/CLUBB/crmx_parameters_model.F90
+A       components/cam/src/physics/spcam/crm/CLUBB/crmx_parameters_radiation.F90
+A       components/cam/src/physics/spcam/crm/CLUBB/crmx_parameters_tunable.F90
+A       components/cam/src/physics/spcam/crm/CLUBB/crmx_pdf_closure_module.F90
+A       components/cam/src/physics/spcam/crm/CLUBB/crmx_pdf_parameter_module.F90
+A       components/cam/src/physics/spcam/crm/CLUBB/crmx_pos_definite_module.F90
+A       components/cam/src/physics/spcam/crm/CLUBB/crmx_saturation.F90
+A       components/cam/src/physics/spcam/crm/CLUBB/crmx_sigma_sqd_w_module.F90
+A       components/cam/src/physics/spcam/crm/CLUBB/crmx_sponge_layer_damping.F90
+A       components/cam/src/physics/spcam/crm/CLUBB/crmx_stat_file_module.F90
+A       components/cam/src/physics/spcam/crm/CLUBB/crmx_stats_LH_sfc.F90
+A       components/cam/src/physics/spcam/crm/CLUBB/crmx_stats_LH_zt.F90
+A       components/cam/src/physics/spcam/crm/CLUBB/crmx_stats_rad_zm.F90
+A       components/cam/src/physics/spcam/crm/CLUBB/crmx_stats_rad_zt.F90
+A       components/cam/src/physics/spcam/crm/CLUBB/crmx_stats_sfc.F90
+A       components/cam/src/physics/spcam/crm/CLUBB/crmx_stats_subs.F90
+A       components/cam/src/physics/spcam/crm/CLUBB/crmx_stats_type.F90
+A       components/cam/src/physics/spcam/crm/CLUBB/crmx_stats_variables.F90
+A       components/cam/src/physics/spcam/crm/CLUBB/crmx_stats_zm.F90
+A       components/cam/src/physics/spcam/crm/CLUBB/crmx_stats_zt.F90
+A       components/cam/src/physics/spcam/crm/CLUBB/crmx_surface_varnce_module.F90
+A       components/cam/src/physics/spcam/crm/CLUBB/crmx_variables_diagnostic_module.F90
+A       components/cam/src/physics/spcam/crm/CLUBB/crmx_variables_prognostic_module.F90
+A       components/cam/src/physics/spcam/crm/CLUBB/crmx_variables_radiation_module.F90
+A       components/cam/src/physics/spcam/crm/CLUBB/recl.inc
+A       components/cam/src/physics/spcam/crm/MICRO_M2005
+A       components/cam/src/physics/spcam/crm/MICRO_M2005/README.MICRO_M2005
+A       components/cam/src/physics/spcam/crm/MICRO_M2005/crmx_drop_activation.F90
+A       components/cam/src/physics/spcam/crm/MICRO_M2005/crmx_microphysics.F90
+A       components/cam/src/physics/spcam/crm/MICRO_M2005/crmx_module_mp_graupel.F90
+A       components/cam/src/physics/spcam/crm/MICRO_SAM1MOM
+A       components/cam/src/physics/spcam/crm/MICRO_SAM1MOM/crmx_cloud.F90
+A       components/cam/src/physics/spcam/crm/MICRO_SAM1MOM/crmx_micro_params.F90
+A       components/cam/src/physics/spcam/crm/MICRO_SAM1MOM/crmx_microphysics.F90
+A       components/cam/src/physics/spcam/crm/MICRO_SAM1MOM/crmx_precip_init.F90
+A       components/cam/src/physics/spcam/crm/MICRO_SAM1MOM/crmx_precip_proc.F90
+A       components/cam/src/physics/spcam/crm/MICRO_SAM1MOM/crmx_precip_proc_clubb.F90
+A       components/cam/src/physics/spcam/crm/Readme_codes_merging_sam6.8.2_sam6.10.4.txt
+A       components/cam/src/physics/spcam/crm/SGS_CLUBBkvhkvm
+A       components/cam/src/physics/spcam/crm/SGS_CLUBBkvhkvm/crmx_clubb_sgs.F90
+A       components/cam/src/physics/spcam/crm/SGS_CLUBBkvhkvm/crmx_clubb_silhs_vars.F90
+A       components/cam/src/physics/spcam/crm/SGS_CLUBBkvhkvm/crmx_clubbvars.F90
+A       components/cam/src/physics/spcam/crm/SGS_CLUBBkvhkvm/crmx_diffuse_mom.F90
+A       components/cam/src/physics/spcam/crm/SGS_CLUBBkvhkvm/crmx_diffuse_mom2D.F90
+A       components/cam/src/physics/spcam/crm/SGS_CLUBBkvhkvm/crmx_diffuse_mom2D_xy.F90
+A       components/cam/src/physics/spcam/crm/SGS_CLUBBkvhkvm/crmx_diffuse_mom2D_z.F90
+A       components/cam/src/physics/spcam/crm/SGS_CLUBBkvhkvm/crmx_diffuse_mom3D.F90
+A       components/cam/src/physics/spcam/crm/SGS_CLUBBkvhkvm/crmx_diffuse_mom3D_xy.F90
+A       components/cam/src/physics/spcam/crm/SGS_CLUBBkvhkvm/crmx_diffuse_mom3D_z.F90
+A       components/cam/src/physics/spcam/crm/SGS_CLUBBkvhkvm/crmx_diffuse_scalar.F90
+A       components/cam/src/physics/spcam/crm/SGS_CLUBBkvhkvm/crmx_diffuse_scalar2D.F90
+A       components/cam/src/physics/spcam/crm/SGS_CLUBBkvhkvm/crmx_diffuse_scalar2D_xy.F90
+A       components/cam/src/physics/spcam/crm/SGS_CLUBBkvhkvm/crmx_diffuse_scalar2D_z.F90
+A       components/cam/src/physics/spcam/crm/SGS_CLUBBkvhkvm/crmx_diffuse_scalar3D.F90
+A       components/cam/src/physics/spcam/crm/SGS_CLUBBkvhkvm/crmx_diffuse_scalar3D_xy.F90
+A       components/cam/src/physics/spcam/crm/SGS_CLUBBkvhkvm/crmx_diffuse_scalar3D_z.F90
+A       components/cam/src/physics/spcam/crm/SGS_CLUBBkvhkvm/crmx_diffuse_scalar_xy.F90
+A       components/cam/src/physics/spcam/crm/SGS_CLUBBkvhkvm/crmx_diffuse_scalar_z.F90
+A       components/cam/src/physics/spcam/crm/SGS_CLUBBkvhkvm/crmx_fluxes_scalar_z.F90
+A       components/cam/src/physics/spcam/crm/SGS_CLUBBkvhkvm/crmx_sgs.F90
+A       components/cam/src/physics/spcam/crm/SGS_CLUBBkvhkvm/crmx_shear_prod2D.F90
+A       components/cam/src/physics/spcam/crm/SGS_CLUBBkvhkvm/crmx_shear_prod3D.F90
+A       components/cam/src/physics/spcam/crm/SGS_CLUBBkvhkvm/crmx_stat_clubb.F90
+A       components/cam/src/physics/spcam/crm/SGS_CLUBBkvhkvm/crmx_tke_full.F90
+A       components/cam/src/physics/spcam/crm/SGS_TKE
+A       components/cam/src/physics/spcam/crm/SGS_TKE/crmx_diffuse_mom.F90
+A       components/cam/src/physics/spcam/crm/SGS_TKE/crmx_diffuse_mom2D.F90
+A       components/cam/src/physics/spcam/crm/SGS_TKE/crmx_diffuse_mom3D.F90
+A       components/cam/src/physics/spcam/crm/SGS_TKE/crmx_diffuse_scalar.F90
+A       components/cam/src/physics/spcam/crm/SGS_TKE/crmx_diffuse_scalar2D.F90
+A       components/cam/src/physics/spcam/crm/SGS_TKE/crmx_diffuse_scalar3D.F90
+A       components/cam/src/physics/spcam/crm/SGS_TKE/crmx_sgs.F90
+A       components/cam/src/physics/spcam/crm/SGS_TKE/crmx_shear_prod2D.F90
+A       components/cam/src/physics/spcam/crm/SGS_TKE/crmx_shear_prod3D.F90
+A       components/cam/src/physics/spcam/crm/SGS_TKE/crmx_tke_full.F90
+A       components/cam/src/physics/spcam/crm/crmx_abcoefs.F90
+A       components/cam/src/physics/spcam/crm/crmx_adams.F90
+A       components/cam/src/physics/spcam/crm/crmx_advect2_mom_xy.F90
+A       components/cam/src/physics/spcam/crm/crmx_advect2_mom_z.F90
+A       components/cam/src/physics/spcam/crm/crmx_advect_all_scalars.F90
+A       components/cam/src/physics/spcam/crm/crmx_advect_mom.F90
+A       components/cam/src/physics/spcam/crm/crmx_atmosphere.F90
+A       components/cam/src/physics/spcam/crm/crmx_bound_duvdt.F90
+A       components/cam/src/physics/spcam/crm/crmx_bound_exchange.F90
+A       components/cam/src/physics/spcam/crm/crmx_boundaries.F90
+A       components/cam/src/physics/spcam/crm/crmx_buoyancy.F90
+A       components/cam/src/physics/spcam/crm/crmx_compress3D.F90
+A       components/cam/src/physics/spcam/crm/crmx_coriolis.F90
+A       components/cam/src/physics/spcam/crm/crmx_crm_module.F90
+A       components/cam/src/physics/spcam/crm/crmx_crmsurface.F90
+A       components/cam/src/physics/spcam/crm/crmx_crmtracers.F90
+A       components/cam/src/physics/spcam/crm/crmx_damping.F90
+A       components/cam/src/physics/spcam/crm/crmx_diagnose.F90
+A       components/cam/src/physics/spcam/crm/crmx_domain.F90
+A       components/cam/src/physics/spcam/crm/crmx_ecppvars.F90
+A       components/cam/src/physics/spcam/crm/crmx_forcing.F90
+A       components/cam/src/physics/spcam/crm/crmx_grid.F90
+A       components/cam/src/physics/spcam/crm/crmx_ice_fall.F90
+A       components/cam/src/physics/spcam/crm/crmx_init.F90
+A       components/cam/src/physics/spcam/crm/crmx_kurant.F90
+A       components/cam/src/physics/spcam/crm/crmx_module_ecpp_crm_driver.F90
+A       components/cam/src/physics/spcam/crm/crmx_module_ecpp_stats.F90
+A       components/cam/src/physics/spcam/crm/crmx_params.F90
+A       components/cam/src/physics/spcam/crm/crmx_periodic.F90
+A       components/cam/src/physics/spcam/crm/crmx_precip_fall.F90
+A       components/cam/src/physics/spcam/crm/crmx_press_grad.F90
+A       components/cam/src/physics/spcam/crm/crmx_press_rhs.F90
+A       components/cam/src/physics/spcam/crm/crmx_pressure.F90
+A       components/cam/src/physics/spcam/crm/crmx_random.F90
+A       components/cam/src/physics/spcam/crm/crmx_sat.F90
+A       components/cam/src/physics/spcam/crm/crmx_setparm.F90
+A       components/cam/src/physics/spcam/crm/crmx_setperturb.F90
+A       components/cam/src/physics/spcam/crm/crmx_stepout.F90
+A       components/cam/src/physics/spcam/crm/crmx_task_init.F90
+A       components/cam/src/physics/spcam/crm/crmx_task_util_NOMPI.F90
+A       components/cam/src/physics/spcam/crm/crmx_utils.F90
+A       components/cam/src/physics/spcam/crm/crmx_uvw.F90
+A       components/cam/src/physics/spcam/crm/crmx_vars.F90
+A       components/cam/src/physics/spcam/crm/crmx_zero.F90
+A       components/cam/src/physics/spcam/crm/fft.F
+A       components/cam/src/physics/spcam/crm/gammafff.c
+          - Routines for the CRM model - includes a CRM-specific version of CLUBB
+
+A       components/cam/src/physics/spcam/ecpp
+A       components/cam/src/physics/spcam/ecpp/ecpp_modal_aero_activate.F90
+A       components/cam/src/physics/spcam/ecpp/ecpp_modal_cloudchem.F90
+A       components/cam/src/physics/spcam/ecpp/ecpp_modal_wetscav.F90
+A       components/cam/src/physics/spcam/ecpp/module_data_ecpp1.F90
+A       components/cam/src/physics/spcam/ecpp/module_data_mosaic_asect.F90
+A       components/cam/src/physics/spcam/ecpp/module_data_radm2.F90
+A       components/cam/src/physics/spcam/ecpp/module_ecpp_ppdriver2.F90
+A       components/cam/src/physics/spcam/ecpp/module_ecpp_td2clm.F90
+A       components/cam/src/physics/spcam/ecpp/module_ecpp_util.F90
+          - Explicit-Cloud-Parametrized-Pollutant (ECPP) approach which is
+            used to treat cloud processing of aerosols with statistics of
+            cloud properties resolved by the cloud resolving model.
+
+List all existing files that have been modified, and describe the changes:
+M       components/cam/bld/build-namelist
+           - sets up a few namelist settings based on spcam configure settings
+
+M       components/cam/bld/config_files/definition.xml
+M       components/cam/bld/configure
+           - introduced two new options to -phys:  sam1mom and m2005 (though m2005 is not currently enabled)
+           - New configure options:
+              spcam_clubb_sgs: turns on the SPCAM version of CLUBB
+              spcam_nx:        SPCAM's x-grid.  defaults to 4
+              spcam_ny:        SPCAM's y-grid
+              spcam_dx:        SPCAM's horizontal grid spacing
+              spcam_dt         SPCAM's timestep
+           - spcam specific settings are added internally to phys_pkg, microphys_pkg,
+             macrophys_pkg and pbl_pkg
+
+M       components/cam/bld/namelist_files/namelist_defaults_cam.xml
+M       components/cam/bld/namelist_files/namelist_definition.xml
+           - specify namelist settings for SPCAM
+
+M       components/cam/cime_config/config_component.xml
+M       components/cam/cime_config/config_compsets.xml
+M       components/cam/cime_config/testdefs/testlist_cam.xml
+           - added FSPCAMS compset to use SPCAM sam1mom
+
+M       components/cam/src/chemistry/modal_aero/aero_model.F90
+           - introduced accessor functions to retrieve aerosol data
+           - aqueous chemistry is done in ECPP and is not done in this module
+
+M       components/cam/src/chemistry/modal_aero/modal_aero_convproc.F90
+M       components/cam/src/chemistry/modal_aero/modal_aero_data.F90
+M       components/cam/src/physics/cam/constituents.F90
+           - constituents species class is now handled like convtran2
+
+M       components/cam/src/chemistry/mozart/gas_wetdep_opts.F90
+           - introduce an 'OFF' option for gas_wetdep_method
+
+M       components/cam/src/chemistry/mozart/mo_gas_phase_chemdr.F90
+           - comment cleanup
+
+M       components/cam/src/chemistry/mozart/mo_neu_wetdep.F90
+           - do_neu_wetdep is no longer public
+
+M       components/cam/src/chemistry/utils/modal_aero_calcsize.F90
+M       components/cam/src/chemistry/utils/modal_aero_wateruptake.F90
+M       components/cam/src/physics/cam/modal_aer_opt.F90
+           - introduce a new routine modal_aero_calcdry and remove
+             this logic from modal_aero_wateruptake_dr
+
+M       components/cam/src/physics/cam/cloud_diagnostics.F90
+           - introduce logic for one and two moment clouds and
+             set them according to the type of microphysics package
+             being used
+
+M       components/cam/src/physics/cam/cloud_fraction.F90
+M       components/cam/src/physics/cam/conv_water.F90
+M       components/cam/src/physics/cam/convect_deep.F90
+M       components/cam/src/physics/cam/convect_shallow.F90
+M       components/cam/src/physics/cam/diffusion_solver.F90
+M       components/cam/src/physics/cam/microp_driver.F90
+M       components/cam/src/physics/cam/phys_control.F90
+M       components/cam/src/physics/cam/physpkg.F90
+M       components/cam/src/physics/cam/pkg_cldoptics.F90
+M       components/cam/src/physics/cam/vertical_diffusion.F90
+           - add checks for the spcam schemes
+
+M       components/cam/src/physics/cam/ndrop.F90
+           - add additional logic if called from spcam
+
+M       components/cam/src/physics/cam/radiation_data.F90
+           - add logic to disable writing of radiation data
+             within the radiation routine.
+
+M       components/cam/src/physics/cam/unicon_cam.F90
+M       components/cam/src/physics/cam/zm_conv_intr.F90
+           - additional pbuf fields used by other methods
+             needed to be added here as well.
+
+M       components/cam/src/physics/rrtmg/radiation.F90
+           - add a few extra variables to the radiation output type
+
+M       components/cam/src/unit_drivers/offline_driver.F90
+           - introduce a new offline driver register method
+
+M       components/cam/src/unit_drivers/rad/unit_driver.F90
+           - introduce a new unit driver register method
+
+M       components/cam/src/unit_drivers/stub/unit_driver.F90
+           - stub out unit_driver_reg
+
+M       components/cam/test/system/input_tests_master
+M       components/cam/test/system/tests_pretag_hobart_nag
+           - add regression test for sam1mom
+
+
+If there were any failures reported from running test_driver.sh on any test
+platform, and checkin with these failures has been OK'd by the gatekeeper,
+then copy the lines from the td.*.status files for the failed tests to the
+appropriate machine below.  All failed tests must be justified.
+
+yellowstone/intel: all BFB
+
+hobart/nag: all BFB except for the new added test which has no baseline
+017 bl221 TBL.sh f10c5spcamsm outfrq3s 9s .....................................................FAIL! rc= 7 at Thu Jul  7 17:55:11 MDT 2016
+
+hobart/pgi or jaguar/pgi: all BFB
+
+Also ran the new aux_spcam compsets on hobart (nag and pgi) and yellowstone (intel) and they ran to completion
+
+===============================================================
 ===============================================================
 
 Tag name: cam5_4_75
@@ -476,7 +1707,7 @@ hobart/pgi:
 068 bl011 TBL.sh f4c5portdm outfrq24h_port 2d .................................................FAIL! rc= 7 at Tue Jun 14 13:59:05 MDT 2016
 
  Baseline failures are expected due to a correction to shr_orb_cosz (in cime4.5.11)
- 
+
 ===============================================================
 ===============================================================
 
@@ -523,6 +1754,8 @@ appropriate machine below.  All failed tests must be justified.
 
 yellowstone/intel: All PASS
 
+yellowstone/intel/aux_cam: Ran test by hand:  F2000_DONOTUSE test is BFB with run made with cam5_4_68
+
 hobart/nag: All PASS
 
 hobart/pgi: All PASS
@@ -563,7 +1796,7 @@ Bugs fixed (include bugzilla ID): none
 
 Describe any changes made to build system: none
 
-Describe any changes made to the namelist: 
+Describe any changes made to the namelist:
 . move cam_branch_file to group cam_initfiles_nl
 . move ct_overlap, trac_decomp from dyn_fv_inparm to spmd_fv_inparm
 
@@ -586,7 +1819,7 @@ components/cam/src/dynamics/eul/inidat.F90
 
 components/cam/src/dynamcis/eul/inital.F90
 . eliminate the cam_initial interface and call dyn_init directly from
-  cam_init. 
+  cam_init.
 
 components/cam/src/dynamics/eul/initcom.F90
 . functionality moved to dyn_grid_init
@@ -600,7 +1833,7 @@ components/cam/src/dynamics/fv/inidat.F90
 
 components/cam/src/dynamcis/fv/inital.F90
 . eliminate the cam_initial interface and call dyn_init directly from
-  cam_init. 
+  cam_init.
 
 components/cam/src/dynamics/fv/initcom.F90
 . functionality moved to dyn_grid_init
@@ -610,7 +1843,7 @@ components/cam/src/dynamics/se/inidat.F90
 
 components/cam/src/dynamcis/se/inital.F90
 . eliminate the cam_initial interface and call dyn_init directly from
-  cam_init. 
+  cam_init.
 
 components/cam/src/dynamics/se/initcom.F90
 . this was a stub module that's no longer needed
@@ -653,7 +1886,7 @@ components/cam/src/control/cam_initfiles.F90
   files are opened here this module will do consistency check on caseid in
   case of branch run.  Also is responsible for providing this name to the
   component interface as long as the separate surface restart file is
-  needed. 
+  needed.
 . add the get_restcase and get_restartdir methods.  This module is now
   responsible for the data that those accessor functions provide.
 . remove call to read_initial from cam_initfiles_open.  Functionality moved
@@ -684,7 +1917,7 @@ components/cam/src/cpl/atm_comp_mct.F90
 components/cam/src/dynamics/eul/dyn_comp.F90
 . dyn_init
   - move subroutine trunc() to module dyn_grid
-  - remove calls to trunc, spmdinit_dyn, hycoef_init (moved to dyn_grid_init) 
+  - remove calls to trunc, spmdinit_dyn, hycoef_init (moved to dyn_grid_init)
   - add calls to initialize_prognostics, scanslt_alloc, spmdbuf, and
     initial_conds.  The initial_conds call will be replaces by a
     read_inidat call which must be inside a conditional to only be called
@@ -721,16 +1954,16 @@ components/cam/src/dynamics/fv/dyn_comp.F90
 . dyn_init
   - move hycoef_init call to dyn_grid_init
   - move setting of namelist values in t_fvdycore_state object into
-    dyn_readnl 
+    dyn_readnl
   - move spmdinit_dyn call to dyn_grid_init
   - clean up after moving all the grid initialization to dyn_grid_init.
   - remove unused arg fh and replace the dyn_state arg by local pointer
     and get state using get_dyn_state
 . dyn_run
   - access ct_overlap, trac_decomp from grid object rather than
-    fv_control_mod. 
+    fv_control_mod.
   - access div24del2flag, del2coef from dyn_state and pass through cd_core
-    interface. 
+    interface.
 
 components/cam/src/dynamics/fv/dyn_grid.F90
 . change default module access to private
@@ -748,7 +1981,7 @@ components/cam/src/dynamics/fv/dyn_grid.F90
   - move call to define_cam_grids here (from dyn_comp::dyn_init)
   - pass fft_flt through pftinit arg list
 . fix use associations of pmgrid (most values now live only in grid
-  object). 
+  object).
 
 components/cam/src/dynamics/fv/dynamics_vars.F90
 . remove the dynamics_init subroutine.  It's functionality is replaced by
@@ -781,7 +2014,7 @@ components/cam/src/dynamics/fv/metdata.F90
 . add only qualifier to pmgrid use statement
 
 components/cam/src/dynamics/fv/pft_module.F90
-. change fft_flt to be module data rather than access via fv_control_mod 
+. change fft_flt to be module data rather than access via fv_control_mod
 . pftinit
   - add fft_flt as input arg for initializing module data
 
@@ -857,7 +2090,7 @@ components/cam/src/dynamics/sld/dyn_comp.F90
 . dyn_init
   - add dyn_in and dyn_out as intent(out) dummy args
   - remove calls to trunc, spmdinit_dyn, hycoef_init, and define_cam_grids
-    (moved to dyn_grid_init) 
+    (moved to dyn_grid_init)
 
 components/cam/src/dynamics/sld/dyn_grid.F90
 . add private attribute
@@ -1152,6 +2385,8 @@ yellowstone/intel:
 047 bl470 TBL.sh fsd1.9c5.4wtclbh outfrq3s_sd+sd_waccm5_geos5 9s ..............................FAIL! rc= 7 at Wed Jun  8 12:00:30 MDT 2016
  expected failures due to changes in geomag date and aurora updates
 
+yellowstone/intel/aux_cam: Ran test by hand:  F2000_DONOTUSE test is BFB with run made with cam5_4_67
+
 hobart/nag:
 067 bl426 TBL.sh f10c4wmxdm outfrq3s_ionos 9s .................................................FAIL! rc= 7 at Tue Jun  7 13:38:35 MDT 2016
 070 bl471 TBL.sh f10c5wmam3dm outfrq3s_modalstrat 9s ..........................................FAIL! rc= 7 at Tue Jun  7 13:45:21 MDT 2016
@@ -1213,6 +2448,9 @@ appropriate machine below.  All failed tests must be justified.
 
 yellowstone/intel: All PASS
 
+yellowstone/intel/aux_cam: Ran test by hand:  F2000_DONOTUSE test is ANSWER CHANGING with run made with cam5_4_66
+   - this is expected due to the ridge changes as this test has use_gw_rdg_beta=.true.
+
 hobart/nag: All PASS
 
 hobart/pgi: All PASS
@@ -1234,8 +2472,8 @@ One-line Summary: Bug fixes for use_cases (including 1850_cam55), cosp simulator
 
 Purpose of changes:
   - Use case fixes for 1850 CAM5.5 and a number of WACCM use cases
-  - Correct estimation of diagnostic precipitation flux calculations to exactly 
-    track precipitation in MG1 and MG2. Affects LS_FLXPRC and LS_FLXSNW used for 
+  - Correct estimation of diagnostic precipitation flux calculations to exactly
+    track precipitation in MG1 and MG2. Affects LS_FLXPRC and LS_FLXSNW used for
     COSP simulator. Adds LS_FLXICE and LS_FLXLIQ for MG2 to be consistent with its methods.
   - unpack sadice and sadsnow for MG_SADICE and MG_SADSNOW diagnostics
 
@@ -1291,6 +2529,8 @@ T 2016
 027 bl485 TBL.sh f1.9c5.5wtmam4h outfrq3s+waccm_tsmlt_2000_cam55 9s ...........................FAIL! rc= 7 at Thu May 26 17:17:40 MD
 T 2016
  -- These two tests differ due to changes in the use_cases
+
+yellowstone/intel/aux_cam: Ran test by hand:  F2000_DONOTUSE test is BFB with run made with cam5_4_64
 
 hobart/nag: all BFB
 
@@ -1359,11 +2599,11 @@ Purpose of changes:
     turned on it replaces the existing turbulent mountain stress
     parameterization, i.e., if do_beljaars is true then do_tms must be
     false.
-  
+
 . Add generation of gravity waves from ridges.
   - This option is controlled by the namelist variable use_gw_rdg_beta.
   - Code was also added for gamma ridges, but this option is not yet
-    validated. 
+    validated.
 
 Bugs fixed (include bugzilla ID): none
 
@@ -1382,7 +2622,7 @@ Code reviewed by: eaton
 
 List all subroutines eliminated: none
 
-List all subroutines added and what they do: 
+List all subroutines added and what they do:
 
 components/cam/src/physics/cam/beljaars_drag.F90
 . portable implementation of Beljaars scheme.
@@ -1400,7 +2640,7 @@ components/cam/bld/build-namelist
 . add defaults for use_gw_rdg_beta and use_gw_rdg_gamma
 . modify default for gw_prndl when beta ridges are being used
 . add defaults for new vars depending on use_gw_rdg_beta and
-  use_gw_rdg_gamma 
+  use_gw_rdg_gamma
 
 components/cam/bld/namelist_files/namelist_defaults_cam.xml
 . set default for do_beljaars to false
@@ -1422,7 +2662,7 @@ components/cam/bld/namelist_files/namelist_definition.xml
   - trpd_leewv_rdg_gamma
   - bnd_rdggm
 . add do_beljaars to switch the beljaars scheme
-  
+
 components/cam/src/physics/cam/diffusion_solver.F90
 . add intent(in) arg dragblg to compute_vdiff
 . modify calcs of tauresx and tauresy
@@ -1446,7 +2686,7 @@ components/cam/src/physics/cam/gw_common.F90
     . if not present the lapply_effgw=.true.  This applies efficiency to
       completed stress profile.
     . lapply_effgw replaces apply_tndmax.  it also replaces
-      (.not. limit_tau_without_eff) 
+      (.not. limit_tau_without_eff)
 
 components/cam/src/physics/cam/gw_drag.F90
 . Add option for ridge scheme
@@ -1555,7 +2795,7 @@ M    components/cam/src/physics/cam/physpkg.F90
  - removed micro_do_icesupersat code block
 
 M    components/cam/src/physics/cam/cldfrc2m.F90
-  - Introduce subgrid scale saturation factor (qsatfac) to allow ice growth beginning at 
+  - Introduce subgrid scale saturation factor (qsatfac) to allow ice growth beginning at
     rhmini if cldfrc2m_do_subgrid_growth is true
 
 M    components/cam/src/physics/cam/micro_mg_utils.F90
@@ -1690,16 +2930,16 @@ https://acomstaff.acom.ucar.edu/bardeenc/waccm55/f2000c55_test05f-f2000c55_contr
 Tag name: cam5_4_62
 Originator(s): bogensch, cacraig
 Date: May 18, 2016
-One-line Summary: Introduced CLUBB liquid supersat, new CLUBB heat diffusivity 
+One-line Summary: Introduced CLUBB liquid supersat, new CLUBB heat diffusivity
                   namelist param and updated CLUBB/MG namelist defaults
 
 Purpose of changes:
-  - Update CLUBB svn external to head of UWM trunk.  
-  - Introduces liquid supersaturation closure after the 2nd PDF call to 
-    avoid relative humidities greater than 100% before CLUBB's equations 
-    are advanced.  
+  - Update CLUBB svn external to head of UWM trunk.
+  - Introduces liquid supersaturation closure after the 2nd PDF call to
+    avoid relative humidities greater than 100% before CLUBB's equations
+    are advanced.
   - Introduces tunable parameter for the diffusivities of heat in CLUBB.
-  - Sets the CLUBB/MG namelist default parameters to what Cecile is using 
+  - Sets the CLUBB/MG namelist default parameters to what Cecile is using
     in her current pre-CAM6 "62" testing
 
 Bugs fixed (include bugzilla ID):
@@ -1760,10 +3000,10 @@ Summarize any changes to answers, i.e.,
 - what code configurations: All configurations which use CLUBB
 - what platforms/compilers: all
 - nature of change (roundoff; larger than roundoff but same climate; new
-  climate): new climate 
+  climate): new climate
 
-This is part of the modifications which are leading up to CAM6 and has not 
-been tested independently, but rather as a group with the next several 
+This is part of the modifications which are leading up to CAM6 and has not
+been tested independently, but rather as a group with the next several
 upcoming tags.
 
 ===============================================================
@@ -1775,9 +3015,9 @@ Date: May 12, 2016
 One-line Summary: Add namelist var zmconv_num_cin and cleanup clubb_intr
 
 Purpose of changes:
- -- Added namelist var zmconv_num_cin to control the number of negative buoyancy regions 
+ -- Added namelist var zmconv_num_cin to control the number of negative buoyancy regions
     that are allowed before the convection top and CAPE calculations are completed
- -- When CAM was run on cori, it core dumped with a floating point exception in clubb.  
+ -- When CAM was run on cori, it core dumped with a floating point exception in clubb.
     Removed the on-the-fly arithmetic for outfld calls which operated on all columns
     in the array, even undefined ones.
  -- Removed unused variables in clubb_intr.F90
@@ -1805,10 +3045,10 @@ M       components/cam/bld/namelist_files/namelist_definition.xml
 M       components/cam/bld/build-namelist
 M       components/cam/src/physics/cam/zm_conv_intr.F90
 M       components/cam/src/physics/cam/zm_conv.F90
-          -- Added zmconv_num_cin to namelist 
+          -- Added zmconv_num_cin to namelist
 
 M       components/cam/src/physics/cam/clubb_intr.F90
-          -- outfld calls had on-the-fly arithmetic being done on the 
+          -- outfld calls had on-the-fly arithmetic being done on the
              entire array, regardless of how many columns were being used.
              Scaled variables before passing to outfld
           -- Removed unused variables
@@ -1833,9 +3073,9 @@ Date: May 9, 2016
 One-line Summary: Remove all references to fortran elementals for performance improvement
 
 Purpose of changes:
-- All elementals within the CAM code were removed and according to performance 
+- All elementals within the CAM code were removed and according to performance
   testing by John Dennis' group, this speeds up CAM by 1.2%
-- scalar and vector versions of these routines are provided with a single 
+- scalar and vector versions of these routines are provided with a single
   interface via fortran overloading
 
 Bugs fixed (include bugzilla ID):
@@ -2277,8 +3517,8 @@ Originator(s): chris.kerr.llc@gmail.com, cacraig
 Date: March 31, 2016
 One-line Summary: optimized MG2
 
-Purpose of changes: 
- - Improve performance of microphysics routines. A 7-8% improvement 
+Purpose of changes:
+ - Improve performance of microphysics routines. A 7-8% improvement
    in microphysics is seen with this optimization.
 
 Bugs fixed (include bugzilla ID):
@@ -2305,7 +3545,7 @@ M       components/cam/src/physics/cam/micro_mg2_0.F90
 
 M       components/cam/src/physics/cam/micro_mg_cam.F90
           - all allocations are removed and arrays are now automatic arrays
-          - micro_mg_cam_tend simply calls micro_mg_get_cols and micro_mg_cam_tend_pack 
+          - micro_mg_cam_tend simply calls micro_mg_get_cols and micro_mg_cam_tend_pack
           - micro_mg_cam_tend_pack is basically the old micro_mg_cam_tend without
             the calls to micro_mg_get_cols.
 
@@ -2551,7 +3791,7 @@ Date: March 21, 2016
 One-line Summary: Added alternative autoconversion scheme
 
 Purpose of changes:
- - New switch to use alternative autoconversion scheme in MG2 (following Seifert and 
+ - New switch to use alternative autoconversion scheme in MG2 (following Seifert and
    Behang 2001).   Currently this is not turned on
 
 Bugs fixed (include bugzilla ID):
@@ -2559,7 +3799,7 @@ Bugs fixed (include bugzilla ID):
 Describe any changes made to build system:
 
 Describe any changes made to the namelist:
-- added logical micro_do_sb_physics which turns on/off the Seifert and Behang autoconversion.  
+- added logical micro_do_sb_physics which turns on/off the Seifert and Behang autoconversion.
 
 List any changes to the defaults for the boundary datasets:
 
@@ -2756,7 +3996,7 @@ M       components/cam/cime_config/testdefs/testlist_cam.xml
 M       components/cam/test/system/tests_pretag_yellowstone
             - removed a number of unnecessary CAM regression tests
 
-Since there were no code changes, and no new CAM regression tests were introduced, the CAM 
+Since there were no code changes, and no new CAM regression tests were introduced, the CAM
 regression testing was not run for this tag.
 
 All variations of yellowstone and hobart compilers and prealpha/prebeta were run through the CESM script
@@ -2773,7 +4013,7 @@ One-line Summary: Revert iulog assignment back to what it was in cam5_4_42
 Purpose of changes:
  - A request had been made to have QNEG3 lines not be directed to unit 6 (which is used by the CESM log).  An mpi_bcast
    was introduced in cam5_4_43 to broadcast the CAM iulog to all tasks, but that had issues with the gnu compiler during
-   FLUSH.  After extensive investigation, it was determined that master should really be the only task which routinely 
+   FLUSH.  After extensive investigation, it was determined that master should really be the only task which routinely
    writes to iulog.  This tag reverst the change made in cam5_4_43 and a future tage will create statistics for QNEG3
    that masterproc can write out.
 

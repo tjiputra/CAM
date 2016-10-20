@@ -87,6 +87,8 @@
   
   call phys_getopts( shallow_scheme_out = shallow_scheme, microp_scheme_out = microp_scheme)
                      
+  ! SPCAM registers its own fields
+  if (shallow_scheme == 'SPCAM') return
 
   call pbuf_add_field('ICWMRSH',    'physpkg' ,dtype_r8,(/pcols,pver/),       icwmrsh_idx )
   call pbuf_add_field('RPRDSH',     'physpkg' ,dtype_r8,(/pcols,pver/),       rprdsh_idx )
@@ -163,6 +165,9 @@
   integer k
   character(len=16)          :: eddy_scheme
     
+  ! SPCAM does its own convection
+  if (shallow_scheme == 'SPCAM') return
+
   ! ------------------------------------------------- !
   ! Variables for detailed abalysis of UW-ShCu scheme !
   ! ------------------------------------------------- !

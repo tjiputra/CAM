@@ -88,7 +88,13 @@ integer :: &
    cu_trr_idx, &
    cmfr_det_idx, &
    qlr_det_idx, &
-   qir_det_idx
+   qir_det_idx,&
+   icwmrdp_idx, &
+   rprddp_idx, &
+   nevapr_dpcu_idx, &
+   prec_dp_idx, &
+   snow_dp_idx
+
 
 ! fields expected to be in the physics buffer
 integer :: &
@@ -220,6 +226,11 @@ subroutine unicon_cam_register
    call pbuf_add_field('cmfr_det',      'global', dtype_r8, (/pcols,pver/),                     cmfr_det_idx)
    call pbuf_add_field('qlr_det',       'global', dtype_r8, (/pcols,pver/),                     qlr_det_idx)
    call pbuf_add_field('qir_det',       'global', dtype_r8, (/pcols,pver/),                     qir_det_idx)
+   call pbuf_add_field('ICWMRDP',       'physpkg',dtype_r8, (/pcols,pver/),                     icwmrdp_idx)
+   call pbuf_add_field('RPRDDP',        'physpkg',dtype_r8, (/pcols,pver/),                     rprddp_idx)
+   call pbuf_add_field('NEVAPR_DPCU',   'physpkg',dtype_r8, (/pcols,pver/),                     nevapr_dpcu_idx)
+   call pbuf_add_field('PREC_DP',       'physpkg',dtype_r8, (/pcols/),                          prec_dp_idx)
+   call pbuf_add_field('SNOW_DP',       'physpkg',dtype_r8, (/pcols/),                          snow_dp_idx)
 
 #endif
 

@@ -465,12 +465,9 @@ contains
     real(r8) :: xlat
     real(r8) :: pm25(ncol)
     real(r8), dimension(ncol,pver) :: o3s_loss             ! tropospheric ozone loss for o3s
+
     logical :: zero_aerosols
     real(r8) :: dlats(ncol)
-!
-! jfl
-!
-!
 
     real(r8), dimension(ncol,pver) :: &      ! aerosol reaction diagnostics
         gprob_n2o5, &
@@ -1174,6 +1171,7 @@ contains
     call outfld('Q_SRF',qh2o(:ncol,pver) , ncol, lchnk )
     call outfld('U_SRF',ufld(:ncol,pver) , ncol, lchnk )
     call outfld('V_SRF',vfld(:ncol,pver) , ncol, lchnk )
+
 !
     if (.not.sad_pbf_ndx>0) then
        deallocate(strato_sad)

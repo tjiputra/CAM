@@ -1591,8 +1591,8 @@ Default: FALSE
        group="cam_history_nl" valid_values="" >
 Array containing the maximum number of time samples written to a history
 file.  The first value applies to the primary history file, the second
-through sixth to the auxillary history files.
-Default: 1,30,30,30,30,30
+through tenth to the auxillary history files.
+Default: 1,30,30,30,30,30,30,30,30,30
 </entry>
 
 <entry id="lcltod_start" type="integer(10)"  category="history"
@@ -1622,7 +1622,7 @@ Array specifying the precision of real data written to each history file
 series. Valid values are 1 or 2. '1' implies output real values are 8-byte
 and '2' implies output real values are 4-byte.
 
-Default: 2,2,2,2,2,2
+Default: 2,2,2,2,2,2,2,2,2,2
 </entry>
 
 
@@ -1636,7 +1636,7 @@ Only the first file series may be a monthly average.  If
 timesteps.  If <varname>nhtfrq(i)</varname> &lt; 0, frequency is specified
 as number of hours.
 
-Default: 0,-24,-24,-24,-24,-24
+Default: 0,-24,-24,-24,-24,-24,-24,-24,-24,-24
 </entry>
 
 <entry id="interpolate_output" type="logical(10)" category="history"
@@ -2419,10 +2419,12 @@ Default: 'ZM' unless using 'UNICON'
 </entry>
 
 <entry id="microp_scheme" type="char*16" category="conv"
-       group="phys_ctl_nl" valid_values="RK,MG" >
+       group="phys_ctl_nl" valid_values="RK,MG,SPCAM_m2005,SPCAM_sam1mom" >
 Type of microphysics scheme employed.  'RK' for Rasch and Kristjansson
 (1998); 'MG' for Morrison and Gettelman (2008), Gettelman et al (2010)
-two moment scheme for CAM5.1
+two moment scheme for CAM5 and CAM6
+SPCAM has two different microphysics schemes: SPCAM_m2005 (Morrison et al 2005),
+SPCAM_sam1mom (Khairoutinov 2003)
 Default: set by build-namelist (depends on value set in configure).
 </entry>
 
@@ -2440,7 +2442,7 @@ Default: FALSE
 </entry>
 
 <entry id="shallow_scheme" type="char*16" category="conv"
-       group="phys_ctl_nl" valid_values="Hack,UW,CLUBB_SGS,UNICON" >
+       group="phys_ctl_nl" valid_values="Hack,UW,CLUBB_SGS,UNICON,SPCAM_m2005,SPCAM_sam1mom" >
 Type of shallow convection scheme employed.  'Hack' for Hack shallow convection;
 'UW' for original McCaa UW pbl scheme, modified by Sungsu Park; 'CLUBB_SGS'
 for CLUBB_SGS; or UNICON which doesn't distinquish shallow and deep.
@@ -2607,6 +2609,11 @@ Low Skewness in C11 Skw. Function
 <entry id="clubb_c11b" type="real" category="pblrad"
        group="clubb_params_nl" valid_values="" >
 High Skewness in C11 Skw. Function
+</entry>
+
+<entry id="clubb_c14" type="real" category="pblrad"
+       group="clubb_params_nl" valid_values="" >
+Constant for u'^2 and v'^2 terms
 </entry>
 
 <entry id="clubb_mult_coef" type="real" category="pblrad"
@@ -3365,7 +3372,7 @@ Default: 0 if <varname>eddy_scheme</varname> is 'HB', 1 otherwise.
 </entry>
 
 <entry id="eddy_scheme" type="char*16" category="pbl"
-       group="phys_ctl_nl" valid_values="HB,diag_TKE,HBR,CLUBB_SGS" >
+       group="phys_ctl_nl" valid_values="HB,diag_TKE,HBR,CLUBB_SGS,SPCAM_sam1mom,SPCAM_m2005" >
 Type of eddy scheme employed by the vertical diffusion package.  'HB' for
 Holtslag and Boville; 'diag_TKE' for diagnostic tke version of Grenier and
 Bretherton; 'HBR' for Rasch modified version of 'HB'.
@@ -3889,10 +3896,11 @@ Default: FALSE
 </entry>
 
 <entry id="gas_wetdep_method" type="char*3" category="cam_chem"
-       group="wetdep_inparm" valid_values="MOZ,NEU" >
-Wet depostion method used
+       group="wetdep_inparm" valid_values="MOZ,NEU,OFF" >
+Wet deposition method used
   MOZ --> mozart scheme is used
   NEU --> J Neu's scheme is used
+  OFF --> wet deposition is turned off
 Default: MOZ
 </entry>
 

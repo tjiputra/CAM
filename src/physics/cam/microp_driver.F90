@@ -53,8 +53,14 @@ subroutine microp_driver_readnl(nlfile)
    case ('RK')
       ! microp_driver doesn't handle this one
       continue
+   case ('SPCAM_sam1mom')
+      ! microp_driver doesn't handle this one
+      continue
+   case ('SPCAM_m2005')
+      ! microp_driver doesn't handle this one
+      continue
    case default
-      call endrun('microp_driver_readnl:: unrecognized microp_scheme')
+      call endrun('microp_driver_readnl:: unrecognized microp_scheme, "'//trim(microp_scheme)//'"')
    end select
 
 end subroutine microp_driver_readnl
@@ -99,8 +105,14 @@ function microp_driver_implements_cnst(name)
    case ('RK')
       ! microp_driver doesn't handle this one
       continue
+   case ('SPCAM_m2005')
+      ! microp_driver doesn't handle this one
+      continue
+   case ('SPCAM_sam1mom')
+      ! microp_driver doesn't handle this one
+      continue
    case default
-      call endrun('microp_driver_implements_cnst:: unrecognized microp_scheme')
+      call endrun('microp_driver_implements_cnst:: unrecognized microp_scheme, '//trim(microp_scheme))
    end select
 
 end function microp_driver_implements_cnst
@@ -125,8 +137,14 @@ subroutine microp_driver_init_cnst(name, latvals, lonvals, mask, q)
    case ('RK')
       ! microp_driver doesn't handle this one
       continue
+   case ('SPCAM_m2005')
+      ! microp_driver doesn't handle this one
+      continue
+   case ('SPCAM_sam1mom')
+      ! microp_driver doesn't handle this one
+      continue
    case default
-      call endrun('microp_driver_init_cnst:: unrecognized microp_scheme')
+      call endrun('microp_driver_init_cnst:: unrecognized microp_scheme'//trim(microp_scheme))
    end select
 
 end subroutine microp_driver_init_cnst
@@ -147,7 +165,7 @@ subroutine microp_driver_init(pbuf2d)
       ! microp_driver doesn't handle this one
       continue
    case default
-      call endrun('microp_driver_init:: unrecognized microp_scheme')
+      call endrun('microp_driver_init:: unrecognized microp_scheme'//trim(microp_scheme))
    end select
 
 
@@ -188,7 +206,7 @@ subroutine microp_driver_tend(state, ptend, dtime, pbuf)
       ! microp_driver doesn't handle this one
       continue
    case default
-      call endrun('microp_driver_tend:: unrecognized microp_scheme')
+      call endrun('microp_driver_tend:: unrecognized microp_scheme'//trim(microp_scheme))
    end select
 
 end subroutine microp_driver_tend

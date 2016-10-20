@@ -821,11 +821,13 @@ end subroutine pbuf_readnl
     integer                           :: col_type_use
     integer, allocatable              :: kount_grid(:) ! For use in copy_if_needed
     logical                           :: subset
+    character(len=*), parameter       :: subname='GET_PBUF1D_FIELD_BY_INDEX'
+    character(len=128)                :: errmsg
 
     ! Copy the generic type to one compatable with the request
-    if(index<1 .or. index>size(pbuf)) then
-      print *,__FILE__,__LINE__,index
-      call endrun('index out of range')
+    if((index < 1) .or. (index > size(pbuf))) then
+      write(errmsg, '(2a,i0,a)') subname,': index (',index,') out of range'
+      call endrun(errmsg)
     end if
 
     ! Default col_type is grid columns
