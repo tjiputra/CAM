@@ -1,0 +1,3 @@
+#undef AEROCOM
+#undef AEROFFL
+#undef COLTST4INTCONS

@@ -130,8 +130,17 @@
     <lname>2000_CAM60%CLB_CLM45%SP_CICE%PRES_DOCN%DOM_RTM_SGLC_SWAV</lname>
   </compset>
   <compset>
+<<<<<<< HEAD
     <alias>F1850C5PM</alias>
     <lname>1850_CAM50%PM_CLM40%SP_CICE%PRES_DOCN%DOM_RTM_SGLC_SWAV</lname>
+=======
+    <alias>FC54</alias>        
+    <lname>2000_CAM54%NCLB_CLM45%SP_CICE%PRES_DOCN%DOM_RTM_SGLC_SWAV</lname>
+  </compset>
+  <compset>
+    <alias>F1850C5PM</alias>       
+    <lname>1850_CAM5%PM_CLM40%SP_CICE%PRES_DOCN%DOM_RTM_SGLC_SWAV</lname>
+>>>>>>> master
   </compset>
   <compset>
     <alias>FC5PM</alias>
@@ -279,7 +288,27 @@
     <lname>2000_CAM%DABIP04_SLND_SICE_SOCN_SROF_SGLC_SWAV</lname>
   </compset>
 
+<<<<<<< HEAD
 <!-- FG compsets -->
+=======
+  <compset>
+   <alias>NFPTAERO</alias>
+   <lname>2000_CAM5%PTAEROUPD1_CLM40%SP_CICE%PRES_DOCN%DOM_RTM_SGLC_SWAV</lname>
+  </compset>
+  <compset>
+   <alias>NFPTAERO55</alias>
+   <lname>2000_CAM55%PTAERO_CLM40%SP_CICE%PRES_DOCN%DOM_RTM_SGLC_SWAV</lname>
+  </compset>
+  <compset>
+   <alias>NFPTAERO54</alias>
+   <lname>2000_CAM54%PTAERO_CLM40%SP_CICE%PRES_DOCN%DOM_RTM_SGLC_SWAV</lname>
+  </compset>
+  <compset>
+   <alias>NFAMIPNUDGEPTAEROUPD1</alias>
+   <lname>2000_CAM5%NUDGEPTAEROUPD1_CLM45%SP_CICE%PRES_DOCN%DOM_RTM_SGLC_SWAV</lname>
+  </compset>
+  <!-- FG compsets -->
+>>>>>>> master
 
   <compset grid="g%gland">
     <alias>FGCN</alias>           

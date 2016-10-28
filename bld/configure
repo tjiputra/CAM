@@ -1528,6 +1528,10 @@ if ($chem_pkg =~ '_mam3') {
     $chem_cppdefs = ' -DMODAL_AERO -DMODAL_AERO_7MODE ';
 }
 
+if ($chem_pkg =~ '_oslo') {
+ $chem_cppdefs = ' -DOSLO_AERO -DDIRIND'
+}
+
 my $carma_nadv = 0;
 my $carma_cppdefs = '';
 
@@ -3023,7 +3027,15 @@ sub write_filepath
 	print $fh "$CASEROOT/SourceMods/src.cam\n";
     }
 
-    # offline unit driver (defaults to stub)
+   #NorESM-specific: 
+   #Any files in "NorESM"-folder go before the original CAM-files
+   #These files MUST give back standard CAM5.3 if a standard CAM5.3 compset is chosen
+   #Un-commenting this line will give back standard CAM 5.3 (unmodified).
+   #This is used for testing.
+   print $fh "$camsrcdir/cam/src/NorESM\n";
+   #print $fh "$camsrcdir/cam/src/NorESM/$dyn\n";
+
+   # offline unit driver (defaults to stub)
     print $fh "$camsrcdir/cam/src/unit_drivers\n";
     print $fh "$camsrcdir/cam/src/unit_drivers/${offline_drv}\n";
 
@@ -3043,10 +3055,18 @@ sub write_filepath
     if ($chem_src_dir) {
         print $fh "$chem_src_dir\n";
     }
-    if ($chem =~ /_mam/) {
-	print $fh "$camsrcdir/cam/src/chemistry/modal_aero\n";
-    } else {
-	print $fh "$camsrcdir/cam/src/chemistry/bulk_aero\n";
+    if ($chem =~/_oslo/) {
+         print $fh "$camsrcdir/cam/src/chemistry/oslo_aero\n";
+    }
+    if ($chem =~/_mam_oslo/){
+      print $fh "$camsrcdir/cam/src/physics/cam_oslo\n";
+    }
+    else{
+       if ($chem =~ /_mam/) {
+      print $fh "$camsrcdir/cam/src/chemistry/modal_aero\n";
+       } else {
+      print $fh "$camsrcdir/cam/src/chemistry/bulk_aero\n";
+       }
     }
     print $fh "$camsrcdir/cam/src/chemistry/aerosol\n";
     print $fh "$camsrcdir/cam/src/chemistry/mozart\n";

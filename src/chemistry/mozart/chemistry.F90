@@ -844,7 +844,7 @@ end function chem_is_active
 
     ! Add chemical tendency of water vapor to water budget output
     if ( history_budget ) then 
-      call add_default ('CT_H2O'  , history_budget_histfile_num, ' ')
+      call add_default ('CT_H2O_GHG'  , history_budget_histfile_num, ' ')
     endif
 
     !-----------------------------------------------------------------------
