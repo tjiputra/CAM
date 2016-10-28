@@ -30,7 +30,6 @@
     <type>char</type>
     <valid_values></valid_values>
     <default_value></default_value>
-<<<<<<< HEAD
     <values modifier='additive'>
       <value compset="_CAM40">-phys cam4</value>
       <value compset="_CAM50">-phys cam5</value>
@@ -78,8 +77,7 @@
 
       <value compset="%PORT">-offline_drv rad</value>
       <value compset="%SPCAMS"        >-rad camrt -chem trop_bam -spcam_nx 16 -spcam_ny 1 -spcam_dx 4000 -spcam_dt 20 -phys spcam_sam1mom </value>              
-=======
-    <values additive='yes'>
+      <values additive='yes'>
       <value compset="_CAM4"          >-phys cam4</value>              
       <value compset="_CAM5"          >-phys cam5</value> 
       <value compset="_CAM55"         >-phys cam5.4 -clubb_sgs</value>
@@ -133,8 +131,6 @@
       <value compset="_CAM54%PTAERO" >-chem trop_mam_oslo</value>               
   
       <value compset="_CAM5%NUDGEPTAERO"   >-phys cam5 -chem trop_mam_oslo -offline_dyn</value>             
-
->>>>>>> master
     </values>
     <group>build_component_cam</group>
     <file>env_build.xml</file>
@@ -224,9 +220,7 @@
       <value compset="AR97_CAM[45]"     >scam_arm97</value>
       <value compset="PIPD_CAM50"        >1850-PD_cam5</value>
       <value compset="2000_CAM%DABIP04" >dabi_p2004</value>
-<<<<<<< HEAD
       <value compset="CAM%HS94"         >held_suarez_1994</value>
-=======
       <value compset="1850_CAM54%PTAERO"  >1850_cam54_ptaero</value>
       <value compset="1850_CAM55%PTAERO"  >1850_cam54_ptaero</value>
       <value compset="2000_CAM54%PTAERO"  >cam54_ptaero_up1</value>
@@ -234,7 +228,6 @@
       <value compset="_CAM5%NUDGEPTAEROUPD1">cam5_nudge_ptaero_up1</value>
       <value compset="_CAM5%NUDGEMAM3" >2000_cam5_oslonudge</value>
       <value compset="_CAM5%PTAEROUPD1"  >cam5_ptaero_up1</value>
->>>>>>> master
     </values>
     <group>run_component_cam</group>
     <file>env_run.xml</file>
@@ -269,16 +262,13 @@
   </entry>
 
   <description>
-<<<<<<< HEAD
     <desc compset="CAM40"			>CAM cam4 physics:</desc>
     <desc compset="CAM50"			>CAM cam5 physics:</desc>
     <desc compset="CAM60"		        >CAM cam6.0 physics:</desc>
-=======
     <desc compset="_CAM4_"			>CAM cam4 physics:</desc>
     <desc compset="_CAM5_"			>CAM cam5 physics:</desc>
     <desc compset="_CAM55_"		        >CAM cam5.5 physics:</desc>
     <desc compset="_CAM55_"		        >CAM cam5.5 physics, not clubb:</desc>
->>>>>>> master
     <desc compset="%CLB[%_]"			>CAM CLUBB:</desc>
     <desc compset="%NCLB[%_]"			>Turn off CAM CLUBB:</desc>
     <desc compset="%PM[%_]"			>CAM prescribed modal aerosols:</desc>
