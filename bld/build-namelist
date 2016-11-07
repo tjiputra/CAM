@@ -2487,9 +2487,7 @@ if ($chem eq 'trop_mam3' or $chem eq 'waccm_sc_mam3') {
     }
 }
 
-<<<<<<< HEAD
 if (($chem eq 'waccm_ma_mam3') or ($chem eq 'waccm_tsmlt_mam3')) {
-=======
 if ($chem eq 'trop_mam_oslo' ) {
 
     my %species;
@@ -2572,10 +2570,8 @@ if ($chem eq 'trop_mam_oslo' ) {
         add_default($nl, $file);
     }
 }
-
+}
 if ($chem =~ /waccm_mozart_mam/ ) {
->>>>>>> master
-
     my %species;
 
     # Surface emission datasets:

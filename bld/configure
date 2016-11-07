@@ -3032,8 +3032,8 @@ sub write_filepath
    #These files MUST give back standard CAM5.3 if a standard CAM5.3 compset is chosen
    #Un-commenting this line will give back standard CAM 5.3 (unmodified).
    #This is used for testing.
-   print $fh "$camsrcdir/cam/src/NorESM\n";
-   #print $fh "$camsrcdir/cam/src/NorESM/$dyn\n";
+#   print $fh "$camsrcdir/cam/src/NorESM\n";
+#   print $fh "$camsrcdir/cam/src/NorESM/$dyn\n";
 
    # offline unit driver (defaults to stub)
     print $fh "$camsrcdir/cam/src/unit_drivers\n";

@@ -77,7 +77,6 @@
 
       <value compset="%PORT">-offline_drv rad</value>
       <value compset="%SPCAMS"        >-rad camrt -chem trop_bam -spcam_nx 16 -spcam_ny 1 -spcam_dx 4000 -spcam_dt 20 -phys spcam_sam1mom </value>              
-      <values additive='yes'>
       <value compset="_CAM4"          >-phys cam4</value>              
       <value compset="_CAM5"          >-phys cam5</value> 
       <value compset="_CAM55"         >-phys cam5.4 -clubb_sgs</value>
@@ -265,10 +264,6 @@
     <desc compset="CAM40"			>CAM cam4 physics:</desc>
     <desc compset="CAM50"			>CAM cam5 physics:</desc>
     <desc compset="CAM60"		        >CAM cam6.0 physics:</desc>
-    <desc compset="_CAM4_"			>CAM cam4 physics:</desc>
-    <desc compset="_CAM5_"			>CAM cam5 physics:</desc>
-    <desc compset="_CAM55_"		        >CAM cam5.5 physics:</desc>
-    <desc compset="_CAM55_"		        >CAM cam5.5 physics, not clubb:</desc>
     <desc compset="%CLB[%_]"			>CAM CLUBB:</desc>
     <desc compset="%NCLB[%_]"			>Turn off CAM CLUBB:</desc>
     <desc compset="%PM[%_]"			>CAM prescribed modal aerosols:</desc>
@@ -302,7 +297,6 @@
     <desc compset="%AQUAP"			>CAM atmosphere in aquaplanet mode: </desc>
     <desc compset="%PORT"			>CAM Parallel Offline Radiation Tool:</desc>
     <desc compset="_CAM.%L60"			>CAM 60 layers and full gravity wave spectrum:</desc>
-
     <desc compset="_CAM5%PTAERO">cam 5 physics and Production tagged aerosols (OSLO_AERO)</desc>
     <desc compset="_CAM55%PTAERO">cam 5.4+CLUBB physics and Production tagged aerosols (OSLO_AERO)</desc>
     <desc compset="_CAM54%PTAERO">cam 5.4+Production tagged aerosols (OSLO_AERO)+clm5 </desc>
