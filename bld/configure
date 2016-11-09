@@ -119,11 +119,12 @@ OPTIONS
                           test_tracers, test_tracers2].
                         Default: none.
      -chem <name>       Build CAM with specified prognostic chemistry package
-                        [ waccm_ma | waccmx_ma | waccm_ma_sulfur | waccm_ma_mam3 | waccm_ma_mam4 | waccm_mad_mam4 |
-			  waccm_sc |waccm_sc_mam3 | waccm_tsmlt | waccm_tsmlt_mam4 | waccm_tsmlt_sulfur |
-                          trop_mozart | trop_mozart_mam3 | trop_mozart_soa | trop_strat_soa | trop_ghg | trop_bam |
-                          trop_mam3 | trop_mam4 | trop_mam7 | super_fast_llnl | super_fast_llnl_mam3 |
-                          trop_strat_soa | trop_strat_mam3 | trop_strat_mam4_vbs | trop_strat_mam7 | none ].  Default: trop_mam3.
+                        [ trop_mam3 | trop_mam4 | trop_mam7 | trop_mozart | trop_mozart_mam3 | trop_mozart_soa | 
+                          trop_strat_mam3 | trop_strat_mam4_vbs | trop_strat_mam7 | trop_strat_soa |  | trop_bam | 
+                          trop_ghg | waccm_ma | waccm_mad_mam4 | waccm_ma_mam4 | waccm_ma_sulfur | waccm_sc | 
+                          waccm_sc_mam4 | waccm_tsmlt | waccm_tsmlt_mam4 | waccm_tsmlt_sulfur | 
+                          super_fast_llnl | super_fast_llnl_mam3 | terminator | none ].
+                        Default: trop_mam3.
      -clubb_sgs         Turns on CLUBB_SGS
      -clubb_opts <list> Comma separated list of CLUBB options to turn on/off.  By default they are all off.  Current
                         option is: clubb_do_adv(Advect CLUBB moments)
@@ -506,10 +507,10 @@ if (defined $opts{'chem'}) {
     # If the user has specified a simple physics package...
     if ($simple_phys) {
 
-	# the only valid chemistry option is 'none'
-	if ($chem_pkg ne 'none') {
+	# the only valid chemistry options are 'none' and 'terminator'
+	if (($chem_pkg ne 'none') and ($chem_pkg ne 'terminator')) {
 	    die "configure ERROR: -phys is set to $opts{'phys'}.\n".
-		"                 -chem can only be set to 'none'.\n";
+		"                 -chem can only be set to 'none or terminator'.\n";
 	}
     }
     elsif ($phys_pkg eq 'cam3' or $phys_pkg eq 'cam4') {
@@ -866,7 +867,7 @@ EOF
 }
 
 # WACCM includes 4 age of air tracers by default
-if ($chem_pkg =~ /waccm_ma/ or $chem_pkg =~ /waccmx_ma/ or $chem_pkg =~ /waccm_tsmlt/) {
+if ($chem_pkg =~ /waccm_ma/ or $chem_pkg =~ /waccm_tsmlt/) {
     $cfg_ref->set('age_of_air_trcs', 1);
 }
 
@@ -1612,6 +1613,10 @@ else {
     # if it's set to zero which is the case for adiabatic or held_suarez physics.
     $nadv = 1;
 
+    # Chemistry package:
+    $nadv += $chem_nadv;
+    if ($print>=2) { print "Advected constituents added by chemistry $chem_pkg: $chem_nadv$eol"; }
+
     # If neither adiabatic nor held_suarez physics are used, then accumulate advected constituents
     # from the moist physics and chemistry processes.
 
@@ -1646,10 +1651,6 @@ else {
             $nadv += 4;
             if ($print>=2) { print "Advected constituents added by co2_cycle: 4$eol"; }
         }
-
-        # Chemistry package:
-        $nadv += $chem_nadv;
-        if ($print>=2) { print "Advected constituents added by chemistry $chem_pkg: $chem_nadv$eol"; }
 
         # CARMA package:
         if ($carma_nadv > 0) {

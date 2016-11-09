@@ -1,23 +1,12 @@
-
-
-
-
       module mo_prod_loss
-
       use shr_kind_mod, only : r8 => shr_kind_r8
-
       private
       public :: exp_prod_loss
       public :: imp_prod_loss
-
       contains
-
       subroutine exp_prod_loss( prod, loss, y, rxt, het_rates )
-
       use ppgrid, only : pver
-
       implicit none
-
 !--------------------------------------------------------------------
 ! ... dummy args
 !--------------------------------------------------------------------
@@ -27,14 +16,9 @@
       real(r8), intent(in) :: y(:,:,:)
       real(r8), intent(in) :: rxt(:,:,:)
       real(r8), intent(in) :: het_rates(:,:,:)
-
-
-
 !--------------------------------------------------------------------
 ! ... loss and production for Explicit method
 !--------------------------------------------------------------------
-
-
          loss(:,:,1) = ( + het_rates(:,:,180))* y(:,:,180)
          prod(:,:,1) = 0._r8
          loss(:,:,2) = ((rxt(:,:,153) +rxt(:,:,154) +rxt(:,:,155))* y(:,:,3) &
@@ -132,15 +116,10 @@
          prod(:,:,36) = 0._r8
          loss(:,:,37) = ( + rxt(:,:,88) + het_rates(:,:,179))* y(:,:,179)
          prod(:,:,37) = 0._r8
-
       end subroutine exp_prod_loss
-
       subroutine imp_prod_loss( prod, loss, y, rxt, het_rates )
-
       use ppgrid, only : pver
-
       implicit none
-
 !--------------------------------------------------------------------
 ! ... dummy args
 !--------------------------------------------------------------------
@@ -150,14 +129,9 @@
       real(r8), intent(in) :: y(:)
       real(r8), intent(in) :: rxt(:)
       real(r8), intent(in) :: het_rates(:)
-
-
-
 !--------------------------------------------------------------------
 ! ... loss and production for Implicit method
 !--------------------------------------------------------------------
-
-
          loss(139) = (rxt(116)* y(2) +rxt(134)* y(3) +rxt(189)* y(9) +rxt(192)* y(10) &
                   +rxt(161)* y(22) +rxt(166)* y(23) +rxt(174)* y(24) +rxt(204)* y(28) &
                   +rxt(231)* y(37) +rxt(290)* y(44) +rxt(311)* y(59) +rxt(333)* y(77) &
@@ -841,7 +815,5 @@
          prod(26) = 0._r8
          loss(27) = ( + rxt(430) + het_rates(169))* y(169)
          prod(27) = 0._r8
-
       end subroutine imp_prod_loss
-
       end module mo_prod_loss

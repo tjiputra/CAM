@@ -1,4 +1,1325 @@
+===============================================================
 
+Tag name: cam5_4_91
+Originator(s): fvitt, mmills, tilmes, dkin
+Date: 21 Oct 2016
+One-line Summary: WACCM chemistry and other msic updates -- "Phase 3" science changes
+
+Purpose of changes:
+
+ - Use vectorized implicit solver for the waccm_tsmlt_mam4 chemistry
+ - Include chemistry preprocessor capable of generating vectorized solvers
+ - Update chemistry in waccm_tsmlt_mam4 mechanism -- includes:
+      . VBS SOA scheme
+      . JPL15 rates
+ - Add chemical forcings associated with energetic particle ionization
+   to WACCM6 build-namelist use cases
+ - Unify tropopause definition for chemistry and aerosol processes for consistency
+ - Use CFC 11* climate forcings in SC-WACCM
+ - SAD calculation change for chemistry
+ - Update JEUV heating efficiency for WACCM and WACCMX
+ - Add EPP settings to WACCM6 build-namelist use cases
+ - Fix a bug in mo_strato_rates
+ - Removed obsolete chemistry packages which were for WACCM with 3-mode aerosol scheme
+
+Bugs fixed (include bugzilla ID):
+
+ - mo_strato_rates
+    . gamma terms need to be added rather than multipled -- dkin
+ - epp_ionization
+    . a correction in the error checking logic
+
+Describe any changes made to build system:
+
+Describe any changes made to the namelist:
+
+ The following namelist options are added to keep CAM bit-for-bit unchanged.
+ These may be removed in the future.
+
+ prescribed_strataero_use_chemtrop (logical):
+   Indicates whether to use the unified chemistry tropopause method to set prescribed
+   stratospheric aerosols below the tropopause to zero.  This has a maximum altitude
+   level corresponding to 300 hPa for latitudes poleward of 50 degrees.
+   Default: set by build-namelist
+
+ chem_use_chemtrop (logical):
+   Indicates whether to use the unified chemistry tropopause method to set the
+   tropopause used in gas phase and aerosol chemical processes.  This has a maximum
+   altitude level corresponding to 300 hPa for latitudes poleward of 50 degrees.
+   Default: set by build-namelist
+
+
+ The following modification to the existing namelist option is for very long rate
+ summation strings in the namelist.
+
+ rxn_rate_sums (char*256(200)):
+  Give the user the ability to specify rate families (or groupings) diagnostics based
+  on reaction tag names. These group names can be added to history fincl variables.
+  To indicate the summation continues with next string use "&" character at the end
+  of the string.
+  Example:
+   rate_sums =
+     'OX_P = NO_HO2 + CH3O2_NO + 2*jo2_b ... ',
+     'OX_L = NO2_O_M + HO2_O3 + CLO_O ...',
+     'RO2_RO2_sum = CH3O2_CH3O2a + CH3O2_CH3O2b + C2H5O2_CH3O2 + C2H5O2_C2H5O2 + CH3CO3_CH3O2 &',
+                 '+ CH3CO3_CH3CO3 + CH3H7O2_CH3O2 + RO2_CH3O2 + MACRO2_CH3O2 ...',
+   fincl1 = 'OX_P','OX_L', 'RO2_RO2_sum', ...
+
+List any changes to the defaults for the boundary datasets:
+
+Describe any substantial timing or memory changes:
+
+Code reviewed by: cacraig, eaton
+
+List all subroutines eliminated:
+
+D     components/cam/src/chemistry/mozart/mo_exp_sol.F90
+ - now each mechanism has it's own version of exp_sol which may
+   or may not be vectorized
+
+D     components/cam/src/chemistry/pp_waccm_ma_mam3
+D     components/cam/src/chemistry/pp_waccm_sc_mam3
+ - removed the waccm 3-mode mechanism -- 4-mode aerosol scheme is preferred
+
+D     components/cam/bld/namelist_files/use_cases/waccm_2000_cam5.xml
+D     components/cam/bld/namelist_files/use_cases/waccm_sc_1955-2005_cam5.xml
+D     components/cam/bld/namelist_files/use_cases/waccm_sc_2000_cam5.xml
+D     components/cam/bld/namelist_files/use_cases/waccm_1955-2005_cam5.xml
+D     components/cam/bld/namelist_files/use_cases/waccm_1850_cam5.xml
+ - removed these obsolete use cases
+
+D     components/cam/test/system/config_files/f1.9c5wmam3dh
+D     components/cam/test/system/config_files/f10c5wmam3dm
+D     components/cam/test/system/config_files/f1.9c5wscmam3dh
+D     components/cam/test/system/config_files/f1.9c5wscmam3dm
+D     components/cam/test/system/config_files/f1.9c5wmam3h
+D     components/cam/test/system/config_files/f1.9c5wmclbdh
+D     components/cam/test/system/config_files/f4c5wmclbdh
+D     components/cam/test/system/config_files/f10c5wscmam3dm
+ - removed these obsolete test configurations
+
+List all subroutines added and what they do:
+
+A     components/cam/src/chemistry/mozart/chem_prod_loss_diags.F90
+ - a utility module to be shared by scalar and vectorized solvers
+   to output chemistry production and loss diagnostics
+
+A     components/cam/bld/namelist_files/use_cases/waccm_ma_amip_cam55.xml
+A     components/cam/bld/namelist_files/use_cases/waccm_sc_2000_cam55.xml
+A     components/cam/bld/namelist_files/use_cases/waccm_ma_1850_cam55.xml
+A     components/cam/bld/namelist_files/use_cases/waccm_sc_amip_cam55.xml
+A     components/cam/bld/namelist_files/use_cases/waccm_ma_2000_cam55.xml
+ - some new waccm mid-atmos and simplified-chem use cases
+
+A     components/cam/src/chemistry/pp_super_fast_llnl/mo_exp_sol.F90
+A     components/cam/src/chemistry/pp_trop_mozart_mam3/mo_exp_sol.F90
+A     components/cam/src/chemistry/pp_none/mo_exp_sol.F90
+A     components/cam/src/chemistry/pp_trop_mam3/mo_exp_sol.F90
+A     components/cam/src/chemistry/pp_trop_mam4/mo_exp_sol.F90
+A     components/cam/src/chemistry/pp_trop_strat_soa/mo_exp_sol.F90
+A     components/cam/src/chemistry/pp_trop_bam/mo_exp_sol.F90
+A     components/cam/src/chemistry/pp_trop_mam7/mo_exp_sol.F90
+A     components/cam/src/chemistry/pp_waccm_ma/mo_exp_sol.F90
+A     components/cam/src/chemistry/pp_waccm_ma_sulfur/mo_exp_sol.F90
+A     components/cam/src/chemistry/pp_trop_ghg/mo_exp_sol.F90
+A     components/cam/src/chemistry/pp_super_fast_llnl_mam3/mo_exp_sol.F90
+A     components/cam/src/chemistry/pp_waccm_tsmlt/mo_exp_sol.F90
+A     components/cam/src/chemistry/pp_waccm_tsmlt_sulfur/mo_exp_sol.F90
+A     components/cam/src/chemistry/pp_trop_strat_mam3/mo_exp_sol.F90
+A     components/cam/src/chemistry/pp_waccm_sc/mo_exp_sol.F90
+A     components/cam/src/chemistry/pp_trop_mozart/mo_exp_sol.F90
+A     components/cam/src/chemistry/pp_trop_mozart_soa/mo_exp_sol.F90
+A     components/cam/src/chemistry/pp_trop_strat_mam7/mo_exp_sol.F90
+A     components/cam/src/chemistry/pp_terminator/mo_exp_sol.F90
+A     components/cam/src/chemistry/pp_waccm_ma_mam4/mo_exp_sol.F90
+A     components/cam/src/chemistry/pp_waccm_mad_mam4/mo_exp_sol.F90
+A     components/cam/src/chemistry/pp_trop_strat_mam4_vbs/mo_exp_sol.F90
+A     components/cam/src/chemistry/pp_waccm_tsmlt_mam4/mo_exp_sol.F90
+ - each chem package has it's own version of explicit solver and may differ
+   depending on if the solvers are scalar or vector versions
+
+A     components/cam/src/chemistry/pp_waccm_sc_mam4/mo_adjrxt.F90
+A     components/cam/src/chemistry/pp_waccm_sc_mam4/mo_rxt_rates_conv.F90
+A     components/cam/src/chemistry/pp_waccm_sc_mam4/mo_imp_sol.F90
+A     components/cam/src/chemistry/pp_waccm_sc_mam4/chem_mods.F90
+A     components/cam/src/chemistry/pp_waccm_sc_mam4/mo_prod_loss.F90
+A     components/cam/src/chemistry/pp_waccm_sc_mam4/mo_lin_matrix.F90
+A     components/cam/src/chemistry/pp_waccm_sc_mam4/mo_exp_sol.F90
+A     components/cam/src/chemistry/pp_waccm_sc_mam4/m_rxt_id.F90
+A     components/cam/src/chemistry/pp_waccm_sc_mam4/mo_phtadj.F90
+A     components/cam/src/chemistry/pp_waccm_sc_mam4/mo_nln_matrix.F90
+A     components/cam/src/chemistry/pp_waccm_sc_mam4/mo_lu_factor.F90
+A     components/cam/src/chemistry/pp_waccm_sc_mam4/mo_sim_dat.F90
+A     components/cam/src/chemistry/pp_waccm_sc_mam4/mo_indprd.F90
+A     components/cam/src/chemistry/pp_waccm_sc_mam4/m_spc_id.F90
+A     components/cam/src/chemistry/pp_waccm_sc_mam4/chem_mech.doc
+A     components/cam/src/chemistry/pp_waccm_sc_mam4/chem_mech.in
+A     components/cam/src/chemistry/pp_waccm_sc_mam4/mo_lu_solve.F90
+A     components/cam/src/chemistry/pp_waccm_sc_mam4/mo_setrxt.F90
+A     components/cam/src/chemistry/pp_waccm_sc_mam4
+ - waccm_sc_mam4 replaces pre-existing waccm_sc_mam3 chem package
+
+A     components/cam/test/system/config_files/f1.9c5.5wmam4h
+A     components/cam/test/system/config_files/f10c5.5wmam4dm
+A     components/cam/test/system/config_files/f1.9c5.5wmam4dh
+A     components/cam/test/system/config_files/f1.9c5.5wscmam4dh
+A     components/cam/test/system/config_files/f1.9c5.5wscmam4dm
+A     components/cam/test/system/config_files/f10c5.5wscmam4dm
+ - some test config files for testing 4-mode aerosol scheme in waccm
+
+List all existing files that have been modified, and describe the changes:
+
+M     components/cam/bld/namelist_files/namelist_defaults_cam.xml
+ - define defaults for use_chemtrop namelist options
+ - remove obsolete waccm*mam3 defaults and add defaulls for waccm*mam4
+
+M     components/cam/bld/namelist_files/namelist_definition.xml
+ - new namelist options added (see above)
+
+M     components/cam/bld/configure
+ - adjustment to the list of available chemistry packages
+ - removal of refrence to waccmx_ma chemistry which does not exit
+
+M     components/cam/bld/build-namelist
+ - set defaults for new *_chemtrop options (see above)
+ - removal of refrence to waccmx_ma chemistry which does not exit
+ - misc chemistry corrections
+
+M     components/cam/bld/config_files/definition.xml
+ - adjustments to the list of chemsitry packages
+
+M     components/cam/src/physics/cam/modal_aer_opt.F90
+ - addded aerosol optics diagnostics
+
+M     components/cam/src/chemistry/modal_aero/aero_model.F90
+ - provide effective radius for use in chemistry
+
+M     components/cam/src/chemistry/bulk_aero/aero_model.F90
+ - interface change
+
+M     components/cam/src/chemistry/mozart/epp_ionization.F90
+ - bug fix in the error checking logic
+
+M     components/cam/src/chemistry/mozart/mo_waccm_hrates.F90
+M     components/cam/src/chemistry/mozart/mo_jeuv.F90
+ - update JEUV heating efficiency
+
+M     components/cam/src/chemistry/mozart/rate_diags.F90
+ - allow very long summation strings to be continued in the next
+   string in the summation list in the namelist
+
+M     components/cam/src/chemistry/mozart/chemistry.F90
+ - mods relevant to the unified chemistry tropopause level
+
+M     components/cam/src/chemistry/mozart/exbdrift.F90
+ - removed outfld calls for ion drift velocities which is done in iondrag
+
+M     components/cam/src/chemistry/mozart/mo_gas_phase_chemdr.F90
+ - mods relevant to the unified chemistry tropopause level
+ - SAD diagnostics for troposphere and stratopshere
+ - effective radius diagnostics
+
+M     components/cam/src/chemistry/mozart/cfc11star.F90
+ - added ability to use prescribed CFC tracers to compute CFCSTAR
+
+M     components/cam/src/chemistry/mozart/mo_neu_wetdep.F90
+ - allow wet removal of 'NDEP' and 'NHDEP'
+
+M     components/cam/src/chemistry/mozart/mo_usrrxt.F90
+ - JPL15 updates
+ - effective radius changes
+
+M     components/cam/src/chemistry/mozart/mo_strato_rates.F90
+ - Doug's bug fix
+
+
+M     components/cam/src/chemistry/utils/prescribed_strataero.F90
+ - convert radius units from centimeters to meters
+ - accept SAD units of cm2/cm3 in addition ot um2/cm3
+ - option to use chemtrop method for tropopause level below which to zero out aerosols
+
+M     components/cam/src/chemistry/utils/tracer_data.F90
+ - improvement on error message
+
+M     components/cam/src/chemistry/pp_super_fast_llnl/chem_mods.F90
+M     components/cam/src/chemistry/pp_super_fast_llnl/mo_prod_loss.F90
+M     components/cam/src/chemistry/pp_super_fast_llnl/mo_lin_matrix.F90
+M     components/cam/src/chemistry/pp_super_fast_llnl/m_rxt_id.F90
+M     components/cam/src/chemistry/pp_super_fast_llnl/mo_phtadj.F90
+M     components/cam/src/chemistry/pp_super_fast_llnl/mo_nln_matrix.F90
+M     components/cam/src/chemistry/pp_super_fast_llnl/mo_lu_factor.F90
+M     components/cam/src/chemistry/pp_super_fast_llnl/mo_sim_dat.F90
+M     components/cam/src/chemistry/pp_super_fast_llnl/mo_indprd.F90
+M     components/cam/src/chemistry/pp_super_fast_llnl/m_spc_id.F90
+M     components/cam/src/chemistry/pp_super_fast_llnl/mo_lu_solve.F90
+M     components/cam/src/chemistry/pp_super_fast_llnl/mo_setrxt.F90
+M     components/cam/src/chemistry/pp_super_fast_llnl/mo_adjrxt.F90
+M     components/cam/src/chemistry/pp_super_fast_llnl/mo_imp_sol.F90
+M     components/cam/src/chemistry/pp_trop_mozart_mam3/mo_imp_sol.F90
+M     components/cam/src/chemistry/pp_trop_mozart_mam3/chem_mods.F90
+M     components/cam/src/chemistry/pp_trop_mozart_mam3/mo_prod_loss.F90
+M     components/cam/src/chemistry/pp_trop_mozart_mam3/mo_lin_matrix.F90
+M     components/cam/src/chemistry/pp_trop_mozart_mam3/m_rxt_id.F90
+M     components/cam/src/chemistry/pp_trop_mozart_mam3/mo_phtadj.F90
+M     components/cam/src/chemistry/pp_trop_mozart_mam3/mo_nln_matrix.F90
+M     components/cam/src/chemistry/pp_trop_mozart_mam3/mo_lu_factor.F90
+M     components/cam/src/chemistry/pp_trop_mozart_mam3/mo_sim_dat.F90
+M     components/cam/src/chemistry/pp_trop_mozart_mam3/mo_indprd.F90
+M     components/cam/src/chemistry/pp_trop_mozart_mam3/m_spc_id.F90
+M     components/cam/src/chemistry/pp_trop_mozart_mam3/mo_lu_solve.F90
+M     components/cam/src/chemistry/pp_trop_mozart_mam3/mo_setrxt.F90
+M     components/cam/src/chemistry/pp_trop_mozart_mam3/mo_adjrxt.F90
+M     components/cam/src/chemistry/pp_none/mo_adjrxt.F90
+M     components/cam/src/chemistry/pp_none/mo_imp_sol.F90
+M     components/cam/src/chemistry/pp_none/chem_mods.F90
+M     components/cam/src/chemistry/pp_none/mo_prod_loss.F90
+M     components/cam/src/chemistry/pp_none/mo_lin_matrix.F90
+M     components/cam/src/chemistry/pp_none/mo_phtadj.F90
+M     components/cam/src/chemistry/pp_none/mo_nln_matrix.F90
+M     components/cam/src/chemistry/pp_none/mo_lu_factor.F90
+M     components/cam/src/chemistry/pp_none/mo_indprd.F90
+M     components/cam/src/chemistry/pp_none/m_spc_id.F90
+M     components/cam/src/chemistry/pp_none/mo_lu_solve.F90
+M     components/cam/src/chemistry/pp_trop_mam3/mo_adjrxt.F90
+M     components/cam/src/chemistry/pp_trop_mam3/mo_imp_sol.F90
+M     components/cam/src/chemistry/pp_trop_mam3/chem_mods.F90
+M     components/cam/src/chemistry/pp_trop_mam3/mo_prod_loss.F90
+M     components/cam/src/chemistry/pp_trop_mam3/mo_lin_matrix.F90
+M     components/cam/src/chemistry/pp_trop_mam3/m_rxt_id.F90
+M     components/cam/src/chemistry/pp_trop_mam3/mo_phtadj.F90
+M     components/cam/src/chemistry/pp_trop_mam3/mo_nln_matrix.F90
+M     components/cam/src/chemistry/pp_trop_mam3/mo_lu_factor.F90
+M     components/cam/src/chemistry/pp_trop_mam3/mo_sim_dat.F90
+M     components/cam/src/chemistry/pp_trop_mam3/mo_indprd.F90
+M     components/cam/src/chemistry/pp_trop_mam3/m_spc_id.F90
+M     components/cam/src/chemistry/pp_trop_mam3/mo_lu_solve.F90
+M     components/cam/src/chemistry/pp_trop_mam3/mo_setrxt.F90
+M     components/cam/src/chemistry/pp_trop_mam4/m_rxt_id.F90
+M     components/cam/src/chemistry/pp_trop_mam4/mo_phtadj.F90
+M     components/cam/src/chemistry/pp_trop_mam4/mo_nln_matrix.F90
+M     components/cam/src/chemistry/pp_trop_mam4/mo_lu_factor.F90
+M     components/cam/src/chemistry/pp_trop_mam4/mo_sim_dat.F90
+M     components/cam/src/chemistry/pp_trop_mam4/mo_indprd.F90
+M     components/cam/src/chemistry/pp_trop_mam4/m_spc_id.F90
+M     components/cam/src/chemistry/pp_trop_mam4/mo_lu_solve.F90
+M     components/cam/src/chemistry/pp_trop_mam4/mo_setrxt.F90
+M     components/cam/src/chemistry/pp_trop_mam4/mo_adjrxt.F90
+M     components/cam/src/chemistry/pp_trop_mam4/mo_imp_sol.F90
+M     components/cam/src/chemistry/pp_trop_mam4/chem_mods.F90
+M     components/cam/src/chemistry/pp_trop_mam4/mo_prod_loss.F90
+M     components/cam/src/chemistry/pp_trop_mam4/mo_lin_matrix.F90
+M     components/cam/src/chemistry/pp_trop_strat_soa/m_rxt_id.F90
+M     components/cam/src/chemistry/pp_trop_strat_soa/mo_phtadj.F90
+M     components/cam/src/chemistry/pp_trop_strat_soa/mo_nln_matrix.F90
+M     components/cam/src/chemistry/pp_trop_strat_soa/mo_lu_factor.F90
+M     components/cam/src/chemistry/pp_trop_strat_soa/mo_sim_dat.F90
+M     components/cam/src/chemistry/pp_trop_strat_soa/mo_indprd.F90
+M     components/cam/src/chemistry/pp_trop_strat_soa/m_spc_id.F90
+M     components/cam/src/chemistry/pp_trop_strat_soa/mo_lu_solve.F90
+M     components/cam/src/chemistry/pp_trop_strat_soa/mo_setrxt.F90
+M     components/cam/src/chemistry/pp_trop_strat_soa/mo_adjrxt.F90
+M     components/cam/src/chemistry/pp_trop_strat_soa/mo_imp_sol.F90
+M     components/cam/src/chemistry/pp_trop_strat_soa/chem_mods.F90
+M     components/cam/src/chemistry/pp_trop_strat_soa/mo_prod_loss.F90
+M     components/cam/src/chemistry/pp_trop_strat_soa/mo_lin_matrix.F90
+M     components/cam/src/chemistry/pp_trop_bam/mo_adjrxt.F90
+M     components/cam/src/chemistry/pp_trop_bam/mo_imp_sol.F90
+M     components/cam/src/chemistry/pp_trop_bam/chem_mods.F90
+M     components/cam/src/chemistry/pp_trop_bam/mo_prod_loss.F90
+M     components/cam/src/chemistry/pp_trop_bam/mo_lin_matrix.F90
+M     components/cam/src/chemistry/pp_trop_bam/m_rxt_id.F90
+M     components/cam/src/chemistry/pp_trop_bam/mo_phtadj.F90
+M     components/cam/src/chemistry/pp_trop_bam/mo_nln_matrix.F90
+M     components/cam/src/chemistry/pp_trop_bam/mo_lu_factor.F90
+M     components/cam/src/chemistry/pp_trop_bam/mo_indprd.F90
+M     components/cam/src/chemistry/pp_trop_bam/mo_sim_dat.F90
+M     components/cam/src/chemistry/pp_trop_bam/m_spc_id.F90
+M     components/cam/src/chemistry/pp_trop_bam/mo_lu_solve.F90
+M     components/cam/src/chemistry/pp_trop_bam/mo_setrxt.F90
+M     components/cam/src/chemistry/pp_trop_mam7/m_spc_id.F90
+M     components/cam/src/chemistry/pp_trop_mam7/mo_lu_solve.F90
+M     components/cam/src/chemistry/pp_trop_mam7/mo_setrxt.F90
+M     components/cam/src/chemistry/pp_trop_mam7/mo_adjrxt.F90
+M     components/cam/src/chemistry/pp_trop_mam7/mo_imp_sol.F90
+M     components/cam/src/chemistry/pp_trop_mam7/chem_mods.F90
+M     components/cam/src/chemistry/pp_trop_mam7/mo_prod_loss.F90
+M     components/cam/src/chemistry/pp_trop_mam7/mo_lin_matrix.F90
+M     components/cam/src/chemistry/pp_trop_mam7/m_rxt_id.F90
+M     components/cam/src/chemistry/pp_trop_mam7/mo_phtadj.F90
+M     components/cam/src/chemistry/pp_trop_mam7/mo_nln_matrix.F90
+M     components/cam/src/chemistry/pp_trop_mam7/mo_lu_factor.F90
+M     components/cam/src/chemistry/pp_trop_mam7/mo_sim_dat.F90
+M     components/cam/src/chemistry/pp_trop_mam7/mo_indprd.F90
+M     components/cam/src/chemistry/pp_waccm_ma/mo_imp_sol.F90
+M     components/cam/src/chemistry/pp_waccm_ma/chem_mods.F90
+M     components/cam/src/chemistry/pp_waccm_ma/mo_prod_loss.F90
+M     components/cam/src/chemistry/pp_waccm_ma/mo_lin_matrix.F90
+M     components/cam/src/chemistry/pp_waccm_ma/m_rxt_id.F90
+M     components/cam/src/chemistry/pp_waccm_ma/mo_phtadj.F90
+M     components/cam/src/chemistry/pp_waccm_ma/mo_nln_matrix.F90
+M     components/cam/src/chemistry/pp_waccm_ma/mo_lu_factor.F90
+M     components/cam/src/chemistry/pp_waccm_ma/mo_sim_dat.F90
+M     components/cam/src/chemistry/pp_waccm_ma/mo_indprd.F90
+M     components/cam/src/chemistry/pp_waccm_ma/m_spc_id.F90
+M     components/cam/src/chemistry/pp_waccm_ma/mo_lu_solve.F90
+M     components/cam/src/chemistry/pp_waccm_ma/mo_setrxt.F90
+M     components/cam/src/chemistry/pp_waccm_ma/mo_adjrxt.F90
+M     components/cam/src/chemistry/pp_waccm_ma_sulfur/mo_lu_solve.F90
+M     components/cam/src/chemistry/pp_waccm_ma_sulfur/mo_setrxt.F90
+M     components/cam/src/chemistry/pp_waccm_ma_sulfur/mo_adjrxt.F90
+M     components/cam/src/chemistry/pp_waccm_ma_sulfur/mo_imp_sol.F90
+M     components/cam/src/chemistry/pp_waccm_ma_sulfur/chem_mods.F90
+M     components/cam/src/chemistry/pp_waccm_ma_sulfur/mo_prod_loss.F90
+M     components/cam/src/chemistry/pp_waccm_ma_sulfur/mo_lin_matrix.F90
+M     components/cam/src/chemistry/pp_waccm_ma_sulfur/m_rxt_id.F90
+M     components/cam/src/chemistry/pp_waccm_ma_sulfur/mo_phtadj.F90
+M     components/cam/src/chemistry/pp_waccm_ma_sulfur/mo_nln_matrix.F90
+M     components/cam/src/chemistry/pp_waccm_ma_sulfur/mo_lu_factor.F90
+M     components/cam/src/chemistry/pp_waccm_ma_sulfur/mo_sim_dat.F90
+M     components/cam/src/chemistry/pp_waccm_ma_sulfur/mo_indprd.F90
+M     components/cam/src/chemistry/pp_waccm_ma_sulfur/m_spc_id.F90
+M     components/cam/src/chemistry/pp_trop_ghg/m_rxt_id.F90
+M     components/cam/src/chemistry/pp_trop_ghg/mo_phtadj.F90
+M     components/cam/src/chemistry/pp_trop_ghg/mo_nln_matrix.F90
+M     components/cam/src/chemistry/pp_trop_ghg/mo_lu_factor.F90
+M     components/cam/src/chemistry/pp_trop_ghg/mo_sim_dat.F90
+M     components/cam/src/chemistry/pp_trop_ghg/mo_indprd.F90
+M     components/cam/src/chemistry/pp_trop_ghg/m_spc_id.F90
+M     components/cam/src/chemistry/pp_trop_ghg/mo_lu_solve.F90
+M     components/cam/src/chemistry/pp_trop_ghg/mo_adjrxt.F90
+M     components/cam/src/chemistry/pp_trop_ghg/mo_imp_sol.F90
+M     components/cam/src/chemistry/pp_trop_ghg/chem_mods.F90
+M     components/cam/src/chemistry/pp_trop_ghg/mo_prod_loss.F90
+M     components/cam/src/chemistry/pp_trop_ghg/mo_lin_matrix.F90
+M     components/cam/src/chemistry/pp_super_fast_llnl_mam3/mo_setrxt.F90
+M     components/cam/src/chemistry/pp_super_fast_llnl_mam3/mo_adjrxt.F90
+M     components/cam/src/chemistry/pp_super_fast_llnl_mam3/mo_imp_sol.F90
+M     components/cam/src/chemistry/pp_super_fast_llnl_mam3/chem_mods.F90
+M     components/cam/src/chemistry/pp_super_fast_llnl_mam3/mo_prod_loss.F90
+M     components/cam/src/chemistry/pp_super_fast_llnl_mam3/mo_lin_matrix.F90
+M     components/cam/src/chemistry/pp_super_fast_llnl_mam3/m_rxt_id.F90
+M     components/cam/src/chemistry/pp_super_fast_llnl_mam3/mo_phtadj.F90
+M     components/cam/src/chemistry/pp_super_fast_llnl_mam3/mo_nln_matrix.F90
+M     components/cam/src/chemistry/pp_super_fast_llnl_mam3/mo_lu_factor.F90
+M     components/cam/src/chemistry/pp_super_fast_llnl_mam3/mo_sim_dat.F90
+M     components/cam/src/chemistry/pp_super_fast_llnl_mam3/mo_indprd.F90
+M     components/cam/src/chemistry/pp_super_fast_llnl_mam3/m_spc_id.F90
+M     components/cam/src/chemistry/pp_super_fast_llnl_mam3/mo_lu_solve.F90
+M     components/cam/src/chemistry/pp_waccm_tsmlt/mo_lu_solve.F90
+M     components/cam/src/chemistry/pp_waccm_tsmlt/mo_setrxt.F90
+M     components/cam/src/chemistry/pp_waccm_tsmlt/mo_adjrxt.F90
+M     components/cam/src/chemistry/pp_waccm_tsmlt/mo_imp_sol.F90
+M     components/cam/src/chemistry/pp_waccm_tsmlt/chem_mods.F90
+M     components/cam/src/chemistry/pp_waccm_tsmlt/mo_prod_loss.F90
+M     components/cam/src/chemistry/pp_waccm_tsmlt/mo_lin_matrix.F90
+M     components/cam/src/chemistry/pp_waccm_tsmlt/m_rxt_id.F90
+M     components/cam/src/chemistry/pp_waccm_tsmlt/mo_phtadj.F90
+M     components/cam/src/chemistry/pp_waccm_tsmlt/mo_nln_matrix.F90
+M     components/cam/src/chemistry/pp_waccm_tsmlt/mo_lu_factor.F90
+M     components/cam/src/chemistry/pp_waccm_tsmlt/mo_sim_dat.F90
+M     components/cam/src/chemistry/pp_waccm_tsmlt/mo_indprd.F90
+M     components/cam/src/chemistry/pp_waccm_tsmlt/m_spc_id.F90
+M     components/cam/src/chemistry/pp_waccm_tsmlt_sulfur/mo_sim_dat.F90
+M     components/cam/src/chemistry/pp_waccm_tsmlt_sulfur/mo_indprd.F90
+M     components/cam/src/chemistry/pp_waccm_tsmlt_sulfur/m_spc_id.F90
+M     components/cam/src/chemistry/pp_waccm_tsmlt_sulfur/mo_lu_solve.F90
+M     components/cam/src/chemistry/pp_waccm_tsmlt_sulfur/mo_setrxt.F90
+M     components/cam/src/chemistry/pp_waccm_tsmlt_sulfur/mo_adjrxt.F90
+M     components/cam/src/chemistry/pp_waccm_tsmlt_sulfur/mo_imp_sol.F90
+M     components/cam/src/chemistry/pp_waccm_tsmlt_sulfur/chem_mods.F90
+M     components/cam/src/chemistry/pp_waccm_tsmlt_sulfur/mo_prod_loss.F90
+M     components/cam/src/chemistry/pp_waccm_tsmlt_sulfur/mo_lin_matrix.F90
+M     components/cam/src/chemistry/pp_waccm_tsmlt_sulfur/m_rxt_id.F90
+M     components/cam/src/chemistry/pp_waccm_tsmlt_sulfur/mo_phtadj.F90
+M     components/cam/src/chemistry/pp_waccm_tsmlt_sulfur/mo_nln_matrix.F90
+M     components/cam/src/chemistry/pp_waccm_tsmlt_sulfur/mo_lu_factor.F90
+M     components/cam/src/chemistry/pp_trop_strat_mam3/mo_sim_dat.F90
+M     components/cam/src/chemistry/pp_trop_strat_mam3/mo_indprd.F90
+M     components/cam/src/chemistry/pp_trop_strat_mam3/m_spc_id.F90
+M     components/cam/src/chemistry/pp_trop_strat_mam3/mo_lu_solve.F90
+M     components/cam/src/chemistry/pp_trop_strat_mam3/mo_setrxt.F90
+M     components/cam/src/chemistry/pp_trop_strat_mam3/mo_adjrxt.F90
+M     components/cam/src/chemistry/pp_trop_strat_mam3/mo_imp_sol.F90
+M     components/cam/src/chemistry/pp_trop_strat_mam3/chem_mods.F90
+M     components/cam/src/chemistry/pp_trop_strat_mam3/mo_prod_loss.F90
+M     components/cam/src/chemistry/pp_trop_strat_mam3/mo_lin_matrix.F90
+M     components/cam/src/chemistry/pp_trop_strat_mam3/m_rxt_id.F90
+M     components/cam/src/chemistry/pp_trop_strat_mam3/mo_phtadj.F90
+M     components/cam/src/chemistry/pp_trop_strat_mam3/mo_nln_matrix.F90
+M     components/cam/src/chemistry/pp_trop_strat_mam3/mo_lu_factor.F90
+M     components/cam/src/chemistry/pp_waccm_sc/mo_imp_sol.F90
+M     components/cam/src/chemistry/pp_waccm_sc/chem_mods.F90
+M     components/cam/src/chemistry/pp_waccm_sc/mo_prod_loss.F90
+M     components/cam/src/chemistry/pp_waccm_sc/mo_lin_matrix.F90
+M     components/cam/src/chemistry/pp_waccm_sc/m_rxt_id.F90
+M     components/cam/src/chemistry/pp_waccm_sc/mo_phtadj.F90
+M     components/cam/src/chemistry/pp_waccm_sc/mo_nln_matrix.F90
+M     components/cam/src/chemistry/pp_waccm_sc/mo_lu_factor.F90
+M     components/cam/src/chemistry/pp_waccm_sc/mo_sim_dat.F90
+M     components/cam/src/chemistry/pp_waccm_sc/mo_indprd.F90
+M     components/cam/src/chemistry/pp_waccm_sc/m_spc_id.F90
+M     components/cam/src/chemistry/pp_waccm_sc/mo_lu_solve.F90
+M     components/cam/src/chemistry/pp_waccm_sc/mo_adjrxt.F90
+M     components/cam/src/chemistry/pp_trop_mozart/mo_lu_solve.F90
+M     components/cam/src/chemistry/pp_trop_mozart/mo_setrxt.F90
+M     components/cam/src/chemistry/pp_trop_mozart/mo_adjrxt.F90
+M     components/cam/src/chemistry/pp_trop_mozart/mo_imp_sol.F90
+M     components/cam/src/chemistry/pp_trop_mozart/chem_mods.F90
+M     components/cam/src/chemistry/pp_trop_mozart/mo_prod_loss.F90
+M     components/cam/src/chemistry/pp_trop_mozart/mo_lin_matrix.F90
+M     components/cam/src/chemistry/pp_trop_mozart/m_rxt_id.F90
+M     components/cam/src/chemistry/pp_trop_mozart/mo_phtadj.F90
+M     components/cam/src/chemistry/pp_trop_mozart/mo_nln_matrix.F90
+M     components/cam/src/chemistry/pp_trop_mozart/mo_lu_factor.F90
+M     components/cam/src/chemistry/pp_trop_mozart/mo_indprd.F90
+M     components/cam/src/chemistry/pp_trop_mozart/mo_sim_dat.F90
+M     components/cam/src/chemistry/pp_trop_mozart/m_spc_id.F90
+M     components/cam/src/chemistry/pp_trop_mozart_soa/m_rxt_id.F90
+M     components/cam/src/chemistry/pp_trop_mozart_soa/mo_phtadj.F90
+M     components/cam/src/chemistry/pp_trop_mozart_soa/mo_nln_matrix.F90
+M     components/cam/src/chemistry/pp_trop_mozart_soa/mo_lu_factor.F90
+M     components/cam/src/chemistry/pp_trop_mozart_soa/mo_indprd.F90
+M     components/cam/src/chemistry/pp_trop_mozart_soa/mo_sim_dat.F90
+M     components/cam/src/chemistry/pp_trop_mozart_soa/m_spc_id.F90
+M     components/cam/src/chemistry/pp_trop_mozart_soa/mo_lu_solve.F90
+M     components/cam/src/chemistry/pp_trop_mozart_soa/mo_setrxt.F90
+M     components/cam/src/chemistry/pp_trop_mozart_soa/mo_adjrxt.F90
+M     components/cam/src/chemistry/pp_trop_mozart_soa/mo_imp_sol.F90
+M     components/cam/src/chemistry/pp_trop_mozart_soa/chem_mods.F90
+M     components/cam/src/chemistry/pp_trop_mozart_soa/mo_prod_loss.F90
+M     components/cam/src/chemistry/pp_trop_mozart_soa/mo_lin_matrix.F90
+M     components/cam/src/chemistry/pp_trop_strat_mam7/mo_indprd.F90
+M     components/cam/src/chemistry/pp_trop_strat_mam7/mo_sim_dat.F90
+M     components/cam/src/chemistry/pp_trop_strat_mam7/m_spc_id.F90
+M     components/cam/src/chemistry/pp_trop_strat_mam7/mo_lu_solve.F90
+M     components/cam/src/chemistry/pp_trop_strat_mam7/mo_setrxt.F90
+M     components/cam/src/chemistry/pp_trop_strat_mam7/mo_adjrxt.F90
+M     components/cam/src/chemistry/pp_trop_strat_mam7/mo_imp_sol.F90
+M     components/cam/src/chemistry/pp_trop_strat_mam7/chem_mods.F90
+M     components/cam/src/chemistry/pp_trop_strat_mam7/mo_prod_loss.F90
+M     components/cam/src/chemistry/pp_trop_strat_mam7/mo_lin_matrix.F90
+M     components/cam/src/chemistry/pp_trop_strat_mam7/m_rxt_id.F90
+M     components/cam/src/chemistry/pp_trop_strat_mam7/mo_phtadj.F90
+M     components/cam/src/chemistry/pp_trop_strat_mam7/mo_nln_matrix.F90
+M     components/cam/src/chemistry/pp_trop_strat_mam7/mo_lu_factor.F90
+M     components/cam/src/chemistry/pp_terminator/mo_imp_sol.F90
+M     components/cam/src/chemistry/pp_terminator/chem_mods.F90
+M     components/cam/src/chemistry/pp_terminator/mo_prod_loss.F90
+M     components/cam/src/chemistry/pp_terminator/mo_lin_matrix.F90
+M     components/cam/src/chemistry/pp_terminator/m_rxt_id.F90
+M     components/cam/src/chemistry/pp_terminator/mo_phtadj.F90
+M     components/cam/src/chemistry/pp_terminator/mo_nln_matrix.F90
+M     components/cam/src/chemistry/pp_terminator/mo_lu_factor.F90
+M     components/cam/src/chemistry/pp_terminator/mo_sim_dat.F90
+M     components/cam/src/chemistry/pp_terminator/mo_indprd.F90
+M     components/cam/src/chemistry/pp_terminator/m_spc_id.F90
+M     components/cam/src/chemistry/pp_terminator/mo_lu_solve.F90
+M     components/cam/src/chemistry/pp_terminator/mo_adjrxt.F90
+M     components/cam/src/chemistry/pp_waccm_ma_mam4/mo_lin_matrix.F90
+M     components/cam/src/chemistry/pp_waccm_ma_mam4/m_rxt_id.F90
+M     components/cam/src/chemistry/pp_waccm_ma_mam4/mo_phtadj.F90
+M     components/cam/src/chemistry/pp_waccm_ma_mam4/mo_nln_matrix.F90
+M     components/cam/src/chemistry/pp_waccm_ma_mam4/mo_lu_factor.F90
+M     components/cam/src/chemistry/pp_waccm_ma_mam4/mo_sim_dat.F90
+M     components/cam/src/chemistry/pp_waccm_ma_mam4/mo_indprd.F90
+M     components/cam/src/chemistry/pp_waccm_ma_mam4/m_spc_id.F90
+M     components/cam/src/chemistry/pp_waccm_ma_mam4/mo_lu_solve.F90
+M     components/cam/src/chemistry/pp_waccm_ma_mam4/mo_setrxt.F90
+M     components/cam/src/chemistry/pp_waccm_ma_mam4/mo_adjrxt.F90
+M     components/cam/src/chemistry/pp_waccm_ma_mam4/mo_imp_sol.F90
+M     components/cam/src/chemistry/pp_waccm_ma_mam4/chem_mods.F90
+M     components/cam/src/chemistry/pp_waccm_ma_mam4/mo_prod_loss.F90
+M     components/cam/src/chemistry/pp_waccm_mad_mam4/mo_nln_matrix.F90
+M     components/cam/src/chemistry/pp_waccm_mad_mam4/mo_lu_factor.F90
+M     components/cam/src/chemistry/pp_waccm_mad_mam4/mo_sim_dat.F90
+M     components/cam/src/chemistry/pp_waccm_mad_mam4/mo_indprd.F90
+M     components/cam/src/chemistry/pp_waccm_mad_mam4/m_spc_id.F90
+M     components/cam/src/chemistry/pp_waccm_mad_mam4/mo_lu_solve.F90
+M     components/cam/src/chemistry/pp_waccm_mad_mam4/mo_setrxt.F90
+M     components/cam/src/chemistry/pp_waccm_mad_mam4/mo_adjrxt.F90
+M     components/cam/src/chemistry/pp_waccm_mad_mam4/mo_imp_sol.F90
+M     components/cam/src/chemistry/pp_waccm_mad_mam4/chem_mods.F90
+M     components/cam/src/chemistry/pp_waccm_mad_mam4/mo_prod_loss.F90
+M     components/cam/src/chemistry/pp_waccm_mad_mam4/mo_lin_matrix.F90
+M     components/cam/src/chemistry/pp_waccm_mad_mam4/m_rxt_id.F90
+M     components/cam/src/chemistry/pp_waccm_mad_mam4/mo_phtadj.F90
+M     components/cam/src/chemistry/pp_trop_strat_mam4_vbs/m_spc_id.F90
+M     components/cam/src/chemistry/pp_trop_strat_mam4_vbs/mo_lu_solve.F90
+M     components/cam/src/chemistry/pp_trop_strat_mam4_vbs/mo_setrxt.F90
+M     components/cam/src/chemistry/pp_trop_strat_mam4_vbs/mo_adjrxt.F90
+M     components/cam/src/chemistry/pp_trop_strat_mam4_vbs/mo_imp_sol.F90
+M     components/cam/src/chemistry/pp_trop_strat_mam4_vbs/chem_mods.F90
+M     components/cam/src/chemistry/pp_trop_strat_mam4_vbs/mo_prod_loss.F90
+M     components/cam/src/chemistry/pp_trop_strat_mam4_vbs/mo_lin_matrix.F90
+M     components/cam/src/chemistry/pp_trop_strat_mam4_vbs/m_rxt_id.F90
+M     components/cam/src/chemistry/pp_trop_strat_mam4_vbs/mo_phtadj.F90
+M     components/cam/src/chemistry/pp_trop_strat_mam4_vbs/mo_nln_matrix.F90
+M     components/cam/src/chemistry/pp_trop_strat_mam4_vbs/mo_lu_factor.F90
+M     components/cam/src/chemistry/pp_trop_strat_mam4_vbs/mo_sim_dat.F90
+M     components/cam/src/chemistry/pp_trop_strat_mam4_vbs/mo_indprd.F90
+M     components/cam/src/chemistry/pp_waccm_tsmlt_mam4/mo_sim_dat.F90
+M     components/cam/src/chemistry/pp_waccm_tsmlt_mam4/mo_indprd.F90
+M     components/cam/src/chemistry/pp_waccm_tsmlt_mam4/m_spc_id.F90
+M     components/cam/src/chemistry/pp_waccm_tsmlt_mam4/chem_mech.doc
+M     components/cam/src/chemistry/pp_waccm_tsmlt_mam4/chem_mech.in
+M     components/cam/src/chemistry/pp_waccm_tsmlt_mam4/mo_lu_solve.F90
+M     components/cam/src/chemistry/pp_waccm_tsmlt_mam4/mo_setrxt.F90
+M     components/cam/src/chemistry/pp_waccm_tsmlt_mam4/mo_adjrxt.F90
+M     components/cam/src/chemistry/pp_waccm_tsmlt_mam4/mo_rxt_rates_conv.F90
+M     components/cam/src/chemistry/pp_waccm_tsmlt_mam4/mo_imp_sol.F90
+M     components/cam/src/chemistry/pp_waccm_tsmlt_mam4/chem_mods.F90
+M     components/cam/src/chemistry/pp_waccm_tsmlt_mam4/mo_prod_loss.F90
+M     components/cam/src/chemistry/pp_waccm_tsmlt_mam4/mo_lin_matrix.F90
+M     components/cam/src/chemistry/pp_waccm_tsmlt_mam4/mo_phtadj.F90
+M     components/cam/src/chemistry/pp_waccm_tsmlt_mam4/m_rxt_id.F90
+M     components/cam/src/chemistry/pp_waccm_tsmlt_mam4/mo_nln_matrix.F90
+M     components/cam/src/chemistry/pp_waccm_tsmlt_mam4/mo_lu_factor.F90
+- all of the chemistry mechanism needed to be re-preprocessed due to changes in
+  the interface between chemdr and the chemical solvers
+
+M     components/cam/test/system/config_files/f1.9c5.4wtclbh
+M     components/cam/test/system/config_files/f1.9c5.4wtclbdh
+M     components/cam/test/system/config_files/f1.9c5.5wtmam4h
+M     components/cam/test/system/config_files/fsd1.9c5.4wtclbh
+ - use a reduced pcol settings (max number of columns in each physics chunk) to
+   mitigate issues with memory footprint in the vectorized implicit solver used
+   in the waccm_tsmlt_mam4 chemistry package
+
+M     components/cam/test/system/input_tests_master
+
+M     components/cam/bld/namelist_files/use_cases/sd_2007-2011_htap_trop_strat_soa.xml
+M     components/cam/bld/namelist_files/use_cases/1850_waccm_tsmlt_cam5.xml
+M     components/cam/bld/namelist_files/use_cases/2007-2011_htap_trop_strat_soa.xml
+M     components/cam/bld/namelist_files/use_cases/1950-2010_ccmi_refc1_trop_strat_soa.xml
+M     components/cam/bld/namelist_files/use_cases/1950-2100_ccmi_refc2_trop_strat_soa.xml
+M     components/cam/bld/namelist_files/use_cases/2004-2100_ccmi_refc2_rcp45_trop_strat_soa.xml
+M     components/cam/bld/namelist_files/use_cases/waccm_tsmlt_1850_cam55.xml
+M     components/cam/bld/namelist_files/use_cases/waccmx_2000_cam4.xml
+M     components/cam/bld/namelist_files/use_cases/volc_waccm_ma_cam5.xml
+M     components/cam/bld/namelist_files/use_cases/sd_waccm5_geos5.xml
+M     components/cam/bld/namelist_files/use_cases/volc_waccm_tsmlt_nomegan_cam5.xml
+M     components/cam/bld/namelist_files/use_cases/1950-2010_ccmi_refc1_waccm_ma.xml
+M     components/cam/bld/namelist_files/use_cases/sd_1975-2010_ccmi_refc1_waccm_tsmlt.xml
+M     components/cam/bld/namelist_files/use_cases/1950-2010_ccmi_refc1_waccm_tsmlt.xml
+M     components/cam/bld/namelist_files/use_cases/waccm_tsmlt_2000_cam55.xml
+M     components/cam/bld/namelist_files/use_cases/volc_waccm_tsmlt_megan_cam5.xml
+M     components/cam/bld/namelist_files/use_cases/sd_1975-2010_ccmi_refc1_waccm_ma.xml
+M     components/cam/bld/namelist_files/use_cases/1950-2100_ccmi_refc2_waccm_tsmlt.xml
+M     components/cam/bld/namelist_files/use_cases/2000_ccmi_refc1_waccm_tsmlt.xml
+M     components/cam/bld/namelist_files/use_cases/waccmxi_2000_cam4.xml
+M     components/cam/bld/namelist_files/use_cases/1950-2100_ccmi_refc2_rcp85_waccm_ma.xml
+M     components/cam/bld/namelist_files/use_cases/1979-2010_sd_trop_strat_soa.xml
+M     components/cam/bld/namelist_files/use_cases/sd_1975-2010_ccmi_refc1_trop_strat_soa.xml
+M     components/cam/bld/namelist_files/use_cases/waccm_tsmlt_amip_cam55.xml
+M     components/cam/bld/namelist_files/use_cases/rcp6.0_waccm_tsmlt_nomegan_cam5.xml
+M     components/cam/bld/namelist_files/use_cases/1950-2100_ccmi_refc2_waccm_ma.xml
+M     components/cam/bld/namelist_files/use_cases/waccm_1974-2005_cam4.xml
+M     components/cam/bld/namelist_files/use_cases/waccm_1850_cam4.xml
+M     components/cam/bld/namelist_files/use_cases/waccmx_1996_cam4.xml
+M     components/cam/bld/namelist_files/use_cases/waccm_ma_2000_cam55.xml
+M     components/cam/bld/namelist_files/use_cases/waccm_2000_cam4.xml
+M     components/cam/bld/namelist_files/use_cases/waccm_1850-2005_cam4.xml
+M     components/cam/bld/namelist_files/use_cases/waccm_2005-2100_cam4_rcp45.xml
+
+M     components/cam/bld/namelist_files/master_aer_drydep_list.xml
+M     components/cam/bld/namelist_files/master_aer_wetdep_list.xml
+M     components/cam/bld/namelist_files/master_gas_drydep_list.xml
+M     components/cam/bld/namelist_files/master_gas_wetdep_list.xml
+ - mods needed for the VBS scheme and updated TSMLT chemistry
+
+M     components/cam/cime_config/config_pes.xml
+ - removed PER_NODE settting for yellowstone 2-degree FV that did not make sense
+ - added default PE layout for waccm
+
+M     components/cam/cime_config/config_compsets.xml
+M     components/cam/cime_config/testdefs/testlist_cam.xml
+M     components/cam/cime_config/config_component.xml
+
+M     components/cam/SVN_EXTERNAL_DIRECTORIES
+ - use chem preprocessor capable of providing vectorized solvers
+
+If there were any failures reported from running test_driver.sh on any test
+platform, and checkin with these failures has been OK'd by the gatekeeper,
+then copy the lines from the td.*.status files for the failed tests to the
+appropriate machine below.  All failed tests must be justified.
+
+yellowstone/intel:
+
+td.183021.status:022 bl373 TBL.sh f1.9c4mozdh outfrq3s+2000_cam4_trop_chem 9s ..................................FAIL! rc= 7 at Fri Oct 21 02:24:34 MDT 2016
+td.183021.status:027 bl485 TBL.sh f1.9c5.5wtmam4h outfrq3s_megan+waccm_tsmlt_2000_cam55 9s .....................FAIL! rc= 7 at Fri Oct 21 02:51:37 MDT 2016
+td.183021.status:030 bl390 TBL.sh f1.9c4wmxh outfrq3s+waccmx_2000_cam4 9s ......................................FAIL! rc= 7 at Fri Oct 21 03:01:04 MDT 2016
+td.183021.status:039 bl429 TBL.sh f1.9c4wmxh outfrq3s+waccmxi_2000_cam4 9s .....................................FAIL! rc= 7 at Fri Oct 21 03:23:15 MDT 2016
+td.183021.status:041 bl430 TBL.sh f1.9c5mzmam3dh outfrq3s_NEUwetdep 9s .........................................FAIL! rc= 7 at Fri Oct 21 03:32:27 MDT 2016
+td.183021.status:044 bl440 TBL.sh f1.9c4soadh outfrq3s+soa_chem_megan_emis 9s ..................................FAIL! rc= 7 at Fri Oct 21 03:50:41 MDT 2016
+td.183021.status:047 bl470 TBL.sh fsd1.9c5.4wtclbh outfrq3s_sd+sd_waccm5_geos5 9s ..............................FAIL! rc= 7 at Fri Oct 21 04:15:26 MDT 2016
+td.183021.status:050 bl482 TBL.sh f1.9c5.5wscmam4dh outfrq3s+waccm_sc_amip_cam55 9s ............................FAIL! rc= 7 at Fri Oct 21 04:54:22 MDT 2016
+
+ These are expected baseline failures due to:
+  . change in tropopause definition
+  . chemistry is updated in waccm_tsmlt_mam4 mechanism
+  . change in how SAD in chemistry is calculated
+  . adjustment of the EUV heating factor in WACCM(X)
+
+yellowstone/intel/aux_cam:
+ERP_Ln9.f09_f09.F1850_DONOTUSE.yellowstone_intel.cam-outfrq9s_clm5 (Overall: NLFAIL), details:
+  FAIL NLCOMP
+ERP_Ln9.f09_f09.F2000_DEV.yellowstone_intel.cam-outfrq9s_clm5 (Overall: NLFAIL), details:
+  FAIL NLCOMP
+SMS_Lm13.f09_f09.F2000_DEV.yellowstone_intel.cam-outfrq1m_clm5 (Overall: NLFAIL), details:
+  FAIL NLCOMP
+
+  Baseline tests passed. The namelist compare tests failed due to new namelist options added.
+
+hobart/nag:
+
+073 bl426 TBL.sh f10c4wmxdm outfrq3s_ionos 9s .................................................FAIL! rc= 7 at Thu Oct 20 20:05:16 MDT 2016
+076 bl471 TBL.sh f10c5.5wmam4dm outfrq3s_modalstrat 9s ........................................FAIL! rc= 7 at Thu Oct 20 20:13:12 MDT 2016
+
+ These are expected baseline failures due to:
+  . chemistry is updated in waccm_tsmlt_mam4 mechanism
+  . change in how SAD in chemistry is calculated
+  . adjustment of the EUV heating factor in WACCM(X)
+
+hobart/pgi: All pass
+
+CAM tag used for the baseline comparison tests if different than previous
+tag:  NA
+
+===============================================================
+===============================================================
+
+Tag name: cam5_4_90
+Originator(s): fvitt, bardeenc
+Date: 14 Oct 2016
+One-line Summary: Added options to improve water vapor and ice clouds in the tropical UTLS and polar stratosphere
+
+Purpose of changes:
+
+ - Provide namelist options to enable changes that have been shown to improve
+   stratospheric water vapor and surface area density in WACCM
+ - Improve water vapor and ice clouds in UTLS and polar stratosphere
+ - Provide a more consistent treatment of subgrid supersaturation for growth
+   and nucleation of ice clouds
+ - Provide some additional diagnostic output related to processes in the UTLS
+   and stratosphere
+
+Note:
+  This leaves the default CAM & WACCM behavior unchanged (bit-for-bit)
+
+Bugs fixed (include bugzilla ID):
+
+Describe any changes made to build system:
+
+Describe any changes made to the namelist:
+
+List any changes to the defaults for the boundary datasets:
+
+Describe any substantial timing or memory changes:
+
+Code reviewed by:
+
+List all subroutines eliminated:
+
+List all subroutines added and what they do:
+
+List all existing files that have been modified, and describe the changes:
+
+M   components/cam/bld/namelist_files/namelist_definition.xml
+ - new namelist options added:
+    nucleate_ice_subgrid_strat
+    nucleate_ice_use_troplev
+    cldfrc2m_rhminis
+    cldfrc2m_rhmaxis
+
+M   components/cam/bld/build-namelist
+ - set defaults for:
+    micro_mg_adjust_cpt
+    nucleate_ice_subgrid_strat
+    nucleate_ice_use_troplev
+    cldfrc2m_rhminis
+    cldfrc2m_rhmaxis
+
+M   components/cam/bld/namelist_files/namelist_defaults_cam.xml
+ - define defaults for:
+    micro_mg_adjust_cpt
+    nucleate_ice_subgrid_strat
+    nucleate_ice_use_troplev
+    cldfrc2m_rhminis
+    cldfrc2m_rhmaxis
+
+M   components/cam/src/physics/cam/cldfrc2m.F90
+M   components/cam/src/physics/cam/cldwat2m_macro.F90
+M   components/cam/src/physics/cam/clubb_intr.F90
+  Add namelist variables (cldfrc2m_rhminis, cldfrc2m_rhmaxis) to allow rhmini and
+  rhmaxi to be configured differently in the stratosphere and troposphere. By default,
+  they will be configured the same.
+
+M   components/cam/src/physics/cam/clubb_intr.F90
+  Add the vertical diffusivity from CLUBB (KVH_CLUBB) as an output field. Also fixed
+  compiler issue with output of RTPHLP_CLUBB (from Francis).
+
+M   components/cam/src/physics/cam/hetfrz_classnuc_cam.F90
+  Initialize some variables to 0._r8 as they were not being explicitly initialized before.
+
+M   components/cam/src/physics/cam/micro_mg_cam.F90
+  Add the ability to adjust the cold point temperature used by the microphysics based
+  upon interpolating the temperature profile between model levels. This is to account
+  for the model not being able to resolve the cold point which should determine entry
+  value for stratospheric water vapor. This feature is disabled by default.
+
+M   components/cam/src/physics/cam/nucleate_ice.F90
+M   components/cam/src/physics/cam/nucleate_ice_cam.F90
+  Via namelist variables, allow the subgrid nucleation (nucleate_ice_subgrid) to be set
+  to the same value as used for subgrid growth (1/QSATFAC) rather than be set to a
+  fixed value. Also allow the subgrid value to be set differently in the troposphere and
+  the stratosphere (nucleate_ice_subgrid_strat). Add a namelist variable
+  (nucleate_ice_troplev) to control whether the chemical tropopause or hard coded
+  pressure levels are used to define where stratospheric ice is nucleated. Using the
+  chemical tropopause definition also adds the coarse and accumulation mode
+  number to the total sulfate concentration used for nucleation. Add more diagnostic
+  output (NISUBGRID, NITROP_PD). By default, fixed pressure levels are used, the
+  troposphere and stratosphere are configured the same, and the subgrid value for
+  nucleation is set to a fixed value of 1.2
+
+If there were any failures reported from running test_driver.sh on any test
+platform, and checkin with these failures has been OK'd by the gatekeeper,
+then copy the lines from the td.*.status files for the failed tests to the
+appropriate machine below.  All failed tests must be justified.
+
+yellowstone/intel: all pass
+
+yellowstone/intel/aux_cam:
+ERP_Ln9.f09_f09.F1850_DONOTUSE.yellowstone_intel.cam-outfrq9s_clm5 (Overall: NLFAIL), details:
+  PASS CREATE_NEWCASE
+  PASS XML
+  FAIL NLCOMP
+  PASS SHAREDLIB_BUILD
+  PASS MODEL_BUILD
+  PASS RUN
+  PASS COMPARE_base_rest
+  PASS GENERATE
+  PASS COMPARE_baseline
+  PASS TPUTCOMP
+  PASS MEMLEAK
+ERP_Ln9.f09_f09.F2000_DEV.yellowstone_intel.cam-outfrq9s_clm5 (Overall: NLFAIL), details:
+  PASS CREATE_NEWCASE
+  PASS XML
+  FAIL NLCOMP
+  PASS SHAREDLIB_BUILD
+  PASS MODEL_BUILD
+  PASS RUN
+  PASS COMPARE_base_rest
+  PASS GENERATE
+  PASS COMPARE_baseline
+  PASS TPUTCOMP
+  PASS MEMLEAK
+SMS_Lm13.f09_f09.F2000_DEV.yellowstone_intel.cam-outfrq1m_clm5 (Overall: NLFAIL), details:
+  PASS CREATE_NEWCASE
+  PASS XML
+  FAIL NLCOMP
+  PASS SHAREDLIB_BUILD
+  PASS MODEL_BUILD
+  PASS RUN
+  PASS GENERATE
+  PASS COMPARE_baseline
+  PASS MEMCOMP
+  PASS TPUTCOMP
+  PASS MEMLEAK
+
+hobart/nag: all pass
+
+hobart/pgi: all pass
+
+===============================================================
+===============================================================
+
+Tag name: cam5_4_89
+Originator(s): cacraig, hannay, bogensch, mmills
+Date: Oct 10, 2016
+One-line Summary:  Phase1b of the CAM changes Cecile is currently using for CESM runs
+
+Purpose of changes:
+
+ ** WARNING ** The cime external in this tag has an error when running the short_term archiver.
+               Manual resubmits are required.  The cime external will be updated in a future
+               tag.
+
+ - F2000_DEV replaces F2000_DONOTUSE compset as this compset is ready for general use.  It should
+   be pointed out that this compset will be a "floating" compset and will follow the current
+   CAM development settings and will be updated as needed.
+
+ - The "chemical tropopause" is defined using the method tropopause_findChemTrop. Between 
+   50N and 50S, this is the lapse rate tropopause backed up by the climatology. For high 
+   latitudes (>50), a fixed pressure level (300 hPa) is used because the lapse rate tropopause 
+   sometimes finds the tropopause at high altitudes. The chemical tropopause is used as the 
+   boundary between tropospheric and stratospheric chemical reaction rates. When prognostic 
+   stratospheric aerosols are used, the chemical tropopause sets the level for differences in 
+   volatility between stratospheric and tropospheric modal aerosols.
+
+ - A cold point tropopause definition is added as an option for defining the tropopause, using 
+   the method TROP_ALG_CPP. History outputs for cold point tropopause are added: TROPF_P, 
+   TROPF_T, TROPF_Z, TROPF_DZ, TROPF_PD, and TROPF_FD. 
+
+ - A function tropopause_interpolateP is added to find interpolated pressure at the specified 
+   tropopause altitude. 
+
+ - Modification to allow the highest possible level for CLUBB's water vapor tendencies to be 
+   applied is the tropopause top, to prevent a drying out of the upper troposphere and stratosphere, 
+   as seen in WACCM simulations.  Includes an option to apply this fixer to heat tendencies.  In 
+   addition, a fix is included to prevent small energy and water conservation violations
+
+ - To get the CLM namelist changes which mimic Cecile's runs, users need to add to their create_newcase the option:
+            --user-mods-dir ../../../components/cam/cime_config/testdefs/testmods_dirs/cam/outfrq1m_clm5
+            ** NOTE ** This directory name will be changing in a future tag
+
+Bugs fixed (include bugzilla ID):
+
+Describe any changes made to build system:
+
+Describe any changes made to the namelist:
+
+List any changes to the defaults for the boundary datasets:
+
+Describe any substantial timing or memory changes:
+
+Code reviewed by: cacraig
+
+List all subroutines eliminated:
+
+List all subroutines added and what they do:
+A       components/cam/cime_config/testdefs/testmods_dirs/cam/outfrq1m_clm5
+A       components/cam/cime_config/testdefs/testmods_dirs/cam/outfrq1m_clm5/shell_commands
+A       components/cam/cime_config/testdefs/testmods_dirs/cam/outfrq1m_clm5/user_nl_cam
+A       components/cam/cime_config/testdefs/testmods_dirs/cam/outfrq1m_clm5/user_nl_clm
+          - add settings for outputting monthly 
+          - add spunup CLM initial condition file
+
+A       components/cam/cime_config/testdefs/testmods_dirs/cam/outfrq9s_clm5
+A       components/cam/cime_config/testdefs/testmods_dirs/cam/outfrq9s_clm5/shell_commands
+A       components/cam/cime_config/testdefs/testmods_dirs/cam/outfrq9s_clm5/user_nl_cam
+A       components/cam/cime_config/testdefs/testmods_dirs/cam/outfrq9s_clm5/user_nl_clm
+          - add spunup CLM initial condition file
+          
+
+List all existing files that have been modified, and describe the changes:
+M       components/cam/bld/namelist_files/use_cases/2000_cam6.xml
+          - added ext_frc_specifier files to match what Cecile is currently using
+
+M       components/cam/cime_config/config_compsets.xml
+M       components/cam/cime_config/testdefs/testlist_cam.xml
+          - F2000_DONOTUSE now becomes F2000_DEV as Cecile has confirmed that this 
+            compset now matches what she is using for development
+          - add test for 13 month simulation for F2000_DEV
+          - use spunup CLM finidat file for CLM5 runs
+
+M       components/cam/cime_config/config_pes.xml
+          - Turn off hyperthreading for all F compsets by default (seeing improved
+            perfomance with hyperthreading turned off)
+          - 1degree FV F compsets now use 720 tasks
+
+M       components/cam/src/physics/cam/clubb_intr.F90
+          - Modification to prevent a drying out of the upper troposphere and stratosphere
+            A fix is included to prevent small energy and water conservation violations
+
+M       components/cam/src/physics/cam/tropopause.F90
+          - changes to tropopause detailed extensively above.
+
+M       components/cam/test/system/test_driver.sh
+          - add a warning if don't supply a CAM_TAG for generating the basline
+          - echo the ./create_test options to the log file also
+          - increase the wall clock time to 3 hours for all CESM jobs until update
+            to the new testdefs formatted files (when update to beta02 externals)
+
+If there were any failures reported from running test_driver.sh on any test
+platform, and checkin with these failures has been OK'd by the gatekeeper,
+then copy the lines from the td.*.status files for the failed tests to the
+appropriate machine below.  All failed tests must be justified.
+
+yellowstone/intel: all BFB except:
+015 bl357 TBL.sh f1.9c5.5h outfrq3s+1850_cam55 9s .............................................FAIL! rc= 7 at Fri Oct  7 19:10:07 MDT 2016
+018 bl366 TBL.sh f1.9c5clbdh outfrq3s_clubb 9s ................................................FAIL! rc= 7 at Fri Oct  7 19:22:03 MDT 2016
+027 bl485 TBL.sh f1.9c5.5wtmam4h outfrq3s_megan+waccm_tsmlt_2000_cam55 9s .....................FAIL! rc= 7 at Fri Oct  7 20:00:45 MDT 2016
+047 bl470 TBL.sh fsd1.9c5.4wtclbh outfrq3s_sd+sd_waccm5_geos5 9s ..............................FAIL! rc= 7 at Fri Oct  7 21:18:53 MDT 2016
+
+
+yellowstone/intel/aux_cam:
+ERP_Ln9.f09_f09.F1850_DONOTUSE.yellowstone_intel.cam-outfrq9s (Overall: DIFF), details:
+  FAIL NLCOMP
+  FAIL COMPARE_baseline
+ERP_Ln9.f09_f09.F2000_DEV.yellowstone_intel.cam-outfrq9s (Overall: DIFF), details:
+  FAIL NLCOMP
+  FAIL COMPARE_baseline
+
+-- Namelist fails due to changes to match Cecile's configuration
+   Baseline comparison fails due to answer changes in CLUBB
+
+hobart/nag: All BFB except:
+058 bl356 TBL.sh fsd1.9c5clbdm off1.9x2.5 9s ..................................................FAIL! rc= 7 at Mon Oct 10 14:01:33 MDT 2016
+064 bl369 TBL.sh f1.9c5clbdm outfrq3s_clubb 9s ................................................FAIL! rc= 7 at Mon Oct 10 14:02:18 MDT 2016
+
+
+hobart/pgi or jaguar/pgi: All BFB
+
+  -- All tests above fail due to answer changes in CLUBB
+
+CAM tag used for the baseline comparison tests if different than previous
+tag:
+
+Summarize any changes to answers, i.e.,
+- what code configurations: all tests which use CLUBB
+- what platforms/compilers: all
+- nature of change (roundoff; larger than roundoff but same climate; new
+  climate): impact of phase1a and phase1b is new climate
+
+If bitwise differences were observed, how did you show they were no worse
+than roundoff?
+
+If this tag changes climate describe the run(s) done to evaluate the new
+climate in enough detail that it(they) could be reproduced, i.e.,
+- source tag (all code used must be in the repository):  
+     https://svn-ccsm-models.cgd.ucar.edu/cam1/branch_tags/cam5_4_75_phase1b_tags/cam5_4_75_phase1b_n05_cam5_4_88 
+     Cecile also added changes for CLM namelist settings which were not in this branch tag.  These CLM changes 
+     are in cam5_4_89. A 13 month run was compared against Cecile's run at 13 months and the files were identical
+     (except at the 7-8th digit as her run was storing single precision and the trunk run was storing double).
+- platform/compilers: yellowstone intel
+- configure commandline: Using the F2000_Dev compset
+- build-namelist command (or complete namelist): the use case automatically supplied with F2000_Dev
+- MSS location of output: not stored on HPSS
+
+URL for AMWG diagnostics output used to validate new climate:
+http://webext.cgd.ucar.edu/FCLIMO/f.e15.F2000_DEV.f09_f09.cam5_4_75_phase1b_n05_cam5_4_88_land_ic/atm/f.e15.F2000_DEV.f09_f09.cam5_4_75_phase1b_n05_cam5_4_88_land_ic-f.e15.F2000.f09_f09.pd.114_cam5_4_75/
+
+===============================================================
+===============================================================
+
+Tag name: cam5_4_88
+Originator(s): cacraig, juliob, hannay, bardeenc
+Date: Oct 5, 2016
+One-line Summary: Phase1a of the CAM changes Cecile is currently using for CESM runs
+
+Purpose of changes:
+  - Replacing analytical kinetic energy change with diagnosed kinetic energy
+    change across diffusion scheme for beljaars runs.
+  - Fixes a bug in MG2 in calculating the fall velocity for small ice particles and moves
+    the threshold for using this fall velocity from 8um to 18um.  This allows the fall
+    velocities for the small particles to blend more smoothly with the fall velocity
+    used for larger particles.
+  - The wrong versions of the nucleate_ice files were included in cam5_4_63.  This corrected
+    version affects how ice nucleation is calculated when cloud fraction is less than 1 and
+    how the use_incloud_nuc namelist variable is applied.
+
+Bugs fixed (include bugzilla ID):
+  - MG2 fall velocity for small particles corrected
+  - correct versions of nucleate_ice routines
+
+Describe any changes made to build system: none
+
+Describe any changes made to the namelist: none
+
+List any changes to the defaults for the boundary datasets: none
+
+Describe any substantial timing or memory changes: none
+
+Code reviewed by: cacraig, fvitt
+
+List all subroutines eliminated: none
+
+List all subroutines added and what they do: none
+
+List all existing files that have been modified, and describe the changes:
+M       components/cam/src/physics/cam/beljaars_drag_cam.F90
+           - allow do_beljaars to be used outside this module
+
+M       components/cam/src/physics/cam/diffusion_solver.F90
+           - Replacing analytical kinetic energy change with diagnosed kinetic energy
+             change across diffusion scheme 
+
+M       components/cam/src/physics/cam/micro_mg2_0.F90
+           - Fixes a bug in calculating the fall velocity for small ice particles and moves
+             the threshold for using this fall velocity from 8um to 18um.  This allows the fall
+             velocities for the small particles to blend more smoothly with the fall velocity
+             used for larger particles.
+
+M       components/cam/src/physics/cam/nucleate_ice.F90
+M       components/cam/src/physics/cam/nucleate_ice_cam.F90
+           - The wrong versions of these files were included in cam5_4_63.  This corrected
+             version affects how ice nucleation is calculated when cloud fraction is less than 1 and
+             how the use_incloud_nuc namelist variable is applied.
+
+
+If there were any failures reported from running test_driver.sh on any test
+platform, and checkin with these failures has been OK'd by the gatekeeper,
+then copy the lines from the td.*.status files for the failed tests to the
+appropriate machine below.  All failed tests must be justified.
+
+yellowstone/intel:
+011 bl353 TBL.sh f1.9c5.4dh outfrq3s 9s .......................................................FAIL! rc= 7 at Tue Oct  4 20:35:19 MDT 2016
+015 bl357 TBL.sh f1.9c5.5h outfrq3s+1850_cam55 9s .............................................FAIL! rc= 7 at Tue Oct  4 20:40:28 MDT 2016
+018 bl366 TBL.sh f1.9c5clbdh outfrq3s_clubb 9s ................................................FAIL! rc= 7 at Tue Oct  4 20:52:21 MDT 2016
+027 bl485 TBL.sh f1.9c5.5wtmam4h outfrq3s_megan+waccm_tsmlt_2000_cam55 9s .....................FAIL! rc= 7 at Tue Oct  4 21:30:08 MDT 2016
+047 bl470 TBL.sh fsd1.9c5.4wtclbh outfrq3s_sd+sd_waccm5_geos5 9s ..............................FAIL! rc= 7 at Tue Oct  4 22:46:41 MDT 2016
+
+yellowstone/intel/aux_cam:
+ERP_Ln9.f09_f09.F1850_DONOTUSE.yellowstone_intel.cam-outfrq9s (Overall: DIFF), details:
+  FAIL COMPARE_baseline
+ERP_Ln9.f09_f09.F2000_DONOTUSE.yellowstone_intel.cam-outfrq9s (Overall: DIFF), details:
+  FAIL COMPARE_baseline
+
+hobart/nag:
+055 bl354 TBL.sh f1.9c5.4dm outfrq3s_npryz 9s .................................................FAIL! rc= 7 at Wed Oct  5 10:34:38 MDT 2016
+058 bl356 TBL.sh fsd1.9c5clbdm off1.9x2.5 9s ..................................................FAIL! rc= 7 at Wed Oct  5 10:35:06 MDT 2016
+061 bl368 TBL.sh f1.9c5mg2dm outfrq3s_macmic2_classnuc 9s .....................................FAIL! rc= 7 at Wed Oct  5 10:35:20 MDT 2016
+064 bl369 TBL.sh f1.9c5clbdm outfrq3s_clubb 9s ................................................FAIL! rc= 7 at Wed Oct  5 10:35:39 MDT 2016
+
+hobart/pgi or jaguar/pgi:
+057 bl354 TBL.sh f1.9c5.4dm outfrq3s_npryz 9s .................................................FAIL! rc= 7 at Wed Oct  5 10:43:25 MDT 2016
+
+Summarize any changes to answers, i.e.,
+- what code configurations: all jobs which use mg2, do_beljaars=.true., certain conditions in nucleate_ice (see above)
+- what platforms/compilers: all
+
+These changes have been tested offline by Cecile Hannay and the validation will be combined with 
+an upcoming CAM tag and reported in that tag.
+
+===============================================================
+===============================================================
+
+Tag name: cam5_4_87
+Originator(s): aconley,fvitt,goldy
+Date: 2016-09-30
+One-line Summary: Add terminator chemistry package
+
+Purpose of changes:
+
+Bugs fixed (include bugzilla ID):
+
+Describe any changes made to build system:
+
+Describe any changes made to the namelist:
+
+List any changes to the defaults for the boundary datasets:
+
+Describe any substantial timing or memory changes:
+
+Code reviewed by:
+
+List all subroutines eliminated:
+
+List all subroutines added and what they do:
+
+List all existing files that have been modified, and describe the changes:
+M       components/cam/bld/config_files/definition.xml
+ - Added terminator as a valid -chem option
+M       components/cam/bld/configure
+ - Added terminator as a valid -chem option. Set proper number of tracers
+A  +    components/cam/bld/namelist_files/use_cases/dctest_baro_moist.xml
+ - Beginning of use case for dycore test use case (uses terminator chem package)
+M       components/cam/cime_config/config_component.xml
+ - Added a dycore test compset CAM options (DCTBM)
+M       components/cam/cime_config/config_compsets.xml
+ - Added dycore test compset (FDCBAROMOIST)
+M       components/cam/cime_config/testdefs/testlist_cam.xml
+ - Created aux_cam_short testlist (same as aux_cam for now).
+M       components/cam/doc/ChangeLog
+ - Improve disk drive manufacturer bottom line but using more storage
+M       components/cam/src/chemistry/mozart/chemistry.F90
+ - Make fh2o a required argument
+M       components/cam/src/chemistry/pp_none/chemistry.F90
+ - Make fh2o an optional argument
+A  +    components/cam/src/chemistry/pp_terminator
+A  +    components/cam/src/chemistry/pp_terminator/chem_mech.doc
+A  +    components/cam/src/chemistry/pp_terminator/chem_mech.in
+A  +    components/cam/src/chemistry/pp_terminator/chem_mods.F90
+A  +    components/cam/src/chemistry/pp_terminator/chemistry.F90
+A  +    components/cam/src/chemistry/pp_terminator/m_rxt_id.F90
+A  +    components/cam/src/chemistry/pp_terminator/m_spc_id.F90
+A  +    components/cam/src/chemistry/pp_terminator/mo_adjrxt.F90
+A  +    components/cam/src/chemistry/pp_terminator/mo_imp_sol.F90
+A  +    components/cam/src/chemistry/pp_terminator/mo_indprd.F90
+A  +    components/cam/src/chemistry/pp_terminator/mo_lin_matrix.F90
+A  +    components/cam/src/chemistry/pp_terminator/mo_lu_factor.F90
+A  +    components/cam/src/chemistry/pp_terminator/mo_lu_solve.F90
+A  +    components/cam/src/chemistry/pp_terminator/mo_nln_matrix.F90
+A  +    components/cam/src/chemistry/pp_terminator/mo_phtadj.F90
+A  +    components/cam/src/chemistry/pp_terminator/mo_prod_loss.F90
+A  +    components/cam/src/chemistry/pp_terminator/mo_rxt_rates_conv.F90
+A  +    components/cam/src/chemistry/pp_terminator/mo_setrxt.F90
+A  +    components/cam/src/chemistry/pp_terminator/mo_sim_dat.F90
+ - Added new terminator chemistry package
+M       components/cam/src/dynamics/eul/dyn_comp.F90
+ - Coordinates passed to cnst_init_default must be in radians
+M       components/cam/src/dynamics/fv/dyn_comp.F90
+ - Coordinates passed to cnst_init_default must be in radians
+M       components/cam/src/dynamics/se/dyn_comp.F90
+ - Coordinates passed to cnst_init_default must be in radians
+M       components/cam/src/dynamics/sld/dyn_comp.F90
+ - Coordinates passed to cnst_init_default must be in radians
+M       components/cam/src/physics/cam/clubb_intr.F90
+ - Only initialize constituents where mask is .true.
+M       components/cam/src/physics/cam/co2_cycle.F90
+ - Only initialize constituents where mask is .true.
+M       components/cam/src/physics/cam/const_init.F90
+ - Pass correct latitude array for each block in cnst_init_default
+M       components/cam/src/physics/cam/micro_mg_cam.F90
+ - Only initialize constituents where mask is .true.
+M       components/cam/src/physics/cam/physpkg.F90
+ - Show that fh2o is an optional argument (use key=value form)
+M       components/cam/src/physics/cam/rk_stratiform.F90
+ - Only initialize constituents where mask is .true.
+M       components/cam/src/physics/cam/tracers_suite.F90
+ - Only initialize constituents where mask is .true.
+M       components/cam/src/physics/cam/unicon_cam.F90
+ - Only initialize constituents where mask is .true.
+M       components/cam/src/physics/carma/cam/carma_intr.F90
+ - Only initialize constituents where mask is .true.
+M	components/cam/src/physics/carma/models/test_growth/carma_model_mod.F90
+M	components/cam/src/physics/carma/models/test_passive/carma_model_mod.F90
+M	components/cam/src/physics/carma/models/test_radiative/carma_model_mod.F90
+M	components/cam/src/physics/carma/models/test_swelling/carma_model_mod.F90
+M	components/cam/src/physics/carma/models/test_tracers/carma_model_mod.F90
+M	components/cam/src/physics/carma/models/test_tracers2/carma_model_mod.F90
+ - Only initialize constituents where mask is .true.
+M       components/cam/src/physics/simple/physpkg.F90
+ - Add chemistry to simple physics (chem_register, chem_init, chem_timestep_tend)
+A  +    components/cam/test/system/config_files/f10adhterm
+ - New test config using adiabatic physics with terminator chemistry
+M       components/cam/test/system/input_tests_master
+ - Add new terminator chemistry test (339)
+A  +    components/cam/test/system/nl_files/terminator
+ - Namelist file for terminator chemistry test
+M       components/cam/test/system/test_driver.sh
+ - Made processing of CAM regression tests and/or CESM auxiliary tests optional
+ - Allow alternate CESM test or test suite
+ - Cleaned up old comments and created usage statement with documentation
+M       components/cam/test/system/tests_pretag_hobart_nag
+ - Add new terminator chemistry test (339)
+
+If there were any failures reported from running test_driver.sh on any test
+platform, and checkin with these failures has been OK'd by the gatekeeper,
+then copy the lines from the td.*.status files for the failed tests to the
+appropriate machine below.  All failed tests must be justified.
+
+yellowstone/intel: All pass
+
+yellowstone/intel/aux_cam: All pass
+
+hobart/nag: Baseline fail for new test (no baseline).
+052 bl339 TBL.sh f10adhterm terminator 9s .....................................................FAIL! rc= 7 at Fri Sep 30 13:49:06 MDT 2016
+
+hobart/pgi:
+
+CAM tag used for the baseline comparison tests if different than previous
+tag: NA
+
+Summarize any changes to answers, i.e.,
+- what code configurations:
+- what platforms/compilers:
+- nature of change (roundoff; larger than roundoff but same climate; new
+  climate): NA
+
+If bitwise differences were observed, how did you show they were no worse
+than roundoff? NA
+
+If this tag changes climate describe the run(s) done to evaluate the new
+climate in enough detail that it(they) could be reproduced, i.e.,
+NA
+
+===============================================================
+===============================================================
+
+Tag name: cam5_4_86
+Originator(s): cacraig, hannay, mmills, fvitt
+Date: September 29, 2016
+One-line Summary: Update solar files and use cases
+
+Purpose of changes:
+ - Update solar files used for CAM/WACCM 1850, HIST and 2000 cases
+ - Add use cases which capture F and FC5 compsets (cam4 and cam5)
+   at this current time.  This allows the namelist defaults to follow the
+   cam6 configuration without impacting older versions.
+ - Added F1850_DONOTUSE compset - this compset is VERY PRELIMINARY and
+   really should not be used
+ - Started work on the FHIST_DONOTUSE compset, but it is broken and will
+   be worked on for future tags.
+
+Bugs fixed (include bugzilla ID):
+
+Describe any changes made to build system:
+
+Describe any changes made to the namelist:
+
+List any changes to the defaults for the boundary datasets:
+
+Describe any substantial timing or memory changes:
+
+Code reviewed by:
+
+List all subroutines eliminated:
+
+List all subroutines added and what they do:
+
+
+A       components/cam/bld/namelist_files/use_cases/1850_cam6.xml
+A       components/cam/bld/namelist_files/use_cases/hist_cam6.xml
+          - With input from Cecile, we are setting up preliminary use cases for FHIST and F1850 compsets
+            Note that hist_cam6.xml does not run to completion yet.
+
+List all existing files that have been modified, and describe the changes:
+M       components/cam/bld/namelist_files/namelist_defaults_cam.xml
+M       components/cam/bld/namelist_files/use_cases/2000_cam6.xml
+          - update solar_data_file (CAM and WACCM) and solar_parms_file (WACCM only) to files
+            provided by Mike Mills
+
+M       components/cam/bld/namelist_files/use_cases/waccm_tsmlt_1850_cam55.xml
+M       components/cam/bld/namelist_files/use_cases/waccm_tsmlt_2000_cam55.xml
+M       components/cam/bld/namelist_files/use_cases/waccm_tsmlt_amip_cam55.xml
+          - update solar_data_file, solar_parms_file, epp_all_filepath and epp_all_varname
+            to settings provided by Mike Mills
+
+M       components/cam/cime_config/config_component.xml
+          - add hooks for hist_cam6 use case
+          - update the 1850_CAM6 compsets to use 1850_cam6 use case 
+
+M       components/cam/cime_config/config_compsets.xml
+          - add F1850_DONOTUSE and FHIST_DONOTUSE compsets
+
+M       components/cam/cime_config/testdefs/testlist_cam.xml
+          - add aux_cam and prealpha testing for F1850_DONOTUSE
+
+M       components/cam/doc/ChangeLog
+          - added additional information for the cam5_4_84 tag as the bug fix for clubb_do_liqsupersat had
+            a larger impact than was first thought
+
+If there were any failures reported from running test_driver.sh on any test
+platform, and checkin with these failures has been OK'd by the gatekeeper,
+then copy the lines from the td.*.status files for the failed tests to the
+appropriate machine below.  All failed tests must be justified.
+
+yellowstone/intel:
+011 bl353 TBL.sh f1.9c5.4dh outfrq3s 9s .......................................................FAIL! rc= 7 at Thu Sep 29 16:34:36 MDT 2016
+027 bl485 TBL.sh f1.9c5.5wtmam4h outfrq3s_megan+waccm_tsmlt_2000_cam55 9s .....................FAIL! rc= 7 at Thu Sep 29 16:37:22 MDT 2016
+
+yellowstone/intel/aux_cam:
+ERP_Ln9.f09_f09.F1850_DONOTUSE.yellowstone_intel.cam-outfrq9s (Overall: DIFF), details:
+  FAIL NLCOMP
+  FAIL COMPARE_baseline
+ERP_Ln9.f09_f09.F2000_DONOTUSE.yellowstone_intel.cam-outfrq9s (Overall: DIFF), details:
+  FAIL NLCOMP
+  FAIL COMPARE_baseline
+    ** Namelist tests fail due to new solar forcing file
+    ** F2000 baseline test fails due to new solar forcing file
+    ** F1850 baseline test fails due to it being a new test
+
+hobart/nag:
+017 bl221 TBL.sh f10c5spcamsm outfrq3s 9s .....................................................FAIL! rc= 7 at Thu Sep 29 16:21:18 MDT 2016
+052 bl354 TBL.sh f1.9c5.4dm outfrq3s_npryz 9s .................................................FAIL! rc= 7 at Thu Sep 29 16:33:18 MDT 2016
+
+hobart/pgi or jaguar/pgi:
+057 bl354 TBL.sh f1.9c5.4dm outfrq3s_npryz 9s .................................................FAIL! rc= 7 at Thu Sep 29 16:31:46 MDT 2016
+
+All of the above tests are expected to change due to the change in the SolarForcing file (which was provided by mmills)
+
+===============================================================
 ===============================================================
 
 Tag name: cam5_4_85
@@ -100,6 +1421,7 @@ Purpose of changes:
   - Add C14 tuning parameter for CLUBB to the namelist.  Change its default value from
     1. to 1.83
   - Add missing mpi_bcast for clubb_do_liqsupersat
+  - After additional use, it was discovered that the clubb_do_liqsupersat fix has a significant impact
 
 Bugs fixed (include bugzilla ID):
   - Fix bug which was causing CESM ERP tests using clubb to not be BFB
@@ -186,6 +1508,9 @@ and
 
 URL for AMWG diagnostics output used to validate new climate:
 http://webext.cgd.ucar.edu/FCLIMO/f.e15.F2000.f09_f09.pd.114_cam5_4_75/atm/f.e15.F2000.f09_f09.pd.114_cam5_4_75-f.e15.F2000.f09_f09.pd.114_cam5_4_75_C14/
+
+URL for impact of the clubb_do_liqsupersat bug fix
+http://webext.cgd.ucar.edu/FCLIMO/f.e15.F2000.f09_f09.pd.114_cam5_4_75_clubb_fix_tropopause_tend/atm/f.e15.F2000.f09_f09.pd.114_cam5_4_75_clubb_fix_tropopause_tend-f.e15.F2000.f09_f09.pd.114_cam5_4_75_clubb_fix_tropopause_tend_nompi/
 
 ===============================================================
 ===============================================================

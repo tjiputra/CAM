@@ -132,7 +132,7 @@
   'PRECT', 'QFLX', 'QPERT', 'QRL', 'QRS', 'QRL_TOT', 'QRS_TOT', 'TREFHT', 'SWCF', 'DTCORE', 'FRONTGF:I',
   'BUTGWSPEC', 'BTAUE', 'BTAUW', 'BTAUN', 'BTAUS', 'TAUE', 'TAUW', 'TAUN', 'TAUS', 'TAUGWX', 'TAUGWY', 'TAUX',
   'TAUY', 'SNOWHLND', 'SNOWHICE', 'ICEFRAC', 'FSDSC', 'RAD_ICE', 'RAD_LNAT', 'RAD_SULFC', 'H2SO4M_C',
-  'SAD_ICE', 'SAD_LNAT', 'SAD_TROP', 'SAD_SULFC', 'SAD', 'VEL_NAT2', 'VOLC_MMR', 'VOLC_DENS',
+  'SAD_ICE', 'SAD_LNAT', 'SAD_TROP', 'SAD_SULFC', 'SAD_STRAT', 'VEL_NAT2', 'VOLC_MMR', 'VOLC_DENS',
   'VOLC_RAD_GEOM ', 'ODV_VOLC_MMR', 'VOLC_MASS', 'VOLC_MASS_C', 'QRS_TOT_24_COS', 'QRS_TOT_24_SIN',
   'QRS_TOT_12_COS', 'QRS_TOT_12_SIN', 'PM25_SRF', 'DTCOND_24_SIN', 'DTCOND_24_COS', 'DTCOND_12_SIN',
   'DTCOND_12_COS', 'UTGWORO', 'UTGWSPEC', 'VERT', 'VTGWORO', 'VTGWSPEC', 'HORZ', 'SFNO', 'SFCO', 'SFCH2O',
@@ -198,7 +198,7 @@
   'CO', 'CH2O', 'CH3OOH', 'C2H6', 'C2H2', 'HCN', 'O', 'O1D', 'O3', 'H', 'OH', 'HO2', 'H2O2', 'H2', 'H2O', 'TOTH', 'N', 'NO',
   'NO2', 'NO3', 'N2O5', 'HNO3', 'HNO3_TOTAL', 'HNO3_STS', 'HNO3_NAT', 'HNO3_GAS', 'HO2NO2', 'PAN', 'NOY', 'CL',
   'CLO', 'OCLO', 'CL2', 'CL2O2', 'HOCL', 'CLONO2', 'HCL', 'HCL_TOTAL', 'HCL_GAS', 'HCL_STS', 'CLOX', 'CLOY', 'TCLY',
-  'BR', 'BRO', 'HOBR', 'HBR', 'BRCL', 'BRONO2', 'BROY', 'TBRY', 'SAD', 'SAD_TROP', 'SAD_SULFC', 'SAD_LNAT',
+  'BR', 'BRO', 'HOBR', 'HBR', 'BRCL', 'BRONO2', 'BROY', 'TBRY', 'SAD_STRAT', 'SAD_TROP', 'SAD_SULFC', 'SAD_LNAT',
   'SAD_ICE', 'RAD_SULFC', 'RAD_LNAT', 'RAD_ICE', 'VEL_NAT2', 'jo2_b', 'jo3_a', 'jo3_b', 'jcl2o2', 'jno2',
   'r_jo2_b', 'r_jo3_a', 'r_jo3_b', 'r_jcl2o2', 'r_jhocl', 'r_jno3_b', 'r_O_O', 'r_O_O3', 'r_NO2_O', 'r_H_O3',
   'r_HO2_O', 'r_HO2_O3', 'r_OH_O3', 'r_OH_O', 'r_CLO_O', 'r_CLO_HO2', 'r_BRO_CLOa', 'r_BRO_CLOb',
@@ -236,7 +236,7 @@
   'H1202', 'H2402', 'AOA1', 'AOA2', 'SF6', 'SF6em', 'NH_5', 'NH_50', 'NH_50W', 'AOA_NH', 'ST80_25', 'O3S', 'CO_25',
   'CO_50', 'SO2t', 'E90', 'E90_NH', 'E90_SH', 'OddOx_Ox_Loss', 'OddOx_HOx_Loss', 'OddOx_NOx_Loss',
   'OddOx_CLOxBROx_Loss', 'OddOx_Loss_Tot', 'O3_Prod', 'O3_Loss', 'O3_CHMP', 'O3_CHML', 'RO2_NO_sum',
-  'RO2_HO2_sum', 'MASS', 'DO3CHM', 'DO3CHM_TRP', 'DO3CHM_LMS', 'SAD', 'SAD_TROP', 'SAD_SULFC', 'SAD_LNAT',
+  'RO2_HO2_sum', 'MASS', 'DO3CHM', 'DO3CHM_TRP', 'DO3CHM_LMS', 'SAD_STRAT', 'SAD_TROP', 'SAD_SULFC', 'SAD_LNAT',
   'SAD_ICE'
 </fincl7>
 <fincl8>

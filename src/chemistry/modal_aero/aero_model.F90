@@ -1592,8 +1592,8 @@ contains
   ! called from mo_usrrxt
   !-------------------------------------------------------------------------
   subroutine aero_model_surfarea( &
-                  mmr, radmean, relhum, pmid, temp, strato_sad, &
-                  sulfate, rho, ltrop, dlat, het1_ndx, pbuf, ncol, sfc, dm_aer, sad_total )
+                  mmr, radmean, relhum, pmid, temp, strato_sad, sulfate, rho, ltrop, &
+                  dlat, het1_ndx, pbuf, ncol, sfc, dm_aer, sad_trop, reff_trop )
 
     ! dummy args
     real(r8), intent(in)    :: pmid(:,:)
@@ -1612,7 +1612,8 @@ contains
 
     real(r8), intent(inout) :: sfc(:,:,:)
     real(r8), intent(inout) :: dm_aer(:,:,:)
-    real(r8), intent(inout) :: sad_total(:,:)
+    real(r8), intent(inout) :: sad_trop(:,:)
+    real(r8), intent(out)   :: reff_trop(:,:)
 
     ! local vars
     real(r8), pointer, dimension(:,:,:) :: dgnumwet
@@ -1624,7 +1625,7 @@ contains
 
     beglev(:ncol)=ltrop(:ncol)+1
     endlev(:ncol)=pver
-    call surf_area_dens( ncol, mmr, pmid, temp, dgnumwet, beglev, endlev, sad_total, sfc=sfc )
+    call surf_area_dens( ncol, mmr, pmid, temp, dgnumwet, beglev, endlev, sad_trop, reff_trop, sfc=sfc )
 
     do i = 1,ncol
        do k = ltrop(i)+1,pver
@@ -1638,7 +1639,7 @@ contains
   ! provides WET stratospheric aerosol surface area info for modal aerosols
   ! if modal_strat_sulfate = TRUE -- called from mo_gas_phase_chemdr
   !-------------------------------------------------------------------------
-  subroutine aero_model_strat_surfarea( ncol, mmr, pmid, temp, ltrop, pbuf, strato_sad )
+  subroutine aero_model_strat_surfarea( ncol, mmr, pmid, temp, ltrop, pbuf, strato_sad, reff_strat )
 
     ! dummy args
     integer,  intent(in)    :: ncol
@@ -1648,6 +1649,7 @@ contains
     integer,  intent(in)    :: ltrop(:) ! tropopause level indices
     type(physics_buffer_desc), pointer :: pbuf(:)
     real(r8), intent(out)   :: strato_sad(:,:)
+    real(r8), intent(out)   :: reff_strat(:,:)
 
     ! local vars
     real(r8), pointer, dimension(:,:,:) :: dgnumwet
@@ -1662,7 +1664,7 @@ contains
 
     beglev(:ncol)=top_lev
     endlev(:ncol)=ltrop(:ncol)
-    call surf_area_dens( ncol, mmr, pmid, temp, dgnumwet, beglev, endlev, strato_sad )
+    call surf_area_dens( ncol, mmr, pmid, temp, dgnumwet, beglev, endlev, strato_sad, reff_strat )
 
   end subroutine aero_model_strat_surfarea
 
@@ -1973,7 +1975,7 @@ contains
 
   !=============================================================================
   !=============================================================================
-  subroutine surf_area_dens( ncol, mmr, pmid, temp, diam, beglev, endlev, sad, sfc )
+  subroutine surf_area_dens( ncol, mmr, pmid, temp, diam, beglev, endlev, sad, reff, sfc )
     use mo_constants,    only : pi
     use modal_aero_data, only : nspec_amode, alnsg_amode
 
@@ -1986,10 +1988,12 @@ contains
     integer,  intent(in)  :: beglev(:)
     integer,  intent(in)  :: endlev(:)
     real(r8), intent(out) :: sad(:,:)
+    real(r8), intent(out) :: reff(:,:)
     real(r8),optional, intent(out) :: sfc(:,:,:)
 
     ! local vars
-    real(r8) :: sad_mode(pcols,pver,ntot_amode)
+    real(r8) :: sad_mode(pcols,pver,ntot_amode),radeff(pcols,pver)
+    real(r8) :: vol(pcols,pver),vol_mode(pcols,pver,ntot_amode)
     real(r8) :: rho_air
     integer  :: i,k,l,m 
     real(r8) :: chm_mass, tot_mass
@@ -2001,6 +2005,9 @@ contains
 
     sad = 0._r8
     sad_mode = 0._r8
+    vol = 0._r8
+    vol_mode = 0._r8
+    reff = 0._r8
 
     do i = 1,ncol
        do k = beglev(i),endlev(i)
@@ -2018,15 +2025,22 @@ contains
                     chm_mass = chm_mass + mmr(i,k,index_chm_mass(l,m))
              end do
              if ( tot_mass > 0._r8 ) then
-               sad_mode(i,k,l) = chm_mass/tot_mass * &
-                    mmr(i,k,num_idx(l))*rho_air*pi*diam(i,k,l)**2*&
-                    exp(2*alnsg_amode(l)**2)  ! m^2/m^3
+               sad_mode(i,k,l) = (chm_mass/tot_mass)**(2._r8/3._r8) * &
+                    mmr(i,k,num_idx(l))*rho_air*pi*diam(i,k,l)**2._r8*&
+                    exp(2._r8*alnsg_amode(l)**2._r8)  ! m^2/m^3
                sad_mode(i,k,l) = 1.e-2_r8 * sad_mode(i,k,l) ! cm^2/cm^3
+               
+               vol_mode(i,k,l) = chm_mass/tot_mass * &
+                    mmr(i,k,num_idx(l))*rho_air*pi/6._r8*diam(i,k,l)**3._r8*&
+                    exp(3._r8*alnsg_amode(l)**2._r8)  ! m^3/m^3 = cm^3/cm^3
              else
                sad_mode(i,k,l) = 0._r8
+               vol_mode(i,k,l) = 0._r8
              end if
           end do
           sad(i,k) = sum(sad_mode(i,k,:))
+          vol(i,k) = sum(vol_mode(i,k,:))
+          reff(i,k) = 3._r8*vol(i,k)/sad(i,k)
 
        enddo
     enddo

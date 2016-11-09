@@ -2062,6 +2062,15 @@ Switch to control whether MG microphysics performs a uniform calculation or not
 Default: .false.
 </entry>
 
+<entry id="micro_mg_adjust_cpt" type="logical" category="microphys"
+       group="micro_mg_nl" valid_values="" >
+Switch to control whether MG microphysics should adjust the temperature
+at the level containing the cold point tropopause by using the value
+obtain by extrapolating between levels.
+Default: set by build-namelist
+</entry>
+
+
 <!-- Aerosol microphysics -->
 <entry id="microp_aero_bulk_scale" type="real" category="microphys"
        group="microp_aero_nl" valid_values="" >
@@ -2095,7 +2104,18 @@ Default: .false.
 
 <entry id="nucleate_ice_subgrid" type="real" category="microphys"
        group="nucleate_ice_nl" valid_values="" >
-Subgrid scaling factor for relative humidity in ice nucleation code.
+Subgrid scaling factor for relative humidity in ice nucleation code. If it has
+a value of -1, then indicates that the subgrid scaling factor will be
+calculated on the fly as 1 / qsatfac (i.e. the saturation scaling factor).
+Default: set by build-namelist
+</entry>
+
+<entry id="nucleate_ice_subgrid_strat" type="real" category="microphys"
+       group="nucleate_ice_nl" valid_values="" >
+Subgrid scaling factor for relative humidity in ice nucleation code in the
+stratosphere. If it has a value of -1, then indicates that the subgrid
+scaling factor will be calculated on the fly as 1 / qsatfac (i.e. the
+saturation scaling factor).
 Default: set by build-namelist
 </entry>
 
@@ -2114,6 +2134,14 @@ stratospheric. Provides an increase in homogeneous freezing over the Liu&Penner 
 Temporary solution to adjust ice surface area density and dehydration in the
 polar stratosphere where there doesn't seem to be enough nucleation. A value of
 zero means Liu&Penner is used.
+Default: set by build-namelist
+</entry>
+
+<entry id="nucleate_ice_use_troplev" type="logical" category="microphys"
+       group="nucleate_ice_nl" valid_values="" >
+Indicates whether to use the tropopause level to determine where to adjust
+nucleation for the stratosphere (true) or whether to use a hard coded transition
+level from 100 to 125 hPa applied only in the polar regions (false).
 Default: set by build-namelist
 </entry>
 
@@ -2231,6 +2259,18 @@ Default: set by build-namelist
 <entry id="cldfrc2m_rhmaxi" type="real" category="conv"
        group="cldfrc2m_nl" valid_values="" >
 rhi at which ice cloud fraction = 1.
+Default: set by build-namelist
+</entry>
+
+<entry id="cldfrc2m_rhminis" type="real" category="conv"
+       group="cldfrc2m_nl" valid_values="" >
+Minimum rh for ice cloud fraction &gt; 0 in the stratosphere.
+Default: set by build-namelist
+</entry>
+
+<entry id="cldfrc2m_rhmaxis" type="real" category="conv"
+       group="cldfrc2m_nl" valid_values="" >
+rhi at which ice cloud fraction = 1 in the stratosphere.
 Default: set by build-namelist
 </entry>
 
@@ -3279,8 +3319,7 @@ Default: set by build-namelist
 </entry>
 
 <entry id="cam_chempkg" type="char*32" category="build"
-       group="phys_ctl_nl" valid_values="waccm_ma,waccmx_ma,waccm_ma_mam3,
-                                         waccm_ma_sulfur,waccm_sc,waccm_sc_mam3,
+       group="phys_ctl_nl" valid_values="waccm_ma,waccm_ma_sulfur,waccm_sc,waccm_sc_mam4,
 					 waccm_tsmlt,waccm_tsmlt_mam4,waccm_tsmlt_sulfur,
 					 trop_mozart,trop_mozart_mam3,trop_mozart_soa,
 					 trop_strat_soa,trop_strat_mam3,trop_strat_mam7,trop_strat_mam4_vbs,
@@ -4910,6 +4949,14 @@ the rad_climate namelist variable.
 Default: false
 </entry>
 
+<entry id="prescribed_strataero_use_chemtrop" type="logical" category="aerosol"
+       group="prescribed_strataero_nl" valid_values="" >
+Indicates whether to use the unified chemistry tropopause method to set prescribed 
+stratospheric aerosols below the tropopause to zero.  This has a maximum altitude 
+level corresponding to 300 hPa for latitudes poleward of 50 degrees.
+Default: set by build-namelist
+</entry>
+
 <entry id="rsf_file" type="char*256" input_pathname="abs" category="cam_chem"
        group="chem_inparm" valid_values="" >
 Full pathname of dataset for radiative source function used in look up table photloysis
@@ -5332,16 +5379,27 @@ Default: set by build-namelist
 </entry>
 
 
-<entry id="rxn_rate_sums" type="char*512(100)" category="cam_chem"
+<entry id="rxn_rate_sums" type="char*256(200)" category="cam_chem"
        group="rxn_rate_diags_nl" valid_values="" >
 Give the user the ability to specify rate families (or groupings) diagnostics based 
 on reaction tag names. These group names can be added to history fincl variables.
+To indicate the summation continues with next string use "&" character at the end of the string.
 Example:
  rate_sums = 
    'OX_P = NO_HO2 + CH3O2_NO + 2*jo2_b ... ', 
    'OX_L = NO2_O_M + HO2_O3 + CLO_O ...', 
- fincl1 = 'OX_P','OX_L', ...
+   'RO2_RO2_sum = CH3O2_CH3O2a + CH3O2_CH3O2b + C2H5O2_CH3O2 + C2H5O2_C2H5O2 + CH3CO3_CH3O2 &',
+               '+ CH3CO3_CH3CO3 + CH3H7O2_CH3O2 + RO2_CH3O2 + MACRO2_CH3O2 ...',
+ fincl1 = 'OX_P','OX_L', 'RO2_RO2_sum', ...
 Default: none
+</entry>
+
+<entry id="chem_use_chemtrop" type="logical" category="chemistry"
+       group="chem_inparm" valid_values="" >
+Indicates whether to use the unified chemistry tropopause method to set the 
+tropopause used in gas phase and aerosol chemical processes.  This has a maximum altitude 
+level corresponding to 300 hPa for latitudes poleward of 50 degrees.
+Default: set by build-namelist
 </entry>
 
 <entry id="fire_emis_factors_file" type="char*256" input_pathname="abs" category="Fire_emissions"

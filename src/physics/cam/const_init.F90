@@ -150,6 +150,7 @@ CONTAINS
     logical, optional, intent(in)  :: mask(:)    ! Only initialize where .true.
 
     ! Local variables
+    real(r8), allocatable         :: latblk(:)
     integer                       :: i, bbeg, bend
     integer                       :: size1, size2, size3
     integer                       :: nblks, blksize
@@ -179,26 +180,32 @@ CONTAINS
       end do
     else if ((size(latvals) == size2) .and. (size(lonvals) == size1)) then
       ! Case: lon,lat,lev
-      nblks = size2
-      do i = 1, nblks
-        if (present(mask)) then
-          call endrun('cnst_init_default_cblock: mask not supported for lon/lat')
-        else
-          call cnst_init_default(m_cnst, latvals, lonvals, q(:,i,:), verbose=verbose)
-        end if
-        verbose = .false.
-      end do
+      if (present(mask)) then
+        call endrun('cnst_init_default_cblock: mask not supported for lon/lat')
+      else
+        nblks = size2
+        allocate(latblk(size1))
+        do i = 1, nblks
+          latblk(:) = latvals(i)
+          call cnst_init_default(m_cnst, latblk, lonvals, q(:,i,:), verbose=verbose)
+          verbose = .false.
+        end do
+        deallocate(latblk)
+      end if
     else if ((size(latvals) == size3) .and. (size(lonvals) == size1)) then
       ! Case: lon,lev,lat
-      nblks = size3
-      do i = 1, nblks
-        if (present(mask)) then
-          call endrun('cnst_init_default_cblock: mask not supported for lon/lat')
-        else
-          call cnst_init_default(m_cnst, latvals, lonvals, q(:,:,i), verbose=verbose)
-        end if
-        verbose = .false.
-      end do
+      if (present(mask)) then
+        call endrun('cnst_init_default_cblock: mask not supported for lon/lat')
+      else
+        nblks = size3
+        allocate(latblk(size1))
+        do i = 1, nblks
+          latblk(:) = latvals(i)
+          call cnst_init_default(m_cnst, latblk, lonvals, q(:,:,i), verbose=verbose)
+          verbose = .false.
+        end do
+        deallocate(latblk)
+      end if
     else
       call endrun('cnst_init_default_cblock: Unknown q layout')
     end if

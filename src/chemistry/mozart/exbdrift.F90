@@ -355,10 +355,6 @@
       wi(i,:) = wi(i,:)*fac
    end do ! i = 1,pcol	
 
-   call outfld( 'UI', ui, pcols, lchnk)
-   call outfld( 'VI', vi, pcols, lchnk)
-   call outfld( 'WI', wi, pcols, lchnk)
-
 #ifdef SW_DEBUG
    if( lchnk == 25 ) then
       write(iulog,*) ' '

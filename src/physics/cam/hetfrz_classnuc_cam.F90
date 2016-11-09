@@ -644,6 +644,8 @@ subroutine hetfrz_classnuc_cam_calc( &
    itim_old = pbuf_old_tim_idx()
    call pbuf_get_field(pbuf, ast_idx, ast, start=(/1,1,itim_old/), kount=(/pcols,pver,1/))
 
+   rho(:,:) = 0._r8
+
    do k = top_lev, pver
       do i = 1, ncol
          rho(i,k) = pmid(i,k)/(rair*t(i,k))
@@ -754,6 +756,22 @@ subroutine hetfrz_classnuc_cam_calc( &
    numice10s(:ncol,:)         = 0._r8
    numice10s_imm_dst(:ncol,:) = 0._r8
    numice10s_imm_bc(:ncol,:)  = 0._r8
+
+   nnuccc_bc(:,:) = 0._r8
+   nnucct_bc(:,:) = 0._r8
+   nnudep_bc(:,:) = 0._r8
+
+   nnuccc_dst(:,:) = 0._r8
+   nnucct_dst(:,:) = 0._r8
+   nnudep_dst(:,:) = 0._r8
+
+   niimm_bc(:,:) = 0._r8
+   nicnt_bc(:,:) = 0._r8
+   nidep_bc(:,:) = 0._r8
+
+   niimm_dst(:,:) = 0._r8
+   nicnt_dst(:,:) = 0._r8
+   nidep_dst(:,:) = 0._r8
 
    do i = 1, ncol
       do k = top_lev, pver

@@ -2349,8 +2349,7 @@ end subroutine read_inidat
 subroutine process_inidat(fh_ini, grid, dyn_in, fieldname, m_cnst)
 
    ! Post-process input fields
-   use const_init,          only: cnst_init_default
-   use commap,              only: latdeg, londeg
+   use commap,              only: clat, clon
    use const_init,          only: cnst_init_default
 
    ! arguments
@@ -2476,7 +2475,7 @@ subroutine process_inidat(fh_ini, grid, dyn_in, fieldname, m_cnst)
             call endrun(sub//': ERROR:  Q must be on Initial File')
          end if
 
-         call cnst_init_default(m_cnst, latdeg(jfirstxy:jlastxy), londeg(ifirstxy:ilastxy,1), tracer(:,:,:,m_cnst))
+         call cnst_init_default(m_cnst, clat(jfirstxy:jlastxy), clon(ifirstxy:ilastxy,1), tracer(:,:,:,m_cnst))
        end if
 
       do k = 1, km

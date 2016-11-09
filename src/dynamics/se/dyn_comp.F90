@@ -643,6 +643,7 @@ end subroutine dyn_init
 subroutine read_inidat(dyn_in)
 
    use shr_vmath_mod,       only: shr_vmath_log
+   use physconst,           only: pi
    use hycoef,              only: ps0
    use dyn_grid,            only: get_horiz_grid_dim_d, dyn_decomp
    use dyn_grid,            only: pelat_deg, pelon_deg
@@ -684,6 +685,8 @@ subroutine read_inidat(dyn_in)
    integer,parameter :: pcnst = PCNST
    integer(iMap), pointer :: ldof(:) => NULL() ! Basic (2D) grid dof
    logical,       pointer :: mask(:) => NULL() ! mask based on ldof
+   real(r8),  allocatable :: lat(:)
+   real(r8),  allocatable :: lon(:)
 
    integer :: rndm_seed_sz
    integer, allocatable :: rndm_seed(:)
@@ -693,6 +696,7 @@ subroutine read_inidat(dyn_in)
    real(r8), parameter :: D0_5 = 0.5_r8
    real(r8), parameter :: D1_0 = 1.0_r8
    real(r8), parameter :: D2_0 = 2.0_r8
+   real(r8), parameter :: deg2rad = pi / 180.0_r8
    character(len=*), parameter :: subname='READ_INIDAT'
 
    fh_ini  => initial_file_get_id()
@@ -815,6 +819,10 @@ subroutine read_inidat(dyn_in)
    mask = ldof /= 0
    deallocate(ldof)
    nullify(ldof)
+   allocate(lat(size(pelat_deg)))
+   allocate(lon(size(pelon_deg)))
+   lat(:) = pelat_deg(:) * deg2rad
+   lon(:) = pelon_deg(:) * deg2rad
 
    do m_cnst = 1, pcnst
 
@@ -827,7 +835,7 @@ subroutine read_inidat(dyn_in)
       end if
 
       if(.not. found) then
-        call cnst_init_default(m_cnst, pelat_deg, pelon_deg, tmp, mask)
+        call cnst_init_default(m_cnst, lat, lon, tmp, mask)
       end if
 
       do ie=1,nelemd
@@ -843,7 +851,9 @@ subroutine read_inidat(dyn_in)
             end do
          end do
       end do
-   end do
+    end do
+    deallocate(lat)
+    deallocate(lon)
 
    fieldname = 'PS'
    tmp(:,1,:) = 0.0_r8

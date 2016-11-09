@@ -29,7 +29,7 @@
 !-------------------------------------------------------
 !       ... local variables
 !-------------------------------------------------------
-      integer  ::  n
+      integer   ::  n
       real(r8)  ::  itemp(ncol,pver)
       real(r8)  ::  exp_fac(ncol,pver)
       real(r8)  :: ko(ncol,pver)
@@ -528,7 +528,7 @@
 !-------------------------------------------------------
 !       ... local variables
 !-------------------------------------------------------
-      integer  ::  n
+      integer   ::  n
       real(r8)  ::  itemp(ncol,kbot)
       real(r8)  ::  exp_fac(ncol,kbot)
       real(r8)  :: ko(ncol,kbot)

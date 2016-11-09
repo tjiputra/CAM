@@ -25,17 +25,23 @@ public ::           &
    aist_vector,     &
    CAMstfrac,       &
    rhmini_const,    &
-   rhmaxi_const
+   rhmaxi_const,    &
+   rhminis_const,   &
+   rhmaxis_const
 
 ! Namelist variables
 real(r8) :: cldfrc2m_rhmini            ! Minimum rh for ice cloud fraction > 0.
 real(r8) :: cldfrc2m_rhmaxi
+real(r8) :: cldfrc2m_rhminis           ! Minimum rh for ice cloud fraction > 0 in the stratsophere.
+real(r8) :: cldfrc2m_rhmaxis
 logical  :: cldfrc2m_do_subgrid_growth = .false.
 ! -------------------------- !
 ! Parameters for Ice Stratus !
 ! -------------------------- !
 real(r8),  protected :: rhmini_const                 ! Minimum rh for ice cloud fraction > 0.
 real(r8),  protected :: rhmaxi_const
+real(r8),  protected :: rhminis_const                 ! Minimum rh for ice cloud fraction > 0.
+real(r8),  protected :: rhmaxis_const
 
 real(r8),  parameter :: qist_min     = 1.e-7_r8      ! Minimum in-stratus ice IWC constraint [ kg/kg ]
 real(r8),  parameter :: qist_max     = 5.e-3_r8      ! Maximum in-stratus ice IWC constraint [ kg/kg ]
@@ -75,7 +81,7 @@ subroutine cldfrc2m_readnl(nlfile)
    integer :: unitn, ierr
    character(len=*), parameter :: subname = 'cldfrc2m_readnl'
 
-   namelist /cldfrc2m_nl/ cldfrc2m_rhmini, cldfrc2m_rhmaxi, cldfrc2m_do_subgrid_growth
+   namelist /cldfrc2m_nl/ cldfrc2m_rhmini, cldfrc2m_rhmaxi, cldfrc2m_rhminis, cldfrc2m_rhmaxis, cldfrc2m_do_subgrid_growth
    !-----------------------------------------------------------------------------
 
    if (masterproc) then
@@ -92,14 +98,18 @@ subroutine cldfrc2m_readnl(nlfile)
       call freeunit(unitn)
 
       ! set local variables
-      rhmini_const = cldfrc2m_rhmini
-      rhmaxi_const = cldfrc2m_rhmaxi
+      rhmini_const  = cldfrc2m_rhmini
+      rhmaxi_const  = cldfrc2m_rhmaxi
+      rhminis_const = cldfrc2m_rhminis
+      rhmaxis_const = cldfrc2m_rhmaxis
 
    end if
 
    ! Broadcast namelist variables
    call mpi_bcast(rhmini_const,               1, mpi_real8,  masterprocid, mpicom, ierr)
    call mpi_bcast(rhmaxi_const,               1, mpi_real8,  masterprocid, mpicom, ierr)
+   call mpi_bcast(rhminis_const,              1, mpi_real8,  masterprocid, mpicom, ierr)
+   call mpi_bcast(rhmaxis_const,              1, mpi_real8,  masterprocid, mpicom, ierr)
    call mpi_bcast(cldfrc2m_do_subgrid_growth, 1, mpi_logical,masterprocid, mpicom, ierr)
 
 end subroutine cldfrc2m_readnl
@@ -125,6 +135,8 @@ subroutine cldfrc2m_init()
       write(iulog,*) '  icecrit           = ', icecrit
       write(iulog,*) '  rhmini            = ', rhmini_const
       write(iulog,*) '  rhmaxi            = ', rhmaxi_const
+      write(iulog,*) '  rhminis           = ', rhminis_const
+      write(iulog,*) '  rhmaxis           = ', rhmaxis_const
       write(iulog,*) '  do_subgrid_growth = ', cldfrc2m_do_subgrid_growth
    end if
 
@@ -832,7 +844,15 @@ subroutine aist_single(qv, T, p, qi, landfrac, snowh, aist, &
      elseif (iceopt.eq.5) then 
         ! set rh ice cloud fraction
         rhi= (qv+qi)/qs * (esl/esi)
-        rhdif= (rhi-rhmini) / (rhmaxi - rhmini)
+        if (rhmaxi .eq. rhmini) then
+           if (rhi .gt. rhmini) then
+              rhdif = 1._r8
+           else
+              rhdif = 0._r8
+           end if
+        else
+           rhdif = (rhi-rhmini) / (rhmaxi - rhmini)
+        end if
         aist = min(1.0_r8, max(rhdif,0._r8)**2)
 
         ! Similar to alpha in Wilson & Ballard (1999), determine a
@@ -897,7 +917,7 @@ subroutine aist_vector(qv_in, T_in, p_in, qi_in, ni_in, landfrac_in, snowh_in, a
    real(r8), intent(out) :: aist_out(pcols)    ! Non-physical ice stratus fraction ( 0<= aist <= 1 )
    integer,  intent(in)  :: ncol 
 
-   real(r8), optional, intent(in)  :: rhmaxi_in
+   real(r8), optional, intent(in)  :: rhmaxi_in(pcols)
    real(r8), optional, intent(in)  :: rhmini_in(pcols)          ! Critical relative humidity for               ice stratus
    real(r8), optional, intent(in)  :: rhminl_in(pcols)          ! Critical relative humidity for low-level  liquid stratus
    real(r8), optional, intent(in)  :: rhminl_adj_land_in(pcols) ! Adjustment drop of rhminl over the land
@@ -971,7 +991,6 @@ subroutine aist_vector(qv_in, T_in, p_in, qi_in, ni_in, landfrac_in, snowh_in, a
      mincld = 1.e-4_r8
 
      rhmaxi          = rhmaxi_const
-     if (present(rhmaxi_in))          rhmaxi          = rhmaxi_in
 
      rhmini          = rhmini_const
      rhminl          = rhminl_const
@@ -1004,6 +1023,7 @@ subroutine aist_vector(qv_in, T_in, p_in, qi_in, ni_in, landfrac_in, snowh_in, a
      esl = svp_water(T)
      esi = svp_ice(T)
 
+     if (present(rhmaxi_in))          rhmaxi          = rhmaxi_in(i)
      if (present(rhmini_in))          rhmini          = rhmini_in(i)      
      if (present(rhminl_in))          rhminl          = rhminl_in(i)      
      if (present(rhminl_adj_land_in)) rhminl_adj_land = rhminl_adj_land_in(i)
@@ -1056,7 +1076,15 @@ subroutine aist_vector(qv_in, T_in, p_in, qi_in, ni_in, landfrac_in, snowh_in, a
      elseif (iceopt.eq.5) then 
         ! set rh ice cloud fraction
         rhi= (qv+qi)/qs * (esl/esi)
-        rhdif= (rhi-rhmini) / (rhmaxi - rhmini)
+        if (rhmaxi .eq. rhmini) then
+           if (rhi .gt. rhmini) then
+              rhdif = 1._r8
+           else
+              rhdif = 0._r8
+           end if
+        else
+           rhdif = (rhi-rhmini) / (rhmaxi - rhmini)
+        end if
         aist = min(1.0_r8, max(rhdif,0._r8)**2)
 
      elseif (iceopt.eq.6) then

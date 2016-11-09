@@ -38,7 +38,6 @@
 <!-- Emissions DEFAULTS OKAY for: airpl_emis_file,ch2o_emis_file,co_emis_file,nox_emis_file-->
 
 <!-- LBC, UBC Files -->
-<flbc_file>atm/waccm/lb/LBC_1765-2005_1.9x2.5_CMIP5_za_c091204.nc</flbc_file>
 <flbc_cycle_yr>1850</flbc_cycle_yr>
 <flbc_type>'CYCLICAL'</flbc_type>
 

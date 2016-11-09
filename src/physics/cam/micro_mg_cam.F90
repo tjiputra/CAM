@@ -113,6 +113,7 @@ integer :: micro_mg_sub_version = 0      ! Second part of version number.
 real(r8) :: micro_mg_dcs = -1._r8
 
 logical :: microp_uniform
+logical :: micro_mg_adjust_cpt  = .false.
 
 character(len=16) :: micro_mg_precip_frac_method = 'max_overlap' ! type of precipitation fraction method
 
@@ -263,7 +264,7 @@ subroutine micro_mg_cam_readnl(nlfile)
   namelist /micro_mg_nl/ micro_mg_version, micro_mg_sub_version, &
        micro_mg_do_cldice, micro_mg_do_cldliq, micro_mg_num_steps, &
        microp_uniform, micro_mg_dcs, micro_mg_precip_frac_method, micro_mg_berg_eff_factor, &
-       micro_do_sb_physics
+       micro_do_sb_physics, micro_mg_adjust_cpt
 
   !-----------------------------------------------------------------------------
 
@@ -323,6 +324,7 @@ subroutine micro_mg_cam_readnl(nlfile)
   call mpibcast(micro_mg_berg_eff_factor,    1, mpir8,  0, mpicom)
   call mpibcast(micro_mg_precip_frac_method, 16, mpichar,0, mpicom)
   call mpibcast(micro_do_sb_physics,           1, mpilog, 0, mpicom)
+  call mpibcast(micro_mg_adjust_cpt,         1, mpilog, 0, mpicom)
 
 #endif
 
@@ -561,8 +563,15 @@ subroutine micro_mg_cam_init_cnst(name, latvals, lonvals, mask, q)
    logical,          intent(in)  :: mask(:)    ! Only initialize where .true.
    real(r8),         intent(out) :: q(:,:)     ! kg tracer/kg dry air (gcol, plev
    !-----------------------------------------------------------------------
+   integer :: k
 
-   if (micro_mg_cam_implements_cnst(name)) q = 0.0_r8
+   if (micro_mg_cam_implements_cnst(name)) then
+     do k = 1, size(q, 2)
+       where(mask)
+         q(:, k) = 0.0_r8
+       end where
+     end do
+   end if
 
 end subroutine micro_mg_cam_init_cnst
 
@@ -761,6 +770,17 @@ subroutine micro_mg_cam_init(pbuf2d)
       call addfld('FICE_SCOL', (/'psubcols','lev     '/), 'I', 'fraction', &
            'Sub-column fractional ice content within cloud', flag_xyfill=.true., fill_value=1.e30_r8)
    end if
+   
+   
+   ! This is only if the coldpoint temperatures are being adjusted.
+   ! NOTE: Some fields related to these and output later are added in tropopause.F90.
+   if (micro_mg_adjust_cpt) then
+     call addfld ('TROPF_TADJ', (/ 'lev' /), 'A', 'K',  'Temperatures after cold point adjustment'                    )
+     call addfld ('TROPF_RHADJ', (/ 'lev' /), 'A', 'K', 'Relative Hunidity after cold point adjustment'               )
+     call addfld ('TROPF_CDT',   horiz_only,  'A', 'K',  'Cold point temperature adjustment'                           )
+     call addfld ('TROPF_CDZ',   horiz_only,  'A', 'm',  'Distance of coldpoint from coldest model level'              )
+   end if
+
 
    ! Averaging for cloud particle number and size
    call addfld ('AWNC',        (/ 'lev' /),  'A', 'm-3',      'Average cloud water number conc'                                   )
@@ -1069,6 +1089,8 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
 
    use physics_buffer,  only: pbuf_col_type_index
    use subcol,          only: subcol_field_avg
+   use tropopause,      only: tropopause_find, TROP_ALG_CPP, TROP_ALG_NONE, NOTFOUND
+   use wv_saturation,   only: qsat
 
    type(physics_state),         intent(in)    :: state
    type(physics_ptend),         intent(out)   :: ptend
@@ -1521,6 +1543,15 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
    real(r8) :: nr_grid(pcols,pver)
    real(r8) :: qs_grid(pcols,pver)
    real(r8) :: ns_grid(pcols,pver)
+   
+   real(r8) :: cp_rh(pcols,pver)
+   real(r8) :: cp_t(pcols)
+   real(r8) :: cp_z(pcols)
+   real(r8) :: cp_dt(pcols)
+   real(r8) :: cp_dz(pcols)
+   integer  :: troplev(pcols)
+   real(r8) :: es
+   real(r8) :: qs
 
    real(r8), pointer :: cmeliq_grid(:,:)
 
@@ -1762,6 +1793,40 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
 
    ! Initialize local state from input.
    call physics_state_copy(state, state_loc)
+
+   ! Because of the of limited vertical resolution, there can be a signifcant
+   ! warm bias at the cold point tropopause, which can create a wet bias in the
+   ! stratosphere. For the microphysics only, update the cold point temperature, with
+   ! an estimate of the coldest point between the model layers.
+   if (micro_mg_adjust_cpt) then
+      cp_rh(:ncol, :pver)  = 0._r8
+      cp_dt(:ncol)         = 0._r8
+      cp_dz(:ncol)         = 0._r8
+
+      call tropopause_find(state_loc, troplev, primary=TROP_ALG_CPP, backup=TROP_ALG_NONE, &
+                           tropZ=cp_z, tropT=cp_t)
+
+      do i = 1, ncol
+
+         ! Update statistics and output results.
+         if (troplev(i) .ne. NOTFOUND) then
+            cp_dt(i) = cp_t(i) - state_loc%t(i,troplev(i))
+            cp_dz(i) = cp_z(i) - state_loc%zm(i,troplev(i))
+
+            ! NOTE: This change in temperature is just for the microphysics
+            ! and should not be added to any tendencies or used to update
+            ! any states
+            state_loc%t(i,troplev(i)) = state_loc%t(i,troplev(i)) + cp_dt(i)
+         end if
+      end do
+
+      ! Output all of the statistics related to the cold point
+      ! tropopause adjustment. Th cold point information itself is
+      ! output in tropopause.F90.
+      call outfld("TROPF_TADJ", state_loc%t, pcols, lchnk)
+      call outfld("TROPF_CDT",  cp_dt,       pcols, lchnk)
+      call outfld("TROPF_CDZ",  cp_dz,       pcols, lchnk)
+   end if
 
    ! Initialize ptend for output.
    lq = .false.
@@ -2941,6 +3006,21 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
    call outfld('FCTM',        fctm_grid,        pcols, lchnk)
    call outfld('FCTSL',       fctsl_grid,       pcols, lchnk)
    call outfld('FCTSLM',      fctslm_grid,      pcols, lchnk)
+
+   if (micro_mg_adjust_cpt) then
+      cp_rh(:ncol, :pver)  = 0._r8
+
+      do i = 1, ncol
+      
+         ! Calculate the RH including any T change that we make.
+         do k = top_lev, pver 
+           call qsat(state_loc%t(i,k), state_loc%pmid(i,k), es, qs)
+           cp_rh(i,k) = state_loc%q(i, k, 1) / qs * 100._r8
+         end do
+      end do
+
+      call outfld("TROPF_RHADJ", cp_rh,       pcols, lchnk)
+   end if
 
    ! ptend_loc is deallocated in physics_update above
    call physics_state_dealloc(state_loc)

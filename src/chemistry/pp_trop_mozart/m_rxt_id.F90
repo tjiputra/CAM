@@ -1,12 +1,5 @@
-
-
-
-
-
       module m_rxt_id
-
       implicit none
-
       integer, parameter :: rid_jo2 = 1
       integer, parameter :: rid_jo1d = 2
       integer, parameter :: rid_jo3p = 3
@@ -102,7 +95,6 @@
       integer, parameter :: rid_usr_SO2_OH = 204
       integer, parameter :: rid_usr_DMS_OH = 206
       integer, parameter :: rid_usr_HO2_aer = 210
-
       integer, parameter :: rid_r0042 = 42
       integer, parameter :: rid_r0046 = 46
       integer, parameter :: rid_r0047 = 47
@@ -220,5 +212,4 @@
       integer, parameter :: rid_r0209 = 209
       integer, parameter :: rid_r0211 = 211
       integer, parameter :: rid_r0212 = 212
-
       end module m_rxt_id

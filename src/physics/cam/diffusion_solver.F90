@@ -157,6 +157,7 @@
     use linear_1d_operators, only : BoundaryType, BoundaryFixedLayer, &
          BoundaryData, BoundaryFlux, TriDiagDecomp
     use vdiff_lu_solver,     only : fin_vol_lu_decomp
+    use beljaars_drag_cam,   only : do_beljaars
     ! FIXME: This should not be needed
     use physconst, only: rairv
   
@@ -321,6 +322,8 @@
     real(r8) :: tmp1(pcols)                              ! Temporary storage
     real(r8) :: tmpi1(pcols,pver+1)                      ! Interface KE dissipation
     real(r8) :: tmpi2(pcols,pver+1)                      ! dt*(g*rho)**2/dp at interfaces
+    real(r8) :: keg_in(pcols,pver)                       ! KE on entry to subroutine
+    real(r8) :: keg_out(pcols,pver)                      ! KE after U and V dissipation/diffusion
     real(r8) :: rrho(pcols)                              ! 1./bottom level density 
 
     real(r8) :: tautotx(pcols)                           ! Total surface stress ( zonal )
@@ -433,6 +436,12 @@
     !---------------------------- !
     ! Diffuse Horizontal Momentum !
     !---------------------------- !
+
+    do k = 1, pver
+       do i = 1, ncol
+          keg_in(i,k) = 0.5_r8 * ( u(i,k)*u(i,k) + v(i,k)*v(i,k) )
+       end do
+    end do
 
     if( diffuse(fieldlist,'u') .or. diffuse(fieldlist,'v') ) then
 
@@ -658,14 +667,33 @@
           end do
        end do
 
-       ! 2. Compute dissipation term at midpoints, add to dry static energy
+       if (do_beljaars) then
 
-       do k = 1, pver
-          do i = 1, ncol
-             dtk(i,k) = ( tmpi1(i,k+1) + tmpi1(i,k) ) * p%rdel(i,k)
-             dse(i,k) = dse(i,k) + dtk(i,k)
+          ! 2. Add Kinetic Energy change across dissipation to Static Energy
+          do k = 1, pver
+             do i = 1, ncol
+                keg_out(i,k) = 0.5_r8 * ( u(i,k)*u(i,k) + v(i,k)*v(i,k) )
+             end do
           end do
-       end do
+    
+          do k = 1, pver
+             do i = 1, ncol
+                dtk(i,k) = keg_in(i,k) - keg_out(i,k)
+                dse(i,k) = dse(i,k) + dtk(i,k) ! + dkeblj(i,k)
+             end do
+          end do
+
+       else
+
+          ! 2. Compute dissipation term at midpoints, add to dry static energy
+          do k = 1, pver
+             do i = 1, ncol
+                dtk(i,k) = ( tmpi1(i,k+1) + tmpi1(i,k) ) * p%rdel(i,k)
+                dse(i,k) = dse(i,k) + dtk(i,k)
+             end do
+          end do
+
+       end if
 
     end if ! End of diffuse horizontal momentum, diffuse(fieldlist,'u') routine
 

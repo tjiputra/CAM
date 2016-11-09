@@ -244,13 +244,14 @@ contains
              datatm = input%times(n)
              datatp = input%times(n+1)
           endif
-          if ( datatp > input%ntimes ) then
-             call endrun('epp_ionization::read_next_data find times failed')
-          endif
           if ( model_time .ge. datatm .and. model_time .le. datatp ) then
              exit findtimes
           endif
        enddo findtimes
+
+       if ( n > input%ntimes ) then
+          call endrun('epp_ionization::read_next_data find times failed')
+       endif
 
        input%timendx = n
     else

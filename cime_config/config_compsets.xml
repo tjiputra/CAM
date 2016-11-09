@@ -40,7 +40,7 @@
     <alias>FW2000</alias>
     <lname>2000_CAM60%WTSM_CLM50%BGC_CICE%PRES_DOCN%DOM_MOSART_CISM1%NOEVOLVE_SWAV</lname>
   </compset>
-   <compset>
+  <compset>
     <alias>FWAMIP</alias>
     <lname>AMIP_CAM60%WTSM_CLM50%BGC_CICE%PRES_DOCN%DOM_MOSART_CISM1%NOEVOLVE_SWAV</lname>
   </compset>
@@ -50,8 +50,21 @@
   </compset>
 
   <compset>
+    <alias>FWmaAMIP</alias>
+    <lname>AMIP_CAM60%WCCM_CLM50%BGC_CICE%PRES_DOCN%DOM_MOSART_CISM1%NOEVOLVE_SWAV</lname>
+  </compset>
+  <compset>
+    <alias>FWscAMIP</alias>
+    <lname>AMIP_CAM60%WCSCM4_CLM50%BGC_CICE%PRES_DOCN%DOM_MOSART_CISM1%NOEVOLVE_SWAV</lname>
+  </compset>
+
+  <compset>
     <alias>F1850</alias>
     <lname>1850_CAM40_CLM40%SP_CICE%PRES_DOCN%DOM_RTM_SGLC_SWAV</lname>
+  </compset>
+  <compset>
+    <alias>F1850_DONOTUSE</alias>
+    <lname>1850_CAM60_CLM50%BGC_CICE%PRES_DOCN%DOM_MOSART_CISM1%NOEVOLVE_SWAV</lname>
   </compset>
   <compset>
     <alias>F1850C5</alias>
@@ -70,7 +83,7 @@
     <lname>2000_CAM50_CLM40%SP_CICE%PRES_DOCN%DOM_RTM_SGLC_SWAV</lname>
   </compset>
   <compset>
-    <alias>F2000_DONOTUSE</alias>
+    <alias>F2000_DEV</alias>
     <lname>2000_CAM60_CLM50%BGC_CICE%PRES_DOCN%DOM_MOSART_CISM1%NOEVOLVE_SWAV</lname>
   </compset>
   <compset>
@@ -122,6 +135,10 @@
     <lname>HIST_CAM40_CLM40%CN_CICE%PRES_DOCN%DOM_RTM_SGLC_SWAV</lname>
   </compset>
   <compset>
+    <alias>FHIST_DONOTUSE</alias>
+    <lname>HIST_CAM60_CLM50%BGC_CICE%PRES_DOCN%DOM_MOSART_CISM1%NOEVOLVE_SWAV</lname>
+  </compset>
+  <compset>
     <alias>FC5CLUBB</alias>
     <lname>2000_CAM50%CLB_CLM40%SP_CICE%PRES_DOCN%DOM_RTM_SGLC_SWAV</lname>
   </compset>
@@ -166,12 +183,8 @@
     <lname>2000_CAM40%WCXI_CLM40%SP_CICE%PRES_DOCN%DOM_RTM_SGLC_SWAV</lname>
   </compset>
   <compset>
-    <alias>FW5</alias>
-    <lname>2000_CAM60%WCCM_CLM45%SP_CICE%PRES_DOCN%DOM_RTM_SGLC_SWAV</lname>
-  </compset>
-  <compset>
-    <alias>FW5CLUBB</alias>
-    <lname>2000_CAM60%WCCM_CLM45%SP_CICE%PRES_DOCN%DOM_RTM_SGLC_SWAV</lname>
+    <alias>FW6</alias>
+    <lname>2000_CAM60%WCCM_CLM50%SP_CICE%PRES_DOCN%DOM_RTM_SGLC_SWAV</lname>
   </compset>
   <compset>
     <alias>FMOZSOA</alias>
@@ -314,10 +327,20 @@
     <lname>2000_CAM50%PORT_SLND_SICE_SOCN_SROF_SGLC_SWAV</lname>
   </compset>
 
+  <!-- Dycore test compsets -->
+
+  <compset>
+    <alias>FDCBAROMOIST</alias>
+    <lname>2000_CAM%DCTBM_SLND_SICE_SOCN_SROF_SGLC_SWAV</lname>
+  </compset>
+
+  <!-- ENTRIES -->
+
   <entries>
 
     <entry id="RUN_STARTDATE">
       <values>
+	<value  compset="AMIP_CAM60%WTS1">1990-01-01</value>
 	<value  compset="AMIP_CAM">1979-01-01</value>
 	<value  compset="HIST_CAM">1850-01-01</value>
 	<value  compset="PIPD_CAM">1850-01-01</value>

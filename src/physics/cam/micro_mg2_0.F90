@@ -2118,10 +2118,10 @@ subroutine micro_mg_tend ( &
            fni(i,k) = g*rho(i,k)* &
                 min(ain(i,k)*gamma_bi_plus1/lami(i,k)**bi,1.2_r8*rhof(i,k))
 
-           ! adjust the ice fall velocity for smaller (r < 10 um) ice
-           ! particles (blend over 8-12 um)
+           ! adjust the ice fall velocity for smaller (r < 20 um) ice
+           ! particles (blend over 18-20 um)
            irad = 1.5_r8 / lami(i,k) * 1e6_r8
-           ifrac = min(1._r8, max(0._r8, (irad - 8._r8) / 4._r8))
+           ifrac = min(1._r8, max(0._r8, (irad - 18._r8) / 2._r8))
  
            if (ifrac .lt. 1._r8) then
               vtrmi(i,k) = ifrac * vtrmi(i,k) + & 
@@ -2129,7 +2129,7 @@ subroutine micro_mg_tend ( &
                  min(ajn(i,k)*gamma_bj_plus4/(6._r8*lami(i,k)**bj), &
                  1.2_r8*rhof(i,k))
 
-              fi(i,k) = g*rho(i,k)+vtrmi(i,k)
+              fi(i,k) = g*rho(i,k)*vtrmi(i,k)
               fni(i,k) = ifrac * fni(i,k) + & 
                  (1._r8 - ifrac) * &
                  g*rho(i,k)* &

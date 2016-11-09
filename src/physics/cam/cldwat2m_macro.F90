@@ -20,7 +20,7 @@
    use ref_pres,         only: top_lev=>trop_cloud_top_lev
    use cldfrc2m,         only: astG_PDF_single, astG_PDF, astG_RHU_single, &
                                astG_RHU, aist_single, aist_vector,         &
-                               rhmini_const, rhmaxi=>rhmaxi_const
+                               rhmini_const, rhmaxi_const
 
    implicit none
    private
@@ -445,6 +445,7 @@
    real(r8) d_rhmin_ice_PBL(pcols,pver)
    real(r8) d_rhmin_liq_det(pcols,pver)
    real(r8) d_rhmin_ice_det(pcols,pver)
+   real(r8) rhmaxi_arr(pcols,pver)
    real(r8) rhmini_arr(pcols,pver)
    real(r8) rhminl_arr(pcols,pver)
    real(r8) rhminl_adj_land_arr(pcols,pver)
@@ -646,11 +647,12 @@
    ! ---------------- !
 
    ! Compute critical RH for stratus
+   rhmaxi_arr(:ncol,:pver) = rhmaxi_const
    call rhcrit_calc( &
       ncol, dp, T0, p, &
       clrw_old, clri_old, tke, qtl_flx, &
       qti_flx, cmfr_det, qlr_det, qir_det, &
-      rhmini_arr, rhminl_arr, rhminl_adj_land_arr, rhminh_arr, &
+      rhmaxi_arr, rhmini_arr, rhminl_arr, rhminl_adj_land_arr, rhminh_arr, &
       d_rhmin_liq_PBL, d_rhmin_ice_PBL, d_rhmin_liq_det, d_rhmin_ice_det)
 
    ! ---------------------------------- !
@@ -725,7 +727,7 @@
                                  a_cud(:,k), zeros(:,k), zeros(:,k),               &
                                  zeros(:,k), zeros(:,k), zeros(:,k),               &
                                  landfrac, snowh,                                  &
-                                 rhmini_arr(:,k), rhminl_arr(:,k), rhminl_adj_land_arr(:,k), rhminh_arr(:,k), &
+                                 rhmaxi_arr(:,k),rhmini_arr(:,k), rhminl_arr(:,k), rhminl_adj_land_arr(:,k), rhminh_arr(:,k), &
                                  T_0(:,k), qv_0(:,k), ql_0(:,k), qi_0(:,k),        & 
                                  al_st_0(:,k), ai_st_0(:,k), ql_st_0(:,k), qi_st_0(:,k) )
       a_st_0(:ncol,k) = max(al_st_0(:ncol,k),ai_st_0(:ncol,k))
@@ -858,7 +860,7 @@
                         rhminl_arr(:,k), rhminl_adj_land_arr(:,k), rhminh_arr(:,k))
       endif
       call aist_vector(qv(:,k),T(:,k),p(:,k),qi(:,k),ni(:,k),landfrac(:),snowh(:),ai_st_nc(:,k),ncol,&
-                       rhmaxi, rhmini_arr(:,k), rhminl_arr(:,k), rhminl_adj_land_arr(:,k), rhminh_arr(:,k))
+                       rhmaxi_arr(:,k), rhmini_arr(:,k), rhminl_arr(:,k), rhminl_adj_land_arr(:,k), rhminh_arr(:,k))
 
       ai_st(:ncol,k)  =  (1._r8-a_cu(:ncol,k))*ai_st_nc(:ncol,k)
       al_st(:ncol,k)  =  (1._r8-a_cu(:ncol,k))*al_st_nc(:ncol,k)
@@ -1063,7 +1065,7 @@
                                  a_cu0(:,k)     , zeros(:,k)     , zeros(:,k)     ,                 & 
                                  zeros(:,k)     , zeros(:,k)     , zeros(:,k)     ,                 &
                                  landfrac       , snowh          ,                                  &
-                                 rhmini_arr(:,k), rhminl_arr(:,k), rhminl_adj_land_arr(:,k), rhminh_arr(:,k), &
+                                 rhmaxi_arr(:,k),rhmini_arr(:,k), rhminl_arr(:,k), rhminl_adj_land_arr(:,k), rhminh_arr(:,k), &
                                  T_star(:,k)    , qv_star(:,k)   , ql_star(:,k)   , qi_star(:,k)  , & 
                                  al_st_star(:,k), ai_st_star(:,k), ql_st_star(:,k), qi_st_star(:,k) )
       a_st_star(:ncol,k)  = max(al_st_star(:ncol,k),ai_st_star(:ncol,k))
@@ -1251,7 +1253,7 @@ subroutine rhcrit_calc( &
    ncol, dp, T0, p, &
    clrw_old, clri_old, tke, qtl_flx, &
    qti_flx, cmfr_det, qlr_det, qir_det, &
-   rhmini_arr, rhminl_arr, rhminl_adj_land_arr, rhminh_arr, &
+   rhmaxi_arr, rhmini_arr, rhminl_arr, rhminl_adj_land_arr, rhminh_arr, &
    d_rhmin_liq_PBL, d_rhmin_ice_PBL, d_rhmin_liq_det, d_rhmin_ice_det)
 
    ! ------------------------------------------------- !
@@ -1274,6 +1276,8 @@ subroutine rhcrit_calc( &
    real(r8), pointer    :: qlr_det(:,:)                 ! (pcols,pver)  Detrained        ql from the convection scheme
    real(r8), pointer    :: qir_det(:,:)                 ! (pcols,pver)  Detrained        qi from the convection scheme
 
+   real(r8), intent(in)  :: rhmaxi_arr(pcols,pver)
+   
    real(r8), intent(out) :: rhmini_arr(pcols,pver)
    real(r8), intent(out) :: rhminl_arr(pcols,pver)
    real(r8), intent(out) :: rhminl_adj_land_arr(pcols,pver)
@@ -1338,7 +1342,7 @@ subroutine rhcrit_calc( &
    if (i_rhmini > 0) then
       do k = top_lev, pver
          do i = 1, ncol
-            rhmini_arr(i,k) = max(0._r8,min(rhmaxi,rhmini_arr(i,k))) 
+            rhmini_arr(i,k) = max(0._r8,min(rhmaxi_arr(i,k),rhmini_arr(i,k))) 
          end do
       end do
    end if
@@ -1408,7 +1412,7 @@ end subroutine rhcrit_calc
                                     a_dc_in, ql_dc_in, qi_dc_in,         &
                                     a_sc_in, ql_sc_in, qi_sc_in,         & 
                                     landfrac, snowh,                     &
-                                    rhmini_in, rhminl_in, rhminl_adj_land_in, rhminh_in, &
+                                    rhmaxi_in, rhmini_in, rhminl_in, rhminl_adj_land_in, rhminh_in, &
                                     T_out, qv_out, ql_out, qi_out,       &
                                     al_st_out, ai_st_out, ql_st_out, qi_st_out )
 
@@ -1439,6 +1443,7 @@ end subroutine rhcrit_calc
    real(r8), intent(in)  :: landfrac(pcols)      ! Land fraction
    real(r8), intent(in)  :: snowh(pcols)         ! Snow depth (liquid water equivalent)
 
+   real(r8), intent(in)  :: rhmaxi_in(pcols) 
    real(r8), intent(in)  :: rhmini_in(pcols) 
    real(r8), intent(in)  :: rhminl_in(pcols)
    real(r8), intent(in)  :: rhminl_adj_land_in(pcols)
@@ -1514,6 +1519,7 @@ end subroutine rhcrit_calc
    real(r8) Tmax
    integer caseid
 
+   real(r8) rhmaxi
    real(r8) rhmini
    real(r8) rhminl
    real(r8) rhminl_adj_land
@@ -1534,7 +1540,7 @@ end subroutine rhcrit_calc
                      rhminl_in(:), rhminl_adj_land_in(:), rhminh_in(:))
    endif
    call aist_vector(qv0_in(:),T0_in(:),p_in(:),qi0_in(:),ni0_in(:),landfrac(:),snowh(:),ai0_st_nc_in(:),ncol,&
-                    rhmaxi, rhmini_in(:), rhminl_in(:), rhminl_adj_land_in(:), rhminh_in(:))
+                    rhmaxi_in(:), rhmini_in(:), rhminl_in(:), rhminl_adj_land_in(:), rhminh_in(:))
 
    do i = 1, ncol
 
@@ -1565,6 +1571,7 @@ end subroutine rhcrit_calc
       es  = esat_in(i) 
       qs  = qsat_in(i) 
  
+      rhmaxi = rhmaxi_in(i)     
       rhmini = rhmini_in(i)     
       rhminl = rhminl_in(i)     
       rhminl_adj_land = rhminl_adj_land_in(i)     

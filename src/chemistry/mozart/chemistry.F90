@@ -141,6 +141,8 @@ module chemistry
   integer, allocatable :: megan_indices_map(:) 
   real(r8),allocatable :: megan_wght_factors(:)
 
+  logical :: chem_use_chemtrop = .false.
+
 !================================================================================================
 contains
 !================================================================================================
@@ -443,6 +445,9 @@ end function chem_is
     namelist /chem_inparm/ tgcm_ubc_file, tgcm_ubc_data_type, tgcm_ubc_cycle_yr, tgcm_ubc_fixed_ymd, tgcm_ubc_fixed_tod, &
                            snoe_ubc_file, t_pert_ubc, no_xfac_ubc
 
+    ! tropopause level control
+    namelist /chem_inparm/ chem_use_chemtrop
+
     ! get the default settings
 
     call linoz_data_defaultopts( &
@@ -612,6 +617,8 @@ end function chem_is
     call mpibcast (tracer_srcs_cycle_yr,  1,                                      mpiint,  0, mpicom)
     call mpibcast (tracer_srcs_fixed_ymd, 1,                                      mpiint,  0, mpicom)
     call mpibcast (tracer_srcs_fixed_tod, 1,                                      mpiint,  0, mpicom)
+
+    call mpibcast (chem_use_chemtrop,1,                                    mpilog,  0, mpicom)
 
 #endif
 
@@ -1053,6 +1060,7 @@ end function chem_is_active
     real(r8) :: rmwch4 != mwch4/mwdry ! ratio of mol weight ch4   to dry air
     real(r8) :: rmwf11 != mwf11/mwdry ! ratio of mol weight cfc11 to dry air
     real(r8) :: rmwf12 != mwf12/mwdry ! ratio of mol weight cfc12 to dry air
+    integer  :: ilev, nlev
 
 !-----------------------------------------------------------------------
 ! initialize local variables
@@ -1066,24 +1074,43 @@ end function chem_is_active
 !-----------------------------------------------------------------------
 ! Get initial mixing ratios
 !-----------------------------------------------------------------------
+    nlev = size(q, 2)
     if ( any( inv_lst .eq. name ) ) then
-       q(:,:) = 0.0_r8
+       do ilev = 1, nlev
+          where(mask)
+             q(:,ilev) = 0.0_r8
+          end where
+       end do
     else
-       q(:,:) = 1.e-38_r8
+       do ilev = 1, nlev
+          where(mask)
+             q(:,ilev) = 1.e-38_r8
+          end where
+       end do
     endif
 
     if ( ghg_chem ) then
-       select case (name)
-       case ('N2O')
-          q = rmwn2o * chem_surfvals_get('N2OVMR')
-       case ('CH4')
-          q = rmwch4 * chem_surfvals_get('CH4VMR')
-       case ('CFC11')
-          q = rmwf11 * chem_surfvals_get('F11VMR')
-       case ('CFC12')
-          q = rmwf12 * chem_surfvals_get('F12VMR')
-       end select
-    endif
+       do ilev = 1, nlev
+          select case (name)
+          case ('N2O')
+             where(mask)
+                q(:,ilev) = rmwn2o * chem_surfvals_get('N2OVMR')
+             end where
+          case ('CH4')
+             where(mask)
+                q(:,ilev) = rmwch4 * chem_surfvals_get('CH4VMR')
+             end where
+          case ('CFC11')
+             where(mask)
+                q(:,ilev) = rmwf11 * chem_surfvals_get('F11VMR')
+             end where
+          case ('CFC12')
+             where(mask)
+                q(:,ilev) = rmwf12 * chem_surfvals_get('F12VMR')
+             end where
+          end select
+       end do
+    end if
 
   end subroutine chem_init_cnst
 
@@ -1219,7 +1246,7 @@ end function chem_is_active
     use mo_gas_phase_chemdr, only : gas_phase_chemdr
     use camsrfexch,          only : cam_in_t, cam_out_t     
     use perf_mod,            only : t_startf, t_stopf
-    use tropopause,          only : tropopause_find, TROP_ALG_TWMO, TROP_ALG_HYBSTOB, TROP_ALG_CLIMATE
+    use tropopause,          only : tropopause_findChemTrop, TROP_ALG_HYBSTOB, TROP_ALG_CLIMATE, tropopause_find
     use mo_drydep,           only : drydep_update
     use mo_neu_wetdep,       only : neu_wetdep_tend
     use aerodep_flx,         only : aerodep_flx_prescribed
@@ -1249,7 +1276,7 @@ end function chem_is_active
     real(r8) :: cldw(pcols,pver)                   ! cloud water (kg/kg)
     real(r8) :: chem_dt              ! time step
     real(r8) :: drydepflx(pcols,pcnst)             ! dry deposition fluxes (kg/m2/s)
-    integer  :: tropLev(pcols)
+    integer  :: tropLev(pcols), tropLevChem(pcols)
     real(r8) :: ncldwtr(pcols,pver)                ! droplet number concentration (#/kg)
     real(r8), pointer :: fsds(:)     ! longwave down at sfc
     real(r8), pointer :: pblh(:)
@@ -1293,8 +1320,15 @@ end function chem_is_active
 !-----------------------------------------------------------------------
     if (chem_is('super_fast_llnl') .or. chem_is('super_fast_llnl_mam3')) then
        call tropopause_find(state, tropLev, primary=TROP_ALG_HYBSTOB, backup=TROP_ALG_CLIMATE)
+       tropLevChem=tropLev
     else
-       call tropopause_find(state, tropLev, primary=TROP_ALG_TWMO, backup=TROP_ALG_CLIMATE)
+       if (.not.chem_use_chemtrop) then
+          call tropopause_find(state,tropLev)
+          tropLevChem=tropLev
+       else
+          call tropopause_find(state,tropLev)
+          call tropopause_findChemTrop(state, tropLevChem)
+       endif
     endif
 
     tim_ndx = pbuf_old_tim_idx()
@@ -1325,7 +1359,7 @@ end function chem_is_active
     call gas_phase_chemdr(lchnk, ncol, imozart, state%q, &
                           state%phis, state%zm, state%zi, calday, &
                           state%t, state%pmid, state%pdel, state%pint, &
-                          cldw, tropLev, ncldwtr, state%u, state%v, &
+                          cldw, tropLev, tropLevChem, ncldwtr, state%u, state%v, &
                           chem_dt, state%ps, xactive_prates, &
                           fsds, cam_in%ts, cam_in%asdir, cam_in%ocnfrac, cam_in%icefrac, &
                           cam_out%precc, cam_out%precl, cam_in%snowhland, ghg_chem, state%latmapback, &

@@ -985,7 +985,7 @@ my @aerosources = ();
 # and commas) that will be assigned to the namelist variable rad_climate.  
 my $radval = "'A:Q:H2O'";
 
-if (($chem =~ /waccm_ma/ or $chem =~ /waccmx_ma/ or $chem =~ /waccm_tsmlt/) and !$chem_rad_passive) {
+if (($chem =~ /waccm_ma/ or $chem =~ /waccm_tsmlt/) and !$chem_rad_passive) {
     $radval .= ",'A:O2:O2','A:CO2:CO2'";
 }
 elsif ($chem =~ /trop_strat/ and !$chem_rad_passive) {
@@ -1017,7 +1017,7 @@ if ($rad_prog_ozone) {
 
 if (($chem =~ /super_fast_llnl/) and !$chem_rad_passive ) {
     $radval .= ",'N:N2O:N2O','N:prsd_ch4:CH4','N:CFC11:CFC11','N:CFC12:CFC12'";
-} elsif ((($chem =~ /waccm_ma/) or ($chem =~ /waccmx_ma/) or ($chem =~ /waccm_tsmlt/) or ($chem =~ /trop_strat/)) and !$chem_rad_passive ) {
+} elsif ((($chem =~ /waccm_ma/) or ($chem =~ /waccm_sc_mam/) or ($chem =~ /waccm_tsmlt/) or ($chem =~ /trop_strat/)) and !$chem_rad_passive ) {
     $radval .= ",'A:N2O:N2O','A:CH4:CH4','N:CFC11STAR:CFC11','A:CFC12:CFC12'";
 } elsif ($prog_ghg1 and $prog_ghg2 and !$chem_rad_passive ) {
     $radval .= ",'A:N2O:N2O','A:CH4:CH4','A:CFC11:CFC11','A:CFC12:CFC12'";
@@ -1696,6 +1696,9 @@ if ( (defined $nl->get_value('prescribed_volcaero_file')) and
      (defined $nl->get_value('prescribed_strataero_file')) ) {
     die "Cannot set both prescribed_volcaero_file and prescribed_strataero_file \n";
 }
+if (defined $nl->get_value('prescribed_strataero_file')) {
+    add_default($nl, 'prescribed_strataero_use_chemtrop');
+}
 
 add_default($nl, 'rad_climate', 'val'=>$radval);
 
@@ -1893,7 +1896,7 @@ if ($chem =~ /trop_mozart/ or $chem =~ /trop_strat/ or $chem =~ /waccm_tsmlt/) {
         %species = (%species,
                     'NH3      -> ' => 'nh3_emis_file');
     }
-    if (!($chem =~ /_vbs/)) {
+    if (!($chem =~ /_vbs/) and !($chem =~ /_tsmlt/)) {
         %species = (%species,
                     'C10H16   -> ' => 'c10h16_emis_file', );
     }
@@ -1915,6 +1918,20 @@ if ($chem =~ /trop_mozart/ or $chem =~ /trop_strat/ or $chem =~ /waccm_tsmlt/) {
                    'TOLUENE  -> ' => 'soa_toluene_emis_file',
                    'IVOCbb   -> ' => 'ivocbb_emis_file',
                    'IVOCff   -> ' => 'ivocff_emis_file',
+                   'bc_a4    -> ' => 'bc_a4_emis_file',
+                   'pom_a4   -> ' => 'pom_a4_emis_file',
+                   'so4_a1   -> ' => 'so4_a1_emis_file',
+                   'so4_a2   -> ' => 'so4_a2_emis_file',
+                   'num_a1   -> ' => 'mam4_num_a1_emis_file',
+                   'num_a2   -> ' => 'num_a2_emis_file',
+                   'num_a4   -> ' => 'mam4_num_a4_emis_file',
+                   );
+    } elsif ($chem =~ /_tsmlt_mam4/) {
+        %species = (%species,
+                   'BENZENE  -> ' => 'soa_benzene_emis_file',
+                   'XYLENES  -> ' => 'soa_xylene_emis_file',
+                   'TOLUENE  -> ' => 'soa_toluene_emis_file',
+                   'IVOC     -> ' => 'ivocbb_emis_file',
                    'bc_a4    -> ' => 'bc_a4_emis_file',
                    'pom_a4   -> ' => 'pom_a4_emis_file',
                    'so4_a1   -> ' => 'so4_a1_emis_file',
@@ -2010,6 +2027,18 @@ if ($chem =~ /trop_mozart/ or $chem =~ /trop_strat/ or $chem =~ /waccm_tsmlt/) {
                    'num_a4 -> ' => 'mam4_num_a4_ext_file',
                    'SVOCbb -> ' => 'svocbb_ext_file' );
       $cyc_yr = '2000';
+    } elsif ($chem =~ /_tsmlt_mam4/) {
+      %species = ( 'NO2    -> ' => 'no2_aircraft_emis_file',
+                   'SO2    -> ' => 'so2_ext_file',
+                   'so4_a1 -> ' => 'so4_a1_ext_file',
+                   'so4_a2 -> ' => 'so4_a2_ext_file',
+                   'pom_a4 -> ' => 'pom_a4_ext_file',
+                   'bc_a4  -> ' => 'bc_a4_ext_file',
+                   'num_a1 -> ' => 'mam4_num_a1_ext_file',
+                   'num_a2 -> ' => 'num_a2_ext_file',
+                   'num_a4 -> ' => 'mam4_num_a4_ext_file',
+                   'SVOC -> ' => 'svocbb_ext_file' );
+      $cyc_yr = '2000';
     } elsif ($chem =~ /mam4/) {
       %species = ( 'NO2    -> ' => 'no2_aircraft_emis_file',
                    'SO2    -> ' => 'so2_ext_file',
@@ -2064,7 +2093,8 @@ if ($chem =~ /trop_mozart/ or $chem =~ /trop_strat/ or $chem =~ /waccm_tsmlt/) {
 
     # Species with fixed lower boundary
     if ($chem =~ /trop_strat/ or $chem =~ /_tsmlt/) {
-      $val = "'CCL4','CF2CLBR','CF3BR','CFC11','CFC113','CFC12','CH3BR','CH3CCL3','CH3CL','CH4','CO2','H2','HCFC22','N2O'";
+      $val = "'CCL4','CF2CLBR','CF3BR','CFC11','CFC113','CFC12','CH3BR','CH3CCL3','CH3CL','CH4','CO2'"
+            .",'H2','HCFC22','N2O','CFC114','CFC115','HCFC141B','HCFC142B','CH2BR2','CHBR3','H1202','H2402'";
     } else {
       $val = "'CH4','H2','N2O','CO2','CFC11','CFC12'";
     }
@@ -2380,7 +2410,7 @@ if ($chem eq 'super_fast_llnl_mam3') {
     }
 }
 
-if ($chem eq 'trop_mam3' or $chem eq 'waccm_sc_mam3') {
+if ($chem eq 'trop_mam3') {
 
     my %species;
 
@@ -2478,7 +2508,7 @@ if ($chem eq 'trop_mam3' or $chem eq 'waccm_sc_mam3') {
     }
 }
 
-if (($chem eq 'waccm_ma_mam3') or ($chem eq 'waccm_tsmlt_mam3')) {
+if ($chem eq 'waccm_tsmlt_mam3') {
 
     my %species;
 
@@ -2587,7 +2617,7 @@ if (($chem eq 'waccm_ma_mam3') or ($chem eq 'waccm_tsmlt_mam3')) {
 
 }
 
-if ($chem eq 'trop_mam4') {
+if ($chem eq 'trop_mam4' or $chem eq 'waccm_sc_mam4') {
 
     my %species;
 
@@ -2643,7 +2673,7 @@ if ($chem eq 'trop_mam4') {
                   'num_a4      -> ' => 'mam4_num_a4_ext_file', ); # only forest fire and grass fire emissions
     }
     # for cam6 add h2o source from methane oxidation
-    if ($phys =~ /cam5.4/ &&  $cfg->get('clubb_sgs') == 1 ) {
+    if ($phys =~ /cam5.4/ &&  $cfg->get('clubb_sgs') == 1 && $chem !~ /waccm_sc/) {
 	%species = (%species, 'H2O -> ' => 'h2o_ch4_ox_file');
     }
     # for mechanisms without OCS use prescribed OCS oxidation rates for 
@@ -2671,15 +2701,23 @@ if ($chem eq 'trop_mam4') {
     }
 
     # Prescribed species
-    add_default($nl, 'tracer_cnst_specifier', 'val'=>"'O3','OH','NO3','HO2'");
-    unless (defined $nl->get_value('tracer_cnst_type')) {
-        add_default($nl, 'tracer_cnst_type',    'ver'=>'fixed_ox');
-        add_default($nl, 'tracer_cnst_cycle_yr','ver'=>'fixed_ox');
+    if ($chem eq 'waccm_sc_mam4') {
+        add_default($nl, 'tracer_cnst_specifier', 'val'=>"'O3','OH','NO3','HO2','HALONS'");
+        add_default($nl, 'tracer_cnst_file',    'ver'=>'fixed_ox_halons');
+        add_default($nl, 'tracer_cnst_datapath','ver'=>'fixed_ox_halons');
+        unless (defined $nl->get_value('tracer_cnst_type')) {
+            add_default($nl, 'tracer_cnst_type',    'ver'=>'fixed_ox_halons');
+            add_default($nl, 'tracer_cnst_cycle_yr','ver'=>'fixed_ox_halons');
+        }
     }
-
-    my @files = ('tracer_cnst_datapath', 'tracer_cnst_file', 'tracer_cnst_filelist');
-    foreach my $file (@files) {
-        add_default($nl, $file, 'ver'=>'fixed_ox');
+    else {
+        add_default($nl, 'tracer_cnst_specifier', 'val'=>"'O3','OH','NO3','HO2'");
+        add_default($nl, 'tracer_cnst_file',    'ver'=>'fixed_ox');
+        add_default($nl, 'tracer_cnst_datapath','ver'=>'fixed_ox');
+        unless (defined $nl->get_value('tracer_cnst_type')) {
+            add_default($nl, 'tracer_cnst_type',    'ver'=>'fixed_ox');
+            add_default($nl, 'tracer_cnst_cycle_yr','ver'=>'fixed_ox');
+        }
     }
 
     add_default($nl, 'fstrat_list', 'val'=>"' '");
@@ -2785,10 +2823,12 @@ if ($chem eq 'trop_mam7') {
 }
 
 # WACCM options.
-if ($chem =~ /waccm_ma/ or $chem =~ /waccmx_ma/ or $chem =~ /waccm_tsmlt/) {
+if ($chem =~ /waccm_ma/ or $chem =~ /waccm_tsmlt/) {
 
     # Species with fixed lower boundary
-    my $val = "'CCL4', 'CF2CLBR', 'CF3BR', 'CFC11', 'CFC113', 'CFC12', 'CH3BR', 'CH3CCL3', 'CH3CL', 'CH4', 'CO2', 'H2', 'HCFC22','N2O'";
+    my $val = "'CCL4','CF2CLBR','CF3BR','CFC11','CFC113','CFC12','CH3BR','CH3CCL3','CH3CL','CH4','CO2'"
+             .",'H2','HCFC22','N2O','CFC114','CFC115','HCFC141B','HCFC142B','CH2BR2','CHBR3','H1202','H2402'";
+
     if ($chem_has_ocs) {
         $val .= ",'OCS'";
     }
@@ -3001,6 +3041,11 @@ $cam_chempkg = "'" . "$chem" . "'";  # add quotes to this string value
 
 $nl->set_variable_value('phys_ctl_nl', 'cam_chempkg', $cam_chempkg);
 
+# tropopause level used in gas-phase / aerosol processes
+if (($chem ne 'none') and ($chem ne 'terminator')) {
+    add_default($nl, 'chem_use_chemtrop');
+}
+
 # Deep convection scheme
 add_default($nl, 'deep_scheme');
 
@@ -3026,7 +3071,10 @@ if ($cfg->get('microphys') =~ /^mg/) {
     add_default($nl, 'micro_mg_version');
     add_default($nl, 'micro_mg_sub_version');
     add_default($nl, 'micro_mg_num_steps');
+    add_default($nl, 'micro_mg_adjust_cpt');
     add_default($nl, 'nucleate_ice_subgrid');
+    add_default($nl, 'nucleate_ice_subgrid_strat');
+    add_default($nl, 'nucleate_ice_use_troplev');
     add_default($nl, 'cld_macmic_num_steps');
     add_default($nl, 'micro_mg_dcs');
     add_default($nl, 'micro_mg_precip_frac_method');
@@ -3189,6 +3237,8 @@ add_default($nl, 'cldfrc_iceopt');
 add_default($nl, 'cldfrc_icecrit');
 add_default($nl, 'cldfrc2m_rhmini');
 add_default($nl, 'cldfrc2m_rhmaxi');
+add_default($nl, 'cldfrc2m_rhminis');
+add_default($nl, 'cldfrc2m_rhmaxis');
 add_default($nl, 'cldfrc2m_do_subgrid_growth');
 
 my $rk_strat_polstrat_rhmin = $nl->get_value('rk_strat_polstrat_rhmin');

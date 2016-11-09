@@ -141,17 +141,26 @@ subroutine init_cnst_lw(latvals, lonvals, mask, q)
    real(r8), intent(out) :: q(:,:)    ! kg tracer/kg dry air (gcol,plev)
 
    ! Local
-   integer indx
+   integer :: indx, k
    !-----------------------------------------------------------------------
 
    indx = setpindxtr(800._r8)
 
    if ( smooth ) then 
-      call setsmoothtr(indx,q,.876_r8)
+      call setsmoothtr(indx,q,.876_r8, mask)
    else 
-      q = 0.0_r8
-      q(:,indx) = 1.0_r8
-   endif
+      do k = 1, size(q, 2)
+         if (k == indx) then
+            where(mask)
+               q(:,k) = 1.0_r8
+            end where
+         else
+            where(mask)
+               q(:,k) = 0.0_r8
+            end where
+         end if
+      end do
+   end if
 
 end subroutine init_cnst_lw
 
@@ -170,7 +179,7 @@ subroutine init_cnst_md(latvals, lonvals, mask, q, rev_in)
    integer,  intent(in), optional :: rev_in         ! reverse the mixing ratio
 
    ! Local
-   integer :: indx
+   integer :: indx, k
    integer :: rev
    !-----------------------------------------------------------------------
 
@@ -184,16 +193,32 @@ subroutine init_cnst_md(latvals, lonvals, mask, q, rev_in)
    indx = setpindxtr(500._r8)
 
    if ( smooth ) then 
-      call setsmoothtr(indx,q,.876_r8,rev_in=rev)
+      call setsmoothtr(indx,q,.876_r8,mask,rev_in=rev)
    else
-      if (rev == 1 ) then
-         q = 1.0_r8
-         q(:,indx) = 0.0_r8
-      else
-         q = 0.0_r8
-         q(:,indx) = 1.0_r8
-      endif
-   endif
+      do k = 1, size(q, 2)
+         if (rev == 1 ) then
+            if (k == indx) then
+               where(mask)
+                  q(:,indx) = 0.0_r8
+               end where
+            else
+               where(mask)
+                  q(:,k) = 1.0_r8
+               end where
+            end if
+         else
+            if (k == indx) then
+               where(mask)
+                  q(:,indx) = 1.0_r8
+               end where
+            else
+               where(mask)
+                  q(:,k) = 0.0_r8
+               end where
+            end if
+         end if
+      end do
+   end if
    
 end subroutine init_cnst_md
 
@@ -211,17 +236,26 @@ subroutine init_cnst_hi(latvals, lonvals, mask, q)
    real(r8), intent(out) :: q(:,:)    ! kg tracer/kg dry air
 
    ! Local
-   integer :: indx
+   integer :: indx, k
    !-----------------------------------------------------------------------
 
    indx = setpindxtr(200._r8)
 
    if ( smooth ) then 
-      call setsmoothtr(indx,q,.3_r8)
+      call setsmoothtr(indx,q,.3_r8,mask)
    else
-      q = 0.0_r8
-      q(:,indx) = 1.0_r8
-   endif
+      do k = 1, size(q, 2)
+         if (k == indx) then
+            where(mask)
+               q(:,k) = 1.0_r8
+            end where
+         else
+            where(mask)
+               q(:,k) = 0.0_r8
+            end where
+         end if
+      end do
+   end if
 
 end subroutine init_cnst_hi
 
@@ -236,19 +270,25 @@ subroutine init_cnst_un(latvals, lonvals, mask, q)
    logical,  intent(in)  :: mask(:)    ! Only initialize where .true.
    real(r8), intent(out) :: q(:,:)    ! kg tracer/kg dry air
    !-----------------------------------------------------------------------
+   integer :: k
 
-   q = 1.0_r8
+   do k = 1, size(q, 2)
+      where(mask)
+         q(:,k) = 1.0_r8
+      end where
+   end do
 
 end subroutine init_cnst_un
 
 !======================================================================
 
-subroutine setsmoothtr(indx,q,width,rev_in)
+subroutine setsmoothtr(indx,q,width,mask,rev_in)
 
    ! Arguments
    integer, intent(in)     :: indx               ! k index of pressure level
    real(r8), intent(inout) :: q(:,:)  ! kg tracer/kg dry air
    real(r8), intent(in)    :: width              ! eta difference from unit level where q = 0.1
+   logical,  intent(in)    :: mask(:) ! Only set q where mask is .true.
    integer,  intent(in), optional :: rev_in      ! reverse the mixing ratio
 
    ! Local variables
@@ -274,9 +314,13 @@ subroutine setsmoothtr(indx,q,width,rev_in)
       pdist = pref_mid(k) - pref_mid(indx)
 
       if ( rev == 1 ) then
-         q(:,k) = 1.0_r8 - exp(-alpha*(pdist**2))
+         where(mask)
+            q(:,k) = 1.0_r8 - exp(-alpha*(pdist**2))
+         end where
       else
-         q(:,k) =       exp(-alpha*(pdist**2))
+         where(mask)
+            q(:,k) =       exp(-alpha*(pdist**2))
+         end where
       endif
    end do
   

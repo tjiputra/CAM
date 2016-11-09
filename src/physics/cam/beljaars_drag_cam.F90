@@ -16,7 +16,7 @@ public :: beljaars_drag_init
 public :: beljaars_drag_tend
 
 ! Is this module on at all?
-logical :: do_beljaars = .false.
+logical, public, protected :: do_beljaars = .false.
 
 ! Tuning parameters for TMS.
 real(r8) :: blj_orocnst

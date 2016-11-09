@@ -1,19 +1,10 @@
-
-
-
-
-
       module chem_mods
 !--------------------------------------------------------------
 ! ... Basic chemistry parameters and arrays
 !--------------------------------------------------------------
-
       use shr_kind_mod, only : r8 => shr_kind_r8
-
       implicit none
-
       save
-
       integer, parameter :: phtcnt = 82, & ! number of photolysis reactions
                             rxntot = 368, & ! number of total reactions
                             gascnt = 286, & ! number of gas phase reactions
@@ -35,25 +26,16 @@
                             rxt_tag_cnt = 367, &
                             enthalpy_cnt = 0, &
                             nslvd = 0
-
       integer :: clscnt(5) = 0
       integer :: cls_rxt_cnt(4,5) = 0
       integer :: clsmap(gas_pcnst,5) = 0
       integer :: permute(gas_pcnst,5) = 0
-
       integer :: diag_map(clscnt4) = 0
-
-
-
       real(r8) :: adv_mass(gas_pcnst) = 0._r8
       real(r8) :: crb_mass(gas_pcnst) = 0._r8
       real(r8) :: fix_mass(max(1,nfs))
-
-
-
       real(r8), allocatable :: cph_enthalpy(:)
       integer, allocatable :: cph_rid(:)
-
       integer, allocatable :: rxt_tag_map(:)
       real(r8), allocatable :: pht_alias_mult(:,:)
       character(len=16), allocatable :: rxt_tag_lst(:)
@@ -61,6 +43,7 @@
       character(len=16) :: inv_lst(max(1,nfs))
       character(len=16) :: extfrc_lst(max(1,extcnt))
       logical :: frc_from_dataset(max(1,extcnt))
+      logical :: is_vector
+      logical :: is_scalar
       character(len=16) :: slvd_lst(max(1,nslvd))
-
       end module chem_mods

@@ -529,7 +529,7 @@ subroutine process_inidat(fieldname, m_cnst, fh)
             call endrun(sub//': ERROR:  Q must be on Initial File')
          end if
 
-         call cnst_init_default(m_cnst, latdeg, londeg(:,1), arr3d_a)
+         call cnst_init_default(m_cnst, clat, clon(:,1), arr3d_a)
       end if
 
 !$omp parallel do private(lat)
