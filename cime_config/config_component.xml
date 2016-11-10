@@ -34,6 +34,7 @@
       <value compset="_CAM40">-phys cam4</value>
       <value compset="_CAM50">-phys cam5</value>
       <value compset="_CAM60">-phys cam5.4 -clubb_sgs</value>
+      <value compset="_CAM54">-phys cam5.4 </value>
       <value compset="_CAM50%CLB">-clubb_sgs</value>
       <value compset="_CAM40%TBAM">-chem trop_bam</value>
       <value compset="_CAM40%TMOZ">-chem trop_mozart</value>
@@ -173,7 +174,7 @@
       <value compset="PIPD_CAM50"        >1850-PD_cam5</value>
       <value compset="2000_CAM%DABIP04" >dabi_p2004</value>
       <value compset="CAM%HS94"         >held_suarez_1994</value>
-
+      <value compset="2000_CAM54"  >2000_cam6_noclb</value>
       <value compset="1850_CAM54%PTAERO"  >1850_cam54_ptaero</value>
       <value compset="2000_CAM54%PTAERO"  >2000_cam6_noclb_oslo</value>
       <value compset="2000_CAM60%PTAERO"  >2000_cam6_oslo</value>
@@ -253,7 +254,7 @@
     <desc compset="_CAM.%L60"			>CAM 60 layers and full gravity wave spectrum:</desc>
 
     <desc compset="_CAM5%PTAERO">cam 5 physics and Production tagged aerosols (OSLO_AERO)</desc>
-    <desc compset="_CAM60%PTAERO">cam 5.4+CLUBB physics and Production tagged aerosols (OSLO_AERO)</desc>
+    <desc compset="_CAM60%PTAERO">cam 6 and Production tagged aerosols (OSLO_AERO)</desc>
     <desc compset="_CAM54%PTAERO">cam 5.4+Production tagged aerosols (OSLO_AERO)+clm5 </desc>
     <desc compset="_CAM5%NUDGEPTAEROUPD1">cam 5 physics and Production tagged aerosols (OSLO_AERO)</desc>
   </description>
