@@ -1706,7 +1706,7 @@ subroutine phys_register
     integer lchnk                              ! chunk identifier
     integer ncol                               ! number of atmospheric columns
 
-    integer :: i                               ! column indicex
+    integer  i,k,m                             ! Longitude, level, constituent indices
     integer :: ixcldice, ixcldliq              ! constituent indices for cloud liquid and ice water.
 !AL
     integer :: ixcldni, ixcldnc              ! constituent indices for cloud liquid and ice water.
@@ -1778,7 +1778,6 @@ subroutine phys_register
     logical :: lglobal, lclutter
 !-tht
     ! Debug physics_state.
-    logical :: state_debug_checks
     integer :: energy_conservation_type
 
 #ifdef AEROCOM
