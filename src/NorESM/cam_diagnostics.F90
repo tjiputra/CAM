@@ -682,7 +682,6 @@ contains
      call add_default ('FSDSCDRF', 1, ' ')
      call add_default ('FLUS    ', 1, ' ')
      call add_default ('FLNT_ORG', 1, ' ')
-     call add_default ('RHW     ', 1, ' ')
 #endif  ! aerocom
 #endif  ! aeroffl
 #ifdef AEROCOM 
@@ -1009,6 +1008,10 @@ contains
    call addfld('a2x_DSTDRY3',  horiz_only, 'A',  'kg/m2/s', 'drydep of dust (bin3)')
    call addfld('a2x_DSTWET4',  horiz_only, 'A',  'kg/m2/s', 'wetdep of dust (bin4)')
    call addfld('a2x_DSTDRY4',  horiz_only, 'A',  'kg/m2/s', 'drydep of dust (bin4)')
+
+#ifdef AEROCOM 
+     call add_default ('RHW     ', 1, ' ')
+#endif  ! aerocom
 
     ! defaults
     if (history_amwg) then

@@ -3033,7 +3033,7 @@ sub write_filepath
    #Un-commenting this line will give back standard CAM 5.3 (unmodified).
    #This is used for testing.
    print $fh "$camsrcdir/cam/src/NorESM\n";
-   #print $fh "$camsrcdir/cam/src/NorESM/$dyn\n";
+   print $fh "$camsrcdir/cam/src/NorESM/$dyn\n";
 
    # offline unit driver (defaults to stub)
     print $fh "$camsrcdir/cam/src/unit_drivers\n";
