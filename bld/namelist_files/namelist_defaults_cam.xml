@@ -961,10 +961,10 @@
 <dust_emis_fact dyn="fv"                   phys="cam5.4" clubb_sgs="1"    >0.60D0</dust_emis_fact>
 <dust_emis_fact dyn="fv"                   phys="spcam_m2005" spcam_clubb_sgs="1"    >0.13D0</dust_emis_fact>
 
-<dust_emis_fact dyn="fv" hgrid="1.9x2.5" chem="trop_mam_oslo">0.20</dust_emis_fact>
-<dust_emis_fact dyn="fv" hgrid="0.9x1.25" chem="trop_mam_oslo">0.25</dust_emis_fact>
-<dust_emis_fact dyn="fv" hgrid="1.9x2.5" chem="trop_mam_oslo" clubb_sgs="1" >0.40</dust_emis_fact>
-<dust_emis_fact dyn="fv" hgrid="0.9x1.25" chem="trop_mam_oslo" clubb_sgs="1" >0.50</dust_emis_fact>
+<dust_emis_fact dyn="fv" hgrid="1.9x2.5" chem="trop_mam_oslo">0.40</dust_emis_fact>
+<dust_emis_fact dyn="fv" hgrid="0.9x1.25" chem="trop_mam_oslo">0.40</dust_emis_fact>
+<dust_emis_fact dyn="fv" hgrid="1.9x2.5" chem="trop_mam_oslo" clubb_sgs="1" >0.48</dust_emis_fact>
+<dust_emis_fact dyn="fv" hgrid="0.9x1.25" chem="trop_mam_oslo" clubb_sgs="1" >0.40</dust_emis_fact>
 
 <!-- seasalt emission tuning factor -->
 <!-- Note that ver="strat" when modal_accum_coarse_exch=.true. -->
