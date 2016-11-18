@@ -5,7 +5,6 @@
 <micro_do_sb_physics>   .true.   </micro_do_sb_physics>
 <do_tms>                .false.  </do_tms>
 <do_beljaars>           .true.   </do_beljaars>  
-<bnd_topo>     atm/cam/topo/fv_0.9x1.25_nc3000_Nsw042_Nrs008_Co060_Fi001_ZR_160505.nc  </bnd_topo>
 
 <tracer_cnst_cycle_yr>   2000                                                 </tracer_cnst_cycle_yr>
 <tracer_cnst_datapath>   atm/cam/ozone                                        </tracer_cnst_datapath>

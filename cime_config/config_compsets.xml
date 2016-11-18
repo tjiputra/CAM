@@ -295,6 +295,10 @@
    <alias>NFAMIPNUDGEPTAEROUPD1</alias>
    <lname>2000_CAM5%NUDGEPTAEROUPD1_CLM45%SP_CICE%PRES_DOCN%DOM_RTM_SGLC_SWAV</lname>
   </compset>
+  <compset>
+   <alias>FC60NC</alias>
+    <lname>2000_CAM54_CLM45%SP_CICE%PRES_DOCN%DOM_RTM_SGLC_SWAV</lname>
+  </compset>
   <!-- FG compsets -->
 
   <compset grid="g%gland">

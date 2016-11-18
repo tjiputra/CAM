@@ -174,7 +174,7 @@
       <value compset="PIPD_CAM50"        >1850-PD_cam5</value>
       <value compset="2000_CAM%DABIP04" >dabi_p2004</value>
       <value compset="CAM%HS94"         >held_suarez_1994</value>
-      <value compset="2000_CAM54"  >2000_cam6_noclb</value>
+      <value compset="2000_CAM54"       >2000_cam6_noclb</value>
       <value compset="1850_CAM54%PTAERO"  >1850_cam54_ptaero</value>
       <value compset="2000_CAM54%PTAERO"  >2000_cam6_noclb_oslo</value>
       <value compset="2000_CAM60%PTAERO"  >2000_cam6_oslo</value>

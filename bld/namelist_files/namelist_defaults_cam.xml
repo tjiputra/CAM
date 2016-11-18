@@ -202,7 +202,9 @@
 <bnd_topo hgrid="ne240np4"  >atm/cam/topo/USGS_gtopo30_0.23x0.31_smooth1000-50_ne240np4_c061107.nc</bnd_topo>
 
 <!-- Ridge parameterization (gamma) --->
-<bnd_rdggm hgrid="0.9x1.25" >atm/cam/topo/fv_0.9x1.25_nc3000_Nsw006_Nrs002_Co008_Fi001_ZR_c160505.nc</bnd_rdggm>
+<bnd_topo  clubb_sgs="1" hgrid="0.9x1.25" >atm/cam/topo/fv_0.9x1.25_nc3000_Nsw042_Nrs008_Co060_Fi001_ZR_160505.nc</bnd_topo>
+<bnd_topo  clubb_sgs="1" hgrid="1.9x2.5" >atm/cam/topo/fv_1.9x2.5_nc3000_Nsw084_Nrs016_Co120_Fi001_ZR_061116.nc</bnd_topo>
+
 
 
 <!-- Bulk aerosol physical properties (includes optics) -->
