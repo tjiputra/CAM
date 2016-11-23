@@ -126,6 +126,14 @@ integer :: num_steps ! Number of MG substeps
 
 integer :: ncnst = 4       ! Number of constituents
 
+! Namelist variables for option to specify constant cloud droplet/ice number
+logical :: micro_mg_nccons = .false. ! set .true. to specify constant cloud droplet number
+logical :: micro_mg_nicons = .false. ! set .true. to specify constant cloud ice number
+! parameters for specified ice and droplet number concentration
+! note: these are local in-cloud values, not grid-mean
+real(r8) :: micro_mg_ncnst = 100.e6_r8 ! constant droplet num concentration (m-3)
+real(r8) :: micro_mg_ninst = 0.1e6_r8  ! constant ice num concentration (m-3)
+
 character(len=8), parameter :: &      ! Constituent names
    cnst_names(8) = (/'CLDLIQ', 'CLDICE','NUMLIQ','NUMICE', &
                      'RAINQM', 'SNOWQM','NUMRAI','NUMSNO'/)
@@ -247,7 +255,8 @@ subroutine micro_mg_cam_readnl(nlfile)
 
   use namelist_utils,  only: find_group_name
   use units,           only: getunit, freeunit
-  use mpishorthand
+  use spmd_utils,      only: mpicom, mstrid=>masterprocid, mpi_integer, mpi_real8, &
+                             mpi_logical, mpi_character
 
   character(len=*), intent(in) :: nlfile  ! filepath for file containing namelist input
 
@@ -259,13 +268,13 @@ subroutine micro_mg_cam_readnl(nlfile)
 
   ! Local variables
   integer :: unitn, ierr
-  character(len=*), parameter :: subname = 'micro_mg_cam_readnl'
+  character(len=*), parameter :: sub = 'micro_mg_cam_readnl'
 
   namelist /micro_mg_nl/ micro_mg_version, micro_mg_sub_version, &
        micro_mg_do_cldice, micro_mg_do_cldliq, micro_mg_num_steps, &
-       microp_uniform, micro_mg_dcs, micro_mg_precip_frac_method, micro_mg_berg_eff_factor, &
-       micro_do_sb_physics, micro_mg_adjust_cpt
-
+       microp_uniform, micro_mg_dcs, micro_mg_precip_frac_method,  &
+       micro_mg_berg_eff_factor, micro_do_sb_physics, micro_mg_adjust_cpt, &
+       micro_mg_nccons, micro_mg_nicons, micro_mg_ncnst, micro_mg_ninst
   !-----------------------------------------------------------------------------
 
   if (masterproc) then
@@ -275,7 +284,7 @@ subroutine micro_mg_cam_readnl(nlfile)
      if (ierr == 0) then
         read(unitn, micro_mg_nl, iostat=ierr)
         if (ierr /= 0) then
-           call endrun(subname // ':: ERROR reading namelist')
+           call endrun(sub // ':: ERROR reading namelist')
         end if
      end if
      close(unitn)
@@ -292,8 +301,6 @@ subroutine micro_mg_cam_readnl(nlfile)
         select case (micro_mg_sub_version)
         case(0)
            ! MG version 1.0
-        case(5)
-           ! MG version 1.5 - MG2 development
         case default
            call bad_version_endrun()
         end select
@@ -312,21 +319,71 @@ subroutine micro_mg_cam_readnl(nlfile)
               &micro_mg_dcs has not been set to a valid value.")
   end if
 
-#ifdef SPMD
   ! Broadcast namelist variables
-  call mpibcast(micro_mg_version,            1, mpiint, 0, mpicom)
-  call mpibcast(micro_mg_sub_version,        1, mpiint, 0, mpicom)
-  call mpibcast(do_cldice,                   1, mpilog, 0, mpicom)
-  call mpibcast(do_cldliq,                   1, mpilog, 0, mpicom)
-  call mpibcast(num_steps,                   1, mpiint, 0, mpicom)
-  call mpibcast(microp_uniform,              1, mpilog, 0, mpicom)
-  call mpibcast(micro_mg_dcs,                1, mpir8,  0, mpicom)
-  call mpibcast(micro_mg_berg_eff_factor,    1, mpir8,  0, mpicom)
-  call mpibcast(micro_mg_precip_frac_method, 16, mpichar,0, mpicom)
-  call mpibcast(micro_do_sb_physics,           1, mpilog, 0, mpicom)
-  call mpibcast(micro_mg_adjust_cpt,         1, mpilog, 0, mpicom)
+  call mpi_bcast(micro_mg_version, 1, mpi_integer, mstrid, mpicom, ierr)
+  if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: micro_mg_version")
 
-#endif
+  call mpi_bcast(micro_mg_sub_version, 1, mpi_integer, mstrid, mpicom, ierr)
+  if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: micro_mg_sub_version")
+
+  call mpi_bcast(do_cldice, 1, mpi_logical, mstrid, mpicom, ierr)
+  if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: do_cldice")
+
+  call mpi_bcast(do_cldliq, 1, mpi_logical, mstrid, mpicom, ierr)
+  if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: do_cldliq")
+
+  call mpi_bcast(num_steps, 1, mpi_integer, mstrid, mpicom, ierr)
+  if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: num_steps")
+
+  call mpi_bcast(microp_uniform, 1, mpi_logical, mstrid, mpicom, ierr)
+  if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: microp_uniform")
+
+  call mpi_bcast(micro_mg_dcs, 1, mpi_real8, mstrid, mpicom, ierr)
+  if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: micro_mg_dcs")
+
+  call mpi_bcast(micro_mg_berg_eff_factor, 1, mpi_real8, mstrid, mpicom, ierr)
+  if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: micro_mg_berg_eff_factor")
+
+  call mpi_bcast(micro_mg_precip_frac_method, 16, mpi_character, mstrid, mpicom, ierr)
+  if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: micro_mg_precip_frac_method")
+
+  call mpi_bcast(micro_do_sb_physics, 1, mpi_logical, mstrid, mpicom, ierr)
+  if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: micro_do_sb_physics")
+
+  call mpi_bcast(micro_mg_adjust_cpt, 1, mpi_logical, mstrid, mpicom, ierr)
+  if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: micro_mg_adjust_cpt")
+
+  call mpi_bcast(micro_mg_nccons, 1, mpi_logical, mstrid, mpicom, ierr)
+  if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: micro_mg_nccons")
+
+  call mpi_bcast(micro_mg_nicons, 1, mpi_logical, mstrid, mpicom, ierr)
+  if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: micro_mg_nicons")
+
+  call mpi_bcast(micro_mg_ncnst, 1, mpi_real8, mstrid, mpicom, ierr)
+  if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: micro_mg_ncnst")
+
+  call mpi_bcast(micro_mg_ninst, 1, mpi_real8, mstrid, mpicom, ierr)
+  if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: micro_mg_ninst")
+
+  if (masterproc) then
+
+     write(iulog,*) 'MG microphysics namelist:'
+     write(iulog,*) '  micro_mg_version            = ', micro_mg_version
+     write(iulog,*) '  micro_mg_sub_version        = ', micro_mg_sub_version
+     write(iulog,*) '  micro_mg_do_cldice          = ', do_cldice
+     write(iulog,*) '  micro_mg_do_cldliq          = ', do_cldliq
+     write(iulog,*) '  micro_mg_num_steps          = ', num_steps
+     write(iulog,*) '  microp_uniform              = ', microp_uniform
+     write(iulog,*) '  micro_mg_dcs                = ', micro_mg_dcs
+     write(iulog,*) '  micro_mg_berg_eff_factor    = ', micro_mg_berg_eff_factor
+     write(iulog,*) '  micro_mg_precip_frac_method = ', micro_mg_precip_frac_method
+     write(iulog,*) '  micro_do_sb_physics         = ', micro_do_sb_physics
+     write(iulog,*) '  micro_mg_adjust_cpt         = ', micro_mg_adjust_cpt
+     write(iulog,*) '  micro_mg_nccons             = ', micro_mg_nccons
+     write(iulog,*) '  micro_mg_nicons             = ', micro_mg_nicons
+     write(iulog,*) '  micro_mg_ncnst              = ', micro_mg_ncnst
+     write(iulog,*) '  micro_mg_ninst              = ', micro_mg_ninst
+  end if
 
 contains
 
@@ -581,7 +638,6 @@ subroutine micro_mg_cam_init(pbuf2d)
    use time_manager,   only: is_first_step
    use micro_mg_utils, only: micro_mg_utils_init
    use micro_mg1_0, only: micro_mg_init1_0 => micro_mg_init
-   use micro_mg1_5, only: micro_mg_init1_5 => micro_mg_init
    use micro_mg2_0, only: micro_mg_init2_0 => micro_mg_init
 
    !-----------------------------------------------------------------------
@@ -639,19 +695,9 @@ subroutine micro_mg_cam_init(pbuf2d)
               r8, gravit, rair, rh2o, cpair, &
               rhoh2o, tmelt, latvap, latice, &
               rhmini, micro_mg_dcs, use_hetfrz_classnuc, &
-              micro_mg_precip_frac_method, micro_mg_berg_eff_factor, errstring)
-      case (5)
-         ! MG 1 does not initialize micro_mg_utils, so have to do it here.
-         call micro_mg_utils_init(r8, rh2o, cpair, tmelt, latvap, latice, &
-              micro_mg_dcs, errstring)
-         call handle_errmsg(errstring, subname="micro_mg_utils_init")
-
-         call micro_mg_init1_5( &
-              r8, gravit, rair, rh2o, cpair, &
-              tmelt, latvap, latice, rhmini, &
-              micro_mg_dcs,                  &
-              microp_uniform, do_cldice, use_hetfrz_classnuc, &
-              micro_mg_precip_frac_method, micro_mg_berg_eff_factor, errstring)
+              micro_mg_precip_frac_method, micro_mg_berg_eff_factor, &
+              micro_mg_nccons, micro_mg_nicons, micro_mg_ncnst,   &
+              micro_mg_ninst, errstring)
       end select
    case (2)
       ! Set constituent number for later loops.
@@ -665,7 +711,9 @@ subroutine micro_mg_cam_init(pbuf2d)
               micro_mg_dcs,                  &
               microp_uniform, do_cldice, use_hetfrz_classnuc, &
               micro_mg_precip_frac_method, micro_mg_berg_eff_factor, &
-              allow_sed_supersat, micro_do_sb_physics, errstring)
+              allow_sed_supersat, micro_do_sb_physics,          &
+              micro_mg_nccons, micro_mg_nicons, micro_mg_ncnst, &
+              micro_mg_ninst, errstring)
       end select
    end select
 
@@ -1039,7 +1087,6 @@ end subroutine micro_mg_cam_init
 subroutine micro_mg_cam_tend(state, ptend, dtime, pbuf)
 
    use micro_mg1_0, only: micro_mg_get_cols1_0 => micro_mg_get_cols
-   use micro_mg1_5, only: micro_mg_get_cols1_5 => micro_mg_get_cols
    use micro_mg2_0, only: micro_mg_get_cols2_0 => micro_mg_get_cols
 
    type(physics_state),         intent(in)    :: state
@@ -1057,14 +1104,8 @@ subroutine micro_mg_cam_tend(state, ptend, dtime, pbuf)
    
    select case (micro_mg_version)
    case (1)
-      select case (micro_mg_sub_version)
-      case (0)
-         call micro_mg_get_cols1_0(ncol, nlev, top_lev, state%q(:,:,ixcldliq), &
-              state%q(:,:,ixcldice), mgncol, mgcols)
-      case (5)
-         call micro_mg_get_cols1_5(ncol, nlev, top_lev, state%q(:,:,ixcldliq), &
-              state%q(:,:,ixcldice), mgncol, mgcols)
-      end select
+      call micro_mg_get_cols1_0(ncol, nlev, top_lev, state%q(:,:,ixcldliq), &
+           state%q(:,:,ixcldice), mgncol, mgcols)
    case (2)
       call micro_mg_get_cols2_0(ncol, nlev, top_lev, state%q(:,:,ixcldliq), &
            state%q(:,:,ixcldice), state%q(:,:,ixrain), state%q(:,:,ixsnow), &
@@ -1084,7 +1125,6 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
    use micro_mg_data, only: MGPacker, MGPostProc, accum_null, accum_mean
 
    use micro_mg1_0, only: micro_mg_tend1_0 => micro_mg_tend
-   use micro_mg1_5, only: micro_mg_tend1_5 => micro_mg_tend
    use micro_mg2_0, only: micro_mg_tend2_0 => micro_mg_tend
 
    use physics_buffer,  only: pbuf_col_type_index
@@ -1239,10 +1279,6 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
 
    real(r8) :: packed_p(mgncol,nlev)
    real(r8) :: packed_pdel(mgncol,nlev)
-
-   ! This is only needed for MG1.5, and can be removed when support for
-   ! that version is dropped.
-   real(r8) :: packed_pint(mgncol,nlev+1)
 
    real(r8) :: packed_cldn(mgncol,nlev)
    real(r8) :: packed_liqcldf(mgncol,nlev)
@@ -1935,7 +1971,7 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
    call post_proc%add_field(p(freqs), p(packed_freqs))
    call post_proc%add_field(p(freqr), p(packed_freqr))
    call post_proc%add_field(p(nfice), p(packed_nfice))
-   if (micro_mg_version /= 1 .or. micro_mg_sub_version /= 0) then
+   if (micro_mg_version /= 1) then
       call post_proc%add_field(p(qcrat), p(packed_qcrat), fillvalue=1._r8)
    end if
 
@@ -1967,8 +2003,6 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
 
    packed_p = packer%pack(state_loc%pmid)
    packed_pdel = packer%pack(state_loc%pdel)
-
-   packed_pint = packer%pack_interface(state_loc%pint)
 
    packed_cldn = packer%pack(ast)
    packed_liqcldf = packer%pack(alst_mic)
@@ -2044,36 +2078,6 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
                  packed_nsout2, drout_dum, dsout2_dum, packed_freqs,packed_freqr,            &
                  packed_nfice, packed_prer_evap, do_cldice, errstring,                      &
                  packed_tnd_qsnow, packed_tnd_nsnow, packed_re_ice,             &
-                 packed_frzimm, packed_frzcnt, packed_frzdep)
-
-         case (5)
-
-            call micro_mg_tend1_5( &
-                 mgncol,   nlev,     dtime/num_steps,    &
-                 packed_t,       packed_q,                     &
-                 packed_qc,      packed_qi,    &
-                 packed_nc,      packed_ni,    &
-                 packed_relvar,             packed_accre_enhan,                            &
-                 packed_p,     packed_pdel,     packed_pint,     &
-                 packed_cldn,                packed_liqcldf,           packed_icecldf,           &
-                 packed_rate1ord_cw2pr_st,           packed_naai,     packed_npccn,    packed_rndst,    packed_nacon,    &
-                 packed_tlat,     packed_qvlat,    packed_qctend,    packed_qitend,    packed_nctend,    packed_nitend,    &
-                 packed_rel,      rel_fn_dum,   packed_rei,                packed_prect,    packed_preci,    &
-                 packed_nevapr,   packed_evapsnow, packed_am_evp_st, packed_prain,    &
-                 packed_prodsnow, packed_cmeout,   packed_dei, &
-                 packed_mu,       packed_lambdac,  packed_qsout,    packed_des,      packed_rflx,     packed_sflx,     &
-                 packed_qrout,              reff_rain_dum,          reff_snow_dum,          &
-                 packed_qcsevap,  packed_qisevap,  packed_qvres,    packed_cmei,  packed_vtrmc,   packed_vtrmi,    &
-                 packed_qcsedten, packed_qisedten, packed_pra,     packed_prc,     packed_mnuccc,  packed_mnucct,  &
-                 packed_msacwi,  packed_psacws,  packed_bergs,   packed_berg,    packed_melt,    packed_homo,    &
-                 packed_qcres,             packed_prci,    packed_prai,    packed_qires,             &
-                 packed_mnuccr,  packed_pracs,   packed_meltsdt,  packed_frzrdt,   packed_mnuccd,            &
-                 packed_nrout,   packed_nsout,    packed_refl,     packed_arefl,    packed_areflz,   packed_frefl,    &
-                 packed_csrfl,    packed_acsrfl,   packed_fcsrfl,             packed_rercld,             &
-                 packed_ncai,     packed_ncal,     packed_qrout2,   packed_qsout2,   packed_nrout2,   packed_nsout2,   &
-                 drout_dum,   dsout2_dum,   packed_freqs,    packed_freqr,    packed_nfice,    packed_qcrat,    &
-                 errstring, &
-                 packed_tnd_qsnow,          packed_tnd_nsnow,          packed_re_ice, packed_prer_evap,             &
                  packed_frzimm, packed_frzcnt, packed_frzdep)
 
          end select

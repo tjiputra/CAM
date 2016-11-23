@@ -1,5 +1,235 @@
 ===============================================================
 
+Tag name: cam5_4_93
+Originator(s): jjb278, brianpm, olson, eaton
+Date: Wed Nov  2 08:55:33 MDT 2016
+One-line Summary: Aquaplanet mods for cesm2.
+
+Purpose of changes:
+
+. Add option to fix the cloud droplet and crystal number concentrations in MG.
+
+. Remove the mg1_5 development code which is superseded by mg2_0.
+
+. Fix broken namelist variable aqua_planet_sst to set options for the
+  analytic SSTs.
+
+. Mods to configure and buildnamelist to support SOM aquaplanet.
+
+Bugs fixed (include bugzilla ID):
+
+. Fix the aqua_planet_sst variable which has been broken longer than anyone
+  can remember.
+
+Describe any changes made to build system:
+
+. configure
+  - remove option '-microphys mg1.5'
+  - add -aquaplanet switch to turn on the aqua-planet mode in CAM.  By
+    default this switch also sets the -ocn option to aquaplanet, but
+    this can be overridden from the command line.
+  - add option '-ocn som' to support aquaplanet with SOM using CAM
+    standalone scripts
+
+Describe any changes made to the namelist:
+
+. Add variables to allow fixing the cloud droplet and crystal numbers in MG
+  - micro_mg_nccons - set .true. to hold cloud droplet number constant
+  - micro_mg_nicons - set .true. to hold cloud ice number constant
+  - micro_mg_ncnst  - droplet num concentration when nccons=.true. (default: 100.e6 m-3)
+  - micro_mg_ninst  - ice num concentration when nicons=.true. (default: 0.1e6 m-3)
+
+. modify output of docn namelist and stream files as appropriate for som.
+
+List any changes to the defaults for the boundary datasets:
+
+. Added the following initial condition files for aquaplanet runs:
+
+  aqua_0006-01-01_0.9x1.25_L26_c161020.nc:  FV, 1-deg, cam4   phys
+  aqua_0006-01-01_0.9x1.25_L30_c161020.nc:  FV, 1-deg, cam5   phys
+  aqua_0006-01-01_0.9x1.25_L32_c161020.nc:  FV, 1-deg, cam5.5 phys
+
+  aqua_0006-01-01_1.9x2.5_L26_c161020.nc :  FV, 2-deg, cam4   phys
+  aqua_0006-01-01_1.9x2.5_L30_c161020.nc :  FV, 2-deg, cam5   phys
+  aqua_0006-01-01_1.9x2.5_L32_c161020.nc :  FV, 2-deg, cam5.5 phys
+
+  aqua_0006-01-01_ne30_np4_L26_c161027.nc:  SE, 1-deg, cam4   phys
+  aqua_0006-01-01_ne30_np4_L30_c161027.nc:  SE, 1-deg, cam5   phys
+  aqua_0006-01-01_ne30_np4_L32_c161027.nc:  SE, 1-deg, cam5.5 phys
+
+  aqua_0006-01-01_ne16_np4_L26_c161027.nc:  SE, 2-deg, cam4   phys
+  aqua_0006-01-01_ne16_np4_L30_c161027.nc:  SE, 2-deg, cam5   phys
+  aqua_0006-01-01_ne16_np4_L32_c161027.nc:  SE, 2-deg, cam5.5 phys
+
+Describe any substantial timing or memory changes: none
+
+Code reviewed by: eaton
+
+List all subroutines eliminated:
+
+components/cam/src/physics/cam/micro_mg1_5.F90
+. remove old development code
+
+List all subroutines added and what they do: none
+
+List all existing files that have been modified, and describe the changes:
+
+components/cam/bld/build-namelist
+. write aquaplanet namelist to file aquap_in
+. modify output of docn namelist and stream files as appropriate for som.
+
+components/cam/bld/config_files/definition.xml
+components/cam/bld/configure
+. remove mg1.5 as valid option
+. add -aquaplanet switch.
+. allow 'som' as a valid value for -ocn option.  SOM is implemented using
+  the DOCN component.
+
+components/cam/bld/namelist_files/namelist_defaults_cam.xml
+. change attribute ocn="aquaplanet" to aquaplanet="1" in ncdata elements.
+. add bndtvs and focndomain entries for som testing.
+
+components/cam/bld/namelist_files/namelist_definition.xml
+. entries for micro_mg_nccons, micro_mg_nicons,
+  micro_mg_ncnst, micro_mg_ninst
+. remove mg1.5 as valid option
+
+components/cam/cime_config/buildnml
+. add code to copy the new aquap_in file to the run directory.
+
+components/cam/src/physics/cam/micro_mg1_0.F90
+. add 4 new variables that are namelist settable
+  - nccons - set .true. to hold cloud droplet number constant
+  - nicons - set .true. to hold cloud ice number constant
+  - ncnst  - droplet num concentration when nccons=.true. (default: 100.e6 m-3)
+  - ninst  - ice num concentration when nicons=.true. (default: 0.1e6 m-3)
+
+components/cam/src/physics/cam/micro_mg2_0.F90
+. Set nccons, nicons, ncnst, ninst via the initialization method from
+  namelist specified values.
+
+components/cam/src/physics/cam/micro_mg_cam.F90
+. add namelist variables (micro_mg_nccons, micro_mg_nicons,
+  micro_mg_ncnst, micro_mg_ninst) to allow constant number concentrations
+  and pass through the init method arg list.
+. update mpi_bcast calls and add log output for namelist settings
+. remove calls to mg1.5 routines
+
+components/cam/utils/cam_aqua/ocn_comp.F90
+. add namelist reader for aqua_planet_sst to set analytic SST option
+
+If there were any failures reported from running test_driver.sh on any test
+platform, and checkin with these failures has been OK'd by the gatekeeper,
+then copy the lines from the td.*.status files for the failed tests to the
+appropriate machine below.  All failed tests must be justified.
+
+yellowstone/intel:
+060 bl731 TBL.sh h16c3aqdh aqua+aquaplanet_cam3 9s ............................................FAIL! rc= 7 at Tue Nov  1 21:17:44 MDT 2016
+063 bl735 TBL.sh h16c5aqdm outfrq3s+aquaplanet_cam5 9s ........................................FAIL! rc= 7 at Tue Nov  1 21:29:12 MDT 2016
+072 bl751 TBL.sh h30c4aqdm outfrq3s+aquaplanet_cam4 9s ........................................FAIL! rc= 7 at Tue Nov  1 21:49:17 MDT 2016
+
+yellowstone/intel/aux_cam: PASS
+
+hobart/nag: all PASS except
+067 bl734 TBL.sh h16c5naqdm outfrq3s_bam+aquaplanet_cam5 9s ...................................FAIL! rc= 7 at Mon Oct 31 14:49:43 MDT 2016
+
+hobart/pgi: all PASS except
+066 bl734 TBL.sh h16c5naqdm outfrq3s_bam+aquaplanet_cam5 9s ...................................FAIL! rc= 7 at Mon Oct 31 14:55:16 MDT 2016
+
+CAM tag used for the baseline comparison tests if different than previous
+tag:
+
+Summarize any changes to answers: BFB.  The aquaplanet tests that failed
+baselines are using new IC files.
+
+===============================================================
+===============================================================
+
+Tag name: cam5_4_92
+Originator(s): cacraig
+Date: Oct 27, 2016
+One-line Summary: Update to current cime (to restore auto-resubmit functionality)
+
+Purpose of changes:
+ - Update to current cime version - this will enable auto-resubmit to work again
+ - This version of cime requires a namelist parameter "cime_model" and the contents of 
+   the docn_ocn_in file is now in ocn_in.  
+ - Added FC6AQUAP compset
+ - Update the testlist format to version 2
+ - Remove "-file xx" from xmlchange commands in CAM regression testing scripts
+ - Added the ability for the CAM test_driver to rerun the CESM tests and only rerun 
+   the parts which did not PASS
+
+Bugs fixed (include bugzilla ID):
+
+Describe any changes made to build system:
+
+Describe any changes made to the namelist:
+
+List any changes to the defaults for the boundary datasets:
+
+Describe any substantial timing or memory changes:
+
+Code reviewed by:
+
+List all subroutines eliminated:
+
+List all subroutines added and what they do:
+
+List all existing files that have been modified, and describe the changes:
+
+ M      .
+M       SVN_EXTERNAL_DIRECTORIES
+         - update to current cime tag
+             - this fixes the issues with auto-restart
+
+M       components/cam/bld/build-namelist
+M       components/cam/bld/namelist_files/namelist_definition.xml
+         - cime_model is now a required namelist variable, hardwire it to cesm
+         - docn_ocn_in is no longer a separate file.  Incorporate all its 
+           values in ocn_in
+
+M       components/cam/cime_config/config_compsets.xml
+         - add in aquaplanet compset at the request of Brian Medeiros and Jim Benedict
+
+M       components/cam/cime_config/testdefs/testlist_cam.xml
+         - update to the version 2 of the testlist format
+
+M       components/cam/test/system/TCB_ccsm.sh
+M       components/cam/test/system/TER_ccsm.sh
+         - remove "-file xx" from xmlchange as it no longer is an allowed field (xmlchange
+           internally determines which file it needs to modify)
+
+M       components/cam/test/system/test_driver.sh
+         - add two new flags, "--rerun-cesm" and "--test-id"
+            * rerun-cesm will rerun the failed tests
+            * test-id is used to specify the actual testname
+         - if CAM_TAG is supplied, the CESM jobs will be collected in that directory in
+           the user's /glade/scratch directory
+
+If there were any failures reported from running test_driver.sh on any test
+platform, and checkin with these failures has been OK'd by the gatekeeper,
+then copy the lines from the td.*.status files for the failed tests to the
+appropriate machine below.  All failed tests must be justified.
+
+yellowstone/intel: all BFB
+
+yellowstone/intel/aux_cam: all BFB
+ERP_Ln9.f09_f09.F1850_DONOTUSE.yellowstone_intel.cam-outfrq9s_clm5 (Overall: NLFAIL), details:
+  FAIL ERP_Ln9.f09_f09.F1850_DONOTUSE.yellowstone_intel.cam-outfrq9s_clm5 NLCOMP
+ERP_Ln9.f09_f09.F2000_DEV.yellowstone_intel.cam-outfrq9s_clm5 (Overall: NLFAIL), details:
+  FAIL ERP_Ln9.f09_f09.F2000_DEV.yellowstone_intel.cam-outfrq9s_clm5 NLCOMP
+SMS_Lm13.f09_f09.F2000_DEV.yellowstone_intel.cam-outfrq1m_clm5 (Overall: NLFAIL), details:
+  FAIL SMS_Lm13.f09_f09.F2000_DEV.yellowstone_intel.cam-outfrq1m_clm5 NLCOMP
+
+
+hobart/nag: all BFB
+
+hobart/pgi or jaguar/pgi: all BFB
+
+===============================================================
+===============================================================
+
 Tag name: cam5_4_91
 Originator(s): fvitt, mmills, tilmes, dkin
 Date: 21 Oct 2016

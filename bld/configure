@@ -111,6 +111,7 @@ OPTIONS
   effect whether running CAM as part of CCSM or running in a CAM standalone mode:
 
      -[no]age_of_air_trcs Switch on [off] age of air tracers. Default: on for waccm_phys, otherwise off
+     -aquaplanet        Switch on aqua-planet mode.
      -build_chem_proc   Switch forces the build of the chemistry preprocessor (primarily for testing).
      -carma <name>      Build CAM with specified CARMA microphysics model
                         [ none | bc_strat | cirrus | cirrus_dust | dust | meteor_impact |
@@ -131,6 +132,7 @@ OPTIONS
      -co2_cycle         This option is meant to be used with the -ccsm_seq option.  It modifies the
                         CAM configuration by increasing the number of advected constituents by 4.
      -comp_intf         Specify the component interfaces [mct | esmf] (default: mct).
+     -cosp              Enable the COSP simulator.
      -cppdefs <string>  A string of user specified CPP defines.  Appended to
                         Makefile defaults.  E.g. -cppdefs '-DVAR1 -DVAR2'
      -dyn <name>        Build CAM with specified dynamical core [eul | sld | fv | se].
@@ -141,7 +143,7 @@ OPTIONS
                         se grids.
      -max_n_rad_cnst <n> Maximum number of constituents that are either radiatively
                         active, or in any single diagnostic list for the radiation.
-     -microphys <name>  Specify the microphysics option [mg1 | mg1.5 | mg2 | rk].
+     -microphys <name>  Specify the microphysics option [mg1 | mg2 | rk].
      -nadv <n>          Set total number of advected species to <n>.
      -nadv_tt <n>       Set number of advected test tracers <n>.
      -nlev <n>          Set number of levels to <n>.
@@ -156,10 +158,10 @@ OPTIONS
      -rad <name>        Specify the radiation package [rrtmg | camrt]
      -res <name>        Specify horizontal grid.  ***DEPRECATED***  Use the -hgrid option.
      -spcam_clubb_sgs   Turn on the SPCAM version of CLUBB
-     -spcam_nx <n>      SPCAM's x-grid. - defaults to 4 (note the CRM requires spcam_nx to be greater than or equal to 4)
-     -spcam_ny <n>      SPCAM's y-grid. - defaults to 1
-     -spcam_dx <n>      SPCAM's horizontal grid spacing.
-     -spcam_dt <n>      SPCAM's timestep.
+     -spcam_nx <n>      SPCAM x-grid. - defaults to 4 (note the CRM requires spcam_nx to be greater than or equal to 4)
+     -spcam_ny <n>      SPCAM y-grid. - defaults to 1
+     -spcam_dx <n>      SPCAM horizontal grid spacing.
+     -spcam_dt <n>      SPCAM timestep.
      -unicon            Switch to turn on the UNICON scheme. Default: off.
      -usr_mech_infile   Path and file name of the user supplied chemistry mechanism file.
      -waccm_phys        Switch enables the use of WACCM physics in any chemistry configuration.
@@ -213,7 +215,7 @@ OPTIONS
   Options for surface components used in standalone CAM mode:
 
      -ice <name>        Build CAM with sea ice model [cice | sice | none ]. Default: cice.
-     -ocn <name>        Build CAM with ocean model [docn | dom | socn | aquaplanet | pop]. Default: docn.
+     -ocn <name>        Build CAM with ocean model [docn | dom | som | socn | aquaplanet | pop]. Default: docn.
      -lnd <name>        Build CAM with land model [clm | slnd | none]. Default: clm.
      -rof <name>        Build CAM with runoff model [rtm | srof | none]. Default: rtm.
 
@@ -226,7 +228,6 @@ OPTIONS
      -cc <name>         User specified C compiler (linux only).  Overrides Makefile default.
      -cflags <string>   A string of user specified C compiler options.  Appended to
                         Makefile defaults.
-     -cosp              Enable the COSP simulator.
      -debug             Switch to turn on building CAM with debugging compiler options.
      -defaults <file>   Specify a configuration file which will be used to supply defaults instead of
                         one of the config_files/defaults_*.xml files.  This file is used to specify model
@@ -311,6 +312,7 @@ my %opts = (
 	    );
 GetOptions(
     "age_of_air_trcs!"          => \$opts{'age_of_air_trcs'},
+    "aquaplanet"                => \$opts{'aquaplanet'},
     "build_chem_proc"           => \$opts{'build_chem_proc'},
     "cache=s"                   => \$opts{'cache'},
     "cachedir=s"                => \$opts{'cachedir'},
@@ -981,9 +983,10 @@ if ($phys_pkg eq 'spcam_m2005') {
 if (defined $opts{'microphys'}) {
     $microphys_pkg = lc($opts{'microphys'});
 
-    # Alias mg -> mg1 for backwards compatibility
+    # Deprecate option '-microphys mg'
     if ($microphys_pkg eq 'mg') {
-        $microphys_pkg = 'mg1';
+	die "CAM configure ERROR: '-microphys mg' is deprecated.\n" .
+            "  Valid microphysics options are: mg1, mg2, rk.\n";
     }
 }
 
@@ -1226,15 +1229,20 @@ if ($phys_pkg eq 'spcam_m2005') {
 #-----------------------------------------------------------------------------------------------
 # Ocean model
 my $ocn_pkg = 'docn';
-# If the physics package is simple (e.g., held_suarez), change the default
-if ($simple_phys) {
+my $aquaplanet = 0;
+# Change default
+if ($simple_phys or defined $opts{'offline_drv'}) {
     $ocn_pkg = 'socn';
 }
-elsif (defined $opts{'offline_drv'}) {
-    $ocn_pkg = 'socn';
+elsif (defined $opts{'aquaplanet'}) {
+    # Default for aquaplanet mode is to use an analytic expression for fixed SST.
+    $ocn_pkg = 'aquaplanet';
+    $aquaplanet = 1;
 }
 
 # Allow the user to override the default via the commandline.
+# For aquaplanet with SOM the option '-ocn som' should be used to override
+# aquaplanet's default ocean component setting.
 if (defined $opts{'ocn'}) {
     $ocn_pkg = lc($opts{'ocn'});
 }
@@ -1243,6 +1251,15 @@ $cfg_ref->set('ocn', $ocn_pkg);
 
 if ($print>=2) { print "Ocean package: $ocn_pkg$eol"; }
 
+# Backwards compatibility: allow aquaplanet mode to be set using just the
+# option '-ocn aquaplanet' without using the -aquaplanet switch.
+if ($ocn_pkg eq 'aquaplanet') { $aquaplanet = 1; }
+
+$cfg_ref->set('aquaplanet', $aquaplanet);
+
+my $aqua_mode = $aquaplanet ? "ON" : "OFF";
+if ($print>=2) { print "Aqua-planet mode: $aqua_mode$eol"; }
+
 #-----------------------------------------------------------------------------------------------
 # Land model
 my $lnd_pkg = 'clm';
@@ -1250,7 +1267,7 @@ my $lnd_pkg = 'clm';
 if ($simple_phys) {
     $lnd_pkg = 'slnd';
 }
-elsif ($ocn_pkg eq 'aquaplanet') {
+elsif ($aquaplanet) {
     $lnd_pkg = 'slnd';
 }
 elsif (defined $opts{'offline_drv'}) {
@@ -1279,7 +1296,7 @@ my $ice_pkg = 'cice';
 if ($simple_phys) {
     $ice_pkg = 'sice';
 }
-elsif ($ocn_pkg eq 'aquaplanet') {
+elsif ($aquaplanet) {
     $ice_pkg = 'sice';
 }
 elsif (defined $opts{'offline_drv'}) {
@@ -1307,7 +1324,7 @@ my $rof_pkg = 'rtm';
 if ($simple_phys) {
     $rof_pkg = 'srof';
 }
-elsif ($ocn_pkg eq 'aquaplanet') {
+elsif ($aquaplanet) {
     $rof_pkg = 'srof';
 }
 elsif (defined $opts{'offline_drv'}) {
@@ -3150,7 +3167,7 @@ sub write_filepath
 	if ($ocn eq 'dom') {
 	    print $fh "$camsrcdir/cam/src/utils/cam_dom\n";
 	}
-	elsif ($ocn eq 'docn') {
+	elsif ($ocn eq 'docn' or $ocn eq 'som') {
 	    print $fh "$cam_root/cime/components/data_comps/docn\n";
 	}
 	elsif ($ocn eq 'aquaplanet') {

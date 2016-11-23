@@ -73,7 +73,7 @@
       <value compset="_CAM%ADIAB">-phys adiabatic</value>
       <value compset="_CAM%DABIP04">-phys adiabatic</value>
       <value compset="_CAM%DCTBM">-phys held_suarez -chem terminator</value>
-      <value compset="_AQUAP">-ocn aquaplanet</value>
+      <value compset="_AQUAP">-ocn aquaplanet -aquaplanet</value>
 
       <value compset="%PORT">-offline_drv rad</value>
       <value compset="%SPCAMS"        >-rad camrt -chem trop_bam -spcam_nx 16 -spcam_ny 1 -spcam_dx 4000 -spcam_dt 20 -phys spcam_sam1mom </value>              
@@ -163,12 +163,12 @@
       <value compset="2000_CAM40%SSOA"   >2000_cam4_trop_strat_soa</value>
       <value compset="GEOS_CAM50%SMA3"   >sd_cam5_trop_strat_mam3</value>
       <value compset="GEOS_CAM40%SSOA"   >sd_cam4_trop_strat_soa</value>
-      <value compset="AR95_CAM[45]"     >scam_arm95</value>
-      <value compset="AR97_CAM[45]"     >scam_arm97</value>
+      <value compset="AR95_CAM[45]"      >scam_arm95</value>
+      <value compset="AR97_CAM[45]"      >scam_arm97</value>
       <value compset="PIPD_CAM50"        >1850-PD_cam5</value>
-      <value compset="2000_CAM%DABIP04" >dabi_p2004</value>
-      <value compset="CAM%HS94"         >held_suarez_1994</value>
-      <value compset="CAM%DCTBM"        >dctest_baro_moist</value>
+      <value compset="2000_CAM%DABIP04"  >dabi_p2004</value>
+      <value compset="CAM%HS94"          >held_suarez_1994</value>
+      <value compset="CAM%DCTBM"         >dctest_baro_moist</value>
     </values>
     <group>run_component_cam</group>
     <file>env_run.xml</file>

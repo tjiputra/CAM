@@ -44,8 +44,9 @@ Option to turn on waccmx thermosphere/ionosphere extension: 0 => no, 1 => yes
 <entry id="phys" valid_values="cam3,cam4,cam5,cam5.4,held_suarez,adiabatic,spcam_sam1mom,spcam_m2005" value="">
 Physics package: cam3, cam4, cam5, cam5.4, held_suarez, adiabatic, spcam_sam1mom, spcam_m2005.
 </entry>
-<entry id="microphys" valid_values="rk,mg1,mg1.5,mg2,spcam_m2005,spcam_sam1mom" value="">
-Microphysics package: rk (Rasch and Kristjansson), mg1 (Morrison and Gettelman two moment scheme CAM5.1), mg1.5 (Morrison and Gettelman second version development), SPCAM_m2005, SPCAM_sam1mom.
+<entry id="microphys" valid_values="rk,mg1,mg2,spcam_m2005,spcam_sam1mom" value="">
+Microphysics package: rk (Rasch and Kristjansson), mg1 and mg2 (Morrison and Gettelman),
+SPCAM_m2005, SPCAM_sam1mom.
 </entry>
 <entry id="macrophys" valid_values="rk,park,clubb_sgs,spcam_sam1mom,spcam_m2005,none" value="">
 Macrophysics package: RK, Park, CLUBB_SGS, SPCAM_sam1mom, SPCAM_m2005.
@@ -112,10 +113,18 @@ Use clm, stub land or no lnd model in cam build: clm, slnd, none
 <entry id="rof" valid_values="rtm,srof,none" value="rtm">
 Use rtm, stub runoff or no runoff model in cam build: rtm, srof, none
 </entry>
-<entry id="ocn" valid_values="docn,dom,socn,aquaplanet,pop" value="docn">
+<entry id="ocn" valid_values="docn,dom,som,socn,aquaplanet,pop" value="docn">
 Use data ocean model (docn or dom), stub ocean (socn), or aqua planet ocean
 (aquaplanet) in cam build.  When built from the CESM scripts the value of
-ocn may be set to pop, but this doesn't impact how CAM is built.
+ocn may be set to pop.  This doesn't impact how CAM is built, only how
+attributes are matched when searching for namelist defaults.  If ocn is set
+to som then the docn component is used.
+</entry>
+<entry id="aquaplanet" valid_value="0,1" value="0">
+Switch for aquaplanet mode.  By default this switch sets the ocn component
+to use an analytic expression for SST.  To use aquaplanet with time varying
+SSTs read from a dataset, or with a slab ocean, the ocean component should
+be set to DOCN.
 </entry>
 <entry id="ice" valid_values="cice,sice,none" value="">
 Use cice, stub ice model or no ice model in cam build: cice, sice, none

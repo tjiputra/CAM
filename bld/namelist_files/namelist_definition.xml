@@ -2070,6 +2070,29 @@ obtain by extrapolating between levels.
 Default: set by build-namelist
 </entry>
 
+<entry id="micro_mg_nccons" type="logical" category="microphys"
+       group="micro_mg_nl" valid_values="" >
+Set .true. to hold cloud droplet number constant.
+Default: .false.
+</entry>
+
+<entry id="micro_mg_nicons" type="logical" category="microphys"
+       group="micro_mg_nl" valid_values="" >
+Set .true. to hold cloud ice number constant.
+Default: .false.
+</entry>
+
+<entry id="micro_mg_ncnst" type="real" category="microphys"
+       group="micro_mg_nl" valid_values="" >
+In-cloud droplet number concentration when micro_mg_nccons=.true.
+Default: 100.e6 m-3
+</entry>
+
+<entry id="micro_mg_ninst" type="real" category="microphys"
+       group="micro_mg_nl" valid_values="" >
+In-cloud ice number concentration when micro_mg_nicons=.true.
+Default: 0.1e6 m-3
+</entry>
 
 <!-- Aerosol microphysics -->
 <entry id="microp_aero_bulk_scale" type="real" category="microphys"
@@ -5841,13 +5864,7 @@ Default: box rearranger used by pio1, subset is default for pio2.
 
 <!-- DOCN -->
 
-<entry id="restfilm" type="char*256" input_pathname="abs" category="ocn"
-       group="docn_nml" valid_values="" >
-Full pathname of docn restart file.
-Default: set by build-namelist.
-</entry>
-
-<entry id="ocn_in" type="char*24" category="ocn"
+<entry id="restfilm" type="char*256" input_pathname="abs" category="restart"
        group="docn_nml" valid_values="" >
 Full pathname of docn restart file.
 Default: set by build-namelist.
@@ -5859,8 +5876,64 @@ Full pathname of docn restart file.
 Default: set by build-namelist.
 </entry>
 
-<!-- Backwards compatibility options: support for old DOM -->
-<!-- SST Data -->
+<entry id="force_prognostic_true" type="logical" category="ocn"
+       group="docn_nml" valid_values="" >
+Default: set by build-namelist.
+</entry>
+
+<entry id="dataMode" type="char*256" category="ocn"
+       group="shr_strdata_nml" valid_values="" >
+Default: set by build-namelist.
+</entry>
+
+<entry id="domainFile" type="char*256" category="ocn"
+       group="shr_strdata_nml" valid_values="" >
+Default: set by build-namelist.
+</entry>
+
+<entry id="fillalgo" type="char*32" category="ocn"
+       group="shr_strdata_nml" valid_values="" >
+Default: set by build-namelist.
+</entry>
+
+<entry id="fillmask" type="char*32" category="ocn"
+       group="shr_strdata_nml" valid_values="" >
+Default: set by build-namelist.
+</entry>
+
+<entry id="mapalgo" type="char*32" category="ocn"
+       group="shr_strdata_nml" valid_values="" >
+Default: set by build-namelist.
+</entry>
+
+<entry id="mapmask" type="char*32" category="ocn"
+       group="shr_strdata_nml" valid_values="" >
+Default: set by build-namelist.
+</entry>
+
+<entry id="streams" type="char*256" category="ocn"
+       group="shr_strdata_nml" valid_values="" >
+Default: set by build-namelist.
+</entry>
+
+<entry id="taxmode" type="char*32" category="ocn"
+       group="shr_strdata_nml" valid_values="" >
+Default: set by build-namelist.
+</entry>
+
+<entry id="tintalgo" type="char*32" category="ocn"
+       group="shr_strdata_nml" valid_values="" >
+Default: set by build-namelist.
+</entry>
+
+<entry id="vectors" type="char*256" category="ocn"
+       group="shr_strdata_nml" valid_values="" >
+Default: set by build-namelist.
+</entry>
+
+<!-- Specify ocean data and domain files in a component independent way. -->
+<!-- build-namelist associates this information with the component       -->
+<!-- dependend variables.                                                -->
 
 <entry id="bndtvs" type="char*256" input_pathname="abs" category="ocn"
        group="camexp" valid_values="" >
@@ -5880,15 +5953,6 @@ Default: set by build-namelist.
 Full pathname of grid file for time-variant sea-surface temperature and sea-ice
 concentration boundary dataset.
 Default: set by build-namelist.
-</entry>
-
-<entry id="sstcyc" type="logical" category="ocn"
-       group="camexp" valid_values="" >
-Flag for yearly cycling of SST data. If set to FALSE, a multi-year dataset
-is assumed, otherwise a single-year dataset is assumed, and SSTs will be
-cycled over the first 12 values in the file.  Not used if running with
-CCSM.
-Default: TRUE
 </entry>
 
 <!-- CICE: These variables are passed through to the CICE build-namelist.   -->
@@ -5915,6 +5979,15 @@ Default: 0
 Full pathname of master restart file from which to branch. Setting is
 Required for branch run.
 Default: none
+</entry>
+
+<entry id="sstcyc" type="logical" category="ocn"
+       group="dom_inparm" valid_values="" >
+Flag for yearly cycling of SST data. If set to FALSE, a multi-year dataset
+is assumed, otherwise a single-year dataset is assumed, and SSTs will be
+cycled over the first 12 values in the file.  This variable is only recognized
+by the old CAM DOM component.
+Default: TRUE
 </entry>
 
 <!-- ========================================================================================  -->
@@ -6164,10 +6237,8 @@ Default: FALSE
 </entry>
 
 <entry id="aqua_planet_sst" type="integer"  category="driver"
-       group="seq_infodata_inparm" valid_values="1" >
-Set the sst to a particular analytic solution.  **Not currently
-functional** The type of analytic solution is currently hardcoded with a
-parameter in ocn_comp.F90.
+       group="aquap_nl" valid_values="1,2,3,4,5,6,7,8,9,10" value="1" >
+Set the sst to a particular analytic solution.
 Default: 1
 </entry>
 
@@ -6251,6 +6322,12 @@ Default: 1
        group="seq_infodata_inparm" valid_values="" >
 Case title.
 Default: none.
+</entry>
+
+<entry id="cime_model" type="char*4"  category="driver"
+       group="seq_infodata_inparm" valid_values="cesm, acme" >
+cime model version.
+Default: cesm.
 </entry>
 
 <entry id="case_name" type="char*80"  category="driver"

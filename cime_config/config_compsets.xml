@@ -280,6 +280,10 @@
     <lname>2000_CAM50_SLND_SICE_AQUAP_SROF_SGLC_SWAV</lname>
   </compset>
   <compset>
+    <alias>FC6AQUAP</alias>
+    <lname>2000_CAM60_SLND_SICE_AQUAP_SROF_SGLC_SWAV</lname>
+  </compset>
+  <compset>
     <alias>FHS94</alias>   
     <lname>2000_CAM%HS94_SLND_SICE_SOCN_SROF_SGLC_SWAV</lname>
   </compset>
