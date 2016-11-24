@@ -1,5 +1,5 @@
 -debug -spmd -smp
--chem waccm_mozart
+-chem waccm_ma
 -age_of_air_trcs
 -dyn fv
 -nlev 88

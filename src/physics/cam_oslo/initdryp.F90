@@ -3,16 +3,25 @@ subroutine initdryp
    use shr_kind_mod, only: r8 => shr_kind_r8
    use oslo_control, only: oslo_getopts, dir_string_length
    use commondefinitions, only: nmodes, nbmodes
-   use opttab,   only: cate, cat, fac, faq, fbc, fombg, fbcbg
+   use opttab,       only: cate, cat, fac, faq, fbc, fombg, fbcbg
    use cam_logfile,  only: iulog
 
    implicit none
+
+!Purpose: To read in the AeroCom look-up tables for calculation of dry
+!     aerosol size and mass distribution properties. The grid for discrete 
+!     input-values in the look-up tables is defined in opptab. 
 
 !     Tabulating the 'aerodryk'-files to save computing time. Routine
 !     originally made by  Alf Kirkevaag, and modified for new aerosol 
 !     schemes in January 2006.
 !     Updated for new kcomp1.out including condensed SOA - Alf Kirkevåg, 
 !     May 2013, and extended for new SOA treatment October 2015.
+!     Modified for optimized added masses and mass fractions for 
+!     concentrations from condensation, coagulation or cloud-processing 
+!     - Alf Kirkevaag, May 2016. 
+!     Modified for optimized added masses and mass fractions for concentrations from 
+!     condensation, coagulation or cloud-processing - Alf Kirkevaag, May 2016. 
 
 
 #include <aerodry.h>
@@ -107,7 +116,8 @@ subroutine initdryp
    50     continue
 
  	  do ic=1,16
-	   if(abs(catot-cate(kcomp,ic))<eps7) then
+!	   if(abs(catot-cate(kcomp,ic))<eps7) then
+	   if(abs((catot-cate(kcomp,ic))/cate(kcomp,ic))<eps2) then
 	    ictot=ic
 	    goto 52
 	   endif
@@ -150,8 +160,8 @@ subroutine initdryp
 
         end do  ! lin
 
-    do iv=1,19      !soa
-    do ifombg=1,6   !soa
+    do iv=1,19
+    do ifombg=1,6
     do ictot=1,16
     do ifac=1,6
      if(a1var(iv,ifombg,ictot,ifac)<=0.0_r8) then
@@ -171,7 +181,8 @@ subroutine initdryp
 !       Modes 2 to 3 (BC/OC + condesate from H2SO4 and SOA)
 !ccccccccc1ccccccccc2ccccccccc3ccccccccc4ccccccccc5ccccccccc6ccccccccc7cc
 
-      do ifil = 2,3
+!      do ifil = 2,3
+      do ifil = 2,2
         do lin = 1,96     ! 16x6
 
           read(9+ifil,994) kcomp, catot, frac,                        &
@@ -180,7 +191,8 @@ subroutine initdryp
            cintsa, cintsa05, cintsa125, aaeros, aaerol, vaeros, vaerol
 
  	  do ic=1,16
-	   if(abs(catot-cate(kcomp,ic))<eps7) then
+!	   if(abs(catot-cate(kcomp,ic))<eps7) then
+	   if(abs((catot-cate(kcomp,ic))/cate(kcomp,ic))<eps2) then
 	    ictot=ic
 	    goto 61
 	   endif
@@ -221,7 +233,19 @@ subroutine initdryp
         end do  ! lin
       end do    ! ifil
 
-    do iv=1,19      !soa
+
+!   Prescribed dummy values for unused kcomp=3
+    kcomp=3
+    do ictot=1,16
+    do ifac=1,6
+    do iv=1,19
+        a2to3var(iv,ictot,ifac,kcomp)=1.0_r8
+    enddo
+    enddo
+    enddo
+
+
+    do iv=1,19
     do kcomp=2,3
     do ictot=1,16
     do ifac=1,6
@@ -253,7 +277,8 @@ subroutine initdryp
            cintsa, cintsa05, cintsa125, aaeros, aaerol, vaeros, vaerol
 
  	  do ic=1,6
-	   if(abs(frbcbg-fbcbg(ic))<eps4) then
+!	   if(abs(frbcbg-fbcbg(ic))<eps4) then
+	   if(abs((frbcbg-fbcbg(ic))/fbcbg(ic))<eps2) then
 	    ifbcbg=ic
 	    goto 70
 	   endif
@@ -312,8 +337,8 @@ subroutine initdryp
 
         end do  ! lin
 
-    do iv=1,19      !soa
-    do ifbcbg=1,6   !soa
+    do iv=1,19
+    do ifbcbg=1,6
     do ictot=1,16
     do ifac=1,6
     do ifaq=1,6
@@ -343,7 +368,8 @@ subroutine initdryp
            cintsa, cintsa05, cintsa125, aaeros, aaerol, vaeros, vaerol
 
  	  do ic=1,6
-	   if(abs(catot-cat(kcomp,ic))<eps6) then
+!	   if(abs(catot-cat(kcomp,ic))<eps6) then
+	   if(abs((catot-cat(kcomp,ic))/cat(kcomp,ic))<eps2) then
 	    ictot=ic
 	    goto 21
 	   endif
@@ -359,7 +385,8 @@ subroutine initdryp
    31     continue
 
  	  do ic=1,6
-	   if(abs(fabc-fbc(ic))<eps4) then
+!	   if(abs(fabc-fbc(ic))<eps4) then
+	   if(abs((fabc-fbc(ic))/fbc(ic))<eps2) then
 	    ifbc=ic
 	    goto 41
 	   endif
@@ -393,12 +420,11 @@ subroutine initdryp
             a5to10var(17,ictot,ifac,ifbc,ifaq,kcomp)=aaerol
             a5to10var(18,ictot,ifac,ifbc,ifaq,kcomp)=vaeros
             a5to10var(19,ictot,ifac,ifbc,ifaq,kcomp)=vaerol
-!soa
 
         end do  ! lin
       end do    ! ifil
 
-    do iv=1,19      !soa
+    do iv=1,19
     do kcomp=5,10
     do ictot=1,6
     do ifac=1,6
@@ -419,7 +445,6 @@ subroutine initdryp
 !ccccccccc1ccccccccc2ccccccccc3ccccccccc4ccccccccc5ccccccccc6ccccccccc7cc
 
 
-!  993 format(I2,3e10.3,f5.2,19e10.3)
   993 format(I2,23e10.3)
   994 format(I2,21e10.3)
   995 format(I2,23e10.3)

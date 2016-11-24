@@ -30,7 +30,8 @@ module cloud_diagnostics
    integer :: dei_idx, mu_idx, lambda_idx, iciwp_idx, iclwp_idx, cld_idx  ! index into pbuf for cloud fields
    integer :: ixcldice, ixcldliq, rei_idx, rel_idx
 
-   logical :: do_cld_diag, mg_clouds, rk_clouds, camrt_rad
+   logical :: do_cld_diag, mg_clouds, rk_clouds, camrt_rad, spcam_m2005_clouds, spcam_sam1mom_clouds
+   logical :: one_mom_clouds, two_mom_clouds
    
    integer :: cicewp_idx = -1
    integer :: cliqwp_idx = -1
@@ -42,6 +43,7 @@ module cloud_diagnostics
    ! Index fields for precipitation efficiency.
    integer :: acpr_idx, acgcme_idx, acnum_idx
 
+   logical           :: use_spcam
 
 contains
 
@@ -54,11 +56,15 @@ contains
     character(len=16) :: rad_pkg, microp_pgk
 
     call phys_getopts(radiation_scheme_out=rad_pkg,microp_scheme_out=microp_pgk)
-    camrt_rad = rad_pkg .eq. 'camrt'
-    rk_clouds = microp_pgk == 'RK'
-    mg_clouds = microp_pgk == 'MG'
+    camrt_rad            = rad_pkg .eq. 'camrt'
+    rk_clouds            = microp_pgk == 'RK'
+    mg_clouds            = microp_pgk == 'MG'
+    spcam_m2005_clouds   = microp_pgk == 'SPCAM_m2005'
+    spcam_sam1mom_clouds = microp_pgk == 'SPCAM_sam1mom'
+    one_mom_clouds       = (rk_clouds .or. spcam_sam1mom_clouds)
+    two_mom_clouds       = (mg_clouds .or. spcam_m2005_clouds)
 
-    if (rk_clouds) then
+    if (one_mom_clouds) then
        call pbuf_add_field('CLDEMIS','physpkg', dtype_r8,(/pcols,pver/), cldemis_idx)
        call pbuf_add_field('CLDTAU', 'physpkg', dtype_r8,(/pcols,pver/), cldtau_idx)
 
@@ -67,7 +73,7 @@ contains
 
        call pbuf_add_field('PMXRGN', 'physpkg', dtype_r8,(/pcols,pverp/), pmxrgn_idx)
        call pbuf_add_field('NMXRGN', 'physpkg', dtype_i4,(/pcols /),      nmxrgn_idx)
-    else if (mg_clouds) then
+    else if (two_mom_clouds) then
        ! In cloud ice water path for radiation
        call pbuf_add_field('ICIWP',      'global', dtype_r8,(/pcols,pver/), iciwp_idx)
        ! In cloud liquid water path for radiation
@@ -95,7 +101,9 @@ contains
 
     cld_idx    = pbuf_get_index('CLD')
 
-    if (mg_clouds) then
+    call phys_getopts(use_spcam_out=use_spcam)
+
+    if (two_mom_clouds) then
 
        call addfld ('ICWMR', (/ 'lev' /), 'A', 'kg/kg', 'Prognostic in-cloud water mixing ratio')
        call addfld ('ICIMR', (/ 'lev' /), 'A', 'kg/kg', 'Prognostic in-cloud ice mixing ratio'  )
@@ -115,7 +123,7 @@ contains
        mu_idx     = pbuf_get_index('MU')
        lambda_idx = pbuf_get_index('LAMBDAC')
 
-    elseif (rk_clouds) then
+    elseif (one_mom_clouds) then
 
        rei_idx    = pbuf_get_index('REI')
        rel_idx    = pbuf_get_index('REL')
@@ -125,17 +133,17 @@ contains
     call cnst_get_ind('CLDICE', ixcldice)
     call cnst_get_ind('CLDLIQ', ixcldliq)
 
-    do_cld_diag = rk_clouds .or. mg_clouds
+    do_cld_diag = one_mom_clouds .or. two_mom_clouds
 
     if (.not.do_cld_diag) return
     
     if (rk_clouds) then 
        wpunits = 'gram/m2'
        sampling_seq='rad_lwsw'
-    else if (mg_clouds) then 
+    else if (two_mom_clouds .or. spcam_sam1mom_clouds) then 
        wpunits = 'kg/m2'
        sampling_seq=''
-    endif
+    end if
 
     call addfld ('ICLDIWP', (/ 'lev' /), 'A', wpunits,'In-cloud ice water path'               , sampling_seq=sampling_seq)
     call addfld ('ICLDTWP', (/ 'lev' /), 'A',wpunits,'In-cloud cloud total water path (liquid and ice)', &
@@ -150,13 +158,13 @@ contains
     call addfld ('TGCLDIWP',horiz_only,  'A',wpunits,'Total grid-box cloud ice water path'   , &
          sampling_seq=sampling_seq)
     
-    if(mg_clouds) then
+    if(two_mom_clouds) then
        call addfld ('lambda_cloud',(/ 'lev' /),'I','1/meter','lambda in cloud')
        call addfld ('mu_cloud',    (/ 'lev' /),'I','1','mu in cloud')
        call addfld ('dei_cloud',   (/ 'lev' /),'I','micrometers','ice radiative effective diameter in cloud')
     endif
 
-    if(rk_clouds) then
+    if(one_mom_clouds) then
        call addfld ('rel_cloud',(/ 'lev' /),'I','1/meter','effective radius of liq in cloud', sampling_seq=sampling_seq)
        call addfld ('rei_cloud',(/ 'lev' /),'I','1','effective radius of ice in cloud', sampling_seq=sampling_seq)
     endif
@@ -273,8 +281,7 @@ subroutine cloud_diagnostics_calc(state,  pbuf)
 !-----------------------------------------------------------------------
     if (.not.do_cld_diag) return
 
-
-    if(rk_clouds) then
+    if(one_mom_clouds) then
        dosw     = radiation_do('sw')      ! do shortwave heating calc this timestep?
        dolw     = radiation_do('lw')      ! do longwave heating calc this timestep?
     else
@@ -290,7 +297,7 @@ subroutine cloud_diagnostics_calc(state,  pbuf)
     itim_old = pbuf_old_tim_idx()
     call pbuf_get_field(pbuf, cld_idx, cld, start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
 
-    if(mg_clouds)then
+    if(two_mom_clouds)then
 
        call pbuf_get_field(pbuf, iclwp_idx, iclwp )
        call pbuf_get_field(pbuf, iciwp_idx, iciwp )
@@ -302,7 +309,7 @@ subroutine cloud_diagnostics_calc(state,  pbuf)
        call outfld('mu_cloud',mu(:,:),pcols,lchnk)
        call outfld('lambda_cloud',lambda(:,:),pcols,lchnk)
 
-    elseif(rk_clouds) then
+    elseif(one_mom_clouds) then
 
        call pbuf_get_field(pbuf, rei_idx, rei )
        call pbuf_get_field(pbuf, rel_idx, rel )
@@ -347,7 +354,7 @@ subroutine cloud_diagnostics_calc(state,  pbuf)
     endif
 
 ! Compute liquid and ice water paths
-    if(mg_clouds) then
+    if(two_mom_clouds) then
 
        ! ----------------------------------------------------------- !
        ! Adjust in-cloud water values to take account of convective  !
@@ -400,7 +407,7 @@ subroutine cloud_diagnostics_calc(state,  pbuf)
           end do
        end do
 
-    elseif(rk_clouds) then
+    elseif(one_mom_clouds) then
 
        if (conv_water_in_rad /= 0) then
           call conv_water_4rad(state, pbuf, allcld_liq, allcld_ice)
@@ -423,10 +430,12 @@ subroutine cloud_diagnostics_calc(state,  pbuf)
 ! Determine parameters for maximum/random overlap
     call cldovrlap(lchnk, ncol, state%pint, cld, nmxrgn, pmxrgn)
 
+    if(.not. use_spcam) then ! in spcam, these diagnostics are calcluated in crm_physics.F90
 ! Cloud cover diagnostics (done in radiation_tend for camrt)
     if (.not.camrt_rad) then
        call cloud_cover_diags_out(lchnk, ncol, cld, state%pmid, nmxrgn, pmxrgn )
     endif
+    end if
     
     tgicewp(:ncol) = 0._r8
     tgliqwp(:ncol) = 0._r8
@@ -440,7 +449,7 @@ subroutine cloud_diagnostics_calc(state,  pbuf)
     gwp(:ncol,:pver) = gicewp(:ncol,:pver) + gliqwp(:ncol,:pver)
     cwp(:ncol,:pver) = cicewp(:ncol,:pver) + cliqwp(:ncol,:pver)
 
-    if(rk_clouds) then
+    if(one_mom_clouds) then
 
        ! Cloud emissivity.
        call cldems(lchnk, ncol, cwp, ficemr, rei, cldemis, cldtau)
@@ -459,7 +468,7 @@ subroutine cloud_diagnostics_calc(state,  pbuf)
           call outfld('EMISCLD' ,cldemis, pcols,lchnk)
        endif
 
-    else if (mg_clouds) then
+    else if (two_mom_clouds) then
 
        ! --------------------------------------------- !
        ! General outfield calls for microphysics       !
@@ -472,12 +481,15 @@ subroutine cloud_diagnostics_calc(state,  pbuf)
 
     endif
 
-    call outfld('GCLDLWP' ,gwp    , pcols,lchnk)
-    call outfld('TGCLDCWP',tgwp   , pcols,lchnk)
-    call outfld('TGCLDLWP',tgliqwp, pcols,lchnk)
-    call outfld('TGCLDIWP',tgicewp, pcols,lchnk)
-    call outfld('ICLDTWP' ,cwp    , pcols,lchnk)
-    call outfld('ICLDIWP' ,cicewp , pcols,lchnk)
+    if (.not. use_spcam) then 
+       ! for spcam, these are diagnostics in crm_physics.F90
+       call outfld('GCLDLWP' ,gwp    , pcols,lchnk)
+       call outfld('TGCLDCWP',tgwp   , pcols,lchnk)
+       call outfld('TGCLDLWP',tgliqwp, pcols,lchnk)
+       call outfld('TGCLDIWP',tgicewp, pcols,lchnk)
+       call outfld('ICLDTWP' ,cwp    , pcols,lchnk)
+       call outfld('ICLDIWP' ,cicewp , pcols,lchnk)
+    endif
 
 ! Compute total preciptable water in column (in mm)
     tpw(:ncol) = 0.0_r8
@@ -494,7 +506,7 @@ subroutine cloud_diagnostics_calc(state,  pbuf)
     call outfld('SETLWP'  ,clwpold, pcols,lchnk)
     call outfld('LWSH'    ,hl     , pcols,lchnk)
     
-    if(rk_clouds) then
+    if(one_mom_clouds) then
        if (cldemis_idx<0) deallocate(cldemis)
        if (cldtau_idx<0) deallocate(cldtau)
     endif

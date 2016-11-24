@@ -1,5 +1,5 @@
 -spmd -smp
--chem waccm_mozart_mam3
+-chem waccm_ma_mam3
 -dyn fv
 -res 4x5
 -phys cam5

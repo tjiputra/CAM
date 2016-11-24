@@ -208,13 +208,15 @@ end function tracers_implements_cnst
 
 !===============================================================================
 
-subroutine tracers_init_cnst(name, q, gcid)
+subroutine tracers_init_cnst(name, latvals, lonvals, mask, q)
 
    ! Initialize test tracer mixing ratio
 
    character(len=*), intent(in)  :: name
-   real(r8),         intent(out) :: q(:,:)   ! kg tracer/kg dry air (ncol,plev)
-   integer,          intent(in)  :: gcid(:)  ! global column id
+   real(r8),         intent(in)  :: latvals(:) ! lat in degrees (ncol)
+   real(r8),         intent(in)  :: lonvals(:) ! lon in degrees (ncol)
+   logical,          intent(in)  :: mask(:)    ! Only initialize where .true.
+   real(r8),         intent(out) :: q(:,:)     ! kg tracer/kg dry air (gcol, plev
 
    ! Local
    integer m
@@ -231,7 +233,7 @@ subroutine tracers_init_cnst(name, q, gcid)
    else
       do m = 1, test_tracer_num
          if (name ==  get_tracer_name(m))  then
-            call init_cnst_tr(m, q, gcid)
+            call init_cnst_tr(m, latvals, lonvals, mask, q)
          endif
       end do
    end if

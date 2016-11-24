@@ -1,64 +1,284 @@
 module dyn_grid
 !----------------------------------------------------------------------- 
 ! 
-! Purpose: Definition of dynamics computational grid.
+! Define grid and decomposition for Semi-Lagrangian spectral dynamics.
 !
-! Method: Variables are private; interface routines used to extract
-!         information for use in user code. Global column index range
-!         defined using full (unreduced) grid. 
-!
-! 
-! Entry points:
-!      get_block_bounds_d       get first and last indices in global 
-!                               block ordering
-!      get_block_gcol_d         get column indices for given block
-!      get_block_gcol_cnt_d     get number of columns in given block
-!      get_block_lvl_cnt_d      get number of vertical levels in column
-!      get_block_levels_d       get vertical levels in column
-!      get_gcol_block_d         get global block indices and local columns 
-!                               index for given global column index
-!      get_gcol_block_cnt_d     get number of blocks containing data
-!                               from a given global column index
-!      get_block_owner_d        get process "owning" given block
-!      get_horiz_grid_d         get horizontal grid coordinates
-!      get_horiz_grid_dim_d     get horizontal dimensions of dynamics grid
-!      dyn_grid_get_pref        get reference pressures for the dynamics grid
-!      dyn_grid_get_elem_coords get coordinates of a specified element (latitude) 
-!                               of the dynamics grid (lat slice of the block)
-!      dyn_grid_find_gcols      finds nearest column for given lat/lon
-!      dyn_grid_get_colndx      get global lat and lon coordinate and MPI process indices 
-!                               corresponding to a specified global column index
-!
-! Author: John Drake and Patrick Worley
+! Original code: John Drake and Patrick Worley
 ! 
 !-----------------------------------------------------------------------
-   use shr_kind_mod,     only: r8 => shr_kind_r8
-   use pmgrid,           only: plev
-   use cam_abortutils,   only: endrun
-   use cam_logfile,      only: iulog
 
-   implicit none
-   save
+use shr_kind_mod,     only: r8 => shr_kind_r8
+use spmd_utils,       only: masterproc
+use pmgrid,           only: plat, plon, plev, plevp
+use physconst,        only: rair, rearth, ra
 
-   ! The SLD dynamics grid
-   integer, parameter, public :: dyn_decomp = 101
+use pio,              only: file_desc_t, pio_inq_dimid, pio_inq_dimlen
+use cam_initfiles,    only: initial_file_get_id
 
-   integer, private   :: ngcols_d = 0     ! number of dynamics columns
-! WS 2006.04.12:  moved here from prognostics
-   integer, parameter :: ptimelevels = 2  ! number of time levels in the dycore
+use cam_abortutils,   only: endrun
+use cam_logfile,      only: iulog
 
+implicit none
+private
+save
 
+public :: &
+   dyn_grid_init,            &
+   dyn_grid_find_gcols,      &! find nearest column for given lat/lon
+   dyn_grid_get_colndx,      &! global lat and lon coordinate and MPI process indices
+                              ! corresponding to a specified global column index
+   dyn_grid_get_elem_coords, &! coordinates of a specified element (latitude)
+                              ! of the dynamics grid (lat slice of the block)
+   get_block_bounds_d,       &! first and last indices in global block ordering
+   get_block_gcol_d,         &! global column indices for given block
+   get_block_gcol_cnt_d,     &! number of columns in given block
+   get_block_levels_d,       &! vertical levels in column
+   get_block_lvl_cnt_d,      &! number of vertical levels in column
+   get_block_owner_d,        &! process "owning" given block
+   get_dyn_grid_parm,        &
+   get_dyn_grid_parm_real1d, &
+   get_gcol_block_d,         &! global block indices and local columns
+                              ! index for given global column index
+   get_gcol_block_cnt_d,     &! number of blocks containing data
+                              ! from a given global column index
+   get_horiz_grid_d,         &! horizontal grid coordinates
+   get_horiz_grid_dim_d,     &! horizontal dimensions of dynamics grid
+   physgrid_copy_attributes_d
+
+! The SLD dynamics grid
+integer, parameter, public :: dyn_decomp = 101
+
+integer, parameter, public :: ptimelevels = 2  ! number of time levels in the dycore
+
+integer :: ngcols_d = 0     ! number of dynamics columns
+
+!========================================================================================
 contains
-  subroutine get_block_ldof_d(nlev, ldof)
-    use pio, only : pio_offset_kind
-    integer, intent(in) :: nlev
-    integer(kind=pio_offset_kind), intent(out) :: ldof(:)
+!========================================================================================
 
-  end subroutine get_block_ldof_d
+subroutine dyn_grid_init()
 
-!========================================================================
-!
-   subroutine get_block_bounds_d(block_first,block_last)
+   use pspect,          only: ptrm, ptrn, ptrk, pnmax, pmmax, pspt
+
+   use scanslt,         only: j1, platd, nlonex
+   use grmult,          only: grmult_init
+   use gauaw_mod,       only: gauaw
+   use commap,          only: sq, rsq, slat, w, cs, href, ecref, clat, clon, &
+                              latdeg, londeg, xm
+
+   use time_manager,    only: get_step_size
+   use hycoef,          only: hycoef_init, hypi, hypm, hypd, nprlev
+   use ref_pres,        only: ref_pres_init
+   use sld_control_mod, only: ifax, trig
+
+#if (defined SPMD)
+   use spmd_dyn,        only: spmdinit_dyn
+#endif
+
+   ! Local variables
+   type(file_desc_t), pointer :: fh_ini
+
+   integer :: ierr
+   integer :: lonid
+   integer :: latid
+   integer :: mlon             ! longitude dimension length from dataset
+   integer :: morec            ! latitude dimension length from dataset
+
+   real(r8) :: zra2           ! ra squared
+   real(r8) :: zsi(plat)      ! sine of latitudes
+   real(r8) :: zw(plat)       ! Gaussian weights
+   real(r8) :: zalp(2*pspt)   ! Legendre function array
+   real(r8) :: zdalp(2*pspt)  ! Derivative array
+   real(r8) :: zslat          ! sin of lat  and cosine of colatitude
+
+   integer :: i           ! longitude index
+   integer :: j           ! Latitude index
+   integer :: k           ! Level index
+   integer :: kk          ! Level index
+   integer :: itmp        ! Dimension of polynomial arrays temporary.
+   integer :: irow        ! Latitude pair index
+   integer :: lat         ! Latitude index
+
+   real(r8) :: xlat       ! Latitude (radians)
+   real(r8) :: pi         ! Mathematical pi (3.14...)
+
+   real(r8) :: dtime      ! timestep size [seconds]
+   real(r8) :: zdt        ! Time step for settau
+
+
+   character(len=*), parameter :: sub='dyn_grid_init'
+   !-----------------------------------------------------------------------
+
+   ! Get file handle for initial file and first consistency check
+   fh_ini => initial_file_get_id()
+
+   ierr = pio_inq_dimid(fh_ini, 'lon' , lonid)
+   ierr = pio_inq_dimid(fh_ini, 'lat' , latid)
+   ierr = pio_inq_dimlen(fh_ini, lonid , mlon)
+   ierr = pio_inq_dimlen(fh_ini, latid , morec)
+   if (mlon /= plon .or. morec /= plat) then
+       write(iulog,*) sub//': ERROR: model parameters do not match initial dataset parameters'
+       write(iulog,*)'Model Parameters:    plon = ',plon,' plat = ',plat
+       write(iulog,*)'Dataset Parameters:  dlon = ',mlon,' dlat = ',morec
+       call endrun(sub//': ERROR: model parameters do not match initial dataset parameters')
+    end if
+
+   ! Compute truncation parameters
+   call trunc()
+
+#if (defined SPMD)
+   call spmdinit_dyn()
+#endif 
+
+   ! Initialize hybrid coordinate arrays
+   call hycoef_init(fh_ini)
+
+   ! Initialize reference pressures
+   call ref_pres_init(hypi, hypm, nprlev)
+
+   dtime = get_step_size()
+
+   ! Initialize horizontal diffusion coefficients
+   call hdinti(rearth, dtime)
+
+   if (pmmax > plon/2) then
+      call endrun ('INITCOM:mmax=ptrm+1 .gt. plon/2')
+   end if
+
+   ! NMAX dependent arrays
+   zra2 = ra*ra
+   do j = 2, pnmax
+      sq(j)  = j*(j-1)*zra2
+      rsq(j) = 1._r8/sq(j)
+   end do
+   sq(1)  = 0._r8
+   rsq(1) = 0._r8
+
+   ! MMAX dependent arrays
+   do j = 1, pmmax
+      xm(j) = j-1
+   end do
+
+   ! Gaussian latitude dependent arrays
+   call gauaw(zsi, zw, plat)
+   do irow = 1, plat/2
+      slat(irow)        = zsi(irow)
+      w(irow)           = zw(irow)
+      w(plat-irow+1)    = zw(irow)
+      cs(irow)          = 1._r8 - zsi(irow)*zsi(irow)
+      xlat              = asin(slat(irow))
+      clat(irow)        = -xlat
+      clat(plat-irow+1) = xlat
+   end do
+
+   do lat = 1, plat
+      latdeg(lat) = clat(lat)*45._r8/atan(1._r8)
+   end do
+
+   ! Integration matrices of hydrostatic equation(href) and conversion
+   ! term(ecref).  ecref calculated to be consistent with continuity Eq.;
+   ! href calculated to conserve energy.
+   do k = 1, plev
+      do kk = 1, plev
+         href(kk,k)  = 0._r8
+         ecref(kk,k) = 0._r8
+      end do
+   end do
+
+   ! Mean atmosphere energy conversion term is consistent with continiuty
+   ! Eq.  In ecref, 1st index = column; 2nd index = row of matrix.
+   ! Mean atmosphere energy conversion term is energy conserving
+   do k = 1, plev
+      ecref(k,k) = 0.5_r8/hypm(k) * hypd(k)
+      do kk = 1, k-1
+         ecref(kk,k) = 1._r8/hypm(k) * hypd(kk)
+      end do
+   end do
+
+   ! Reference hydrostatic integration matrix consistent with conversion
+   ! term for energy conservation.  In href, 1st index = column; 
+   ! 2nd index = row of matrix.
+   do k = 1, plev
+      do kk = k, plev
+         href(kk,k) = ecref(k,kk)*hypd(kk)/hypd(k)
+      end do
+   end do
+
+   do k = 1, plev
+      do kk = 1, plev
+         href(kk,k) = href(kk,k)*rair
+      end do
+   end do
+
+   ! Compute semi-implicit timestep constants (COMSPE)
+   zdt = 0.5_r8*dtime
+   call settau(zdt)
+
+   ! Compute constants related to Legendre transforms
+   ! Compute and reorder ALP and DALP
+   do j = 1, plat/2
+      zslat = slat(j)
+      itmp = 2*pspt - 1
+      call phcs(zalp, zdalp, itmp, zslat)
+      call reordp(j, itmp, zalp, zdalp)
+   end do
+
+   call grmult_init()
+
+   ! Mirror latitudes south of south pole
+   lat = 1
+   do j = j1-2, 1, -1
+      nlonex(j) = plon
+      lat = lat + 1
+   end do
+   nlonex(j1-1) = plon     ! south pole
+
+   ! Real latitudes
+   j = j1
+   do lat = 1, plat
+      nlonex(j) = plon
+      j = j + 1
+   end do
+   nlonex(j1+plat) = plon  ! north pole
+
+   ! Mirror latitudes north of north pole
+   lat = plat
+   do j = j1+plat+1, platd
+      nlonex(j) = plon
+      lat = lat - 1
+   end do
+
+   ! Longitude array
+   pi = 4.0_r8*atan(1.0_r8)
+   do lat = 1, plat
+      do i = 1, plon
+         londeg(i,lat) = (i-1)*360._r8/plon
+         clon(i,lat)   = (i-1)*2.0_r8*pi/plon
+      end do
+   end do
+
+   ! Set up trigonometric tables for fft
+   do j = 1, plat
+      call set99(trig(1,j), ifax(1,j), plon)
+   end do
+
+   ! Define the CAM grids (must be before addfld calls)
+   call define_cam_grids()
+
+
+   if (masterproc) then
+      write(iulog,*) ' '
+      write(iulog,*) 'Semi-Lagrangian Dynamics -- Done grid and decomposition initialization'
+      write(iulog,*) '  Truncation Parameters: M =',ptrm,'  N =',ptrn,'  K =',ptrk
+      write(iulog,*) '  zdt, dtime=', zdt, dtime
+      write(iulog,*) ' '
+   end if
+
+end subroutine dyn_grid_init
+
+!========================================================================================
+
+subroutine get_block_bounds_d(block_first,block_last)
 
 !----------------------------------------------------------------------- 
 ! 
@@ -605,32 +825,6 @@ contains
    end function get_dyn_grid_parm
 !#######################################################################
 
-subroutine dyn_grid_get_pref(pref_edge, pref_mid, num_pr_lev)
-
-   ! return reference pressures for the dynamics grid
-
-   use hycoef, only: hypi, hypm, nprlev
-
-   ! arguments
-   real(r8), intent(out) :: pref_edge(:) ! reference pressure at layer edges (Pa)
-   real(r8), intent(out) :: pref_mid(:)  ! reference pressure at layer midpoints (Pa)
-   integer,  intent(out) :: num_pr_lev   ! number of top levels using pure pressure representation
-
-   integer :: k
-   !-----------------------------------------------------------------------
-
-   do k = 1, plev
-      pref_edge(k) = hypi(k)
-      pref_mid(k)  = hypm(k)
-   end do
-   pref_edge(plev+1) = hypi(plev+1)
-   
-   num_pr_lev = nprlev
-
-end subroutine dyn_grid_get_pref
-
-!#######################################################################
-
 !-------------------------------------------------------------------------------
 ! This returns the lat/lon information (and corresponding MPI task numbers (owners)) 
 ! of the global model grid columns nearest to the input satellite coordinate (lat,lon)
@@ -794,6 +988,106 @@ endsubroutine dyn_grid_get_elem_coords
 
 !#######################################################################
 
+subroutine physgrid_copy_attributes_d(gridname, grid_attribute_names)
+  use cam_grid_support, only: max_hcoordname_len
+
+  ! Dummy arguments
+  character(len=max_hcoordname_len),          intent(out) :: gridname
+  character(len=max_hcoordname_len), pointer, intent(out) :: grid_attribute_names(:)
+
+  gridname = 'gauss_grid'
+  allocate(grid_attribute_names(4))
+  grid_attribute_names(1) = 'gw'
+  grid_attribute_names(2) = 'ntrm'
+  grid_attribute_names(3) = 'ntrn'
+  grid_attribute_names(4) = 'ntrk'
+
+end subroutine physgrid_copy_attributes_d
+
+!========================================================================================
+! Private Methods
+!========================================================================================
+
+subroutine trunc()
+
+! Check consistency of truncation parameters and evaluate pointers
+! and displacements for spectral arrays
+!
+! Original version:  CCM1
+
+  use shr_kind_mod,   only: r8 => shr_kind_r8
+  use pspect,         only: ptrm, ptrn, ptrk, pmax, pmmax
+  use comspe,         only: ncoefi, nalp, nco2, nm, nstart, nlen, ncutoff, locm
+  use cam_abortutils, only: endrun
+
+  implicit none
+
+!---------------------------Local variables-----------------------------
+!
+  integer n              ! Loop index over diagonals
+  integer ik2            ! K+2
+  integer m              ! loop index
+!
+!-----------------------------------------------------------------------
+!
+! trunc first evaluates truncation parameters for a general pentagonal 
+! truncation for which the following parameter relationships are true
+!
+! 0 .le. |m| .le. ptrm
+!
+! |m| .le. n .le. |m|+ptrn for |m| .le. ptrk-ptrn
+!
+! |m| .le. n .le. ptrk     for (ptrk-ptrn) .le. |m| .le. ptrm
+!
+! Most commonly utilized truncations include:
+!  1: triangular  truncation for which ptrk=ptrm=ptrn
+!  2: rhomboidal  truncation for which ptrk=ptrm+ptrn
+!  3: trapezoidal truncation for which ptrn=ptrk .gt. ptrm
+!
+! Simple sanity check
+! It is necessary that ptrm .ge. ptrk-ptrn .ge. 0
+!
+  if (ptrm.lt.(ptrk-ptrn)) then
+     call endrun ('TRUNC: Error in truncation parameters. ntrm.lt.(ptrk-ptrn)')
+  end if
+  if (ptrk.lt.ptrn) then
+     call endrun ('TRUNC: Error in truncation parameters. ptrk.lt.ptrn')
+  end if
+!
+! Evaluate pointers and displacement info based on truncation params
+!
+  ncoefi(1) = 1
+  ik2 = ptrk + 2
+  do n=1,pmax
+     ncoefi(n+1) = ncoefi(n) + min0(pmmax,ik2-n)
+     nalp(n) = ncoefi(n) - 1
+     nco2(n) = ncoefi(n)*2
+     nm(n) = ncoefi(n+1) - ncoefi(n)
+  end do
+  nstart(1) = 0
+  nlen(1) = ptrn + 1
+  do m=2,pmmax
+     nstart(m) = nstart(m-1) + nlen(m-1)
+     nlen(m) = min0(ptrn+1,ptrk+2-m)
+  end do
+!
+! Define break-even point for vector lengths in GRCALC.  Don't implement
+! for non-PVM machines
+!
+  ncutoff = pmax
+!
+! Assign wavenumbers if not SPMD.
+!
+#if ( ! defined SPMD )
+   do m=1,pmmax
+      locm(m,0) = m
+   enddo
+#endif
+
+end subroutine trunc
+
+!========================================================================================
+
 subroutine define_cam_grids()
   use pmgrid,           only: beglat, endlat, plat, plon
   use pspect,           only: ptrm, ptrn, ptrk
@@ -850,24 +1144,6 @@ subroutine define_cam_grids()
 
 end subroutine define_cam_grids
 
-!#######################################################################
-
-subroutine physgrid_copy_attributes_d(gridname, grid_attribute_names)
-  use cam_grid_support, only: max_hcoordname_len
-
-  ! Dummy arguments
-  character(len=max_hcoordname_len),          intent(out) :: gridname
-  character(len=max_hcoordname_len), pointer, intent(out) :: grid_attribute_names(:)
-
-  gridname = 'gauss_grid'
-  allocate(grid_attribute_names(4))
-  grid_attribute_names(1) = 'gw'
-  grid_attribute_names(2) = 'ntrm'
-  grid_attribute_names(3) = 'ntrn'
-  grid_attribute_names(4) = 'ntrk'
-
-end subroutine physgrid_copy_attributes_d
-
-!#######################################################################
+!========================================================================================
 
 end module dyn_grid

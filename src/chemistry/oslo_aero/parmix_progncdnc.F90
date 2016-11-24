@@ -748,11 +748,8 @@ contains
       !real(r8), dimension(pcols,pver)         :: cxstot     ![kg/m3] non allocated mass
       integer, dimension(pcols)                :: ind        ![idx] index in mapping (not really used)
       real(r8), dimension(pcols,pver)          :: radius_tmp ![m] radius in look up tables
-
-!soa
       real(r8) :: f_ocm(pcols,pver,4) ! [-] fraction of added mass which is either SOA condensate or OC coagulate
-      integer iloop
-!soa
+      integer                               :: iloop
       integer                               :: kcomp
       integer                               :: i
       integer                               :: k
@@ -767,9 +764,8 @@ contains
          ind(i)=i
       end do
 
-!soa  calculate fraction of added mass which is either SOA condensate or OC coagulate,
-!soa  which in AeroTab are both treated as condensate for kcomp=1-4.
-! dette burde kanskje helst beregnes i og hentes fra partitionMass ...?
+!    calculate fraction of added mass which is either SOA condensate or OC coagulate,
+!    which in AeroTab are both treated as condensate for kcomp=1-4
       do kcomp=1,4
         do k=1,pver
           do i=1,ncol
@@ -777,7 +773,6 @@ contains
           enddo
         enddo
       enddo
-!soa
 
  do iloop=1,1   !  loop over i>1 for testing CPU use in intlog*  
 
@@ -790,7 +785,6 @@ contains
          !Calculate growth from knowing added process specific internally mixed mass to each background mode
          !(level sent but not needed, and kcomp not needed for intlog4_sub)
 
-!cka: soa         if( kcomp .ge. MODE_IDX_SO4_AIT .and. kcomp .le. MODE_IDX_BC_AIT)then       ! kcomp=1,2
          if( kcomp .ge. MODE_IDX_SO4SOA_AIT .and. kcomp .le. MODE_IDX_BC_AIT)then       ! kcomp=1,2
 
             do k=1,pver
@@ -800,9 +794,7 @@ contains
                                  , kcomp                       &                 !I [idx] mode index
                                  , camUg(:,k)                  &                 !I [ug/m3] mass concentration
                                  , nConccm3(:,k)               &     !I [#/cm3] number concentration
-!soa
                                  , f_ocm(:,k,kcomp)            &                 !I [frc] mass fraction which is SOA cond. or OC coag.
-!soa
                                  , cxs(:,k,kcomp)              &                 !O [ug/m3] mass which did not fit the table
                                  , log10sig(:,k)               &                 !O [-]sigma, is later thrown away begause of volume balance
                                  , radius_tmp(:,k)             &                 !O [m] Number median radius                  
@@ -819,9 +811,7 @@ contains
                               , kcomp                          &                 !I [idx] mode index
                               , camUg(:,k)                     &                 !I [ug/m3] mass concentration
                               , nConccm3(:,k)                  &        !I [#/cm3] number concentration
-!soa                              , f_aitbc(:,k)                   &                 !I [frc] bc fraction in int mix bc/oc mode
                               , f_ocm(:,k,kcomp)               &                 !I [frc] mass fraction which is SOA cond. or OC coag.
-!soa
                               , f_aqm(:,k,kcomp)               &                 !I [frc] fraction of sulfate which is aquous
                               , cxs(:,k,kcomp)                 &                 !O [ug/m3] mass which did not fit the table
                               , log10sig(:,k)                  &                 !O [-]sigma, is later thrown away begause of volume balance

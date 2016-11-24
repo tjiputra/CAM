@@ -77,7 +77,6 @@ contains
     use mo_strato_rates,   only : init_strato_rates
     use mo_cph,            only : init_cph
     use mo_sad,            only : sad_inti
-    use mo_solarproton,    only : spe_init
     use mo_solar_parms,    only : solar_parms_init, solar_parms_get
     use euvac,             only : euvac_init, euvac_set_etf
     use mo_heatnirco2,     only : heatnirco2_init
@@ -218,11 +217,6 @@ contains
     !-----------------------------------------------------------------------
     call euvac_init (euvac_file)
     call euvac_set_etf( f107, f107a )
-
-    !-----------------------------------------------------------------------
-    ! 	... initialize the solar proton event module
-    !-----------------------------------------------------------------------
-    call spe_init()
 
     call photo_inti( xs_coef_file, xs_short_file, xs_long_file, rsf_file, &
          photon_file, electron_file, &

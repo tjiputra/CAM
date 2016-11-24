@@ -37,6 +37,29 @@ real(r8) :: cpair     ! specific heat of dry air
 real(r8) :: rair      ! gas constant for dry air
 real(r8) :: zvir      ! rh2o/rair - 1
 
+
+!------------------------------------------------------------------------!
+! Purpose: Compilers aren't creating optimized vector versions of        !
+!          elemental routines, so we'll explicitly create them and bind  !
+!          them via an interface for transparent use                     !
+!------------------------------------------------------------------------!
+interface calc_ustar
+  module procedure calc_ustar_scalar
+  module procedure calc_ustar_vector
+end interface 
+
+interface calc_obklen
+  module procedure calc_obklen_scalar
+  module procedure calc_obklen_vector
+end interface
+
+interface virtem
+  module procedure virtem_vector1D
+  module procedure virtem_vector2D  ! Used in hb_diff.F90
+end interface
+
+
+
 contains
 
 subroutine pbl_utils_init(g_in,vk_in,cpair_in,rair_in,zvir_in)
@@ -59,7 +82,7 @@ subroutine pbl_utils_init(g_in,vk_in,cpair_in,rair_in,zvir_in)
 
 end subroutine pbl_utils_init
 
-elemental subroutine calc_ustar( t,    pmid, taux, tauy, &
+subroutine calc_ustar_scalar( t,    pmid, taux, tauy, &
                                  rrho, ustar)
 
   !-----------------------------------------------------------------------!
@@ -78,9 +101,33 @@ elemental subroutine calc_ustar( t,    pmid, taux, tauy, &
   rrho = rair * t / pmid
   ustar = max( sqrt( sqrt(taux**2 + tauy**2)*rrho ), ustar_min )
 
-end subroutine calc_ustar
+end subroutine calc_ustar_scalar
 
-elemental subroutine calc_obklen( ths,  thvs, qflx, shflx, rrho, ustar, &
+subroutine calc_ustar_vector(n, t, pmid, taux, tauy, &
+                                 rrho, ustar)
+
+  !-----------------------------------------------------------------------!
+  ! Purpose: Calculate ustar and bottom level density (necessary for      !
+  !  Obukhov length calculation).                                         !
+  !-----------------------------------------------------------------------!
+  integer, intent(in) :: n             ! Length of vectors
+
+  real(r8), intent(in) :: t(n)         ! surface temperature
+  real(r8), intent(in) :: pmid(n)      ! midpoint pressure (bottom level)
+  real(r8), intent(in) :: taux(n)      ! surface u stress [N/m2]
+  real(r8), intent(in) :: tauy(n)      ! surface v stress [N/m2]
+
+
+  real(r8), intent(out) :: rrho(n)     ! 1./bottom level density
+  real(r8), intent(out) :: ustar(n)    ! surface friction velocity [m/s]
+
+
+  rrho = rair * t / pmid
+  ustar = max( sqrt( sqrt(taux**2 + tauy**2)*rrho ), ustar_min )
+
+end subroutine calc_ustar_vector
+
+subroutine calc_obklen_scalar( ths,  thvs, qflx, shflx, rrho, ustar, &
                                   khfs, kqfs, kbfs, obklen)
 
   !-----------------------------------------------------------------------!
@@ -108,20 +155,72 @@ elemental subroutine calc_obklen( ths,  thvs, qflx, shflx, rrho, ustar, &
   ! Compute Obukhov length:
   obklen = -thvs * ustar**3 / (g*vk*(kbfs + sign(1.e-10_r8,kbfs)))
 
-end subroutine calc_obklen
+end subroutine calc_obklen_scalar
 
-elemental real(r8) function virtem(t,q)
+subroutine calc_obklen_vector(n, ths,  thvs, qflx, shflx, rrho, ustar, &
+                                  khfs, kqfs, kbfs, obklen)
+
+  !-----------------------------------------------------------------------!
+  ! Purpose: Calculate Obukhov length and kinematic fluxes.               !
+  !-----------------------------------------------------------------------!
+  integer, intent(in) :: n                  ! Length of vectors
+
+  real(r8), intent(in)  :: ths(n)           ! potential temperature at surface [K]
+  real(r8), intent(in)  :: thvs(n)          ! virtual potential temperature at surface
+  real(r8), intent(in)  :: qflx(n)          ! water vapor flux (kg/m2/s)
+  real(r8), intent(in)  :: shflx(n)         ! surface heat flux (W/m2)
+
+  real(r8), intent(in)  :: rrho(n)          ! 1./bottom level density [ m3/kg ]
+  real(r8), intent(in)  :: ustar(n)         ! Surface friction velocity [ m/s ]
+
+  real(r8), intent(out) :: khfs(n)          ! sfc kinematic heat flux [mK/s]
+  real(r8), intent(out) :: kqfs(n)          ! sfc kinematic water vapor flux [m/s]
+  real(r8), intent(out) :: kbfs(n)          ! sfc kinematic buoyancy flux [m^2/s^3]
+  real(r8), intent(out) :: obklen(n)        ! Obukhov length
+
+
+  ! Need kinematic fluxes for Obukhov:
+  khfs = shflx*rrho/cpair
+  kqfs = qflx*rrho
+  kbfs = khfs + zvir*ths*kqfs
+
+  ! Compute Obukhov length:
+  obklen = -thvs * ustar**3 / (g*vk*(kbfs + sign(1.e-10_r8,kbfs)))
+
+end subroutine calc_obklen_vector
+
+subroutine virtem_vector1D(n, t,q, virtem)
 
   !-----------------------------------------------------------------------!
   ! Purpose: Calculate virtual temperature from temperature and specific  !
   !  humidity.                                                            !
   !-----------------------------------------------------------------------!
 
-  real(r8), intent(in) :: t, q
+  integer,  intent(in) :: n              ! vector length
+
+  real(r8), intent(in) :: t(n), q(n)
+  real(r8), intent(out):: virtem(n)
 
   virtem = t * (1.0_r8 + zvir*q)
 
-end function virtem
+end subroutine virtem_vector1D
+
+subroutine virtem_vector2D(n, m, t, q, virtem)
+
+  !-----------------------------------------------------------------------!
+  ! Purpose: Calculate virtual temperature from temperature and specific  !
+  !  humidity.                                                            !
+  !-----------------------------------------------------------------------!
+
+  integer,  intent(in) :: n, m            ! vector lengths
+
+  real(r8), intent(in) :: t(n,m), q(n,m)
+  real(r8), intent(out):: virtem(n,m)
+
+  virtem = t * (1.0_r8 + zvir*q)
+
+end subroutine virtem_vector2D
+
 
 subroutine compute_radf( choice_radf, i, pcols, pver, ncvmax, ncvfin, ktop, qmin, &
                          ql, pi, qrlw, g, cldeff, zi, chs, lwp_CL, opt_depth_CL,  &

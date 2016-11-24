@@ -80,7 +80,7 @@ CONTAINS
          pio_put_var, pio_initdecomp, pio_setframe, &
          pio_freedecomp, pio_enddef, file_desc_t
     use cam_pio_utils, only : pio_subsystem
-    use dyn_comp, only : timelevel
+    use dyn_grid, only : timelevel
     use control_mod, only: qsplit
     use time_mod, only : tstep, TimeLevel_Qdp
     use element_mod, only : element_t
@@ -310,13 +310,13 @@ CONTAINS
   subroutine read_restart_dynamics (File, dyn_in, dyn_out)
     ! for restart and initial condition, timelevel == timelevel_dyn
     ! so we wont update this routine to use both  
-    use dyn_comp, only : timelevel
+    use dyn_grid, only: elem, timelevel
     use parallel_mod, only : initmp, par
     use element_mod, only : element_t
     use pio, only : file_desc_t, pio_global, pio_double, pio_offset_kind, &
          pio_get_att, pio_inq_dimid, pio_inq_dimlen, pio_initdecomp, pio_inq_varid, &
          pio_read_darray, pio_setframe, file_desc_t, io_desc_t, pio_double
-    use dyn_comp, only : dyn_init1, dyn_init2
+    use dyn_comp, only :  dyn_init
     use dimensions_mod, only : nlev, np, ne, nelemd, qsize_d
     use cam_abortutils,   only: endrun
     use constituents, only : cnst_name
@@ -329,16 +329,14 @@ CONTAINS
     ! Input arguments
     !
     type(File_desc_t), intent(inout) :: File
-    type(dyn_import_t), intent(inout)  :: dyn_in
-    type(dyn_export_t), intent(inout)  :: dyn_out
+    type(dyn_import_t), intent(out)  :: dyn_in
+    type(dyn_export_t), intent(out)  :: dyn_out
 
     type(io_desc_t) :: iodesc2d, iodesc3d
     real(r8), allocatable :: var3d(:), var2d(:)
     integer :: ie, ierr, fne, fnp, fnlev
     integer :: ncols
     integer, pointer :: ldof(:)
-    type(element_t), pointer :: elem(:)               ! pointer to dyn_in element array
-    type(fvm_struct), pointer :: fvm(:)
     integer(kind=pio_offset_kind), parameter :: t = 1
     integer :: i, k, cnt, st, tl, tlQdp, s2d, q, j
     integer :: timelevel_dimid, timelevel_chk
@@ -346,13 +344,6 @@ CONTAINS
 !    type(file_desc_t) :: ncid
 !    integer :: ncid
 
-    call dyn_init1(file, dyn_in, dyn_out)
-
-   if (iam .lt. par%nprocs) then
-    elem=>dyn_in%elem
-   else
-    allocate (elem(0))
-   endif
 
     ierr = PIO_Get_Att(File, PIO_GLOBAL, 'ne', fne)
     ierr = PIO_Get_Att(File, PIO_GLOBAL, 'np', fnp)
@@ -545,15 +536,8 @@ CONTAINS
 
     deallocate(qdesc, qdesc_dp)
 
-    call dyn_init2(dyn_in)
+    call dyn_init(dyn_in, dyn_out)
 
-   if (iam .lt. par%nprocs) then
-   else
-    deallocate(elem)
-    deallocate(fvm)
-   endif  !!  iam .lt. par%nprocs
-
-    return
 
   end subroutine read_restart_dynamics
 

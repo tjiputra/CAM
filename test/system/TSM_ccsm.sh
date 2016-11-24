@@ -93,10 +93,10 @@ fi
 ./xmlchange -file env_run.xml -id DOUT_S -val FALSE
 ./xmlchange -file env_run.xml -id RUN_WITH_SUBMIT -val TRUE
 runscript=`ls *.run` 
-./$runscript > ${CAM_TESTDIR}/${test_name}/test.log 2>&1
+CIMEROOT=${CAM_ROOT}/cime ./$runscript > ${CAM_TESTDIR}/${test_name}/test.log 2>&1
 rc=$?
 cd ${rundir}
-if [-e ${CAM_TESTDIR}/case.$1.$2/logs/atm.log*]; then
+if [ -e ${CAM_TESTDIR}/case.$1.$2/logs/atm.log* ]; then
    log_file=`ls -t ${CAM_TESTDIR}/case.$1.$2/logs/atm.log* | head -n1`
 else
    log_file=`ls -t ${CAM_TESTDIR}/case.$1.$2/run/atm.log* | head -n1`

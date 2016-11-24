@@ -30,7 +30,6 @@
       subroutine init_hrates( )
         use mo_chem_utls, only : get_spc_ndx
         use cam_history,  only : addfld
-        use ppgrid,       only : pver
         use ref_pres,     only : ptop_ref, psurf_ref
 
 
@@ -170,9 +169,6 @@
       real(r8)     ::  euv_hrate(ncol,pver)                          ! chunk euv thermal heating rate
       real(r8)     ::  aur_hrate(ncol,pver)                          ! chunk auroral heating rate
       real(r8)     ::  co2_hrate(ncol,pver)                          ! chunk co2 nir heating rate
-      real(r8)     ::  o2mmr(ncol,pver)                              ! chunk o2 concentration (kg/kg)
-      real(r8)     ::  ommr(ncol,pver)                               ! chunk o concentration (kg/kg)
-      real(r8)     ::  fac1(pver)                                    ! work array
       real(r8)     ::  colo3(pver)                                   ! vertical o3 column density
       real(r8)     ::  zarg(pver)                                    ! vertical height array
       real(r8)     ::  parg(pver)                                    ! vertical pressure array (hPa)
@@ -433,11 +429,7 @@ column_loop : &
 !-----------------------------------------------------------------------      
 !     	... auroral ion production
 !-----------------------------------------------------------------------      
-      do k = 1,pver
-         o2mmr(:ncol,k) = mmr(:ncol,k,id_o2)
-         ommr(:ncol,k)  = mmr(:ncol,k,id_o)
-      end do
-      call aurora( state%t, o2mmr, ommr, mbar, rlats, &
+      call aurora( state%t, mbar, rlats, &
                    aur_hrate, cpair, state%pmid, lchnk, calday, &
                    ncol, rlons )
       do k = 1,pver

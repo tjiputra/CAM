@@ -27,18 +27,20 @@ module mo_apex
    use cam_abortutils,  only: endrun
    use cam_logfile,     only: iulog
    use spmd_utils,      only: masterproc
-   use apex,            only: apex_mka, apex_mall, apex_dypol
-
+   use apex,            only: apex_mka, apex_mall, apex_dypol, apex_set_igrf
+   use apex,            only: apex_beg_yr, apex_end_yr
    implicit none
 
    private
+   public :: mo_apex_readnl
    public :: mo_apex_init
    public :: alatm, alonm, bnorth, beast, bdown, bmag
    public :: d1vec, d2vec, colatp, elonp
    public :: maglon0 ! geographic longitude at the equator where geomagnetic longitude is zero (radians)
 
-   ! year to initialize apex -- probably should be namelist variable
-   integer, public, parameter :: geomag_year = 1995
+   ! year to initialize apex
+   real(r8), public, protected :: geomag_year = -1._r8
+   integer :: fixed_geomag_year = -1
 
 !-------------------------------------------------------------------------------
 ! Magnetic field output arrays, chunked for physics:
@@ -60,10 +62,49 @@ module mo_apex
 
    real(r8), protected :: maglon0
 
-   logical :: initialized = .false.
+   character(len=256) :: igrf_geomag_coefs_file = 'igrf_geomag_coefs_file'
 
 contains
 
+!======================================================================
+!======================================================================
+subroutine mo_apex_readnl(nlfile)
+
+  use namelist_utils, only : find_group_name
+  use units,          only : getunit, freeunit
+  use spmd_utils,     only : mpicom, masterprocid, mpi_integer, mpi_character
+
+  character(len=*), intent(in) :: nlfile  ! filepath for file containing namelist input
+
+  ! Local variables
+  integer :: unitn, ierr
+  character(len=*), parameter :: subname = 'mo_apex_readnl'
+
+  namelist /geomag_nl/ fixed_geomag_year, igrf_geomag_coefs_file
+
+  ! Read namelist
+  if (masterproc) then
+     unitn = getunit()
+     open( unitn, file=trim(nlfile), status='old' )
+     call find_group_name(unitn, 'geomag_nl', status=ierr)
+     if (ierr == 0) then
+        read(unitn, geomag_nl, iostat=ierr)
+        if (ierr /= 0) then
+           call endrun(subname // ':: ERROR reading namelist')
+        end if
+     end if
+     close(unitn)
+     call freeunit(unitn)
+  end if
+
+  ! Broadcast namelist variables
+  call mpi_bcast(fixed_geomag_year,  1, mpi_integer, masterprocid, mpicom, ierr)
+  call mpi_bcast(igrf_geomag_coefs_file,  len(igrf_geomag_coefs_file), mpi_character, masterprocid, mpicom, ierr)
+
+end subroutine mo_apex_readnl
+
+!======================================================================
+!======================================================================
 subroutine mo_apex_init(phys_state)
 !-------------------------------------------------------------------------------
 ! Driver for apex code to calculate apex magnetic coordinates at 
@@ -75,9 +116,12 @@ subroutine mo_apex_init(phys_state)
 
    use physconst,only : pi
    use physics_types, only: physics_state
+   use epp_ionization,only: epp_ionization_setmag
+   use time_manager,  only: get_curr_date
+   use dyn_grid,      only: get_horiz_grid_dim_d
 
    ! Input/output arguments
-   type(physics_state), pointer :: phys_state(:)
+   type(physics_state), intent(in), dimension(begchunk:endchunk) :: phys_state
 
 !-------------------------------------------------------------------------------
 ! Local variables
@@ -91,8 +135,8 @@ subroutine mo_apex_init(phys_state)
    integer  :: c, i, j, ist           ! indices
    integer  :: ncol
 
-   real(r8) :: rekm, h0km, alt, hr, ror03, alon, alat, & ! apxmall args
-               vmp, w, d, be3, sim, xlatqd, f, si, date, collat, collon
+   real(r8) :: alt, hr, alon, alat, & ! apxmall args
+               vmp, w, d, be3, sim, xlatqd, f, si, collat, collon
 
 !-------------------------------------------------------------------------------
 ! Non-scalar arguments returned by APXMALL:
@@ -109,22 +153,38 @@ subroutine mo_apex_init(phys_state)
    real(r8), parameter :: rtd = 180._r8/pi     ! radians to degrees
    real(r8), parameter :: dtr = pi/180._r8     ! degrees to radians
 
-   integer, parameter :: nglats = 181
-   integer, parameter :: nglons = 361
+   integer :: nglats
+   integer :: nglons
    integer, parameter :: ngalts = 2             ! number of altitudes
 
-   real(r8) :: gridlats(nglats)
-   real(r8) :: gridlons(nglons)
+   real(r8), allocatable :: gridlats(:)
+   real(r8), allocatable :: gridlons(:)
    real(r8) :: gridalts(ngalts)                   ! altitudes passed to apxmka
 
-   if (initialized) return
+   real(r8) :: maglat(pcols,begchunk:endchunk)
+   integer :: ngcols, hdim1_d, hdim2_d
+   integer :: yr, mon, day, sec
+
+   ! read the IGRF coefs from file
+   call apex_set_igrf( igrf_geomag_coefs_file )
+
+   if (fixed_geomag_year>0) then
+      yr = fixed_geomag_year
+   else
+      call get_curr_date(yr, mon, day, sec)
+   end if
+
+   if ( yr < apex_beg_yr )   yr = apex_beg_yr
+   if ( yr > apex_end_yr-1 ) yr = apex_end_yr-1
+
+   if (.not.(yr > geomag_year)) return
+
+   geomag_year = dble(yr)+0.5_r8
 
 !-------------------------------------------------------------------------------
 ! Allocate output arrays
 !-------------------------------------------------------------------------------
    call allocate_arrays
-
-   date = dble(geomag_year)
 
 !-------------------------------------------------------------------------------
 ! Center min, max altitudes about 130 km
@@ -135,6 +195,26 @@ subroutine mo_apex_init(phys_state)
 ! Initialize APEX with a regular lat/lon grid ...
 ! (Note apex_mka expects longitudes in -180 -> +180)
 !-------------------------------------------------------------------------------
+   call get_horiz_grid_dim_d(hdim1_d,hdim2_d)
+   ngcols = hdim1_d*hdim2_d
+   if (     ngcols < 1000 ) then ! 10-degrees
+      nglats = 19
+      nglons = 37
+   elseif ( ngcols < 10000 ) then ! 5-degrees
+      nglats = 37
+      nglons = 73
+   elseif ( ngcols < 20000 ) then ! 2-degree
+      nglats = 91
+      nglons = 181
+   elseif ( ngcols < 100000 ) then ! 1-degree
+      nglats = 181
+      nglons = 361
+   else                            ! half-degee
+      nglats = 361
+      nglons = 721
+   endif
+
+   allocate ( gridlats(nglats), gridlons(nglons) )
    do i = 1,nglons
       gridlons(i) = -180._r8 + dble(i-1)*360._r8/(nglons-1)
    enddo
@@ -142,7 +222,7 @@ subroutine mo_apex_init(phys_state)
       gridlats(j) = -90._r8 + dble(j-1)*180._r8/(nglats-1)
    enddo
 
-   call apex_mka( date, gridlats, gridlons, gridalts, &
+   call apex_mka( geomag_year, gridlats, gridlons, gridalts, &
                   nglats, nglons, ngalts, ist )
 
    if( ist /= 0 ) then
@@ -150,11 +230,10 @@ subroutine mo_apex_init(phys_state)
      call endrun("mo_apex_init: Error from apxmka")
    end if
 
-   rekm  = re*cm2km    ! earth radius (km)
-   h0km  = h0*cm2km    ! base height (km)
+   deallocate( gridlats, gridlons )
+
    alt   = hs*cm2km    ! altitude for apxmall (km)
    hr    = alt         ! reference altitude (km)
-   ror03 = ((rekm + alt)/(rekm + h0km))**3
 
 !------------------------------------------------------------------------------
 ! Apex coords alon, alat are returned for each geographic grid point:
@@ -182,6 +261,7 @@ subroutine mo_apex_init(phys_state)
          bdown (i,c) = -bg(3)
          alonm (i,c) = alon*dtr       ! mag lons (radians)
          alatm (i,c) = alat*dtr       ! mag lats (radians)
+         maglat(i,c) = alat  ! mag lats (degrees)
       enddo
    enddo
 
@@ -207,11 +287,15 @@ subroutine mo_apex_init(phys_state)
    call apex_dypol( colatp, elonp, rdum )	! get geomagnetic dipole north pole 
 
    if (masterproc) then
-      write(iulog,*) 'mo_apex_init: colatp,elonp ', colatp, elonp
-      write(iulog, "('mo_apex_init: Calculated apex magnetic coordinates for year AD ',i4)") geomag_year
+      write(iulog, "('mo_apex_init: nglons,nglats ', 2i6)") nglons, nglats
+      write(iulog, "('mo_apex_init: colatp,elonp ', 2f12.6)") colatp, elonp
+      if (fixed_geomag_year<1) then
+         write(iulog, "('mo_apex_init: model yr,mon,day,sec ',4i6)") yr, mon, day, sec
+      endif
+      write(iulog, "('mo_apex_init: Calculated apex magnetic coordinates for year AD ',f8.2)") geomag_year
    endif
 
-   initialized = .true.
+   call epp_ionization_setmag(maglat)
 
 end subroutine mo_apex_init
 

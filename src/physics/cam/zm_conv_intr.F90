@@ -54,8 +54,10 @@ module zm_conv_intr
    real(r8) :: zmconv_ke_lnd = unset_r8
    real(r8) :: zmconv_momcu  = unset_r8
    real(r8) :: zmconv_momcd  = unset_r8
-   logical  :: zmconv_org                !  Parameterization for sub-grid scale convective organization for the ZM deep 
-                                         !  convective scheme based on Mapes and Neale (2011)
+   integer  :: zmconv_num_cin            ! Number of negative buoyancy regions that are allowed 
+                                         ! before the convection top and CAPE calculations are completed.
+   logical  :: zmconv_org                ! Parameterization for sub-grid scale convective organization for the ZM deep 
+                                         ! convective scheme based on Mapes and Neale (2011)
 
 !  indices for fields in the physics buffer
    integer  ::    cld_idx          = 0    
@@ -114,6 +116,12 @@ subroutine zm_conv_register
 ! deep gbm cloud liquid water (kg/kg)    
    call pbuf_add_field('DP_CLDICE','global',dtype_r8,(/pcols,pver/), dp_cldice_idx)  
 
+   call pbuf_add_field('ICWMRDP',    'physpkg',dtype_r8,(/pcols,pver/),icwmrdp_idx)
+   call pbuf_add_field('RPRDDP',     'physpkg',dtype_r8,(/pcols,pver/),rprddp_idx)
+   call pbuf_add_field('NEVAPR_DPCU','physpkg',dtype_r8,(/pcols,pver/),nevapr_dpcu_idx)
+   call pbuf_add_field('PREC_DP',    'physpkg',dtype_r8,(/pcols/),     prec_dp_idx)
+   call pbuf_add_field('SNOW_DP',   'physpkg',dtype_r8,(/pcols/),      snow_dp_idx)
+
    if (zmconv_org) then
       call cnst_add('ZM_ORG',0._r8,0._r8,0._r8,ixorg,longname='organization parameter')
    endif
@@ -125,10 +133,9 @@ end subroutine zm_conv_register
 subroutine zm_conv_readnl(nlfile)
 
    use cam_abortutils,  only: endrun
-   use spmd_utils,      only: masterproc
+   use spmd_utils,      only: mpicom, masterproc, masterprocid, mpi_real8, mpi_integer, mpi_logical
    use namelist_utils,  only: find_group_name
    use units,           only: getunit, freeunit
-   use mpishorthand
 
    character(len=*), intent(in) :: nlfile  ! filepath for file containing namelist input
 
@@ -136,7 +143,8 @@ subroutine zm_conv_readnl(nlfile)
    integer :: unitn, ierr
    character(len=*), parameter :: subname = 'zm_conv_readnl'
 
-   namelist /zmconv_nl/ zmconv_c0_lnd, zmconv_c0_ocn, zmconv_ke, zmconv_ke_lnd, zmconv_org, &
+   namelist /zmconv_nl/ zmconv_c0_lnd, zmconv_c0_ocn, zmconv_num_cin, &
+                        zmconv_ke, zmconv_ke_lnd, zmconv_org, &
                         zmconv_momcu, zmconv_momcd
    !-----------------------------------------------------------------------------
 
@@ -155,16 +163,23 @@ subroutine zm_conv_readnl(nlfile)
 
    end if
 
-#ifdef SPMD
    ! Broadcast namelist variables
-   call mpibcast(zmconv_c0_lnd,            1, mpir8,  0, mpicom)
-   call mpibcast(zmconv_c0_ocn,            1, mpir8,  0, mpicom)
-   call mpibcast(zmconv_ke,                1, mpir8,  0, mpicom)
-   call mpibcast(zmconv_ke_lnd,            1, mpir8,  0, mpicom)
-   call mpibcast(zmconv_momcu,             1, mpir8,  0, mpicom)
-   call mpibcast(zmconv_momcd,             1, mpir8,  0, mpicom)
-   call mpibcast(zmconv_org,               1, mpilog, 0, mpicom)
-#endif
+   call mpi_bcast(zmconv_num_cin,           1, mpi_integer, masterprocid, mpicom, ierr)
+   if (ierr /= 0) call endrun("zm_conv_init: FATAL: mpi_bcast: zmconv_num_cin")
+   call mpi_bcast(zmconv_c0_lnd,            1, mpi_real8,   masterprocid, mpicom, ierr)
+   if (ierr /= 0) call endrun("zm_conv_init: FATAL: mpi_bcast: zmconv_c0_lnd")
+   call mpi_bcast(zmconv_c0_ocn,            1, mpi_real8,   masterprocid, mpicom, ierr)
+   if (ierr /= 0) call endrun("zm_conv_init: FATAL: mpi_bcast: zmconv_c0_ocn")
+   call mpi_bcast(zmconv_ke,                1, mpi_real8,   masterprocid, mpicom, ierr)
+   if (ierr /= 0) call endrun("zm_conv_init: FATAL: mpi_bcast: zmconv_ke")
+   call mpi_bcast(zmconv_ke_lnd,            1, mpi_real8,   masterprocid, mpicom, ierr)
+   if (ierr /= 0) call endrun("zm_conv_init: FATAL: mpi_bcast: zmconv_ke_lnd")
+   call mpi_bcast(zmconv_momcu,             1, mpi_real8,   masterprocid, mpicom, ierr)
+   if (ierr /= 0) call endrun("zm_conv_init: FATAL: mpi_bcast: zmconv_momcu")
+   call mpi_bcast(zmconv_momcd,             1, mpi_real8,   masterprocid, mpicom, ierr)
+   if (ierr /= 0) call endrun("zm_conv_init: FATAL: mpi_bcast: zmconv_momcd")
+   call mpi_bcast(zmconv_org,               1, mpi_logical, masterprocid, mpicom, ierr)
+   if (ierr /= 0) call endrun("zm_conv_init: FATAL: mpi_bcast: zmconv_org")
 
 end subroutine zm_conv_readnl
 
@@ -294,15 +309,10 @@ subroutine zm_conv_init(pref_edge)
         
     no_deep_pbl = phys_deepconv_pbl()
     call zm_convi(limcnv,zmconv_c0_lnd, zmconv_c0_ocn, zmconv_ke, zmconv_ke_lnd, &
-                  zmconv_momcu, zmconv_momcd, zmconv_org, no_deep_pbl_in = no_deep_pbl)
+                  zmconv_momcu, zmconv_momcd, zmconv_num_cin, zmconv_org, no_deep_pbl_in = no_deep_pbl)
 
     cld_idx         = pbuf_get_index('CLD')
-    icwmrdp_idx     = pbuf_get_index('ICWMRDP')
-    rprddp_idx      = pbuf_get_index('RPRDDP')
     fracis_idx      = pbuf_get_index('FRACIS')
-    nevapr_dpcu_idx = pbuf_get_index('NEVAPR_DPCU')
-    prec_dp_idx     = pbuf_get_index('PREC_DP')
-    snow_dp_idx     = pbuf_get_index('SNOW_DP')
 
 end subroutine zm_conv_init
 !=========================================================================================

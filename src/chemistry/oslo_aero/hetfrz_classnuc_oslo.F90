@@ -775,6 +775,7 @@ subroutine get_aer_num(qaerpt, qaercwpt, rhoair,           &   ! input
     num_dst1_idx = MODE_IDX_DST_A2
     num_dst3_idx = MODE_IDX_DST_A3
 
+
 !*****************************************************************************
 !                calculate intersitial aerosol 
 !*****************************************************************************
@@ -847,7 +848,7 @@ subroutine get_aer_num(qaerpt, qaercwpt, rhoair,           &   ! input
         awcam(2) = 0._r8
     end if
     if (awcam(2) >0._r8) then
-        awfacm(2) = f_acm(num_dst1_idx) 
+        awfacm(2) = f_acm(num_dst1_idx)
     else
         awfacm(2) = 0._r8
     end if
@@ -859,9 +860,9 @@ subroutine get_aer_num(qaerpt, qaercwpt, rhoair,           &   ! input
         awcam(3) = 0._r8
     end if
     if (awcam(3) >0._r8) then
-        awfacm(3) = f_acm(num_dst3_idx) 
-    else
-    awfacm(3) = 0._r8
+      awfacm(3) = f_acm(num_dst3_idx)
+    else 
+       awfacm(3) = 0._r8
     end if
         
         

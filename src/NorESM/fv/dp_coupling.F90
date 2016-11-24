@@ -77,7 +77,7 @@ CONTAINS
     use constituents,   only: cnst_get_type_byind, qmin
     use physics_types,  only: set_state_pdry, set_wet_to_dry
 
-    use pmgrid,         only: plev, plevp
+    use pmgrid,         only: plev
     use ctem,           only: ctem_diags, do_circulation_diags
     use gravity_waves_sources, only: gws_src_fnct
     use physconst,    only: physconst_update
@@ -272,7 +272,7 @@ CONTAINS
     endif
     if (use_gw_front .or. use_gw_front_igw) then
        call t_startf('DP_CPLN_gw_sources')
-       call gws_src_fnct (u3,v3,ptxy,  tracer(:,jfirstxy:jlastxy,:,1), pexy, grid, frontgf, frontga)
+       call gws_src_fnct(grid, u3, v3, ptxy, tracer(:,jfirstxy:jlastxy,:,1), pexy, frontgf, frontga)
        call t_stopf('DP_CPLN_gw_sources')
     end if
     if (qbo_use_forcing) then

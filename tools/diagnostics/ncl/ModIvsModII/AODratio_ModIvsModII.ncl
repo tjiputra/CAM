@@ -18,6 +18,7 @@ begin
  coffa=pi*re^2./180.      
  area1=4.*pi*re^2          
  small=1.0e-15             ; small number
+ small6=1.0e-6             ; small number
 
 ; *************************************************************************
 ; **** To be edited by the user if the ncl script is run interactively ****
@@ -116,15 +117,16 @@ end if
  else if (plot_type.eq.5) then
  var="ANG4487"                        ; name of plot to be made                    
  varname="ANG~B~4487~N~ "             ; variable name used in text string:
- AOD_I=-log((/f1_I[:]->DOD870/)/(/(f1_I[:]->DOD440)/))/log(870.0/440.0)
+; AOD_I=-log((/f1_I[:]->DOD870/)/(/(f1_I[:]->DOD440)/))/log(870.0/440.0)
+ AOD_I=-log((/(f1_I[:]->DOD870)/)/(/(f1_I[:]->DOD440)/))/log(870.0/440.0)
  AOD_II=-log((/(f1_II[:]->DOD870)/)/(/(f1_II[:]->DOD440)/))/log(870.0/440.0)
-; AOD_I=-log((/f1_I[:]->DOD670/)/(/(f1_I[:]->DOD500)/))/log(670.0/500.0)       ; alternative definition (ANG5067)
+; AOD_I=-log((/(f1_I[:]->DOD670)/)/(/(f1_I[:]->DOD500)/))/log(670.0/500.0)       ; alternative definition (ANG5067)
 ; AOD_II=-log((/(f1_II[:]->DOD670)/)/(/(f1_II[:]->DOD500)/))/log(670.0/500.0)  ; alternative definition (ANG5067)
  else if (plot_type.eq.6) then
  var="CANG4487"                        ; name of plot to be made                    
  varname="Clear-sky ANG~B~4487~N~ "             ; variable name used in text string:
- AOD_I=-log((/f1_I[:]->CDOD870/)/(/(f1_I[:]->CDOD440)/))/log(870.0/440.0)
- AOD_II=-log((/(f1_II[:]->CDOD870)/)/(/(f1_II[:]->CDOD440)/))/log(870.0/440.0)
+ AOD_I =-log(((/(f1_I[:]->CDOD870)/)/((/(f1_I[:]->CLDFREE)/)+small6))/((/(f1_I[:]->CDOD440)/)/((/(f1_I[:]->CLDFREE)/)+small6)))/log(870.0/440.0)
+ AOD_II=-log((((/(f1_II[:]->CDOD870)/)+small6)/((/(f1_II[:]->CLDFREE)/)+small6))/(((/(f1_II[:]->CDOD440)/)+small6)/((/(f1_II[:]->CLDFREE)/)+small6)))/log(870.0/440.0)
  end if
  end if
  end if

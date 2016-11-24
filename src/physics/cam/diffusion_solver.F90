@@ -131,7 +131,8 @@
                             p               , t                  , rhoi          , ztodt        , taux        , &
                             tauy            , shflx              , cflx          , &
                             kvh             , kvm                , kvq           , cgs          , cgh         , &
-                            zi              , ksrftms            , qmincg        , fieldlist    , fieldlistm  , &
+                            zi              , ksrftms            , dragblj       , & 
+                            qmincg          , fieldlist          , fieldlistm    , &
                             u               , v                  , q             , dse          ,               &
                             tautmsx         , tautmsy            , dtk           , topflx       , errstring   , &
                             tauresx         , tauresy            , itaures       , cpairv       , dse_top, &
@@ -159,6 +160,8 @@
     ! FIXME: This should not be needed
     use physconst, only: rairv
   
+    use phys_control,        only : phys_getopts 
+ 
   ! Modification : Ideally, we should diffuse 'liquid-ice static energy' (sl), not the dry static energy.
   !                Also, vertical diffusion of cloud droplet number concentration and aerosol number
   !                concentration should be done very carefully in the future version.
@@ -188,6 +191,7 @@
     real(r8), intent(in)    :: cflx(pcols,ncnst)         ! Surface constituent flux [ kg/m2/s ]
     real(r8), intent(in)    :: zi(pcols,pver+1)          ! Interface heights [ m ]
     real(r8), intent(in)    :: ksrftms(pcols)            ! Surface drag coefficient for turbulent mountain stress. > 0. [ kg/s/m2 ]
+    real(r8), intent(in)    :: dragblj(pcols,pver)       ! Drag profile from Beljaars SGO form drag  > 0. [ 1/s ]
     real(r8), intent(in)    :: qmincg(ncnst)             ! Minimum constituent mixing ratios from cg fluxes
     real(r8), intent(in)    :: cpairv(pcols,pver)        ! Specific heat at constant pressure
     real(r8), intent(in)    :: kvh(pcols,pver+1)         ! Eddy diffusivity for heat [ m2/s ]
@@ -347,11 +351,16 @@
     real(r8) :: tauimpy(pcols)                           ! Actual net stress added at the current step other than mountain stress
     real(r8) :: ramda                                    ! dt/timeres [ no unit ]
 
+    real(r8) :: taubljx(pcols)                           ! recomputed explicit/residual beljaars stress
+    real(r8) :: taubljy(pcols)                           ! recomputed explicit/residual beljaars stress
+
     ! Rate at which external (surface) stress damps wind speeds (1/s).
     real(r8) :: tau_damp_rate(ncol, pver)
 
     ! Combined molecular and eddy diffusion.
     real(r8) :: kv_total(pcols,pver+1)
+
+    logical  :: use_spcam
 
     !--------------------------------
     ! Variables needed for WACCM-X
@@ -371,6 +380,8 @@
     ! ----------------------- !
     ! Main Computation Begins !
     ! ----------------------- !
+
+    call phys_getopts(use_spcam_out = use_spcam)
 
     errstring = ''
     if( ( diffuse(fieldlist,'u') .or. diffuse(fieldlist,'v') ) .and. .not. diffuse(fieldlist,'s') ) then
@@ -531,7 +542,14 @@
        ! Therefore, gravit*ksrf/p%del is the acceleration of wind per unit
        ! wind speed, i.e. the rate at which wind is exponentially damped by
        ! surface stress.
+
+       ! Beljaars et al SGO scheme incorporated here. It 
+       ! appears as a "3D" tau_damp_rate specification.
+
        tau_damp_rate(:,pver) = -gravit*ksrf(:ncol)*p%rdel(:,pver)
+       do k=1,pver
+          tau_damp_rate(:,k) = tau_damp_rate(:,k) + dragblj(:ncol,k)
+       end do
 
        decomp = fin_vol_lu_decomp(ztodt, p, &
             coef_q=tau_damp_rate, coef_q_diff=kvm(:ncol,:)*dpidz_sq)
@@ -556,6 +574,16 @@
           tautmsx(i) = -ksrftms(i)*u(i,pver)
           tautmsy(i) = -ksrftms(i)*v(i,pver)
 
+          ! We want to add vertically-integrated Beljaars drag to residual stress.
+          ! So this has to be calculated locally. 
+          ! We may want to rethink the residual drag calculation performed here on. (jtb)
+          taubljx(i) = 0._r8
+          taubljy(i) = 0._r8
+          do k = 1, pver
+             taubljx(i) = taubljx(i) + (1._r8/gravit)*dragblj(i,k)*u(i,k)*p%del(i,k)
+             taubljy(i) = taubljy(i) + (1._r8/gravit)*dragblj(i,k)*v(i,k)*p%del(i,k)
+          end do
+        
           if( do_iss ) then
 
             ! Compute vertical integration of final horizontal momentum
@@ -584,8 +612,8 @@
             ! the sum of 'taux(i) - ksrftms(i)*u(i,pver) + tauresx(i)'.
 
               if( itaures .eq. 1 ) then
-                 tauresx(i) = taux(i) + tautmsx(i) + tauresx(i) - tauimpx(i)
-                 tauresy(i) = tauy(i) + tautmsy(i) + tauresy(i) - tauimpy(i)
+                 tauresx(i) = taux(i) + tautmsx(i) + taubljx(i) + tauresx(i)- tauimpx(i)
+                 tauresy(i) = tauy(i) + tautmsy(i) + taubljy(i) + tauresy(i)- tauimpy(i)
               endif
 
           else
@@ -649,17 +677,17 @@
   !                moist static energy,not the dry static energy.
 
     if( diffuse(fieldlist,'s') ) then
+      if (.not. use_spcam) then
 
-      ! Add counter-gradient to input static energy profiles
+       ! Add counter-gradient to input static energy profiles
 
-        do k = 1, pver
-           dse(:ncol,k) = dse(:ncol,k) + ztodt * p%rdel(:,k) * gravit  * &
-                                       ( rhoi(:ncol,k+1) * kvh(:ncol,k+1) * cgh(:ncol,k+1) &
-                                       - rhoi(:ncol,k  ) * kvh(:ncol,k  ) * cgh(:ncol,k  ) )
-       end do
-
-     ! Add the explicit surface fluxes to the lowest layer
-
+         do k = 1, pver
+            dse(:ncol,k) = dse(:ncol,k) + ztodt * p%rdel(:,k) * gravit  *                &
+                                        ( rhoi(:ncol,k+1) * kvh(:ncol,k+1) * cgh(:ncol,k+1) &
+                                        - rhoi(:ncol,k  ) * kvh(:ncol,k  ) * cgh(:ncol,k  ) )
+         end do
+       endif
+       ! Add the explicit surface fluxes to the lowest layer
        dse(:ncol,pver) = dse(:ncol,pver) + tmp1(:ncol) * shflx(:ncol)
 
      ! Diffuse dry static energy
@@ -679,8 +707,10 @@
                coef_q_diff=kvh(:ncol,:)*dpidz_sq, &
                upper_bndry=interface_boundary)
 
-          call decomp%left_div(dse(:ncol,:), &
-               l_cond=BoundaryData(dse_top(:ncol)))
+          if (.not. use_spcam) then
+           call decomp%left_div(dse(:ncol,:), &
+                l_cond=BoundaryData(dse_top(:ncol)))
+          endif
 
           call decomp%finalize()
 
@@ -699,7 +729,9 @@
           ttemp = ttemp0
 
           ! upper boundary is zero flux for extended model
-          call decomp%left_div(ttemp)
+          if (.not. use_spcam) then
+             call decomp%left_div(ttemp)
+          end if
 
           call decomp%finalize()
 
@@ -725,8 +757,10 @@
                coef_q_diff=kv_total(:ncol,:)*dpidz_sq, &
                upper_bndry=interface_boundary)
 
-          call decomp%left_div(dse(:ncol,:), &
-               l_cond=BoundaryData(dse_top(:ncol)))
+          if (.not. use_spcam) then
+             call decomp%left_div(dse(:ncol,:), &
+                  l_cond=BoundaryData(dse_top(:ncol)))
+          end if
 
           call decomp%finalize()
 
@@ -760,25 +794,27 @@
     do m = 1, ncnst
 
        if( diffuse(fieldlist,'q',m) ) then
+           if (.not. use_spcam) then
 
-           ! Add the nonlocal transport terms to constituents in the PBL.
-           ! Check for neg q's in each constituent and put the original vertical
-           ! profile back if a neg value is found. A neg value implies that the
-           ! quasi-equilibrium conditions assumed for the countergradient term are
-           ! strongly violated.
-
-           qtm(:ncol,:pver) = q(:ncol,:pver,m)
-
-           do k = 1, pver
-              q(:ncol,k,m) = q(:ncol,k,m) + &
-                             ztodt * p%rdel(:,k) * gravit  * ( cflx(:ncol,m) * rrho(:ncol) ) * &
-                           ( rhoi(:ncol,k+1) * kvh(:ncol,k+1) * cgs(:ncol,k+1)                 &
-                           - rhoi(:ncol,k  ) * kvh(:ncol,k  ) * cgs(:ncol,k  ) )
-           end do
-           lqtst(:ncol) = all(q(:ncol,1:pver,m) >= qmincg(m), 2)
-           do k = 1, pver
-              q(:ncol,k,m) = merge( q(:ncol,k,m), qtm(:ncol,k), lqtst(:ncol) )
-           end do
+              ! Add the nonlocal transport terms to constituents in the PBL.
+              ! Check for neg q's in each constituent and put the original vertical
+              ! profile back if a neg value is found. A neg value implies that the
+              ! quasi-equilibrium conditions assumed for the countergradient term are
+              ! strongly violated.
+   
+              qtm(:ncol,:pver) = q(:ncol,:pver,m)
+   
+              do k = 1, pver
+                 q(:ncol,k,m) = q(:ncol,k,m) + &
+                                ztodt * p%rdel(:,k) * gravit  * ( cflx(:ncol,m) * rrho(:ncol) ) * &
+                              ( rhoi(:ncol,k+1) * kvh(:ncol,k+1) * cgs(:ncol,k+1)                 &
+                              - rhoi(:ncol,k  ) * kvh(:ncol,k  ) * cgs(:ncol,k  ) )
+              end do
+              lqtst(:ncol) = all(q(:ncol,1:pver,m) >= qmincg(m), 2)
+              do k = 1, pver
+                 q(:ncol,k,m) = merge( q(:ncol,k,m), qtm(:ncol,k), lqtst(:ncol) )
+              end do
+           endif
 
            ! Add the explicit surface fluxes to the lowest layer
 
@@ -819,9 +855,11 @@
 
            else
 
-              ! Currently, no ubc for constituents without molecular
-              ! diffusion (they cannot diffuse out the top of the model).
-              call no_molec_decomp%left_div(q(:ncol,:,m))
+              if (.not. use_spcam) then
+                 ! Currently, no ubc for constituents without molecular
+                 ! diffusion (they cannot diffuse out the top of the model).
+                 call no_molec_decomp%left_div(q(:ncol,:,m))
+              end if
 
            end if
 

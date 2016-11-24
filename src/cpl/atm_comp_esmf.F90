@@ -28,7 +28,7 @@ module atm_comp_esmf
   use ppgrid           , only: pcols, begchunk, endchunk       
   use dyn_grid         , only: get_horiz_grid_dim_d
   use camsrfexch       , only: cam_out_t, cam_in_t     
-  use cam_restart      , only: get_restcase, get_restartdir
+  use cam_initfiles    , only: cam_initfiles_get_caseid, cam_initfiles_get_restdir
   use filenames        , only: interpret_filename_spec
   use spmd_utils       , only: spmdinit, masterproc
   use time_manager     , only: get_curr_calday, advance_timestep, get_curr_date, get_nstep, &
@@ -948,10 +948,10 @@ CONTAINS
     call seq_timemgr_EClockGetData( EClock, curr_yr=yr_spec,curr_mon=mon_spec, &
          curr_day=day_spec, curr_tod=sec_spec ) 
 
-    fname_srf_cam = interpret_filename_spec( rsfilename_spec_cam, case=get_restcase(), &
+    fname_srf_cam = interpret_filename_spec( rsfilename_spec_cam, case=cam_initfiles_get_caseid(), &
          yr_spec=yr_spec, mon_spec=mon_spec, day_spec=day_spec, sec_spec= sec_spec )
 
-    pname_srf_cam = trim(get_restartdir() )//fname_srf_cam
+    pname_srf_cam = trim(cam_initfiles_get_restdir() )//fname_srf_cam
 
     call getfil(pname_srf_cam, fname_srf_cam)
     

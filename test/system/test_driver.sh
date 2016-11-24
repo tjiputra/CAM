@@ -6,49 +6,69 @@
 # ./test_driver.sh
 #
 # valid arguments: 
-# -i    interactive usage
-# -f    force batch submission (avoids user prompt)
-# -j    number of jobs for gmake
 # -b    support baseline scripts for cam5_2_12 and earlier.
+# -e    email summary to $USER
+# -f    force batch submission (avoids user prompt)
 # -h    displays this help message
+# -i    interactive usage
+# -j    number of jobs for gmake
 #
 # **pass environment variables by preceding above commands 
 #   with 'env var1=setting var2=setting '
 # **more details in the CAM testing user's guide, accessible 
 #   from the CAM developers web page
 
-interactive=false
+## These variables may be overridden from the user's environment
+EMAIL=${EMAIL:-"${USER}@ucar.edu"}
+SUMMARY_FILE="${SUMMARY_FILE:-`pwd -P`/cam_test_summaries}"
+
+# These variables may be modified by script switches (./test_driver.sh -h)
+cam_email_summary=false
 force=false
 gmake_j=8
+interactive=false
 
-while [ -n "$(echo $1 | grep '-')" ]; do
+while [ "${1:0:1}" == "-" ]; do
     case $1 in
-
-	-i ) interactive=true ;;
-
-	-f ) force=true 
-             if  $interactive ; then
-               echo "test_driver.sh: FATAL ERROR: -i and -f were set"
-             exit 1
-             fi
-             ;;
-
-	-j ) shift; gmake_j=$1 ;;
 
         -b ) export CAM_BASEBACK="YES"
              ;; 
 
-	-h ) echo 'usage: test_driver.sh [-i] [-f] [-h] [-j N] [-b]...'; exit 1 ;;
+        -e ) cam_email_summary=true
+             ;; 
 
-	* ) echo "test_driver.sh: FATAL ERROR: unrecognized arg: $1"; exit 1 ;;
+	-f ) force=true 
+             if  $interactive ; then
+               echo "test_driver.sh: FATAL ERROR: -i and -f were set"
+               exit 1
+             fi
+             ;;
+
+	-h ) echo 'usage: test_driver.sh [-i] [-f] [-h] [-j N] [-b] [-e] ...'
+             exit 1
+             ;;
+
+	-i ) interactive=true
+             if  $force ; then
+               echo "test_driver.sh: FATAL ERROR: -i and -f were set"
+               exit 1
+             fi
+             ;;
+
+	-j ) shift; gmake_j=$1
+             ;;
+
+	* ) echo "test_driver.sh: FATAL ERROR: unrecognized arg: $1"
+            exit 1
+            ;;
 
     esac
     shift
 done
 
-
 #will attach timestamp onto end of script name to prevent overwriting
-cur_time=`date '+%H:%M:%S'`
+start_date="`date --iso-8601=seconds`"
+cur_time=`date '+%H%M%S'`
 
 hostname=`hostname`
 
@@ -152,6 +172,7 @@ if [ "\$CAM_FC" = "PGI" ]; then
   module load netcdf/4.2
   module load pnetcdf/1.3.0
   module load perlmods
+  module load python
   export CFG_STRING=" -cc mpicc -fc_type pgi -fc mpif90 -cppdefs -DNO_MPI2 -cppdefs -DNO_MPIMOD "
 else
   module load intel/15.0.3
@@ -162,6 +183,7 @@ else
   module load pnetcdf/1.3.0
   module load mkl/11.0.1
   module load perlmods
+  module load python
   export CFG_STRING="-cc mpicc -fc mpif90 -fc_type intel "
 fi
 
@@ -227,6 +249,7 @@ if [ "\$CAM_FC" = "PGI" ]; then
   module load netcdf
   module load pnetcdf
   module load perlmods
+  module load python
   export CFG_STRING=" -cc mpicc -fc_type pgi -fc mpif90 -cppdefs -DNO_MPI2 -cppdefs -DNO_MPIMOD "
 else
   module load intel/15.0.1
@@ -237,6 +260,7 @@ else
   module load pnetcdf/1.3.0
   module load mkl/11.0.1
   module load perlmods
+  module load python
   export CFG_STRING="-cc mpicc -fc mpif90 -fc_type intel "
 fi
 
@@ -348,8 +372,7 @@ if [ "\$CAM_FC" = "INTEL" ]; then
     input_file="tests_pretag_hobart_nag"
     export CCSM_MACH="hobart_intel"
 elif [ "\$CAM_FC" = "NAG" ]; then
-    module load compiler/nag/6.0
-    module load mpi/nag/mvapich2-1.8.1-qlc
+    module load compiler/nag/6.1
     export CFG_STRING="-cc mpicc -fc mpif90 -fc_type nag "
     export INC_NETCDF=\${NETCDF_PATH}/include
     export LIB_NETCDF=\${NETCDF_PATH}/lib
@@ -357,7 +380,6 @@ elif [ "\$CAM_FC" = "NAG" ]; then
     export CCSM_MACH="hobart_nag"
 else
     module load compiler/pgi/15.1
-#    module load mpi/pgi/mvapich2-1.8.1-qlc
     export CFG_STRING=" -cc mpicc -fc_type pgi -fc mpif90 -cppdefs -DNO_MPI2 -cppdefs -DNO_MPIMOD "
     export INC_NETCDF=\${NETCDF_PATH}/include
     export LIB_NETCDF=\${NETCDF_PATH}/lib
@@ -1019,39 +1041,71 @@ else
     echo "end of input" >> \${cam_log}
 fi
 
-if [ \$skipped_tests = "YES" ]; then
+if [ "\$skipped_tests" = "YES" ]; then
     echo "*  please verify that any skipped tests are not required of your cam commit" >> \${cam_status}
 fi
-if [ \$pending_tests = "YES" ]; then
+if [ "\$pending_tests" = "YES" ]; then
     echo "** tests that are pending must be checked manually for a successful completion" >> \${cam_status}
     if  ! \$interactive ; then
 	echo "   see the test's output in \${cam_log} " >> \${cam_status}
 	echo "   for the location of test results" >> \${cam_status}
     fi
 fi
-
 EOF
 ##^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ writing to batch script ^^^^^^^^^^^^^^^^^^^
 
 cb_flag=`expr $cb_flag + 1`
 done
+
+## Make sure we have a place to store test summaries
+if [ ! -f "${SUMMARY_FILE}" ]; then
+  touch "${SUMMARY_FILE}"
+fi
+
+##vvvvvvvvvvvvvvvvvvvvvvvvvvvvv add summary to output or email vvvvvvvvvvvvvvv
 cat >> ${submit_script} << EOF
+banner="========================================"
+subj="CAM regression test summary from \$CCSM_MACH"
+np="Num PASS = \$( grep PASS \${cam_status} | wc -l )"
+nf="Num FAIL = \$( grep FAIL \${cam_status} | wc -l )"
+js="$CAM_FC job started at ${start_date}"
+je="$CAM_FC job finished at \$( date --iso-8601=seconds )"
+echo "${banner}" | tee -a ${SUMMARY_FILE}
+echo "\${js}" | tee -a ${SUMMARY_FILE}
+echo "" | tee -a ${SUMMARY_FILE}
+echo "\${np}" | tee -a ${SUMMARY_FILE}
+echo "\${nf}" | tee -a ${SUMMARY_FILE}
+if [ "${nf}" != "Num FAIL = 0" ]; then
+  grep FAIL \${cam_status} | tee -a ${SUMMARY_FILE}
+fi
+echo "" | tee -a ${SUMMARY_FILE}
+echo "\${je}" | tee -a ${SUMMARY_FILE}
+echo "" | tee -a ${SUMMARY_FILE}
+EOF
+if $cam_email_summary; then
+  cat >> ${submit_script} << EOF
+echo -e "\${js}\n\n\${np}\n\${nf}\n\n${je}" | mail -s "\${subj}" ${EMAIL}
 exit 0
 EOF
-if [ ${submit_script_cb} ]; then
+else
+  cat >> ${submit_script} << EOF
+exit 0
+EOF
+fi
+
+if [ -n "${submit_script_cb}" ]; then
 cat >> ${submit_script_cb} << EOF
 echo "bsub < ${submit_script}" >> \${cam_log}
 bsub < ${submit_script} >> \${cam_log} 2>&1
 exit 0
 EOF
 fi
-
+##^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ add summary to output or email ^^^^^^^^^^^^^^^
 
 for file in ${submit_script} ${submit_script_cb}
 do
   chmod a+x $file
 done
-
 
 if $interactive ; then
     if [ ${submit_script_cb} ]; then
@@ -1082,7 +1136,37 @@ case $hostname in
     ff* )  bsub < ${submit_script};;
 
     ##yellowstone
-    ye* | ys* | ca*)  bsub < ${submit_script_cb};;
+    ye* | ys* | ca*)
+      export LSB_JOB_REPORT_MAIL=Y
+      bsub < ${submit_script_cb}
+##vvvvvvvvvvvvvvvvvvvvvv start CAM aux test suite vvvvvvvvvvvvvvvvvvvvvvvvvvvv
+      module load python
+
+      currdir="`pwd -P`"
+      logfile="${currdir}/aux_cam_test_${cur_time}.log"
+      tdir="$( cd $( dirname $0 ); pwd -P )"
+      root_dir="$( dirname $( dirname $( dirname $( dirname ${tdir} ) ) ) )"
+      script_dir="${root_dir}/cime/scripts"
+      if [ ! -d "${script_dir}" ]; then
+        echo "ERROR: CIME scripts dir not found at ${script_dir}"
+        exit 1
+      fi
+      if [ ! -x "${script_dir}/create_test" ]; then
+        echo "ERROR: create_test script dir not found in ${script_dir}"
+        exit 1
+      fi
+      cd ${script_dir}
+      testargs="--xml-machine yellowstone --xml-compiler intel --xml-category aux_cam"
+      testargs="${testargs} --test-id aux_cam_${cur_time}"
+      testargs="${testargs} --generate ${CAM_TAG} --walltime 00:30"
+      if [ -n "${BL_TESTDIR}" ]; then
+        testargs="${testargs} --compare $( basename ${BL_TESTDIR} )"
+      fi
+      echo "Running ./create_test ${testargs}"
+      execca ./create_test ${testargs} 2>&1 | tee ${logfile}
+      cd ${currdir}
+##^^^^^^^^^^^^^^^^^^^^^^ start CAM aux test suite ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+      ;;
 
     ##hobart  
     hob* | h[[:digit:]]* )  qsub ${submit_script};;
@@ -1103,4 +1187,5 @@ case $hostname in
     ly* ) qsub ${submit_script};;
 
 esac
+
 exit 0

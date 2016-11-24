@@ -128,6 +128,11 @@ integer              :: ksrftms_idx  = -1
 integer              :: tautmsx_idx  = -1
 integer              :: tautmsy_idx  = -1
 
+! pbuf fields for blj (Beljaars)
+integer              :: dragblj_idx  = -1
+integer              :: taubljx_idx  = -1
+integer              :: taubljy_idx  = -1
+
 logical              :: diff_cnsrv_mass_check        ! do mass conservation check
 logical              :: do_iss                       ! switch for implicit turbulent surface stress
 logical              :: prog_modal_aero = .false.    ! set true if prognostic modal aerosols are present
@@ -149,6 +154,7 @@ subroutine vd_readnl(nlfile)
   use spmd_utils,      only: masterproc, masterprocid, mpi_logical, mpicom
   use shr_log_mod,     only: errMsg => shr_log_errMsg
   use trb_mtn_stress_cam, only: trb_mtn_stress_readnl
+  use beljaars_drag_cam, only: beljaars_drag_readnl
   use eddy_diff_cam,   only: eddy_diff_readnl
   
     character(len=*), intent(in) :: nlfile  ! filepath for file containing namelist input
@@ -186,7 +192,10 @@ subroutine vd_readnl(nlfile)
   ! TMS reads its own namelist.
   call trb_mtn_stress_readnl(nlfile)
 
-  if (eddy_scheme == 'diag_TKE') call eddy_diff_readnl(nlfile)
+  ! Beljaars reads its own namelist.
+  call beljaars_drag_readnl(nlfile)
+
+  if (eddy_scheme == 'diag_TKE' .or. eddy_scheme == 'SPCAM_m2005' ) call eddy_diff_readnl(nlfile)
 
 end subroutine vd_readnl
 
@@ -202,6 +211,7 @@ subroutine vd_register()
 
     use physics_buffer,      only : pbuf_add_field, dtype_r8, dtype_i4
   use trb_mtn_stress_cam,  only : trb_mtn_stress_register
+  use beljaars_drag_cam,   only : beljaars_drag_register
   use eddy_diff_cam,       only : eddy_diff_register
 
     ! Add fields to physics buffer
@@ -229,12 +239,15 @@ subroutine vd_register()
   end if
 
   ! diag_TKE fields
-  if (eddy_scheme == 'diag_TKE') then
+  if (eddy_scheme == 'diag_TKE' .or. eddy_scheme == 'SPCAM_m2005') then
      call eddy_diff_register()
   end if
 
   ! TMS fields
   call trb_mtn_stress_register()
+
+  ! Beljaars fields
+  call beljaars_drag_register()
 
 end subroutine vd_register
 
@@ -262,6 +275,7 @@ subroutine vertical_diffusion_init(pbuf2d)
     use rad_constituents,  only : rad_cnst_get_info, rad_cnst_get_mode_num_idx, &
                                   rad_cnst_get_mam_mmr_idx
   use trb_mtn_stress_cam,only : trb_mtn_stress_init
+  use beljaars_drag_cam, only : beljaars_drag_init
   use upper_bc,          only : ubc_init
   use phys_control,      only : waccmx_is
 
@@ -317,8 +331,8 @@ subroutine vertical_diffusion_init(pbuf2d)
        !        impacting the climate calculation (i.e., can get info from list 0).
        ! 
 #ifndef OSLO_AERO
-   !NOTE THAT THIS BREAKS THE CONCEPT OF KEEPEING MAM3-AEROSOLS OUT OF
-   !DIFFUSION
+   !NOTE THAT THIS BREAKS THE CONCEPT OF KEEPEING MAM-AEROSOLS OUT OF
+   !DIFFUSION, BUT IF YOU ARE USING MAM, YOU SHOULD NOT BEE HERE ANYWAY!!
        ! First need total number of mam constituents
        call rad_cnst_get_info(0, nmodes=nmodes)
        do m = 1, nmodes
@@ -387,11 +401,11 @@ subroutine vertical_diffusion_init(pbuf2d)
    if (masterproc) write(iulog, fmt='(a,i3,5x,a,i3)') 'NTOP_EDDY  =', ntop_eddy, 'NBOT_EDDY  =', nbot_eddy
 
     select case ( eddy_scheme )
-    case ( 'diag_TKE' ) 
+    case ( 'diag_TKE', 'SPCAM_m2005' )
         if( masterproc ) write(iulog,*) &
              'vertical_diffusion_init: eddy_diffusivity scheme: UW Moist Turbulence Scheme by Bretherton and Park'
      call eddy_diff_init(pbuf2d, ntop_eddy, nbot_eddy)
-    case ( 'HB', 'HBR')
+    case ( 'HB', 'HBR', 'SPCAM_sam1mom')
         if( masterproc ) write(iulog,*) 'vertical_diffusion_init: eddy_diffusivity scheme:  Holtslag and Boville'
         call init_hb_diff(gravit, cpair, ntop_eddy, nbot_eddy, pref_mid, &
                           karman, eddy_scheme)
@@ -406,6 +420,12 @@ subroutine vertical_diffusion_init(pbuf2d)
 
   call trb_mtn_stress_init()
     
+  ! ----------------------------------- !
+  ! Initialize Beljaars SGO drag module !
+  ! ----------------------------------- !
+
+  call beljaars_drag_init()
+
     ! ---------------------------------- !
     ! Initialize diffusion solver module !
     ! ---------------------------------- !
@@ -589,6 +609,10 @@ subroutine vertical_diffusion_init(pbuf2d)
   tautmsx_idx = pbuf_get_index('tautmsx')
   tautmsy_idx = pbuf_get_index('tautmsy')
 
+  dragblj_idx = pbuf_get_index('dragblj')
+  taubljx_idx = pbuf_get_index('taubljx')
+  taubljy_idx = pbuf_get_index('taubljy')
+
      ! Initialization of some pbuf fields
      if (is_first_step()) then
         ! Initialization of pbuf fields tke, kvh, kvm are done in phys_inidat
@@ -644,6 +668,7 @@ subroutine vertical_diffusion_tend( &
     use cam_history,        only : outfld
     
   use trb_mtn_stress_cam, only : trb_mtn_stress_tend
+  use beljaars_drag_cam,  only : beljaars_drag_tend
   use eddy_diff_cam,      only : eddy_diff_tend
     use hb_diff,            only : compute_hb_diff
     use wv_saturation,      only : qsat
@@ -710,6 +735,10 @@ subroutine vertical_diffusion_tend( &
   real(r8), pointer :: tautmsy(:)                                 ! V component of turbulent mountain stress [ N/m2 ]
     real(r8) :: tautotx(pcols)                                      ! U component of total surface stress [ N/m2 ]
     real(r8) :: tautoty(pcols)                                      ! V component of total surface stress [ N/m2 ]
+
+  real(r8), pointer :: dragblj(:,:)                               ! Beljaars SGO form drag profile [ 1/s ]
+  real(r8), pointer :: taubljx(:)                                 ! U component of turbulent mountain stress [ N/m2 ]
+  real(r8), pointer :: taubljy(:)                                 ! V component of turbulent mountain stress [ N/m2 ]
 
     real(r8), pointer :: kvh_in(:,:)                                ! kvh from previous timestep [ m2/s ]
     real(r8), pointer :: kvm_in(:,:)                                ! kvm from previous timestep [ m2/s ]
@@ -912,6 +941,21 @@ subroutine vertical_diffusion_tend( &
   tautotx(:ncol) = cam_in%wsx(:ncol) + tautmsx(:ncol)
   tautoty(:ncol) = cam_in%wsy(:ncol) + tautmsy(:ncol)
 
+  ! ------------------------------------- !
+  ! Computation of Beljaars SGO form drag !
+  ! ------------------------------------- !
+
+  call beljaars_drag_tend(state, pbuf, cam_in)
+
+  call pbuf_get_field(pbuf, dragblj_idx, dragblj)
+  call pbuf_get_field(pbuf, taubljx_idx, taubljx)
+  call pbuf_get_field(pbuf, taubljy_idx, taubljy)
+
+  ! Add Beljaars integrated drag
+
+  tautotx(:ncol) = tautotx(:ncol) + taubljx(:ncol)
+  tautoty(:ncol) = tautoty(:ncol) + taubljy(:ncol)
+
     !----------------------------------------------------------------------- !
     !   Computation of eddy diffusivities - Select appropriate PBL scheme    !
     !----------------------------------------------------------------------- !
@@ -923,24 +967,24 @@ subroutine vertical_diffusion_tend( &
   ! Get potential temperature.
   th(:ncol,:pver) = state%t(:ncol,:pver) * state%exner(:ncol,:pver)
 
-    select case (eddy_scheme)
-    case ( 'diag_TKE' ) 
+  select case (eddy_scheme)
+  case ( 'diag_TKE', 'SPCAM_m2005' )
 
      call eddy_diff_tend(state, pbuf, cam_in, &
           ztodt, p, tint, rhoi, cldn, wstarent, &
-          kvm_in, kvh_in, ksrftms, tauresx, tauresy, &
+          kvm_in, kvh_in, ksrftms, dragblj, tauresx, tauresy, &
           rrho, ustar, pblh, kvm, kvh, kvq, cgh, cgs, tpert, qpert, &
           tke, sprod, sfi, turbtype, smaw)
 
        ! The diag_TKE scheme does not calculate the Monin-Obukhov length, which is used in dry deposition calculations.
        ! Use the routines from pbl_utils to accomplish this. Assumes ustar and rrho have been set.
-       thvs(:ncol) = virtem(th(:ncol,pver),state%q(:ncol,pver,1))
-     call calc_obklen(th(:ncol,pver), thvs(:ncol), cam_in%cflx(:ncol,1), &
+     call virtem(ncol, th(:ncol,pver),state%q(:ncol,pver,1), thvs(:ncol))
+     call calc_obklen(ncol, th(:ncol,pver), thvs(:ncol), cam_in%cflx(:ncol,1), &
           cam_in%shf(:ncol), rrho(:ncol), ustar(:ncol), &
                         khfs(:ncol),    kqfs(:ncol), kbfs(:ncol),   obklen(:ncol))
 
 
-    case ( 'HB', 'HBR' )
+  case ( 'HB', 'HBR', 'SPCAM_sam1mom' )
 
        ! Modification : We may need to use 'taux' instead of 'tautotx' here, for
        !                consistency with the previous HB scheme.
@@ -963,13 +1007,13 @@ subroutine vertical_diffusion_tend( &
      ! is only handling other things, e.g. some boundary conditions, tms,
      ! and molecular diffusion.
 
-     thvs(:ncol) = virtem(th(:ncol,pver),state%q(:ncol,pver,1))
+     call virtem(ncol, th(:ncol,pver),state%q(:ncol,pver,1), thvs(:ncol))
 
-     call calc_ustar( state%t(:ncol,pver), state%pmid(:ncol,pver), &
-          cam_in%wsx(:ncol), cam_in%wsy(:ncol), rrho(:ncol), ustar(:ncol) )
-     call calc_obklen( th(:ncol,pver), thvs(:ncol), cam_in%lhf(:ncol)/latvap, &
+     call calc_ustar( ncol, state%t(:ncol,pver), state%pmid(:ncol,pver), &
+          cam_in%wsx(:ncol), cam_in%wsy(:ncol), rrho(:ncol), ustar(:ncol))
+     call calc_obklen( ncol, th(:ncol,pver), thvs(:ncol), cam_in%lhf(:ncol)/latvap, &
           cam_in%shf(:ncol), rrho(:ncol), ustar(:ncol), &
-          khfs(:ncol), kqfs(:ncol), kbfs(:ncol), obklen(:ncol) )
+          khfs(:ncol), kqfs(:ncol), kbfs(:ncol), obklen(:ncol))
 
      ! These tendencies all applied elsewhere.
      kvm = 0._r8
@@ -1082,7 +1126,8 @@ subroutine vertical_diffusion_tend( &
           p    , state%t      , rhoi, ztodt         , taux          , &
           tauy          , shflux             , cflux        , &
                             kvh           , kvm                , kvq          , cgs           , cgh           , &
-                            state%zi      , ksrftms            , qmincg       , fieldlist_wet , fieldlist_molec,&
+          state%zi      , ksrftms            , dragblj      , &
+          qmincg       , fieldlist_wet , fieldlist_molec,&
                             u_tmp         , v_tmp              , q_tmp        , s_tmp         ,                 &
                             tautmsx       , tautmsy            , dtk          , topflx        , errstring     , &
           tauresx       , tauresy            , 1            , cpairv(:,:,state%lchnk), dse_top, &
@@ -1114,7 +1159,8 @@ subroutine vertical_diffusion_tend( &
           p_dry , state%t      , rhoi_dry,  ztodt         , taux          , &
           tauy          , shflux             , cflux        , &
                             kvh           , kvm                , kvq          , cgs           , cgh           , &   
-                            state%zi      , ksrftms            , qmincg       , fieldlist_dry , fieldlist_molec,&
+          state%zi      , ksrftms            , dragblj      , & 
+          qmincg       , fieldlist_dry , fieldlist_molec,&
                             u_tmp         , v_tmp              , q_tmp        , s_tmp         ,                 &
           tautmsx_temp  , tautmsy_temp       , dtk_temp     , topflx_temp   , errstring     , &
           tauresx       , tauresy            , 1            , cpairv(:,:,state%lchnk), dse_top, &
@@ -1257,7 +1303,7 @@ subroutine vertical_diffusion_tend( &
     !                                                             !
   ! ------------------------------------------------------------ !
 
-    if( eddy_scheme .eq. 'diag_TKE' .and. do_pseudocon_diff ) then
+    if( (eddy_scheme .eq. 'diag_TKE' .or. eddy_scheme .eq. 'SPCAM_m2005') .and. do_pseudocon_diff ) then
 
          ptend%q(:ncol,:pver,1) = qtten(:ncol,:pver)
          ptend%s(:ncol,:pver)   = slten(:ncol,:pver)

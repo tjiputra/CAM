@@ -116,7 +116,8 @@
 <solar_parms_file>atm/waccm/solar/wasolar_c150720.nc</solar_parms_file>
 
 <!-- Solar protons -->
-<spe_data_file>atm/waccm/solar/spes_1963-2014_c150717.nc</spe_data_file>
+<epp_spe_filepath>atm/waccm/solar/spes_1963-2014_c150717.nc</epp_spe_filepath>
+<epp_spe_varname>'Prod'</epp_spe_varname>
 
 <!-- History Files -->
 
@@ -139,8 +140,8 @@
   'HNO3_GAS', 'NO_Aircraft', 'NO_Lightning', 'QNO', 'QRS_AUR', 'QRS_CO2NIR', 'QRS_EUV', 
   'SAD_ICE', 'SAD_LNAT', 'SAD_SULFC', 'T', 'TREFHT', 
   'TTGW', 'U', 'UTGWORO', 'UTGWSPEC', 'V', 'VERT', 'VTGWORO', 'VTGWSPEC', 'Z3', 'O2_1S', 
-  'O2_1D', 'NOX', 'NOY', 'CLOX', 'CLOY', 'BROX', 'BROY', 'TCLY', 'TOTH', 'QJOULE', 'UE', 
-  'VE', 'UIONTEND', 'VIONTEND', 'DTCORE', 'T_24_COS',  'T_24_SIN', 'T_12_COS', 'T_12_SIN',
+  'O2_1D', 'NOX', 'NOY', 'CLOX', 'CLOY', 'BROX', 'BROY', 'TCLY', 'TOTH', 'QJOULE', 'UI', 
+  'VI', 'UIONTEND', 'VIONTEND', 'DTCORE', 'T_24_COS',  'T_24_SIN', 'T_12_COS', 'T_12_SIN',
   'OMEGA_24_COS', 'OMEGA_24_SIN', 'OMEGA_12_COS', 'OMEGA_12_SIN',
   'U_24_COS', 'U_24_SIN', 'U_12_COS', 'U_12_SIN', 'V_24_COS', 'V_24_SIN', 'V_12_COS', 
   'V_12_SIN', 'PS_24_COS', 'PS_24_SIN', 'PS_12_COS', 'PS_12_SIN', 'CLDLIQ','CLDICE','CONCLD',

@@ -53,6 +53,9 @@ module metdata
   public :: met_rlx
   public :: met_fix_mass
   public :: met_srf_feedback
+  !++ IH
+  public :: met_nudge_only_uvps
+  !-- IH
 
   interface write_met_restart
      Module procedure write_met_restart_bin
@@ -94,6 +97,11 @@ module metdata
   logical  :: met_srf_nudge_flux = .true. ! wsx, wsy, shf, and cflx nudged rather than forced.
                                           ! This is done primarily to prevent unrealistic
                                           ! surface temperatures.
+  !++ IH 
+  logical  :: met_nudge_only_uvps = .true.   ! When true, only U, V and PS is nudged.
+                                             ! When false, other variables can also be nudged
+                                             ! (T, Q, TAUY, TAUX, SHFLX, QFLX, TS, SHOWH,...) 
+  !-- IH
 
 ! !REVISION HISTORY:
 !   31 Oct 2003  Francis Vitt     Creation
@@ -104,6 +112,8 @@ module metdata
 !   14 Jul 2005  W Sawyer Removed pmgrid, spmd_dyn dependencies
 !   12 Apr 2006  W Sawyer Removed unneeded ghosting of met_us, met_vs
 !   08 Apr 2010  J Edwards Replaced serial netcdf calls with pio interface  
+!   16 Sep 2016  IH Karset Implemented ability to nudge only U, V and PS and change
+!                the relaxation time
 !
 ! EOP
 !----------------------------------------------------------------------- 
@@ -222,6 +232,9 @@ contains
         met_rlx_top, &
         met_rlx_bot, &
         met_rlx_time, &
+        !++ IH: new option for uvps
+        met_nudge_only_uvps, &
+        !-- IH
         met_fix_mass, &
         met_shflx_name, &
         met_shflx_factor, &
@@ -265,6 +278,9 @@ contains
    call mpibcast (met_shflx_factor   ,1, mpir8,  0, mpicom )
    call mpibcast (met_snowh_factor   ,1, mpir8,  0, mpicom )
    call mpibcast (met_srf_feedback   ,1 ,mpilog, 0, mpicom )
+   !++ IH
+   call mpibcast (met_nudge_only_uvps   ,1 ,mpilog, 0, mpicom )
+   !-- IH
 #endif
 
    if (masterproc) then
@@ -282,6 +298,9 @@ contains
        write(iulog,*)'Meteorological qflx multiplication factor : ', met_qflx_factor 
        write(iulog,*)'Meteorological snowh multiplication factor : ', met_snowh_factor
        write(iulog,*)'Meteorological allow srf models feedbacks : ', met_srf_feedback
+       !++ IH 
+       write(iulog,*)'Meteorological fields to nudge (u, v and ps, or more) : ', met_nudge_only_uvps
+       !-- IH
     endif
 
  end subroutine metdata_readnl
@@ -504,34 +523,40 @@ contains
 
     integer :: c,ncol,i
 
-    if (met_srf_nudge_flux) then
-       do c=begchunk,endchunk
-          ncol = get_ncols_p(c)
-          cam_in(c)%wsx(:ncol)     = (1._r8-met_rlx(pver)) * cam_in(c)%wsx(:ncol)    + met_rlx(pver) * met_taux(:ncol,c)
-          cam_in(c)%wsy(:ncol)     = (1._r8-met_rlx(pver)) * cam_in(c)%wsy(:ncol)    + met_rlx(pver) * met_tauy(:ncol,c)
-          cam_in(c)%shf(:ncol)     = (1._r8-met_rlx(pver)) * cam_in(c)%shf(:ncol)    + &
-               met_rlx(pver) * (met_shflx(:ncol,c) * met_shflx_factor)
-          cam_in(c)%cflx(:ncol,1)  = (1._r8-met_rlx(pver)) * cam_in(c)%cflx(:ncol,1) + &
-               met_rlx(pver) * (met_qflx(:ncol,c)  * met_qflx_factor)
-       end do                    ! Chunk loop
-    else
-       do c=begchunk,endchunk
-          ncol = get_ncols_p(c)
-          cam_in(c)%wsx(:ncol)     = met_taux(:ncol,c)
-          cam_in(c)%wsy(:ncol)     = met_tauy(:ncol,c)
-          cam_in(c)%shf(:ncol)     = met_shflx(:ncol,c) * met_shflx_factor
-          cam_in(c)%cflx(:ncol,1)  = met_qflx(:ncol,c)  * met_qflx_factor
-       end do                    ! Chunk loop
-    end if
+    !++ IH  don't nudge the stress and the heat fluxes if met_nudge_only_uvps is true
+    if (.not. met_nudge_only_uvps) then
+    !-- IH
+       if (met_srf_nudge_flux) then
+          do c=begchunk,endchunk
+             ncol = get_ncols_p(c)
+             cam_in(c)%wsx(:ncol)     = (1._r8-met_rlx(pver)) * cam_in(c)%wsx(:ncol)    + met_rlx(pver) * met_taux(:ncol,c)
+             cam_in(c)%wsy(:ncol)     = (1._r8-met_rlx(pver)) * cam_in(c)%wsy(:ncol)    + met_rlx(pver) * met_tauy(:ncol,c)
+             cam_in(c)%shf(:ncol)     = (1._r8-met_rlx(pver)) * cam_in(c)%shf(:ncol)    + &
+                  met_rlx(pver) * (met_shflx(:ncol,c) * met_shflx_factor)
+             cam_in(c)%cflx(:ncol,1)  = (1._r8-met_rlx(pver)) * cam_in(c)%cflx(:ncol,1) + &
+                  met_rlx(pver) * (met_qflx(:ncol,c)  * met_qflx_factor)
+          end do                    ! Chunk loop
+       else
+          do c=begchunk,endchunk
+             ncol = get_ncols_p(c)
+             cam_in(c)%wsx(:ncol)     = met_taux(:ncol,c)
+             cam_in(c)%wsy(:ncol)     = met_tauy(:ncol,c)
+             cam_in(c)%shf(:ncol)     = met_shflx(:ncol,c) * met_shflx_factor
+             cam_in(c)%cflx(:ncol,1)  = met_qflx(:ncol,c)  * met_qflx_factor
+          end do                    ! Chunk loop
+       end if
 
-    if (debug) then
-       if (masterproc) then
-          write(iulog,*)'METDATA   maxval(met_taux),minval(met_taux): ',maxval(met_taux),minval(met_taux)
-          write(iulog,*)'METDATA   maxval(met_tauy),minval(met_tauy): ',maxval(met_tauy),minval(met_tauy)
-          write(iulog,*)'METDATA maxval(met_shflx),minval(met_shflx): ',maxval(met_shflx),minval(met_shflx)
-          write(iulog,*)'METDATA   maxval(met_qflx),minval(met_qflx): ',maxval(met_qflx),minval(met_qflx)
+       if (debug) then
+          if (masterproc) then
+             write(iulog,*)'METDATA   maxval(met_taux),minval(met_taux): ',maxval(met_taux),minval(met_taux)
+             write(iulog,*)'METDATA   maxval(met_tauy),minval(met_tauy): ',maxval(met_tauy),minval(met_tauy)
+             write(iulog,*)'METDATA maxval(met_shflx),minval(met_shflx): ',maxval(met_shflx),minval(met_shflx)
+             write(iulog,*)'METDATA   maxval(met_qflx),minval(met_qflx): ',maxval(met_qflx),minval(met_qflx)
+          endif
        endif
-    endif
+    !++ IH
+    end if
+    !-- IH
     
     do c = begchunk, endchunk
        call outfld('MET_TAUX',cam_in(c)%wsx , pcols   ,c   )
@@ -561,13 +586,19 @@ contains
        call endrun('The meteorolgy input must have TS to run with met_srf_feedback set to FALSE')
     endif
 
-    do c=begchunk,endchunk
-       ncol = get_ncols_p(c)
-       cam_in(c)%ts(:ncol)     = met_ts(:ncol,c)
-       do i = 1,ncol
-          cam_in(c)%snowhland(i) = met_snowh(i,c)*cam_in(c)%landfrac(i) * met_snowh_factor
-       enddo
-    end do ! Chunk loop
+    !++ IH don't nudge TS and SNOWH if met_nudge_only_uvps is true
+    if (.not. met_nudge_only_uvps) then
+    !-- IH
+       do c=begchunk,endchunk
+          ncol = get_ncols_p(c)
+          cam_in(c)%ts(:ncol)     = met_ts(:ncol,c)
+          do i = 1,ncol
+             cam_in(c)%snowhland(i) = met_snowh(i,c)*cam_in(c)%landfrac(i) * met_snowh_factor
+          enddo
+       end do ! Chunk loop
+     !++ IH
+     end if
+     !-- IH
 
     if (debug) then
        if (masterproc) then
@@ -666,19 +697,23 @@ contains
     call phys_getopts(energy_conservation_type_out=energy_conservation_type)
 !-tht
 
-    do c = begchunk, endchunk
-       ncol = get_ncols_p(c)
-       do k=1,pver
-          do i=1,ncol
-             state(c)%t(i,k) = (1._r8-met_rlx(k))*state(c)%t(i,k) + met_rlx(k)*met_t(i,k,c)
+    !++ IH don't nudge T and Q if met_nudge_only_uvps is true
+    !      (I don't think Q is nudged by the defalut settings anyways since alpha is 1)
+    if (.not. met_nudge_only_uvps) then
+    !-- IH
+       do c = begchunk, endchunk
+          ncol = get_ncols_p(c)
+          do k=1,pver
+             do i=1,ncol
+                state(c)%t(i,k) = (1._r8-met_rlx(k))*state(c)%t(i,k) + met_rlx(k)*met_t(i,k,c)
 
-             qini(i,k) = state(c)%q(i,k,1)
+                qini(i,k) = state(c)%q(i,k,1)
 
-             ! at this point tracer mixing ratios have already been
-             ! converted from dry to moist
+                ! at this point tracer mixing ratios have already been
+                ! converted from dry to moist
 !!$             if (  moist_q_mmr .and. (.not. online_test)) then
-                state(c)%q(i,k,1) = alpha*state(c)%q(i,k,1) + &
-                     (1-alpha)*met_q(i,k,c)
+                   state(c)%q(i,k,1) = alpha*state(c)%q(i,k,1) + &
+                        (1-alpha)*met_q(i,k,c)
 !!$             else 
 !!$                ! dry-to-moist conversion
 !!$                state(c)%q(i,k,1) = alpha*state(c)%q(i,k,1) + &
@@ -686,18 +721,21 @@ contains
 !!$                     * state(c)%pdeldry(i,k)/state(c)%pdel(i,k)
 !!$             endif
 
-             if ((state(c)%q(i,k,1) < D0_0).and. (alpha .ne. D1_0 )) state(c)%q(i,k,1) = D0_0
+                if ((state(c)%q(i,k,1) < D0_0).and. (alpha .ne. D1_0 )) state(c)%q(i,k,1) = D0_0
+
+             end do
 
           end do
 
+          ! now adjust mass of each layer now that water vapor has changed
+          if (( .not. online_test ) .and. (alpha .ne. D1_0 )) then
+             call physics_dme_adjust(state(c), tend(c), qini, dt)
+           endif
+
        end do
-
-       ! now adjust mass of each layer now that water vapor has changed
-       if (( .not. online_test ) .and. (alpha .ne. D1_0 )) then
-          call physics_dme_adjust(state(c), tend(c), qini, dt)
-        endif
-
-    end do
+    !++ IH
+    endif
+    !-- IH
 
     if (debug) then
     if (masterproc) then
@@ -1757,7 +1795,13 @@ contains
     call pio_seterrorhandling(fileid, PIO_BCAST_ERROR)
 
     ierr = pio_inq_varid( fileid, 'TS', varid )
-    has_ts = ierr==PIO_NOERR
+    !++IH
+    if (.not. met_nudge_only_uvps) then
+    !--IH
+       has_ts = ierr==PIO_NOERR
+    !++IH
+    endif
+    !--IH
 
     call pio_seterrorhandling(fileid, PIO_INTERNAL_ERROR)
 
@@ -1898,8 +1942,14 @@ contains
 !-----------------------------------------------------------------------
 !-----------------------------------------------------------------------
   subroutine set_met_rlx( )
+  !++ IH  
+  !       The relaxation time between surface and met_rlx_bot is given by
+  !       namelist input met_rlx (hours). This will decay exponentially between
+  !       met_rlx_bot and met_rlx_top. 6h relaxation time when dt is 1800s gives
+  !       met_rlx = 1800/(6*3600) = 0.8333.
+  !-- IH
 
-    use pmgrid
+    use pmgrid, only: plev
     use hycoef, only: hypm, ps0
 
     integer :: k, k_cnt, k_top

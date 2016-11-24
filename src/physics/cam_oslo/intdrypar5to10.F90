@@ -46,24 +46,6 @@ subroutine intdrypar5to10 (lchnk, ncol, Nnatk, Camk, xfac, xfbc, xfaq, &
 !
       real(r8) a, b, e, eps, catot, fabc, fraq, xct(pcols,pver)
 
-!soa
-!      real(r8) & 
-!        arr111, arr112, arr121, arr122, arr211, arr212, arr221, arr222, &
-!        arr11, arr12, arr21, arr22, arre1, arre2  
-!      real(r8) &
-!        arr1111, arr1112, arr1121, arr1122, arr1211, arr1212, arr1221, &
-!        arr1222, arr2111, arr2112, arr2121, arr2122, arr2211, arr2212, & 
-!        arr2221, arr2222
-!      real(r8) &
-!        arr11111, arr11112, arr11121, arr11122, arr11211, arr11212, & 
-!        arr11221, arr11222, arr12111, arr12112, arr12121, arr12122, &
-!        arr12211, arr12212, arr12221, arr12222, arr21111, arr21112, &
-!        arr21121, arr21122, arr21211, arr21212, arr21221, arr21222, &
-!        arr22111, arr22112, arr22121, arr22122, arr22211, arr22212, &
-!        arr22221, arr22222
-!soa
-
-!soa      integer i, ierr, ictot, ifac, ifbc, ifaq, kcomp, k, icol
       integer iv, ictot, ifac, ifbc, ifaq, kcomp, k, icol
       integer ict1(pcols,pver), &
         ict2(pcols,pver), ifac1(pcols,pver), ifac2(pcols,pver),     &
@@ -76,12 +58,9 @@ subroutine intdrypar5to10 (lchnk, ncol, Nnatk, Camk, xfac, xfbc, xfaq, &
       real(r8)    t_fbc1, t_fbc2, t_xfbc
       real(r8)    t_fac1, t_fac2, t_xfac
       real(r8)    t_xct,  t_cat1, t_cat2
-!soa      real(r8) esssf1, esssf2, esssf3, esssf4, esssf5, esssf6, esssf7, &
-!soa        esssf8, esssf9, esssf10, esssf3x6x9x10
       real(r8) d2mx(4), dxm1(4), invd(4)
       real(r8) opt4d(2,2,2,2)
       real(r8) opt1, opt2, opt
-!soa
 
       parameter (e=2.718281828_r8, eps=1.0e-60_r8)
 
@@ -198,19 +177,6 @@ subroutine intdrypar5to10 (lchnk, ncol, Nnatk, Camk, xfac, xfbc, xfaq, &
       t_xfbc = xfbc(icol,k,kcomp)
       t_xfaq = xfaq(icol,k,kcomp)
 
-!soa 
-!      esssf1 = (t_faq2-t_xfaq)
-!      esssf2 = (t_xfaq-t_faq1)
-!      esssf3 = 1.0_r8/(t_faq2-t_faq1)
-!      esssf4 = (t_fbc2-t_xfbc)
-!      esssf5 = (t_xfbc-t_fbc1)
-!      esssf6 = 1.0_r8/(t_fbc2-t_fbc1)
-!      esssf7 = (t_fac2-t_xfac)
-!      esssf8 = (t_xfac-t_fac1)
-!      esssf9 = 1.0_r8/(t_fac2-t_fac1)
-!      esssf10= 1.0_r8/(t_cat2-t_cat1)
-!      esssf3x6x9x10 = esssf3*esssf6*esssf9*esssf10
-!
 !     partial lengths along each dimension (1-4) for interpolation 
       d2mx(1) = (t_cat2-t_xct)
       dxm1(1) = (t_xct-t_cat1)
@@ -228,7 +194,6 @@ subroutine intdrypar5to10 (lchnk, ncol, Nnatk, Camk, xfac, xfbc, xfaq, &
 
 !ccccccccc1ccccccccc2ccccccccc3ccccccccc4ccccccccc5ccccccccc6ccccccccc7cc
 
-!soa         do i=1,19  ! variable number
          do iv=1,19  ! variable number
 
 !     end points as basis for multidimentional linear interpolation  
@@ -249,57 +214,22 @@ subroutine intdrypar5to10 (lchnk, ncol, Nnatk, Camk, xfac, xfbc, xfaq, &
       opt4d(2,2,2,1)=a5to10var(iv,t_ict2,t_ifc2,t_ifb2,t_ifa1,kcomp)
       opt4d(2,2,2,2)=a5to10var(iv,t_ict2,t_ifc2,t_ifb2,t_ifa2,kcomp)
 
-!soa
-!       if(i==1) then
-!      arr11111=a5to10cintbg(t_ict1,t_ifc1,t_ifb1,t_ifa1,kcomp)
-!      arr11112=a5to10cintbg(t_ict1,t_ifc1,t_ifb1,t_ifa2,kcomp)
-!      arr11121=a5to10cintbg(t_ict1,t_ifc1,t_ifb2,t_ifa1,kcomp)
-!      arr11122=a5to10cintbg(t_ict1,t_ifc1,t_ifb2,t_ifa2,kcomp)
-!      arr11211=a5to10cintbg(t_ict1,t_ifc2,t_ifb1,t_ifa1,kcomp)
-!      arr11212=a5to10cintbg(t_ict1,t_ifc2,t_ifb1,t_ifa2,kcomp)
-!      arr11221=a5to10cintbg(t_ict1,t_ifc2,t_ifb2,t_ifa1,kcomp)
-!      arr11222=a5to10cintbg(t_ict1,t_ifc2,t_ifb2,t_ifa2,kcomp)
-!      arr12111=a5to10cintbg(t_ict2,t_ifc1,t_ifb1,t_ifa1,kcomp)
-!      arr12112=a5to10cintbg(t_ict2,t_ifc1,t_ifb1,t_ifa2,kcomp)
-!      arr12121=a5to10cintbg(t_ict2,t_ifc1,t_ifb2,t_ifa1,kcomp)
-!      arr12122=a5to10cintbg(t_ict2,t_ifc1,t_ifb2,t_ifa2,kcomp)
-!      arr12211=a5to10cintbg(t_ict2,t_ifc2,t_ifb1,t_ifa1,kcomp)
-!      arr12212=a5to10cintbg(t_ict2,t_ifc2,t_ifb1,t_ifa2,kcomp)
-!      arr12221=a5to10cintbg(t_ict2,t_ifc2,t_ifb2,t_ifa1,kcomp)
-!      arr12222=a5to10cintbg(t_ict2,t_ifc2,t_ifb2,t_ifa2,kcomp)
-!...
-!       endif
-!
-!      arr1111=esssf1*arr11111+esssf2*arr11112
-!      arr1112=esssf1*arr11121+esssf2*arr11122
-!      arr1121=esssf1*arr11211+esssf2*arr11212
-!      arr1122=esssf1*arr11221+esssf2*arr11222
-!      arr1211=esssf1*arr12111+esssf2*arr12112
-!      arr1212=esssf1*arr12121+esssf2*arr12122
-!      arr1221=esssf1*arr12211+esssf2*arr12212
-!      arr1222=esssf1*arr12221+esssf2*arr12222
-!      arr111=esssf4*arr1111+esssf5*arr1112
-!      arr112=esssf4*arr1121+esssf5*arr1122
-!      arr121=esssf4*arr1211+esssf5*arr1212
-!      arr122=esssf4*arr1221+esssf5*arr1222
-!      arr11 =esssf7*arr111+esssf8*arr112
-!      arr12 =esssf7*arr121+esssf8*arr122
-!      arre1  =((t_cat2-t_xct)*arr11+(t_xct-t_cat1)*arr12)*esssf3x6x9x10
-!soa
-
 !     interpolation in the faq, fbc, and fac and dimensions
       call lininterpol4dim (d2mx, dxm1, invd, opt4d, opt1, opt2)
 
 !     finally, interpolation in the cat dimension 
       opt = (d2mx(1)*opt1+dxm1(1)*opt2)*invd(1)
 
+!      if(k.eq.1.and.kcomp.eq.10) then
+!         write(*,*) 'a5to10var11=', &
+!         a5to10var(iv,t_ict2,t_ifc1,t_ifb1,t_ifa2,kcomp), iv,t_ict2,t_ifc1,t_ifb1,t_ifa2,kcomp
+!         write(*,*) 'a5to10var12=',&
+!         a5to10var(iv,t_ict2,t_ifc1,t_ifb2,t_ifa2,kcomp), iv,t_ict2,t_ifc1,t_ifb2,t_ifa2,kcomp
+!      endif
+ 
+
 !      write(*,*) 'Before array'
 
-!soa
-!       if(i==1) then
-!         cintbg(icol,k,kcomp)=arre1
-!...
-!       endif
        if(iv==1) then
          cintbg(icol,k,kcomp)=opt
        elseif(iv==2) then
@@ -344,9 +274,6 @@ subroutine intdrypar5to10 (lchnk, ncol, Nnatk, Camk, xfac, xfbc, xfaq, &
 
            endif
          
-!          cknorm(icol,k,kcomp)  = a5to10cintbg(1,1,1,1,kcomp)
-!          cknlt05(icol,k,kcomp) = a5to10cintbg05(1,1,1,1,kcomp)
-!          ckngt125(icol,k,kcomp)= a5to10cintbg125(1,1,1,1,kcomp)
           cknorm(icol,k,kcomp)  = a5to10var(1,1,1,1,1,kcomp)
           cknlt05(icol,k,kcomp) = a5to10var(2,1,1,1,1,kcomp)
           ckngt125(icol,k,kcomp)= a5to10var(3,1,1,1,1,kcomp)

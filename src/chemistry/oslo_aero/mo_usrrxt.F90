@@ -35,6 +35,7 @@ module mo_usrrxt
   integer :: usr_SO2_OH_ndx
   integer :: usr_DMS_OH_ndx
   integer :: usr_HO2_aer_ndx
+  integer :: usr_GLYOXAL_aer_ndx
   
   integer :: tag_NO2_NO3_ndx
   integer :: tag_NO2_OH_ndx
@@ -76,8 +77,25 @@ module mo_usrrxt
   
   integer :: ion1_ndx, ion2_ndx, ion3_ndx, ion11_ndx
   integer :: elec1_ndx, elec2_ndx, elec3_ndx
+  integer :: elec4_ndx, elec5_ndx, elec6_ndx
   integer :: het1_ndx
 
+  integer, parameter :: nean = 3
+  integer :: ean_ndx(nean)
+  integer, parameter :: nrpe = 5
+  integer :: rpe_ndx(nrpe)
+  integer, parameter :: npir = 16
+  integer :: pir_ndx(npir)
+  integer, parameter :: nedn = 2
+  integer :: edn_ndx(nedn)
+  integer, parameter :: nnir = 13
+  integer :: nir_ndx(nnir)  
+  integer, parameter :: niira = 112
+  integer :: iira_ndx(niira)
+  integer, parameter :: niirb = 14
+  integer :: iirb_ndx(niirb)
+
+  integer :: usr_clm_h2o_m_ndx, usr_clm_hcl_m_ndx
   integer :: usr_oh_co_ndx, het_no2_h2o_ndx, usr_oh_dms_ndx, aq_so2_h2o2_ndx, aq_so2_o3_ndx
 
   integer :: h2o_ndx, so4_ndx, cb2_ndx, oc2_ndx, soa_ndx, nit_ndx
@@ -140,7 +158,7 @@ module mo_usrrxt
   real(r8), parameter :: trlim2 = 17._r8/3._r8           ! K
   real(r8), parameter :: trlim3 = 15._r8/3._r8           ! K
 
-  logical :: has_ion_rxts
+  logical :: has_ion_rxts, has_d_chem
 
 contains
 
@@ -154,6 +172,11 @@ contains
     use physics_buffer, only : pbuf_get_index
 
     implicit none
+
+    character(len=4) :: xchar
+    character(len=32) :: rxtname
+    integer :: i
+
 !
 ! full tropospheric chemistry
 !
@@ -175,6 +198,7 @@ contains
     usr_SO2_OH_ndx       = get_rxt_ndx( 'usr_SO2_OH' )
     usr_DMS_OH_ndx       = get_rxt_ndx( 'usr_DMS_OH' )
     usr_HO2_aer_ndx      = get_rxt_ndx( 'usr_HO2_aer' )
+    usr_GLYOXAL_aer_ndx  = get_rxt_ndx( 'usr_GLYOXAL_aer' )
  !
     tag_NO2_NO3_ndx      = get_rxt_ndx( 'tag_NO2_NO3' )
     tag_NO2_OH_ndx       = get_rxt_ndx( 'tag_NO2_OH' )
@@ -263,8 +287,67 @@ contains
     elec2_ndx  = get_rxt_ndx( 'elec2' )
     elec3_ndx  = get_rxt_ndx( 'elec3' )
 
+    do i = 1,nean
+      write (xchar,'(i4)') i
+      rxtname = 'ean'//trim(adjustl(xchar))
+      ean_ndx(i) = get_rxt_ndx(trim(rxtname))
+    enddo
+
+    do i = 1,nrpe
+      write (xchar,'(i4)') i
+      rxtname = 'rpe'//trim(adjustl(xchar))
+      rpe_ndx(i) = get_rxt_ndx(trim(rxtname))
+    enddo
+
+    do i = 1,npir
+      write (xchar,'(i4)') i
+      rxtname = 'pir'//trim(adjustl(xchar))
+      pir_ndx(i) = get_rxt_ndx(trim(rxtname))
+    enddo
+
+    do i = 1,nedn
+      write (xchar,'(i4)') i
+      rxtname = 'edn'//trim(adjustl(xchar))
+      edn_ndx(i) = get_rxt_ndx(trim(rxtname))
+    enddo
+
+    do i = 1,nnir
+      write (xchar,'(i4)') i
+      rxtname = 'nir'//trim(adjustl(xchar))
+      nir_ndx(i) = get_rxt_ndx(trim(rxtname))
+    enddo
+
+    do i = 1,niira
+      write (xchar,'(i4)') i
+      rxtname = 'iira'//trim(adjustl(xchar))
+      iira_ndx(i) = get_rxt_ndx(trim(rxtname))
+    enddo
+
+    do i = 1,niirb
+      write (xchar,'(i4)') i
+      rxtname = 'iirb'//trim(adjustl(xchar))
+      iirb_ndx(i) = get_rxt_ndx(trim(rxtname))
+    enddo
+
+    usr_clm_h2o_m_ndx = get_rxt_ndx( 'usr_CLm_H2O_M' )
+    usr_clm_hcl_m_ndx = get_rxt_ndx( 'usr_CLm_HCL_M' )
+
+    elec4_ndx  = get_rxt_ndx( 'Op2P_ea' )
+    elec5_ndx  = get_rxt_ndx( 'Op2P_eb' )
+    elec6_ndx  = get_rxt_ndx( 'Op2D_e' )
+
     has_ion_rxts = ion1_ndx>0 .and. ion2_ndx>0 .and. ion3_ndx>0 .and. elec1_ndx>0 &
                  .and. elec2_ndx>0 .and. elec3_ndx>0
+
+    has_d_chem = &
+         all(ean_ndx>0) .and. &
+         all(rpe_ndx>0) .and. &
+         all(pir_ndx>0) .and. &
+         all(edn_ndx>0) .and. &
+         all(nir_ndx>0) .and. &
+         all(iira_ndx>0) .and. &
+         all(iirb_ndx>0) .and. &
+         usr_clm_h2o_m_ndx>0 .and. usr_clm_hcl_m_ndx>0
 
     so4_ndx    = get_spc_ndx( 'SO4' )
     cb2_ndx    = get_spc_ndx( 'CB2' )
@@ -337,7 +420,9 @@ contains
        write(iulog,'(10i5)') usr_O_O2_ndx,usr_HO2_HO2_ndx,tag_NO2_NO3_ndx,usr_N2O5_M_ndx,tag_NO2_OH_ndx,usr_HNO3_OH_ndx &
                             ,tag_NO2_HO2_ndx,usr_HO2NO2_M_ndx,usr_N2O5_aer_ndx,usr_NO3_aer_ndx,usr_NO2_aer_ndx &
                             ,usr_CO_OH_b_ndx,tag_C2H4_OH_ndx,tag_C3H6_OH_ndx,tag_CH3CO3_NO2_ndx,usr_PAN_M_ndx,usr_CH3COCH3_OH_ndx &
-                            ,usr_MCO3_NO2_ndx,usr_MPAN_M_ndx,usr_XOOH_OH_ndx,usr_SO2_OH_ndx,usr_DMS_OH_ndx,usr_HO2_aer_ndx
+                            ,usr_MCO3_NO2_ndx,usr_MPAN_M_ndx,usr_XOOH_OH_ndx,usr_SO2_OH_ndx,usr_DMS_OH_ndx,usr_HO2_aer_ndx &
+                            ,usr_GLYOXAL_aer_ndx
+
     end if
 
   end subroutine usrrxt_inti
@@ -398,6 +483,8 @@ contains
     real(r8), parameter :: gamma_ho2  = 0.20_r8         ! 
     real(r8), parameter :: gamma_no2  = 0.0001_r8       ! 
     real(r8), parameter :: gamma_no3  = 0.001_r8        ! 
+    real(r8), parameter :: gamma_glyoxal  = 2.0e-4_r8   !  Washenfelder et al, JGR, 2011
+
 
     integer  ::  i, k
     integer  ::  l
@@ -411,13 +498,14 @@ contains
     real(r8) ::  xr(ncol)   
     real(r8) ::  sur(ncol)   
     real(r8) ::  sqrt_t(ncol)                   ! sqrt( temp )
+    real(r8) ::  sqrt_t_58(ncol)                ! sqrt( temp / 58.)
     real(r8) ::  exp_fac(ncol)                  ! vector exponential
     real(r8) ::  lwc(ncol)   
     real(r8) ::  ko_m(ncol)   
     real(r8) ::  k0(ncol)   
     real(r8) ::  kinf_m(ncol)   
     real(r8) ::  o2(ncol)
-    real(r8) ::  c_n2o5, c_ho2, c_no2, c_no3
+    real(r8) ::  c_n2o5, c_ho2, c_no2, c_no3, c_glyoxal
     real(r8) ::  amas
     !-----------------------------------------------------------------
     !	... density of sulfate aerosol
@@ -484,7 +572,8 @@ contains
     dm_array(:,:,:) = 0._r8
     sad_total(:,:) = 0._r8
     
-    if( usr_NO2_aer_ndx > 0 .or. usr_NO3_aer_ndx > 0 .or. usr_N2O5_aer_ndx > 0 .or. usr_HO2_aer_ndx > 0 ) then
+    if( usr_NO2_aer_ndx > 0 .or. usr_NO3_aer_ndx > 0 .or. usr_N2O5_aer_ndx > 0 .or. usr_HO2_aer_ndx > 0 &
+      .or. usr_GLYOXAL_aer_ndx > 0) then
 
 ! sad_total should be set outside of usrrxt ?? 
        if( carma_hetchem_feedback ) then
@@ -502,6 +591,7 @@ contains
        tinv(:)           = 1._r8 / temp(:ncol,k)
        tp(:)             = 300._r8 * tinv(:)
        sqrt_t(:)         = sqrt( temp(:ncol,k) )
+       sqrt_t_58(:)      = sqrt( temp(:ncol,k) / 58.0_r8 )
 
 !-----------------------------------------------------------------
 !	... o + o2 + m --> o3 + m
@@ -779,7 +869,8 @@ contains
 !
 ! hydrolysis reactions on wetted aerosols
 !      
-       if( usr_NO2_aer_ndx > 0 .or. usr_NO3_aer_ndx > 0 .or. usr_N2O5_aer_ndx > 0 .or. usr_HO2_aer_ndx > 0 ) then
+       if( usr_NO2_aer_ndx > 0 .or. usr_NO3_aer_ndx > 0 .or. usr_N2O5_aer_ndx > 0 .or. usr_HO2_aer_ndx > 0 &
+         .or. usr_GLYOXAL_aer_ndx > 0) then
 
           long_loop : do i = 1,ncol
 
@@ -790,6 +881,7 @@ contains
              c_no3  = 1.85e3_r8 * sqrt_t(i)         ! mean molecular speed of no3
              c_no2  = 2.15e3_r8 * sqrt_t(i)         ! mean molecular speed of no2
              c_ho2  = 2.53e3_r8 * sqrt_t(i)         ! mean molecular speed of ho2
+             c_glyoxal = 1.455e4_r8 * sqrt_t_58(i)  ! mean molecular speed of ho2
 
              !-------------------------------------------------------------------------
              !  Heterogeneous reaction rates for uptake of a gas on an aerosol:
@@ -832,6 +924,13 @@ contains
              if( usr_HO2_aer_ndx > 0 ) then
                 rxt(i,k,usr_HO2_aer_ndx) = hetrxtrate( sfc, dm_aer, dg, c_ho2, gamma_ho2 )
              end if
+             !-------------------------------------------------------------------------
+             !  ... glyoxal ->  soag1  (on sulfate, nh4no3, oc2, soa)  
+             ! first order uptake, Fuchs and Sutugin, 1971,  dCg = 1/4 * gamma * ! A * |v_mol| * Cg * dt
+             !-------------------------------------------------------------------------
+             if( usr_GLYOXAL_aer_ndx > 0 ) then
+                rxt(i,k,usr_GLYOXAL_aer_ndx) = hetrxtrate_gly( sfc, c_glyoxal, gamma_glyoxal )
+             end if
           end do long_loop
        end if
 
@@ -873,6 +972,7 @@ contains
           if ( aq_so2_h2o2_ndx > 0 ) then
              rxt(:,k,aq_so2_h2o2_ndx) = lwc(:) * 1.0e-03_r8 * avo * &
                   K_AQ * &
+
                   exp(ER_AQ * ((1.0e+00_r8 / 298.0e+00_r8) - tinv(:))) * &
                   HENRY298_SO2 * &
                   K298_SO2_HSO3 * &
@@ -880,6 +980,7 @@ contains
                   exp(((H298_SO2 + H298_SO2_HSO3 + H298_H2O2) / R_CAL) * &
                   ((1.0e+00_r8 / 298.0e+00_r8) - tinv(:))) * &
                   (R_CONC * temp(:ncol,k))**2.0e+00_r8 / &
+
                   (1.0e+00_r8 + 13.0e+00_r8 * 10.0e+00_r8**(-pH))
           endif
           !-----------------------------------------------------------------------
@@ -906,6 +1007,94 @@ contains
           endif
        endif
 
+    if ( has_d_chem ) then
+
+        call comp_exp( exp_fac, -600._r8 * tinv, ncol )
+        rxt(:,k,ean_ndx(1))  = 1.e-31_r8 * tp(:) * exp_fac(:)
+        rxt(:,k,ean_ndx(2))  = 9.1e-12_r8 * tp(:)**(-1.46_r8)
+        call comp_exp( exp_fac, -193._r8 * tinv, ncol )
+        rxt(:,k,ean_ndx(3))  = (4.e-30_r8 * exp_fac(:)) * 0.21_r8
+
+        rxt(:,k,rpe_ndx(1))  = 4.2e-6_r8 * tp(:)**0.5_r8
+        rxt(:,k,rpe_ndx(2))  = 6.3e-7_r8 * tp(:)**0.5_r8
+        rxt(:,k,rpe_ndx(3))  = 2.5e-6_r8 * tp(:)**0.1_r8
+        rxt(:,k,rpe_ndx(4))  = 2.48e-6_r8 * tp(:)**0.76_r8
+        rxt(:,k,rpe_ndx(5))  = 1.4e-6_r8 * tp(:)**0.4_r8
+
+        rxt(:,k,pir_ndx(1)) = 4.e-30_r8 * tp(:)**2.93_r8
+        rxt(:,k,pir_ndx(2))  = 4.6e-27_r8 * tp(:)**4._r8
+
+        call comp_exp( exp_fac, -15900._r8 * tinv, ncol )
+        rxt(:,k,pir_ndx(3))  = (2.5e-2_r8 * tp(:)**5._r8) * exp_fac(:)
+        rxt(:,k,pir_ndx(4))  = 2.3e-27_r8 * tp(:)**7.5_r8
+
+        call comp_exp( exp_fac, -10272._r8 * tinv, ncol )
+        rxt(:,k,pir_ndx(5))  = (2.6e-3_r8 * tp(:)**8.5_r8) * exp_fac(:)
+        rxt(:,k,pir_ndx(6))  = 3.6e-27_r8 * tp(:)**8.1_r8
+
+        call comp_exp( exp_fac, -9000._r8 * tinv, ncol )
+        rxt(:,k,pir_ndx(7))  = (1.5e-1_r8 * tp(:)**9.1_r8) * exp_fac(:)
+        rxt(:,k,pir_ndx(8))  = 4.6e-28_r8 * tp(:)**14._r8
+
+        call comp_exp( exp_fac, -6400._r8 * tinv, ncol )
+        rxt(:,k,pir_ndx(9))  = (1.7e-3_r8 * tp(:)**15._r8) * exp_fac(:)
+        rxt(:,k,pir_ndx(10)) = 1.35e-28_r8 * tp(:)**2.83_r8
+
+        rxt(:,k,pir_ndx(11)) = 1.e-27_r8 * (308._r8 * tinv(:))**4.7_r8
+        rxt(:,k,pir_ndx(12)) = rxt(:,k,pir_ndx(11))
+        rxt(:,k,pir_ndx(13)) = 1.4e-29_r8 * tp(:)**4._r8
+
+        call comp_exp( exp_fac, -3872._r8 * tinv, ncol )
+        rxt(:,k,pir_ndx(14)) = (3.4e-7_r8 * tp(:)**5._r8) * exp_fac(:)
+
+        rxt(:,k,pir_ndx(15)) = 3.0e-31_r8 * tp(:)**4.3_r8
+        call comp_exp( exp_fac, -2093._r8 * tinv, ncol )
+        rxt(:,k,pir_ndx(16)) = (1.5e-8_r8 * tp(:)**4.3_r8) * exp_fac(:)
+
+        rxt(:,k,edn_ndx(1)) = 3.1e-10_r8 * tp(:)**0.83_r8
+        call comp_exp( exp_fac, -4990._r8 * tinv, ncol )
+        rxt(:,k,edn_ndx(2)) = (1.9e-12_r8 * tp(:)**(-1.5_r8)) * exp_fac(:)
+
+        rxt(:,k,nir_ndx(1)) = 1.05e-12_r8 * tp(:)**2.15_r8
+        rxt(:,k,nir_ndx(2)) = 2.5e-11_r8 * tp(:)**0.79_r8
+        rxt(:,k,nir_ndx(3)) = 7.5e-11_r8 * tp(:)**0.79_r8
+        rxt(:,k,nir_ndx(4)) = rxt(:,k,nir_ndx(1))
+        rxt(:,k,nir_ndx(5)) = 1.3e-11_r8 * tp(:)**1.64_r8
+        rxt(:,k,nir_ndx(6)) = 3.3e-11_r8 * tp(:)**2.38_r8
+
+        call comp_exp( exp_fac, -7300_r8 * tinv, ncol )
+        rxt(:,k,nir_ndx(7)) = (1.0e-3_r8 * tp(:)) * exp_fac(:)
+        call comp_exp( exp_fac, -7050_r8 * tinv, ncol )
+        rxt(:,k,nir_ndx(8)) = (7.2e-4_r8 * tp(:)) * exp_fac(:)
+        call comp_exp( exp_fac, -6800_r8 * tinv, ncol )
+        rxt(:,k,nir_ndx(9)) = (6.5e-3_r8 * tp(:)) * exp_fac(:)
+        call comp_exp( exp_fac, -7600_r8 * tinv, ncol )
+        rxt(:,k,nir_ndx(10)) = (5.7e-4_r8 * tp(:)) * exp_fac(:)
+
+        call comp_exp( exp_fac, -7150_r8 * tinv, ncol )
+        rxt(:,k,nir_ndx(11)) = (1.5e-2_r8 * tp(:)) * exp_fac(:)
+
+        call comp_exp( exp_fac, -13130_r8 * tinv, ncol )
+        rxt(:,k,nir_ndx(12)) = (6.0e-3_r8 * tp(:)) * exp_fac(:)
+        rxt(:,k,nir_ndx(13)) = 5.22e-28_r8 * tp(:)**2.62_r8
+
+        rxt(:,k,iira_ndx(1)) = 6.0e-8_r8 * tp(:)**.5_r8
+        do i = 2,niira
+          rxt(:,k,iira_ndx(i)) = rxt(:,k,iira_ndx(i-1))
+        enddo
+
+        rxt(:,k,iirb_ndx(1)) = 1.25e-25_r8 * tp(:)**4._r8
+        do i = 2,niirb
+          rxt(:,k,iirb_ndx(i)) = rxt(:,k,iirb_ndx(i-1))
+        enddo
+
+        call comp_exp( exp_fac, -6600._r8 * tinv, ncol )
+        rxt(:,k,usr_clm_h2o_m_ndx) = 2.e-8_r8 * exp_fac(:)
+
+        call comp_exp( exp_fac, -11926._r8 * tinv, ncol )
+        rxt(:,k,usr_clm_hcl_m_ndx) =  tinv(:) * exp_fac(:)
+
+     endif
     end do level_loop
     
 !-----------------------------------------------------------------
@@ -937,6 +1126,18 @@ contains
 	      rxt(:,k,elec2_ndx) = 1.6e-7_r8 * tp(:)**.55_r8
 	   end where
 	end do level_loop2
+     endif
+
+     ! quenching of O+(2P) and O+(2D) by e to produce O+
+     ! See TABLE 1 of Roble (1995) 
+     ! drm 2015-07-27
+     if (elec4_ndx > 0 .and. elec5_ndx > 0 .and. elec6_ndx > 0) then
+         do k=1,pver
+            tp(:ncol)          = sqrt(300._r8 / tempe(:ncol,k))
+            rxt(:,k,elec4_ndx) = 1.5e-7_r8 * tp(:)
+            rxt(:,k,elec5_ndx) = 4.0e-8_r8 * tp(:)
+            rxt(:,k,elec6_ndx) = 6.6e-8_r8 * tp(:)
+         end do 
      endif
 
 !-----------------------------------------------------------------
@@ -1279,5 +1480,32 @@ contains
     deallocate(rxt)
 
   endfunction hetrxtrate
+
+  !-------------------------------------------------------------------------
+  !  Heterogeneous reaction rates for uptake of a glyoxal gas on an aerosol:
+  !-------------------------------------------------------------------------
+  function hetrxtrate_gly( sfc, c_gas, gamma_gas ) result(rate)
+
+    real(r8), intent(in) :: sfc(:)
+    real(r8), intent(in) :: c_gas
+    real(r8), intent(in) :: gamma_gas
+    real(r8) :: rate
+
+    real(r8),allocatable :: rxt(:)
+    integer :: n, i
+
+    n = size(sfc)
+
+    allocate(rxt(n))
+    do i=1,n
+       rxt(i) =  0.25_r8 * c_gas * sfc(i) * gamma_gas
+    enddo
+
+    rate = sum(rxt)
+
+    deallocate(rxt)
+
+  endfunction hetrxtrate_gly
+
 
 end module mo_usrrxt

@@ -20,7 +20,7 @@ module mo_gas_phase_chemdr
 
   integer :: map2chm(pcnst) = 0           ! index map to/from chemistry/constituents list
 
-  integer :: synoz_ndx, so4_ndx, h2o_ndx, o2_ndx, o_ndx, hno3_ndx, hcl_ndx, dst_ndx, cldice_ndx
+  integer :: synoz_ndx, so4_ndx, h2o_ndx, o2_ndx, o_ndx, hno3_ndx, hcl_ndx, dst_ndx, cldice_ndx, snow_ndx
   integer :: o3_ndx, o3s_ndx
   integer :: het1_ndx
   integer :: ndx_cldfr, ndx_cmfdqr, ndx_nevapr, ndx_cldtop, ndx_prain
@@ -128,6 +128,8 @@ contains
     dst_ndx = get_spc_ndx( dust_names(1) )
     synoz_ndx = get_extfrc_ndx( 'SYNOZ' )
     call cnst_get_ind( 'CLDICE', cldice_ndx )
+    call cnst_get_ind( 'SNOWQM', snow_ndx, abort=.false. )
+
 
     do m = 1,extcnt
        WRITE(UNIT=string, FMT='(I2.2)') m
@@ -437,12 +439,9 @@ contains
     real(r8) :: xlat
     real(r8) :: pm25(ncol)
     real(r8), dimension(ncol,pver) :: o3s_loss             ! tropospheric ozone loss for o3s
+
     logical :: zero_aerosols
     real(r8) :: dlats(ncol)
-!
-! jfl
-!
-!
 
     real(r8), dimension(ncol,pver) :: &      ! aerosol reaction diagnostics
         gprob_n2o5, &
@@ -619,7 +618,11 @@ contains
           h2o_gas(:,k)    = h2ovmr(:,k)
           hcl_gas(:,k)    = vmr(:,k,hcl_ndx)
           wrk(:,k)        = h2ovmr(:,k)
-          cldice(:ncol,k) = q(:ncol,k,cldice_ndx)
+          if (snow_ndx>0) then
+             cldice(:ncol,k) = q(:ncol,k,cldice_ndx) + q(:ncol,k,snow_ndx)
+          else
+             cldice(:ncol,k) = q(:ncol,k,cldice_ndx)
+          endif
        end do
        do m = 1,2
           do k = 1,pver
@@ -1025,6 +1028,11 @@ contains
        call ghg_chem_set_flbc( vmr, ncol )
     endif
 
+    !-----------------------------------------------------------------------
+    ! force ion/electron balance -- ext forcings likely do not conserve charge
+    !-----------------------------------------------------------------------      
+    call charge_balance( ncol, vmr )
+
     !-----------------------------------------------------------------------      
     !         ... Xform from vmr to mmr
     !-----------------------------------------------------------------------      
@@ -1130,6 +1138,7 @@ contains
     call outfld('Q_SRF',qh2o(:ncol,pver) , ncol, lchnk )
     call outfld('U_SRF',ufld(:ncol,pver) , ncol, lchnk )
     call outfld('V_SRF',vfld(:ncol,pver) , ncol, lchnk )
+
 !
     if (.not.sad_pbf_ndx>0) then
        deallocate(strato_sad)

@@ -332,9 +332,7 @@ CONTAINS
     use time_manager,     only: get_prev_time, get_curr_time
     use cam_control_mod,  only: restart_run, branch_run
     use sat_hist,         only: sat_hist_init
-#if (defined SPMD)
     use spmd_utils,       only: mpicom, masterprocid, mpicom, mpi_character
-#endif
     !
     !-----------------------------------------------------------------------
     !
@@ -395,11 +393,9 @@ CONTAINS
       host = ' '
       call shr_sys_getenv ('HOST',host,rcode)
     end if
-#ifdef SPMD
     ! PIO requires netcdf attributes have consistant values on all tasks
     call mpi_bcast(logname, len(logname), mpi_character, masterprocid, mpicom, rcode)
     call mpi_bcast(host,    len(host),    mpi_character, masterprocid, mpicom, rcode)
-#endif
     !
     ! Override averaging flag for all fields on a particular tape if namelist input so specifies
     !
@@ -1531,9 +1527,7 @@ CONTAINS
     use cam_history_support, only: get_hist_coord_index, add_hist_coord
 
     use shr_sys_mod,         only: shr_sys_getenv
-#if (defined SPMD)
-    use spmd_utils,          only: mpicom, mpichar
-#endif
+    use spmd_utils,          only: mpicom, mpi_character, masterprocid
     !
     !-----------------------------------------------------------------------
     !
@@ -1604,11 +1598,9 @@ CONTAINS
       host = ' '
       call shr_sys_getenv ('HOST',host,ierr)
     end if
-#ifdef SPMD
     ! PIO requires netcdf attributes have consistant values on all tasks
-    call mpibcast(logname, len(logname), mpichar, 0, mpicom)
-    call mpibcast(host, len(host), mpichar, 0, mpicom)
-#endif
+    call mpi_bcast(logname, len(logname), mpi_character, masterprocid, mpicom, ierr)
+    call mpi_bcast(host,    len(host),    mpi_character, masterprocid, mpicom, ierr)
 
     call pio_seterrorhandling(File, PIO_BCAST_ERROR)
 
@@ -3588,7 +3580,7 @@ end subroutine print_active_fldlst
     !
     listentry => get_entry_by_name(masterlinkedlist, trim(name))
     if(.not.associated(listentry)) then
-      call endrun ('ADD_DEFAULT: field='//name//' not found')
+      call endrun ('ADD_DEFAULT: field = "'//trim(name)//'" not found')
     end if
     listentry%actflag(t) = .true.
     if (flag /= ' ') then
@@ -3668,6 +3660,7 @@ end subroutine print_active_fldlst
     integer :: f               ! field index
     integer :: ncreal          ! real data type for output
     integer :: dtime           ! timestep size
+    integer :: sec_nhtfrq      ! nhtfrq converted to seconds
     integer :: ndbase = 0      ! days component of base time
     integer :: nsbase = 0      ! seconds component of base time
     integer :: nbdate          ! base date in yyyymmdd format
@@ -3829,17 +3822,25 @@ end subroutine print_active_fldlst
 
     ! Determine what time period frequency is being output for each file
     ! Note that nhtfrq is now in timesteps
+
+    sec_nhtfrq = nhtfrq(t)
+
+    ! If nhtfrq is in hours, convert to seconds
+    if (nhtfrq(t) < 0) then    
+      sec_nhtfrq = abs(nhtfrq(t))*3600
+    end if
+
     dtime = get_step_size()
-    if (nhtfrq(t) == 0) then                                !month 
+    if (sec_nhtfrq == 0) then                                !month 
       time_per_freq = 'month_1'
-    else if (mod(nhtfrq(t)*dtime,86400) == 0) then          ! day
-      write(time_per_freq,999) 'day_',nhtfrq(t)*dtime/86400
-    else if (mod(nhtfrq(t)*dtime,3600) == 0) then           ! hour
-      write(time_per_freq,999) 'hour_',(nhtfrq(t)*dtime)/3600
-    else if (mod(nhtfrq(t)*dtime,60) == 0) then           ! hour
-      write(time_per_freq,999) 'minute_',(nhtfrq(t)*dtime)/60
-    else                                                    ! second
-      write(time_per_freq,999) 'second_',nhtfrq(t)*dtime
+    else if (mod(sec_nhtfrq*dtime,86400) == 0) then          ! day
+      write(time_per_freq,999) 'day_',sec_nhtfrq*dtime/86400
+    else if (mod(sec_nhtfrq*dtime,3600) == 0) then           ! hour
+      write(time_per_freq,999) 'hour_',(sec_nhtfrq*dtime)/3600
+    else if (mod(sec_nhtfrq*dtime,60) == 0) then             ! minute
+      write(time_per_freq,999) 'minute_',(sec_nhtfrq*dtime)/60
+    else                                                     ! second
+      write(time_per_freq,999) 'second_',sec_nhtfrq*dtime
     end if
 999 format(a,i0)
 
@@ -4593,11 +4594,6 @@ end subroutine print_active_fldlst
     ! 
     ! Purpose: Driver routine to write fields on history tape t
     ! 
-    ! Method: For variables which do not need to be gathered (SPMD) just issue the netcdf call
-    !         For those that do need to be gathered, call "dump_field" to do the operation.
-    !         Finally, zero the history buffers for each field written.
-    ! 
-    ! Author: CCM Core Group
     ! 
     !-----------------------------------------------------------------------
     use time_manager,  only: get_nstep, get_curr_date, get_curr_time, get_step_size

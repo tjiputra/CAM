@@ -40,7 +40,7 @@ module advance_xm_wpxp_module
   contains
 
   !=============================================================================
-  subroutine advance_xm_wpxp( dt, sigma_sqd_w, wm_zm, wm_zt, wp2, &
+  subroutine advance_xm_wpxp( dt, sigma_sqd_w, um, vm, wm_zm, wm_zt, wp2, &
                               Lscale, wp3_on_wp2, wp3_on_wp2_zt, Kh_zt, Kh_zm, &
                               tau_C6_zm, Skw_zm, rtpthvp, rtm_forcing, &
                               wprtp_forcing, rtm_ref, thlpthvp, &
@@ -49,7 +49,8 @@ module advance_xm_wpxp_module
                               invrs_rho_ds_zt, thv_ds_zm, rtp2, thlp2, &
                               w_1_zm, w_2_zm, varnce_w_1_zm, varnce_w_2_zm, &
                               mixt_frac_zm, l_implemented, em, &
-                              sclrpthvp, sclrm_forcing, sclrp2, &
+                              sclrpthvp, sclrm_forcing, sclrp2, exner, rcm, &
+                              p_in_Pa, cloud_frac, &
                               rtm, wprtp, thlm, wpthlp, &
                               err_code, &
                               sclrm, wpsclrp )
@@ -108,7 +109,8 @@ module advance_xm_wpxp_module
         zt2zm
 
     use model_flags, only: &
-        l_clip_semi_implicit ! Variable(s)
+        l_clip_semi_implicit, & ! Variable(s)
+        l_use_C7_Richardson
 
     use mono_flux_limiter, only: &
         calc_turb_adv_range ! Procedure(s)
@@ -163,6 +165,8 @@ module advance_xm_wpxp_module
 
     real( kind = core_rknd ), intent(in), dimension(gr%nz) :: & 
       sigma_sqd_w,     & ! sigma_sqd_w on momentum levels           [-]
+      um,              & ! u mean wind component (thermodynamic levels)   [m/s]
+      vm,              & ! v mean wind component (thermodynamic levels)   [m/s]
       wm_zm,           & ! w wind component on momentum levels      [m/s]
       wm_zt,           & ! w wind component on thermodynamic levels [m/s]
       wp2,             & ! w'^2 (momentum levels)                   [m^2/s^2]
@@ -206,6 +210,12 @@ module advance_xm_wpxp_module
     real( kind = core_rknd ), intent(in), dimension(gr%nz,sclr_dim) ::  & 
       sclrpthvp, sclrm_forcing,  & !                           [Units vary]
       sclrp2                       ! For clipping Vince Larson [Units vary]
+
+    real( kind = core_rknd ), intent(in), dimension(gr%nz) ::  &
+      exner,           & ! Exner function                            [-]
+      rcm,             & ! cloud water mixing ratio, r_c             [kg/kg]
+      p_in_Pa,         & ! Air pressure                              [Pa]
+      cloud_frac         ! Cloud fraction                            [-]
 
     ! Input/Output Variables
     real( kind = core_rknd ), intent(inout), dimension(gr%nz) ::  & 
@@ -300,16 +310,25 @@ module advance_xm_wpxp_module
       C6thl_Skw_fnc(1:gr%nz) = C6thlb
     endif
 
-    if ( C7 /= C7b ) then
-      C7_Skw_fnc(1:gr%nz) = C7b + (C7-C7b) & 
-        *EXP( -one_half * (Skw_zm(1:gr%nz)/C7c)**2 )
+    ! Compute C7_Skw_fnc
+    if ( l_use_C7_Richardson ) then
+      ! New formulation based on Richardson number
+      C7_Skw_fnc = compute_C7_Skw_fnc_Richardson( thlm, um, vm, em, Lscale, exner, rtm, &
+                                                  rcm, p_in_Pa, cloud_frac, rho_ds_zm )
     else
-      C7_Skw_fnc(1:gr%nz) = C7b
-    endif
+      if ( C7 /= C7b ) then
+        C7_Skw_fnc(1:gr%nz) = C7b + (C7-C7b) & 
+          *EXP( -one_half * (Skw_zm(1:gr%nz)/C7c)**2 )
+      else
+        C7_Skw_fnc(1:gr%nz) = C7b
+      endif
 
-    ! Damp C6 and C7 as a function of Lscale in stably stratified regions
-    C7_Skw_fnc = damp_coefficient( C7, C7_Skw_fnc, &
-                                   C7_Lscale0, wpxp_L_thresh, Lscale )
+      ! Damp C7 as a function of Lscale in stably stratified regions
+      C7_Skw_fnc = damp_coefficient( C7, C7_Skw_fnc, &
+                                     C7_Lscale0, wpxp_L_thresh, Lscale )
+    end if ! l_use_C7_Richardson
+
+    ! Damp C6 as a function of Lscale in stably stratified regions
     C6rt_Skw_fnc = damp_coefficient( C6rt, C6rt_Skw_fnc, &
                                      C6rt_Lscale0, wpxp_L_thresh, Lscale )
     C6thl_Skw_fnc = damp_coefficient( C6thl, C6thl_Skw_fnc, &
@@ -382,7 +401,7 @@ module advance_xm_wpxp_module
                         C6rt_Skw_fnc, rho_ds_zm, rho_ds_zt, & ! Intent(in)
                         invrs_rho_ds_zm, invrs_rho_ds_zt,  & ! Intent(in)
                         wpxp_upper_lim, wpxp_lower_lim, l_implemented, & ! Intent(in)
-                        em, Lscale, thlm, & ! Intent(in)
+                        em, Lscale, thlm, exner, rtm, rcm, p_in_Pa, cloud_frac, & ! Intent(in)
                         lhs ) ! Intent(out)
 
       ! Compute the explicit portion of the r_t and w'r_t' equations.
@@ -456,7 +475,7 @@ module advance_xm_wpxp_module
                         C6thl_Skw_fnc, rho_ds_zm, rho_ds_zt, & ! Intent(in)
                         invrs_rho_ds_zm, invrs_rho_ds_zt, & ! Intent(in)
                         wpxp_upper_lim, wpxp_lower_lim, l_implemented, & ! Intent(in)
-                        em, Lscale, thlm, & ! Intent(in)
+                        em, Lscale, thlm, exner, rtm, rcm, p_in_Pa, cloud_frac, & ! Intent(in)
                         lhs ) ! Intent(out)
 
       ! Compute the explicit portion of the th_l and w'th_l' equations.
@@ -541,7 +560,7 @@ module advance_xm_wpxp_module
                           C6rt_Skw_fnc, rho_ds_zm, rho_ds_zt,  &  ! Intent(in)
                           invrs_rho_ds_zm, invrs_rho_ds_zt,  &  ! Intent(in)
                           wpxp_upper_lim, wpxp_lower_lim, l_implemented, & ! Intent(in)
-                          em, Lscale, thlm, & ! Intent(in)
+                          em, Lscale, thlm, exner, rtm, rcm, p_in_Pa, cloud_frac, & ! Intent(in)
                           lhs ) ! Intent(out)
 
         ! Compute the explicit portion of the sclrm and w'sclr' equations.
@@ -603,7 +622,7 @@ module advance_xm_wpxp_module
                         C6rt_Skw_fnc, rho_ds_zm, rho_ds_zt,  & ! Intent(in)
                         invrs_rho_ds_zm, invrs_rho_ds_zt,  & ! Intent(in)
                         dummy_1d, dummy_1d, l_implemented,  & ! Intent(in)
-                        em, Lscale, thlm, & ! Intent(in)
+                        em, Lscale, thlm, exner, rtm, rcm, p_in_Pa, cloud_frac, & ! Intent(in)
                         lhs ) ! Intent(out)
 
       ! Compute the explicit portion of the r_t and w'r_t' equations.
@@ -813,6 +832,7 @@ module advance_xm_wpxp_module
       if( l_stats_samp ) then
         call stat_begin_update( irtm_sdmp, rtm / dt, stats_zt )
       end if
+
       rtm(1:gr%nz) = sponge_damp_xm( dt, rtm_ref(1:gr%nz), rtm(1:gr%nz), &
                                        rtm_sponge_damp_profile )
 
@@ -843,7 +863,7 @@ module advance_xm_wpxp_module
                           C6x_Skw_fnc, rho_ds_zm, rho_ds_zt,  &
                           invrs_rho_ds_zm, invrs_rho_ds_zt,  &
                           wpxp_upper_lim, wpxp_lower_lim, l_implemented,  &
-                          em, Lscale, thlm, &
+                          em, Lscale, thlm, exner, rtm, rcm, p_in_Pa, cloud_frac, &
                           lhs )
 
     ! Description:
@@ -975,6 +995,11 @@ module advance_xm_wpxp_module
       Lscale,          & ! Turbulent mixing length                   [m]
       em,              & ! Turbulent Kinetic Energy (TKE)            [m^2/s^2]
       thlm,            & ! th_l (thermo. levels)                     [K]
+      exner,           & ! Exner function                            [-]
+      rtm,             & ! total water mixing ratio, r_t             [-]
+      rcm,             & ! cloud water mixing ratio, r_c             [kg/kg]
+      p_in_Pa,         & ! Air pressure                              [Pa]
+      cloud_frac,      & ! Cloud fraction                            [-]
       wm_zm,           & ! w wind component on momentum levels       [m/s]
       wm_zt,           & ! w wind component on thermodynamic levels  [m/s]
       wp2,             & ! w'^2 (momentum levels)                    [m^2/s^2]
@@ -1024,7 +1049,8 @@ module advance_xm_wpxp_module
     constant_nu = 0.1_core_rknd
 
     if ( l_stability_correct_Kh_N2_zm ) then
-      Kh_N2_zm = Kh_zm / calc_stability_correction( thlm, Lscale, em)
+      Kh_N2_zm = Kh_zm / calc_stability_correction( thlm, Lscale, em, exner, rtm, rcm, &
+                                                    p_in_Pa, cloud_frac )
     else
       Kh_N2_zm = Kh_zm
     end if
@@ -3280,5 +3306,258 @@ module advance_xm_wpxp_module
 
   end function damp_coefficient
 !===============================================================================
+  function compute_C7_Skw_fnc_Richardson( thlm, um, vm, em, Lscale, exner, rtm, &
+                                          rcm, p_in_Pa, cloud_frac, rho_ds_zm ) &
+    result( C7_Skw_fnc )
+
+  ! Description:
+  !   Compute C7 as a function of the Richardson number
+
+  ! References:
+  !   cam:ticket:59
+  !-----------------------------------------------------------------------
+
+    use clubb_precision, only: &
+      core_rknd  ! Konstant
+
+    use grid_class, only: &
+      gr,   & ! Variable
+      ddzt, & ! Procedure(s)
+      zt2zm
+
+    use advance_helper_module, only: &
+      calc_brunt_vaisala_freq_sqd ! Procedure
+
+    use constants_clubb, only: &
+      one_fourth, &     ! Constant(s)
+      one_third,  &
+      one,        &
+      five
+
+    use interpolation, only: &
+      linear_interp_factor ! Procedure
+
+    use stats_variables, only: &
+      iRichardson_num, &    ! Variable(s)
+      ibrunt_vaisala_freq_sqd, &
+      stats_zm,       &
+      l_stats_samp
+
+    use stats_type_utilities, only: &
+      stat_update_var      ! Procedure
+
+    implicit none
+
+    ! Constant Parameters
+    real( kind = core_rknd ), parameter :: &
+      Richardson_num_divisor_threshold = 1.0e-8_core_rknd, &
+      Richardson_num_min = one_fourth, &
+      Richardson_num_max = five,       &
+      C7_min            = one_third,   &
+      C7_max            = one,         &
+      C7_Skw_fnc_below_ground_value = one
+
+    logical, parameter :: &
+      l_C7_Skw_fnc_vert_avg = .true.   ! Vertically average C7_Skw_fnc over a
+                                       ! distance of Lscale
+
+    ! Input Variables
+    real( kind = core_rknd ), dimension(gr%nz), intent(in) :: &
+      thlm,    & ! th_l (liquid water potential temperature)      [K]
+      um,      & ! u mean wind component (thermodynamic levels)   [m/s]
+      vm,      & ! v mean wind component (thermodynamic levels)   [m/s]
+      em,      & ! Turbulent Kinetic Energy (TKE)                 [m^2/s^2]
+      Lscale,  & ! Turbulent mixing length                        [m]
+      exner,   & ! Exner function                                 [-]
+      rtm,     & ! total water mixing ratio, r_t                  [kg/kg]
+      rcm,     & ! cloud water mixing ratio, r_c                  [kg/kg]
+      p_in_Pa, & ! Air pressure                                   [Pa]
+      cloud_frac, & ! Cloud fraction                              [-]
+      rho_ds_zm  ! Dry static density on momentum levels          [kg/m^3]
+
+
+    ! Output Variable
+    real( kind = core_rknd), dimension(gr%nz) :: &
+      C7_Skw_fnc
+
+    ! Local Variables
+    real( kind = core_rknd ), dimension(gr%nz) :: &
+      brunt_vaisala_freq_sqd, &
+      Richardson_num, &
+      dum_dz, dvm_dz, &
+      shear_sqd, &
+      turb_freq_sqd, &
+      Lscale_zm
+
+  !-----------------------------------------------------------------------
+    !----- Begin Code -----
+    brunt_vaisala_freq_sqd = calc_brunt_vaisala_freq_sqd( thlm, exner, rtm, rcm, p_in_Pa, &
+                                                          cloud_frac )
+
+    ! Statistics sampling
+    if ( l_stats_samp ) then
+
+      ! NOTE: This is a kludgy place to sample brunt_vaisala_freq_sqd, because
+      ! it is used in multiple places, and depending on CLUBB parameters, it
+      ! could be computed in another place and not here. In the future, we
+      ! should compute brunt_vaisala_freq_sqd once, and pass it around
+      ! everywhere. This will save on computational expense as well.
+      call stat_update_var( ibrunt_vaisala_freq_sqd, brunt_vaisala_freq_sqd, stats_zm )
+
+    end if ! l_stats_samp
+
+    Lscale_zm = zt2zm( Lscale )
+    turb_freq_sqd = em / Lscale_zm**2
+
+    ! Calculate shear_sqd
+    dum_dz = ddzt( um )
+    dvm_dz = ddzt( vm )
+    shear_sqd = dum_dz**2 + dvm_dz**2
+
+    Richardson_num = brunt_vaisala_freq_sqd / max( shear_sqd, turb_freq_sqd, &
+                                                  Richardson_num_divisor_threshold )
+
+    ! C7_Skw_fnc is interpolated based on the value of Richardson_num
+    where ( Richardson_num <= Richardson_num_min )
+      C7_Skw_fnc = C7_min
+    else where ( Richardson_num >= Richardson_num_max )
+      C7_Skw_fnc = C7_max
+    else where
+      ! Linear interpolation
+      C7_Skw_fnc = linear_interp_factor( (Richardson_num-Richardson_num_min) / &
+                                         (Richardson_num_max-Richardson_num_min), C7_max, C7_min )
+    end where
+
+    if ( l_C7_Skw_fnc_vert_avg ) then
+      C7_Skw_fnc = Lscale_width_vert_avg( C7_Skw_fnc, Lscale_zm, rho_ds_zm, &
+                                          C7_Skw_fnc_below_ground_value )
+    end if
+
+    ! Stats sampling
+    if ( l_stats_samp ) then
+      call stat_update_var( iRichardson_num, Richardson_num, stats_zm )
+    end if
+
+  end function compute_C7_Skw_fnc_Richardson
+  !----------------------------------------------------------------------
+
+  !----------------------------------------------------------------------
+  function Lscale_width_vert_avg( var_profile, Lscale_zm, rho_ds_zm, var_below_ground_value )
+
+  ! Description:
+  !   Averages a profile over vertical levels within Lscale_zm of a given level
+
+  ! References:
+  !   cam:ticket:59
+
+    use clubb_precision, only: &
+      core_rknd ! Precision
+
+    use grid_class, only: &
+      gr ! Variable
+
+    use fill_holes, only: &
+      vertical_avg ! Procedure
+
+    implicit none
+
+    ! Input Variables
+    real( kind = core_rknd ), dimension(gr%nz), intent(in) :: &
+      var_profile, &      ! Profile on momentum levels
+      Lscale_zm, &        ! Lscale on momentum levels
+      rho_ds_zm           ! Dry static energy on momentum levels!
+
+    real( kind = core_rknd ), intent(in) :: &
+      var_below_ground_value ! Value to use below ground
+
+    ! Result Variable
+    real( kind = core_rknd ), dimension(gr%nz) :: &
+      Lscale_width_vert_avg ! Vertically averaged profile (on momentum levels)
+
+    ! Local Variables
+    integer :: k, k_avg_lower, k_avg_upper, k_inner_loop
+
+    real( kind = core_rknd ), dimension(:), allocatable :: &
+      rho_ds_zm_virtual, &
+      var_profile_virtual, &
+      invrs_dzm_virtual
+
+    integer :: n_virtual_levels, n_below_ground_levels
+
+  !----------------------------------------------------------------------
+    !----- Begin Code -----
+    outer_vert_loop: do k=1, gr%nz
+
+      !------------------------------------------------------------
+      ! Hunt down all vertical levels with Lscale_zm(k) of gr%zm(k).
+      !------------------------------------------------------------
+
+      k_avg_upper = k
+      inner_vert_loop_upward: do k_inner_loop=k+1, gr%nz
+        if ( gr%zm(k_inner_loop) - gr%zm(k) <= Lscale_zm(k) ) then
+          ! Include this height level in the average.
+          k_avg_upper = k_inner_loop
+        else
+          ! Do not include this level in the average. No point in searching further.
+          exit
+        end if
+      end do inner_vert_loop_upward
+
+      k_avg_lower = k
+      inner_vert_loop_downward: do k_inner_loop=k-1, 1, -1
+        if ( gr%zm(k) - gr%zm(k_inner_loop) <= Lscale_zm(k) ) then
+          ! Include this height level in the average.
+          k_avg_lower = k_inner_loop
+        else
+          ! Do not include this level in the average. No point in searching further.
+          exit
+        end if
+      end do inner_vert_loop_downward
+
+      ! Compute the number of levels below ground to include.
+      if ( k_avg_lower > 1 ) then
+        ! k=1, the lowest "real" level, is not included in the average, so no
+        ! below-ground levels should be included.
+        n_below_ground_levels = 0
+      else
+        ! The number of below-ground levels included is equal to Lscale_zm(1)
+        ! divided by the distance between vertical levels below ground; the
+        ! latter is assumed to be the same as the distance between the first and
+        ! second vertical levels.
+        n_below_ground_levels = int( Lscale_zm(1) / (gr%zm(2)-gr%zm(1)) )
+      end if
+
+      ! Prepare the virtual levels!
+      n_virtual_levels = k_avg_upper-k_avg_lower+n_below_ground_levels+1
+      allocate( rho_ds_zm_virtual(n_virtual_levels), var_profile_virtual(n_virtual_levels), &
+                invrs_dzm_virtual(n_virtual_levels) )
+
+      ! All vertical levels have rho_ds_zm and invrs_dzm_virtual equal to the
+      ! values at k=1. The value of var_profile at k=1 is given as an argument
+      ! to this function.
+      if ( n_below_ground_levels > 0 ) then
+        rho_ds_zm_virtual(1:n_below_ground_levels) = rho_ds_zm(1)
+        var_profile_virtual(1:n_below_ground_levels) = var_below_ground_value
+        invrs_dzm_virtual(1:n_below_ground_levels) = gr%invrs_dzm(1)
+      end if
+
+      ! Set up the above-ground virtual levels.
+      rho_ds_zm_virtual(n_below_ground_levels+1:n_virtual_levels) = &
+        rho_ds_zm(k_avg_lower:k_avg_upper)
+      var_profile_virtual(n_below_ground_levels+1:n_virtual_levels) = &
+        var_profile(k_avg_lower:k_avg_upper)
+      invrs_dzm_virtual(n_below_ground_levels+1:n_virtual_levels) = &
+        gr%invrs_dzm(k_avg_lower:k_avg_upper)
+
+      ! Finally, compute the average.
+      Lscale_width_vert_avg(k) = vertical_avg( n_virtual_levels, rho_ds_zm_virtual, &
+                                               var_profile_virtual, invrs_dzm_virtual )
+
+      deallocate( rho_ds_zm_virtual, var_profile_virtual, invrs_dzm_virtual )
+
+    end do outer_vert_loop
+
+    return
+  end function Lscale_width_vert_avg
 
 end module advance_xm_wpxp_module

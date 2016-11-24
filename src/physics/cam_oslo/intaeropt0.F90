@@ -12,9 +12,7 @@ subroutine intaeropt0 (lchnk, ncol, Nnatk, &
 
    use ppgrid
    use shr_kind_mod, only: r8 => shr_kind_r8
-!   use inpgraer
    use opttab,   only: cate, cat, fac, faq, fbc 
-!   use aerosoldef, only: nbmodes, nmodes
    use commondefinitions, only: nmodes, nbmodes
 
    implicit none
@@ -28,7 +26,6 @@ subroutine intaeropt0 (lchnk, ncol, Nnatk, &
    real(r8), intent(in) :: Nnatk(pcols,pver,0:nmodes) ! modal aerosol number concentration  
 !
 ! Output arguments: Modal total and absorption extiction coefficients (for AeroCom)
-!old: for 550nm (1) and 865nm (2), and for r<1um (lt1) and r>1um (gt1).
 ! for 440nm, 500nm, 550nm, 670nm and 870nm, and for d<1um (lt1) and d>1um (gt1).
 ! March 2009: + backscatter coefficient, backsc550 (km-1 sr-1).
 

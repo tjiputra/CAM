@@ -1,128 +1,87 @@
-
-! FV Dynamics specific time-stepping
-
 module stepon
 
-   use shr_kind_mod,       only: r8 => shr_kind_r8
-   use shr_sys_mod,        only: shr_sys_flush
-   use pmgrid,             only: plev, plevp, plat
-   use spmd_utils,         only: iam, masterproc
-   use dyn_internal_state, only: get_dyn_state, get_dyn_state_grid
-   use cam_abortutils,     only: endrun
-   use ppgrid,             only: begchunk, endchunk
-   use physconst,          only: zvir, cappa
-   use physics_types,      only: physics_state, physics_tend
-   use dyn_comp,           only: dyn_import_t, dyn_export_t
-   use dynamics_vars,      only: T_FVDYCORE_STATE, T_FVDYCORE_GRID
-   use cam_control_mod,    only: initial_run, moist_physics
-#if defined ( SPMD )
-   use mpishorthand,       only: mpicom
-#endif
-   use perf_mod
-   use cam_logfile,        only: iulog
-
-   implicit none
-
-   private
-
-!
-! !PUBLIC MEMBER FUNCTIONS:
-!
-  public stepon_init   ! Initialization
-  public stepon_run1   ! run method phase 1
-  public stepon_run2   ! run method phase 2
-  public stepon_run3   ! run method phase 3
-  public stepon_final  ! Finalization
-
 !----------------------------------------------------------------------
-!
-! !DESCRIPTION: Module for FV dynamics specific time-stepping.
-!
-! !REVISION HISTORY:
-!
-! 2005.06.10  Sawyer    Adapted from FVdycore_GridCompMod
-! 2005.09.16  Kluzek    Creation from stepon subroutine. 
-! 2005.09.23  Kluzek    Create multiple run methods.
-! 2005.11.10  Sawyer    Now using dyn_import/export_t containers
-! 2006.04.13  Sawyer    Removed dependencies on prognostics
-! 2006.06.29  Sawyer    Changed t3 to IJK; removed use_eta option
-! 2006.07.01  Sawyer    Transitioned q3 to T_TRACERS
-!
-!EOP
+! stepon provides the interface layer that allows the different dynamical
+! cores to be called from different locations in the time loop.  It also
+! provides a standard interface that is called from the higher level CAM   
+! component run methods while leaving non-standardized dycore interface
+! methods to be called from this layer.  Ideally only the run methods
+! which allow flexibility in the dynamics/physics calling sequence should
+! remain.  The init and finalize methods should be removed and their
+! functionality incorporated in the dycore init and finalize.
 !----------------------------------------------------------------------
-!BOC
-!
-! !PRIVATE DATA MEMBERS:
-!
-  save
 
-!-----------------------------------------------------------------------
+use shr_kind_mod,       only: r8 => shr_kind_r8
 
-! Magic numbers used in this module
-   real(r8), parameter ::  D0_0                    =  0.0_r8
-   real(r8), parameter ::  D1_0                    =  1.0_r8
-   real(r8), parameter ::  D1E5                    =  1.0e5_r8
+use spmd_utils,         only: mpicom, iam, masterproc
+use cam_control_mod,    only: initial_run, moist_physics
+use ppgrid,             only: begchunk, endchunk
+use physconst,          only: zvir, cappa
 
-   integer :: pdt       ! Physics time step
-   real(r8) :: dtime    ! Physics time step
-   real(r8) :: te0            ! Total energy before dynamics
+use physics_types,      only: physics_state, physics_tend
+
+use dyn_comp,           only: dyn_import_t, dyn_export_t
+use dynamics_vars,      only: t_fvdycore_state, t_fvdycore_grid
+use dyn_internal_state, only: get_dyn_state, get_dyn_state_grid
+
+use cam_logfile,        only: iulog
+use cam_abortutils,     only: endrun
+use perf_mod,           only: t_startf, t_stopf, t_barrierf
+
+implicit none
+private
+save
+
+public :: &
+   stepon_init,  &! Initialization
+   stepon_run1,  &! run method phase 1
+   stepon_run2,  &! run method phase 2
+   stepon_run3,  &! run method phase 3
+   stepon_final   ! Finalization
+
+integer :: pdt       ! Physics time step
+real(r8) :: dtime    ! Physics time step
+real(r8) :: te0            ! Total energy before dynamics
 
 ! for fv_out
-   integer :: freq_diag ! Output frequency in seconds
-   logical fv_monitor         ! Monitor Mean/Max/Min fields every time step
-   data freq_diag  / 21600 /  ! time interval (sec) for calling fv_out
-   data fv_monitor / .true. / ! This is CPU-time comsuming; set it to false for
-                              ! production runs
-!
-! Pointers to variables in dyn_state%grid (for convenience)
-   integer            :: ks
-   real (r8)          :: ptop
-   real (r8), pointer :: ak(:)
-   real (r8), pointer :: bk(:)
+logical, parameter :: fv_monitor=.true.  ! Monitor Mean/Max/Min fields
+                                         ! This is CPU-time comsuming;
+                                         ! set it to false for production runs
+real (r8) :: ptop
 
-   integer            :: im, jm, km, mq
-   integer            :: jfirst, kfirst, jlast, klast, klastp
-   integer            :: ifirstxy, ilastxy, jfirstxy, jlastxy
-
-
-CONTAINS
-
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!=========================================================================================
+contains
+!=========================================================================================
 
 subroutine stepon_init(dyn_in, dyn_out)
 
    use constituents,       only: pcnst, cnst_get_type_byind
    use time_manager,       only: get_step_size
-   use pmgrid,             only: myid_z, npr_z, twod_decomp
-   use hycoef,             only: hyai, hybi
 
-  type (dyn_import_t)   :: dyn_in             ! Dynamics import container
-  type (dyn_export_t)   :: dyn_out            ! Dynamics export container
+   type (dyn_import_t)   :: dyn_in             ! Dynamics import container
+   type (dyn_export_t)   :: dyn_out            ! Dynamics export container
 
-! Allocate data, initialize values, setup grid locations and other
-! work needed to prepare the FV dynamics to run. Return weights and 
-! vertical coords to atmosphere calling program.
+   ! local variables:
+   type (t_fvdycore_grid), pointer :: grid
 
-! !LOCAL VARIABLES:
-   type (T_FVDYCORE_GRID), pointer :: grid
-   integer i,k,j,m             ! longitude, level, latitude and tracer indices
+   integer :: im, km
+   integer :: ifirstxy, ilastxy, jfirstxy, jlastxy
+   integer :: i,k,j,m             ! longitude, level, latitude and tracer indices
    logical :: nlres = .false.  ! true => restart or branch run
-!delta pressure dry
+
+   integer :: ks
+   real (r8), pointer :: ak(:)
+   real (r8), pointer :: bk(:)
+
    real(r8), allocatable :: delpdryxy(:,:,:)
-!-----------------------------------------------------------------------
+   !----------------------------------------------------------------------------
 
    if (.not. initial_run) nlres=.true.
 
    grid => get_dyn_state_grid()
    im      =  grid%im
-   jm      =  grid%jm
    km      =  grid%km
 
-   jfirst    =  grid%jfirst
-   jlast    =  grid%jlast
-   kfirst    =  grid%kfirst
-   klast    =  grid%klast
-   klastp   =  grid%klastp
 
    ifirstxy  =  grid%ifirstxy
    ilastxy  =  grid%ilastxy
@@ -134,33 +93,8 @@ subroutine stepon_init(dyn_in, dyn_out)
    ak     => grid%ak
    bk     => grid%bk
 
-   !-----------------------------------------
-   ! Use ak and bk as specified by CAM IC
-   !-----------------------------------------
-   do k = 1, km+1
-      ak(k) = hyai(k) * D1E5
-      bk(k) = hybi(k)
-      if( bk(k) == D0_0 ) ks = k-1
-   end do
-   ptop = ak(1)
-   if ( iam == 0 ) then
-      write(iulog,*) 'Using hyai & hybi from IC:', 'KS=',ks,' PTOP=',ptop
-   endif
-   grid%ks   = ks
-   grid%ptop = ptop
-
-   !----------------------------------------------------------
-   ! Lin-Rood dynamical core initialization
-   !----------------------------------------------------------
-
    pdt = get_step_size()    ! Physics time step
    dtime = pdt
-
-#if (!defined STAGGERED)
-   write(iulog,*) "STEPON: pre-processor variable STAGGERED must be set"
-   write(iulog,*) "Then recompile CAM. Quitting."
-   call endrun
-#endif
 
    do j = jfirstxy, jlastxy
       do i=ifirstxy, ilastxy
@@ -249,7 +183,7 @@ subroutine stepon_init(dyn_in, dyn_out)
          do j = jfirstxy, jlastxy
             do i = ifirstxy, ilastxy
                dyn_in%pt(i,j,k) =  dyn_in%t3(i,j,k)*            &
-                (D1_0+zvir*dyn_in%tracer(i,j,k,1))    &
+                (1._r8 + zvir*dyn_in%tracer(i,j,k,1))    &
                 /dyn_in%pkz(i,j,k) 
             enddo
          enddo
@@ -270,7 +204,7 @@ subroutine stepon_init(dyn_in, dyn_out)
          do j = jfirstxy, jlastxy
             do i = ifirstxy, ilastxy
                delpdryxy(i,j,k) = dyn_in%delp(i,j,k)*          &
-                    (D1_0-dyn_in%tracer(i,j,k,1))
+                    (1._r8 - dyn_in%tracer(i,j,k,1))
             enddo
          enddo
       enddo
@@ -294,55 +228,21 @@ subroutine stepon_init(dyn_in, dyn_out)
 !EOC
 end subroutine stepon_init
 
-!-----------------------------------------------------------------------
+!=========================================================================================
 
-!----------------------------------------------------------------------- 
-!BOP
-! !ROUTINE:  stepon_run1 -- Phase 1 of dynamics run method.
-!
-! !INTERFACE:
 subroutine stepon_run1( dtime_out, phys_state, phys_tend, pbuf2d,        &
                         dyn_in, dyn_out )
-!-----------------------------------------------------------------------
-!
-!  ATTENTION *** ATTENTION *** ATTENTION *** ATTENTION *** ATTENTION
-!
-!
-!     A 2D xy decomposition is used for handling the Lagrangian surface
-!     remapping, the ideal physics, and (optionally) the geopotential
-!     calculation.
-!
-!     The transpose from yz to xy decomposition takes place within dynpkg.
-!     The xy decomposed variables are then transposed directly to the
-!     physics decomposition within d_p_coupling.
-!
-!     The xy decomposed variables have names corresponding to the
-!     yz decomposed variables: simply append "xy". Thus, "uxy" is the
-!     xy decomposed version of "u".
-!
-!     To assure that the latitudinal decomposition operates
-!     as efficiently as before, a separate parameter "twod_decomp" has
-!     been defined; a value of 1 refers to the multi-2D decomposition with
-!     transposes; a value of 0 means that the decomposition is effectively
-!     one-dimensional, thereby enabling the transpose logic to be skipped;
-!     there is an option to force computation of transposes even for case
-!     where decomposition is effectively 1-D.
-!
-!     For questions/comments, contact Art Mirin, mirin@llnl.gov
-!
-!-----------------------------------------------------------------------
-! !USES:
+
+   ! Phase 1 run of FV dynamics. Run the dynamics, and couple to physics.
+
    use dp_coupling,       only: d_p_coupling
    use dyn_comp,          only: dyn_run
    
    use physics_buffer,    only: physics_buffer_desc
-   use pmgrid,            only: twod_decomp
    use advect_tend,       only: compute_adv_tends_xyz
-   use fv_control_mod,    only: nsplit, nspltrac
-!-----------------------------------------------------------------------
-! !OUTPUT PARAMETERS:
-!
-   real(r8), intent(out) :: dtime_out   ! Time-step
+
+   ! arguments
+   real(r8),            intent(out)   :: dtime_out   ! Time-step
    type(physics_state), intent(inout) :: phys_state(begchunk:endchunk)
    type(physics_tend),  intent(inout) :: phys_tend(begchunk:endchunk)
    type(physics_buffer_desc), pointer :: pbuf2d(:,:)
@@ -351,18 +251,7 @@ subroutine stepon_run1( dtime_out, phys_state, phys_tend, pbuf2d,        &
 
    type(T_FVDYCORE_STATE), pointer :: dyn_state
 
-! !DESCRIPTION:
-!
-!  Phase 1 run of FV dynamics. Run the dynamics, and couple to physics.
-!
-!EOP
-!-----------------------------------------------------------------------
-!BOC
-   
    integer  :: rc 
-#if (! defined SPMD)
-   integer  :: mpicom = 0
-#endif
 
    dtime_out = dtime
    dyn_state => get_dyn_state()
@@ -445,9 +334,6 @@ subroutine stepon_run2( phys_state, phys_tend, dyn_in, dyn_out )
 !EOP
 !-----------------------------------------------------------------------
 !BOC
-#if (! defined SPMD)
-   integer  :: mpicom = 0
-#endif
 
 !-----------------------------------------------------------------------
 
@@ -480,7 +366,6 @@ subroutine stepon_run3(dtime, cam_out, phys_state,             &
    use time_manager,     only: get_curr_date
    use fv_prints,        only: fv_out
    use camsrfexch,       only: cam_out_t    
-   use pmgrid,           only: twod_decomp
 !
 ! !INPUT PARAMETERS:
 !
@@ -507,14 +392,14 @@ subroutine stepon_run3(dtime, cam_out, phys_state,             &
 !
 ! !LOCAL VARIABLES:
 !
-   type (T_FVDYCORE_GRID), pointer :: grid
+
+   type(t_fvdycore_state), pointer :: state
+   type(t_fvdycore_grid),  pointer :: grid
    integer :: ncdate            ! current date in integer format [yyyymmdd]
    integer :: ncsec             ! time of day relative to current date [seconds]
    integer :: yr, mon, day      ! year, month, day components of a date
    integer :: ncsecp
-#if (! defined SPMD)
-   integer  :: mpicom = 0
-#endif
+   integer :: freq_diag
 
    !----------------------------------------------------------
    ! Monitor max/min/mean of selected fields
@@ -528,10 +413,13 @@ subroutine stepon_run3(dtime, cam_out, phys_state,             &
    !----------------------------------------------------------
    call get_curr_date(yr, mon, day, ncsec)
    ncdate = yr*10000 + mon*100 + day
-   ncsecp = pdt + ncsec      !  step complete, but nstep not incremented yet
+   ncsecp = ncsec + pdt      !  step complete, but nstep not incremented yet
 
-   if ( fv_monitor .and. mod(ncsecp, freq_diag) == 0 ) then
-      grid => get_dyn_state_grid()
+   state => get_dyn_state()
+   freq_diag = state%check_dt
+
+   if (fv_monitor .and. mod(ncsecp, freq_diag) == 0) then
+      grid => state%grid
 
       call t_barrierf('sync_fv_out', mpicom)
       call t_startf('fv_out')

@@ -35,7 +35,7 @@ integer,           parameter :: unset_int = huge(1)
 
 ! Namelist variables:
 character(len=16) :: cam_physpkg          = unset_str  ! CAM physics package [cam3 | cam4 | cam5 |
-                                                       !   ideal | adiabatic].
+                                                       !   ideal | adiabatic | spcam_sam1mom | spcam_m2005].
 character(len=32) :: cam_chempkg          = unset_str  ! CAM chemistry package 
 character(len=16) :: waccmx_opt           = unset_str  ! WACCMX run option [ionosphere | neutral | off
 character(len=16) :: deep_scheme          = unset_str  ! deep convection package
@@ -67,7 +67,6 @@ logical           :: history_chemistry    = .true.     ! output default chemistr
 logical           :: history_carma        = .true.     ! output default CARMA-related variables
 logical           :: history_clubb        = .true.     ! output default CLUBB-related variables
 logical           :: do_clubb_sgs
-logical           :: micro_do_icesupersat
 ! Check validity of physics_state objects in physics_update.
 logical           :: state_debug_checks   = .false.
 
@@ -75,6 +74,8 @@ logical           :: state_debug_checks   = .false.
 integer           :: cld_macmic_num_steps = 1
 
 logical           :: offline_driver       = .false.    ! true => offline driver is being used
+
+logical :: use_spcam       ! true => use super parameterized CAM
 
 logical :: prog_modal_aero ! determines whether prognostic modal aerosols are present in the run.
 
@@ -101,7 +102,8 @@ subroutine phys_ctl_readnl(nlfile)
 
    use namelist_utils,  only: find_group_name
    use units,           only: getunit, freeunit
-   use mpishorthand
+   use spmd_utils,      only: mpi_character, mpi_integer, mpi_logical, masterprocid, mpicom
+   use cam_control_mod, only: cam_ctrl_set_physics_type
 
    character(len=*), intent(in) :: nlfile  ! filepath for file containing namelist input
 
@@ -116,7 +118,7 @@ subroutine phys_ctl_readnl(nlfile)
       history_waccmx, history_chemistry, history_carma, history_clubb, &
       do_clubb_sgs, state_debug_checks, use_hetfrz_classnuc, use_gw_oro, use_gw_front, &
       use_gw_front_igw, use_gw_convect_dp, use_gw_convect_sh, cld_macmic_num_steps, &
-      offline_driver, micro_do_icesupersat, convproc_do_aer
+      offline_driver, convproc_do_aer
    !-----------------------------------------------------------------------------
 
    if (masterproc) then
@@ -133,45 +135,47 @@ subroutine phys_ctl_readnl(nlfile)
       call freeunit(unitn)
    end if
 
-#ifdef SPMD
    ! Broadcast namelist variables
-   call mpibcast(deep_scheme,      len(deep_scheme)      , mpichar, 0, mpicom)
-   call mpibcast(cam_physpkg,      len(cam_physpkg)      , mpichar, 0, mpicom)
-   call mpibcast(cam_chempkg,      len(cam_chempkg)      , mpichar, 0, mpicom)
-   call mpibcast(waccmx_opt,       len(waccmx_opt)       , mpichar, 0, mpicom)
-   call mpibcast(shallow_scheme,   len(shallow_scheme)   , mpichar, 0, mpicom)
-   call mpibcast(eddy_scheme,      len(eddy_scheme)      , mpichar, 0, mpicom)
-   call mpibcast(microp_scheme,    len(microp_scheme)    , mpichar, 0, mpicom)
-   call mpibcast(radiation_scheme, len(radiation_scheme) , mpichar, 0, mpicom)
-   call mpibcast(macrop_scheme,    len(macrop_scheme)    , mpichar, 0, mpicom)
-   call mpibcast(srf_flux_avg,                    1 , mpiint,  0, mpicom)
-   call mpibcast(use_subcol_microp,               1 , mpilog,  0, mpicom)
-   call mpibcast(atm_dep_flux,                    1 , mpilog,  0, mpicom)
-   call mpibcast(history_amwg,                    1 , mpilog,  0, mpicom)
-   call mpibcast(history_vdiag,                   1 , mpilog,  0, mpicom)
-   call mpibcast(history_eddy,                    1 , mpilog,  0, mpicom)
-   call mpibcast(history_aerosol,                 1 , mpilog,  0, mpicom)
-   call mpibcast(history_aero_optics,             1 , mpilog,  0, mpicom)
-   call mpibcast(history_budget,                  1 , mpilog,  0, mpicom)
-   call mpibcast(history_budget_histfile_num,     1 , mpiint,  0, mpicom)
-   call mpibcast(history_waccm,                   1 , mpilog,  0, mpicom)
-   call mpibcast(history_waccmx,                  1 , mpilog,  0, mpicom)
-   call mpibcast(history_chemistry,               1 , mpilog,  0, mpicom)
-   call mpibcast(history_carma,                   1 , mpilog,  0, mpicom)
-   call mpibcast(history_clubb,                   1 , mpilog,  0, mpicom)
-   call mpibcast(do_clubb_sgs,                    1 , mpilog,  0, mpicom)
-   call mpibcast(micro_do_icesupersat,            1 , mpilog,  0, mpicom)
-   call mpibcast(state_debug_checks,              1 , mpilog,  0, mpicom)
-   call mpibcast(use_hetfrz_classnuc,             1 , mpilog,  0, mpicom)
-   call mpibcast(use_gw_oro,                      1 , mpilog,  0, mpicom)
-   call mpibcast(use_gw_front,                    1 , mpilog,  0, mpicom)
-   call mpibcast(use_gw_front_igw,                1 , mpilog,  0, mpicom)
-   call mpibcast(use_gw_convect_dp,               1 , mpilog,  0, mpicom)
-   call mpibcast(use_gw_convect_sh,               1 , mpilog,  0, mpicom)
-   call mpibcast(cld_macmic_num_steps,            1 , mpiint,  0, mpicom)
-   call mpibcast(offline_driver,                  1 , mpilog,  0, mpicom)
-   call mpibcast(convproc_do_aer,                 1 , mpilog,  0, mpicom)
-#endif
+   call mpi_bcast(deep_scheme,                 len(deep_scheme),      mpi_character, masterprocid, mpicom, ierr)
+   call mpi_bcast(cam_physpkg,                 len(cam_physpkg),      mpi_character, masterprocid, mpicom, ierr)
+   call mpi_bcast(cam_chempkg,                 len(cam_chempkg),      mpi_character, masterprocid, mpicom, ierr)
+   call mpi_bcast(waccmx_opt,                  len(waccmx_opt),       mpi_character, masterprocid, mpicom, ierr)
+   call mpi_bcast(shallow_scheme,              len(shallow_scheme),   mpi_character, masterprocid, mpicom, ierr)
+   call mpi_bcast(eddy_scheme,                 len(eddy_scheme),      mpi_character, masterprocid, mpicom, ierr)
+   call mpi_bcast(microp_scheme,               len(microp_scheme),    mpi_character, masterprocid, mpicom, ierr)
+   call mpi_bcast(radiation_scheme,            len(radiation_scheme), mpi_character, masterprocid, mpicom, ierr)
+   call mpi_bcast(macrop_scheme,               len(macrop_scheme),    mpi_character, masterprocid, mpicom, ierr)
+   call mpi_bcast(srf_flux_avg,                1,                     mpi_integer,   masterprocid, mpicom, ierr)
+   call mpi_bcast(use_subcol_microp,           1,                     mpi_logical,   masterprocid, mpicom, ierr)
+   call mpi_bcast(atm_dep_flux,                1,                     mpi_logical,   masterprocid, mpicom, ierr)
+   call mpi_bcast(history_amwg,                1,                     mpi_logical,   masterprocid, mpicom, ierr)
+   call mpi_bcast(history_vdiag,               1,                     mpi_logical,   masterprocid, mpicom, ierr)
+   call mpi_bcast(history_eddy,                1,                     mpi_logical,   masterprocid, mpicom, ierr)
+   call mpi_bcast(history_aerosol,             1,                     mpi_logical,   masterprocid, mpicom, ierr)
+   call mpi_bcast(history_aero_optics,         1,                     mpi_logical,   masterprocid, mpicom, ierr)
+   call mpi_bcast(history_budget,              1,                     mpi_logical,   masterprocid, mpicom, ierr)
+   call mpi_bcast(history_budget_histfile_num, 1,                     mpi_integer,   masterprocid, mpicom, ierr)
+   call mpi_bcast(history_waccm,               1,                     mpi_logical,   masterprocid, mpicom, ierr)
+   call mpi_bcast(history_waccmx,              1,                     mpi_logical,   masterprocid, mpicom, ierr)
+   call mpi_bcast(history_chemistry,           1,                     mpi_logical,   masterprocid, mpicom, ierr)
+   call mpi_bcast(history_carma,               1,                     mpi_logical,   masterprocid, mpicom, ierr)
+   call mpi_bcast(history_clubb,               1,                     mpi_logical,   masterprocid, mpicom, ierr)
+   call mpi_bcast(do_clubb_sgs,                1,                     mpi_logical,   masterprocid, mpicom, ierr)
+   call mpi_bcast(state_debug_checks,          1,                     mpi_logical,   masterprocid, mpicom, ierr)
+   call mpi_bcast(use_hetfrz_classnuc,         1,                     mpi_logical,   masterprocid, mpicom, ierr)
+   call mpi_bcast(use_gw_oro,                  1,                     mpi_logical,   masterprocid, mpicom, ierr)
+   call mpi_bcast(use_gw_front,                1,                     mpi_logical,   masterprocid, mpicom, ierr)
+   call mpi_bcast(use_gw_front_igw,            1,                     mpi_logical,   masterprocid, mpicom, ierr)
+   call mpi_bcast(use_gw_convect_dp,           1,                     mpi_logical,   masterprocid, mpicom, ierr)
+   call mpi_bcast(use_gw_convect_sh,           1,                     mpi_logical,   masterprocid, mpicom, ierr)
+   call mpi_bcast(cld_macmic_num_steps,        1,                     mpi_integer,   masterprocid, mpicom, ierr)
+   call mpi_bcast(offline_driver,              1,                     mpi_logical,   masterprocid, mpicom, ierr)
+   call mpi_bcast(convproc_do_aer,             1,                     mpi_logical,   masterprocid, mpicom, ierr)
+
+   use_spcam       = (     cam_physpkg_is('spcam_sam1mom') &
+                      .or. cam_physpkg_is('spcam_m2005'))
+
+   call cam_ctrl_set_physics_type(cam_physpkg)
 
    ! Error checking:
 
@@ -193,13 +197,13 @@ subroutine phys_ctl_readnl(nlfile)
    endif
    
    ! Add a check to make sure CLUBB and MG are used together
-   if ( do_clubb_sgs .and. ( microp_scheme .ne. 'MG')) then
+   if ( do_clubb_sgs .and. ( microp_scheme .ne. 'MG') .and. .not. use_spcam) then
       write(iulog,*)'CLUBB is only compatible with MG microphysics.  Quiting'
       call endrun('CLUBB and microphysics schemes incompatible')
    endif
 
    ! Check that eddy_scheme, macrop_scheme, shallow_scheme are all set to CLUBB_SGS if do_clubb_sgs is true
-   if (do_clubb_sgs) then
+   if (do_clubb_sgs .and. .not. use_spcam) then
       if (eddy_scheme .ne. 'CLUBB_SGS' .or. macrop_scheme .ne. 'CLUBB_SGS' .or. shallow_scheme .ne. 'CLUBB_SGS') then
          write(iulog,*)'eddy_scheme, macrop_scheme and shallow_scheme must all be CLUBB_SGS.  Quiting'
          call endrun('CLUBB and eddy, macrop or shallow schemes incompatible')
@@ -261,8 +265,8 @@ subroutine phys_getopts(deep_scheme_out, shallow_scheme_out, eddy_scheme_out, mi
                         history_waccm_out, history_waccmx_out, history_chemistry_out, &
                         history_carma_out, history_clubb_out, &
                         cam_chempkg_out, prog_modal_aero_out, macrop_scheme_out, &
-                        do_clubb_sgs_out, state_debug_checks_out, cld_macmic_num_steps_out, &
-                        offline_driver_out, micro_do_icesupersat_out, convproc_do_aer_out)
+                        do_clubb_sgs_out, use_spcam_out, state_debug_checks_out, cld_macmic_num_steps_out, &
+                        offline_driver_out, convproc_do_aer_out)
 !-----------------------------------------------------------------------
 ! Purpose: Return runtime settings
 !          deep_scheme_out   : deep convection scheme
@@ -270,6 +274,7 @@ subroutine phys_getopts(deep_scheme_out, shallow_scheme_out, eddy_scheme_out, mi
 !          eddy_scheme_out   : vertical diffusion scheme
 !          microp_scheme_out : microphysics scheme
 !          radiation_scheme_out : radiation_scheme
+!	   SPCAM_microp_scheme_out : SPCAM microphysics scheme
 !-----------------------------------------------------------------------
 
    character(len=16), intent(out), optional :: deep_scheme_out
@@ -279,6 +284,7 @@ subroutine phys_getopts(deep_scheme_out, shallow_scheme_out, eddy_scheme_out, mi
    character(len=16), intent(out), optional :: radiation_scheme_out
    character(len=16), intent(out), optional :: macrop_scheme_out
    logical,           intent(out), optional :: use_subcol_microp_out
+   logical,           intent(out), optional :: use_spcam_out
    logical,           intent(out), optional :: atm_dep_flux_out
    logical,           intent(out), optional :: history_amwg_out
    logical,           intent(out), optional :: history_vdiag_out
@@ -293,7 +299,6 @@ subroutine phys_getopts(deep_scheme_out, shallow_scheme_out, eddy_scheme_out, mi
    logical,           intent(out), optional :: history_carma_out
    logical,           intent(out), optional :: history_clubb_out
    logical,           intent(out), optional :: do_clubb_sgs_out
-   logical,           intent(out), optional :: micro_do_icesupersat_out        
    character(len=32), intent(out), optional :: cam_chempkg_out
    logical,           intent(out), optional :: prog_modal_aero_out
    logical,           intent(out), optional :: state_debug_checks_out
@@ -306,8 +311,9 @@ subroutine phys_getopts(deep_scheme_out, shallow_scheme_out, eddy_scheme_out, mi
    if ( present(eddy_scheme_out         ) ) eddy_scheme_out          = eddy_scheme
    if ( present(microp_scheme_out       ) ) microp_scheme_out        = microp_scheme
    if ( present(radiation_scheme_out    ) ) radiation_scheme_out     = radiation_scheme
-
    if ( present(use_subcol_microp_out   ) ) use_subcol_microp_out    = use_subcol_microp
+   if ( present(use_spcam_out           ) ) use_spcam_out            = use_spcam
+
    if ( present(macrop_scheme_out       ) ) macrop_scheme_out        = macrop_scheme
    if ( present(atm_dep_flux_out        ) ) atm_dep_flux_out         = atm_dep_flux
    if ( present(history_aerosol_out     ) ) history_aerosol_out      = history_aerosol
@@ -323,7 +329,6 @@ subroutine phys_getopts(deep_scheme_out, shallow_scheme_out, eddy_scheme_out, mi
    if ( present(history_carma_out       ) ) history_carma_out        = history_carma
    if ( present(history_clubb_out       ) ) history_clubb_out        = history_clubb
    if ( present(do_clubb_sgs_out        ) ) do_clubb_sgs_out         = do_clubb_sgs
-   if ( present(micro_do_icesupersat_out )) micro_do_icesupersat_out = micro_do_icesupersat
    if ( present(cam_chempkg_out         ) ) cam_chempkg_out          = cam_chempkg
    if ( present(prog_modal_aero_out     ) ) prog_modal_aero_out      = prog_modal_aero
    if ( present(state_debug_checks_out  ) ) state_debug_checks_out   = state_debug_checks

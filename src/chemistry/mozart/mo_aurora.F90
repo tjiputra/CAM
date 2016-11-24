@@ -13,7 +13,7 @@
 ! The aurora assumes a Maxwellian in energy, so that the characteristic
 !  energy is half of the mean energy (or mean energy = 2*alfa, where alfa
 !  is the characteristic energy).  The Maxwellian is approximated in the
-!  aion and bion subroutines.
+!  aion subroutine.
 ! The aurora oval is assumed to be a Gaussian in auroral latitude, with
 !  peak values on the day (=1) and night (=2) sides that change from one to
 !  the other using cosines of the auroral longitude coordinate.
@@ -52,8 +52,6 @@
 
       use shr_kind_mod,  only: r8 => shr_kind_r8
       use mo_constants,  only: pi, &
-                               avo => avogadro, &
-                               boltz_cgs, &
                                gask => rgas_cgs
       use cam_logfile,   only: iulog
       use spmd_utils,    only: masterproc
@@ -89,8 +87,8 @@
 !   ed   : Column energy input of drizzle electrons (ergs/cm**2/s)
 !   fd   : Electron particle flux of drizzle electrons (particles/cm**2/s)
 !-----------------------------------------------------------------------
-      real(r8), parameter :: alfad = 2.0_r8, &
-                             ed    = 0.5_r8     
+      real(r8), parameter :: alfad = 0.5_r8
+      real(r8) :: ed
       real(r8) :: fd                     ! set in sub aurora_ions
 
 !-----------------------------------------------------------------------
@@ -99,8 +97,8 @@
 !   ec   : Column energy input of polar cusp electrons (ergs/cm**2/s)
 !   fc   : Electron particle flux of polar cusp electrons (particles/cm**2/s)
 !-----------------------------------------------------------------------
-      real(r8), parameter :: alfac = 1.0_r8, &
-                             ec    = 0.5_r8
+      real(r8), parameter :: alfac = 0.1_r8
+      real(r8) :: ec
       real(r8) :: fc                     ! set in sub aurora_ions
 
 !-----------------------------------------------------------------------
@@ -112,26 +110,6 @@
       real(r8) :: &
         e1, e2, &                        ! set in sub aurora_cons (function of hem power)
         h1, h2                           ! set in sub aurora_cons (function of hem power)
-
-!-----------------------------------------------------------------------
-! 	... solar proton parameters for the polar cap (time-gcm only)
-!   alfa_sp: Characteristic Maxwellian energy of solar protons (MeV) (was alfad2)
-!   e_sp   : Column energy input of solar protons (ergs/cm**2/s) (was ed2)
-!   flx_sp : e_sp/1.602e-6, for input to sub bion                (was fd2)
-! Add solar protons to ionization if add_sproton is true (time-gcm only)
-!-----------------------------------------------------------------------
-      logical :: add_sproton = .false.
-      real(r8), parameter :: &
-        alfa_sp = 10._r8, &
-        e_sp    = 1.e-20_r8
-      real(r8) :: flx_sp
-
-!-----------------------------------------------------------------------
-! 	... high energy electron parameters in the auroral oval (time-gcm only):
-!-----------------------------------------------------------------------
-      logical :: add_helectron = .false.
-      real(r8), parameter :: alfa30 = 40._r8, &                  ! Characteristic energy of auroral electrons (Mev)
-                             e30    = .05_r8                     ! Column energy of auroral electrons (ergs/cm**2/s)
 
 !-----------------------------------------------------------------------
 ! 	... additional auroral parameters
@@ -160,8 +138,11 @@
       public :: aurora_inti, aurora_timestep_init, aurora
       public :: aurora_register
 
-      logical :: has_ions = .false.
+      logical :: aurora_active = .false.
       integer :: indxAIPRS = -1
+
+      real(r8) :: byloc      ! local By
+      real(r8), parameter :: h2deg = 15._r8   ! hour to degree
 
       contains
 
@@ -195,8 +176,7 @@
 ! 	... local variables
 !-----------------------------------------------------------------------
       integer             :: k, m
-      real(r8), parameter :: e       = 1.e-10_r8
-      real(r8), parameter :: convert = 3.1211e8_r8
+      real(r8), parameter :: e = 1.e-10_r8
 
       real(r8) :: plb
       real(r8) :: alfa_1, alfa_2, alfa21, alfa22
@@ -210,9 +190,10 @@
       n2p_ndx  = get_spc_ndx( 'N2p' )
       e_ndx    = get_spc_ndx( 'e' )
 
-      has_ions = op_ndx > 0 .and. o2p_ndx > 0 .and. np_ndx > 0 .and. n2p_ndx > 0 .and. e_ndx > 0
+      aurora_active = op_ndx > 0 .and. o2p_ndx > 0 .and. np_ndx > 0 .and. n2p_ndx > 0 .and. e_ndx > 0 &
+                     .and. pref_mid(1) < 0.1_r8 ! need high-top
 
-      if (.not. has_ions) return
+      if (.not. aurora_active) return
 
 !-----------------------------------------------------------------------
 !	... initialize module variables
@@ -231,11 +212,11 @@
       rmass_n2    = 2._r8*cnst_mw(m)
       rmassinv_n2 = 1._r8/rmass_n2
 
-      offa(isouth)   = 4.3_r8*dtr
-      offa(inorth)   = 3.7_r8*dtr
-      phid(isouth)   = 0._r8
-      phid(inorth)   = 0._r8
-      alfa_1         = 2._r8
+      offa(isouth)   = 1.0_r8*dtr
+      offa(inorth)   = 1.0_r8*dtr
+      phid(isouth)   = (9.39_r8 + 0.21_r8*byloc - 12._r8) * h2deg * dtr
+      phid(inorth)   = (9.39_r8 - 0.21_r8*byloc - 12._r8) * h2deg * dtr
+      alfa_1         = 1.5_r8
       alfa_2         = 2._r8
 
 !-----------------------------------------------------------------------
@@ -253,19 +234,6 @@
       e22    = 1.e-80_r8
       e20    = 0.5_r8 * (e21 + e22)
       re2    = (e22 - e21) / (e21 + e22)
-
-!-----------------------------------------------------------------------
-! Set cusp and drizzle parameters:
-! (conversion between particle number density and characteristic
-!  energy and column energy input)
-!-----------------------------------------------------------------------
-      fc = convert * ec / alfac
-      fd = convert * ed / alfad
-
-!-----------------------------------------------------------------------
-! Solar proton flux:
-!-----------------------------------------------------------------------
-      flx_sp = e_sp/1.602e-6_r8
 
 !-----------------------------------------------------------------------
 ! 	... set auroral lower bndy index
@@ -287,21 +255,13 @@
 !-----------------------------------------------------------------------
 #ifdef AURORA_DIAGS
         write(iulog,"(/,'aurora_cons:')")
-        write(iulog,"('  cusp:    alfac=',f8.3,' ec=',f8.3,' fc=',e10.4)") &
-          alfac,ec,fc
-        write(iulog,"('  drizzle: alfad=',f8.3,' ed=',f8.3,' fd=',e10.4)") &
-          alfad,ed,fd
+!        write(iulog,"('  cusp:    alfac=',f8.3,' ec=',f8.3,' fc=',e10.4)") &
+!          alfac,ec,fc
+!        write(iulog,"('  drizzle: alfad=',f8.3,' ed=',f8.3,' fd=',e10.4)") &
+!          alfad,ed,fd
         write(iulog,"('  half-widths = h1,h2=',2f10.3)") h1,h2
         write(iulog,"('  energy flux = e1,e2=',2f10.3)") e1,e2
         write(iulog,"('  add_sproton = ',l1)") add_sproton
-        if( add_sproton ) then
-           write(iulog,"('  solar protons: alfa_sp=',f8.3, &
-          ' e_sp = ',e10.4,' flx_sp = ',e10.4)") alfa_sp,e_sp,flx_sp
-        end if
-        if( add_helectron ) then
-          write(iulog,"('  high-energy electrons: alfa30 = ',f8.3, &
-          ' e30 = ',f8.3)") alfa30,e30
-        end if
         write(iulog,"(' ')")
 #endif
         call addfld('ALATM', horiz_only,  'I','degrees', &
@@ -327,8 +287,9 @@
       real(r8) :: power, plevel
       real(r8) :: roth, rote, rcp, rhp
       real(r8) :: arad
+      real(r8), parameter :: convert = 3.1211e8_r8
 
-      if (.not. has_ions) return
+      if (.not. aurora_active) return
 
 !-----------------------------------------------------------------------
 !	... get hemispheric power
@@ -342,27 +303,33 @@
       end if
 #endif
 
-      if( power >= .01_r8 ) then
+      if( power >= 1.0_r8 ) then
          plevel = 2.09_r8*log( power )
       else
          plevel = 0._r8
       end if
 
-! fvitt -- moved the calc of h1, h2, rh, and h0 from aurora_inti
-!          This was done to for bit-for-bit restarts.
-!          These aurora oval dimension quantities power dependent and should be updated.
+!
+! Add limits to byimf if use the Heelis convection pattern,this is to have 
+! asymmetric dawn and dusk convection cells and By effect. Adapted from TIEGCM.
+! This is for now just a hook, since in the current setting byimf is likely 0.
+!
+      byloc = byimf ! init local from original namelist input
+!      If (potential_model == 'HEELIS') then
+        if (byloc > 7.0_r8) byloc = 7.0_r8
+        if (byloc < -11.0_r8) byloc = -11.0_r8         
+!      endif
+
 !-----------------------------------------------------------------------
 ! h1 = Gaussian half-width of the noon auroral oval in degrees
 ! h2 = Gaussian half-width of the midnight auroral oval in degrees
 !-----------------------------------------------------------------------
-!      h1 = 3._r8
-!      h2 = 10._r8
-! modified by LQIAN, 2007
 ! produce realistic oval compared to NOAA empirical auroral oval and TIMED/GUVI
 ! h1 formula given by Wenbin base on POLARVIS image;
 ! h2 formula based on Emery et al original auroral parameterization report
       h1 = min(2.35_r8, 0.83_r8 + 0.33_r8*plevel)
       h2 = 2.5_r8+0.025_r8*max(power,55._r8)+0.01_r8*min(0._r8,power-55._r8)
+
 !-----------------------------------------------------------------------
 ! Values from corrections to Emery et al Parameterization report:
 !     h1 = amin1(2.35, 0.83 + 0.33*plevel)
@@ -374,25 +341,46 @@
 
       theta0(isouth) = (-3.80_r8 + 8.48_r8*(ctpoten**.1875_r8))*dtr
       theta0(inorth) = theta0(isouth)
-      dskofa(isouth) = (-1.26_r8 + 0.15_r8 * byimf)*dtr
+      dskofa(isouth) = 0._r8
       dskofa(inorth) = dskofa(isouth)
-      roth           = (12.18_r8 - 0.89_r8 * plevel)
-      rote           = ( 2.62_r8 - 0.55_r8 * plevel)
-      rroth          = roth * dtr
-      rrote          = rote * dtr
+
+! roth = MLT of max width of aurora in hours
+! rote = MLT of max energy flux of aurora in hours
+
+      roth = 0.81_r8 - 0.06_r8 * plevel
+      rote = 0.17_r8 - 0.04_r8 * plevel
+
+!  Convert MLT from hours to degrees to radians
+
+      rroth = roth * h2deg * dtr
+      rrote = rote * h2deg * dtr
 
 !-----------------------------------------------------------------------
 ! e1 = energy flux in the noon sector of the aurora (ergs/cm**2/s)
 ! e2 = energy flux in the midnight sector of the aurora (ergs/cm**2/s)
 !-----------------------------------------------------------------------
-!      e1 = (0.5_r8 + 0.15_r8 * power)
-!      e2 = (1.5_r8 + 0.25_r8 * power)
-! modified by LQIAN, 2008
 ! produce realistic oval compared to NOAA empirical auroral oval and TIMED/GUVI
 ! e1 formula given by Wenbin base on POLARVIS image;
 ! e2 formula based on Emery et al original auroral parameterization report
+!-----------------------------------------------------------------------
       e1 = max(0.50_r8, -2.15_r8 + 0.62_r8*plevel)
       e2=1._r8+0.11_r8*power
+
+!-----------------------------------------------------------------------
+!   ed   : Column energy input of drizzle electrons (ergs/cm**2/s)
+!   ec   : Column energy input of polar cusp electrons (ergs/cm**2/s)
+!-----------------------------------------------------------------------
+      ed = .0012_r8+.0006_r8*power
+      ec = (0.24_r8+0.0067_r8*power)/5._r8
+
+!-----------------------------------------------------------------------
+! Set cusp and drizzle parameters:
+! (conversion between particle number density and characteristic
+!  energy and column energy input)
+!-----------------------------------------------------------------------
+      fc = convert * ec / alfac
+      fd = convert * ed / alfad
+
 !-----------------------------------------------------------------------
 ! Values from corrections to Emery et al Parameterization report:
 !-----------------------------------------------------------------------
@@ -466,17 +454,15 @@
       real(r8) :: cusp(ncol)
       real(r8) :: alfa(ncol)
       real(r8) :: alfa2(ncol)
-      real(r8) :: alfa3(ncol)
       real(r8) :: flux(ncol)
       real(r8) :: flux2(ncol)
-      real(r8) :: flux3(ncol)
       real(r8) :: drizl(ncol)
       real(r8) :: qteaur(ncol)                         ! for electron temperature
       logical  :: do_aurora(ncol)
 
       real(r8) :: dayfrac, rotation
 
-      if (.not. has_ions) return
+      if (.not. aurora_active) return
 
 !-----------------------------------------------------------------------
 ! 	... initialize ion production
@@ -565,21 +551,21 @@
 !-----------------------------------------------------------------------
 ! 	... make alfa, flux, and drizzle
 !-----------------------------------------------------------------------
-      call aurora_heat( flux, flux2, flux3, alfa, alfa2, &
-                        alfa3, qteaur, drizl, do_aurora, hemis, &
+      call aurora_heat( flux, flux2, alfa, alfa2, &
+                        qteaur, drizl, do_aurora, hemis, &
                         alon, colat, ncol )
 
 !-----------------------------------------------------------------------
 ! 	... auroral additions to ionization rates
 !-----------------------------------------------------------------------
-      call aurora_ions( drizl, cusp, alfa, alfa2, alfa3, &
-                        flux, flux2, flux3, tn, o2, &
+      call aurora_ions( drizl, cusp, alfa, alfa2, &
+                        flux, flux2, tn, o2, &
                         o1, mbar, qo2p, qop, qn2p, &
                         qnp, pmid, do_aurora, ncol, lchnk, pbuf )
 
       end subroutine aurora_prod
 
-      subroutine aurora_hrate( tn, o2, o1, mbar, rlats, &
+      subroutine aurora_hrate( tn, mbar, rlats, &
                                aur_hrate, cpair, pmid, lchnk, calday, &
                                ncol, rlons )
 !-----------------------------------------------------------------------
@@ -602,8 +588,6 @@
         calday                           ! calendar day of year
       real(r8), intent(in) :: &
         tn(pcols,pver), &                ! neutral gas temperature (K)
-        o2(ncol,pver), &                 ! O2 concentration (kg/kg)
-        o1(ncol,pver), &                 ! O concentration (kg/kg)
         mbar(ncol,pver)                  ! mean molecular weight (g/mole)
       real(r8), intent(in) :: &
         cpair(ncol,pver)                 ! specific heat capacity (J/K/kg)
@@ -638,10 +622,8 @@
       real(r8) :: cusp(ncol)
       real(r8) :: alfa(ncol)
       real(r8) :: alfa2(ncol)
-      real(r8) :: alfa3(ncol)
       real(r8) :: flux(ncol)
       real(r8) :: flux2(ncol)
-      real(r8) :: flux3(ncol)
       real(r8) :: drizl(ncol)
       real(r8) :: qteaur(ncol)                         ! for electron temperature
       real(r8) :: qsum(ncol,pver)                      ! total ion production (1/s)
@@ -656,7 +638,7 @@
         aur_hrate(:,k) = 0._r8
       end do
 
-      if (.not. has_ions) return
+      if (.not. aurora_active) return
 
       r2d = 180._r8/pi
 
@@ -729,17 +711,18 @@
 !-----------------------------------------------------------------------
 ! 	... make alfa, flux, and drizzle
 !-----------------------------------------------------------------------
-      call aurora_heat( flux, flux2, flux3, alfa, alfa2, &
-                        alfa3, qteaur, drizl, do_aurora, hemis, &
+      call aurora_heat( flux, flux2, alfa, alfa2, &
+                        qteaur, drizl, do_aurora, hemis, &
                         alon, colat, ncol )
 
 !-----------------------------------------------------------------------
 ! 	... auroral additions to ionization rates
 !-----------------------------------------------------------------------
-      call total_ion_prod( drizl, cusp, alfa, alfa2, alfa3, &
-                           flux, flux2, flux3, tn, o2, &
-                           o1, mbar, qsum, pmid, do_aurora, &
-                           ncol, lchnk )
+      call total_ion_prod( drizl, cusp, alfa, alfa2, &
+                           flux, flux2, tn, &
+                           mbar, qsum, pmid, do_aurora, &
+                           ncol )
+
 !-----------------------------------------------------------------------
 ! 	... form auroral heating rate
 !-----------------------------------------------------------------------
@@ -782,8 +765,8 @@
 
       end subroutine aurora_cusp 
 
-      subroutine aurora_heat( flux, flux2, flux3, alfa, alfa2, &
-                              alfa3, qteaur, drizl, do_aurora, hemis, &
+      subroutine aurora_heat( flux, flux2, alfa, alfa2, &
+                              qteaur, drizl, do_aurora, hemis, &
                               alon, colat, ncol )
 !-----------------------------------------------------------------------
 ! 	... calculate alfa, flux, and drizzle
@@ -800,12 +783,10 @@
       real(r8), intent(in)    :: alon(ncol)
       real(r8), intent(inout) :: flux(ncol)
       real(r8), intent(inout) :: flux2(ncol)
-      real(r8), intent(inout) :: flux3(ncol)
       real(r8), intent(inout) :: drizl(ncol)
       real(r8), intent(inout) :: qteaur(ncol)
       real(r8), intent(inout) :: alfa(ncol)
       real(r8), intent(inout) :: alfa2(ncol)
-      real(r8), intent(inout) :: alfa3(ncol)
       logical, intent(in)     :: do_aurora(ncol)
 
 !-----------------------------------------------------------------------
@@ -860,11 +841,6 @@
          alfa2(:) = alfa20*(1._r8 - ralfa2*coslamda(:))
          flux2(:) = e20*(1._r8 - re2*coslamda(:))*wrk(:) / (2._r8*alfa2(:)*1.602e-9_r8)
 !-----------------------------------------------------------------------
-! 	... alfa3, flux3 for high energy electrons:
-!-----------------------------------------------------------------------
-         alfa3(:) = alfa30
-         flux3(:) = e30*wrk(:) / 1.602e-6_r8
-!-----------------------------------------------------------------------
 ! 	... for electron temperature (used in settei):  
 !-----------------------------------------------------------------------
          qteaur(:) = -7.e8_r8*wrk(:)
@@ -872,8 +848,8 @@
 
       end subroutine aurora_heat
 
-      subroutine aurora_ions( drizl, cusp, alfa1, alfa2, alfa3, &
-                              flux1, flux2, flux3, tn, o2, &
+      subroutine aurora_ions( drizl, cusp, alfa1, alfa2, &
+                              flux1, flux2, tn, o2, &
                               o1, mbar, qo2p, qop, qn2p, &
                               qnp, pmid, do_aurora, ncol, lchnk, pbuf )
 !-----------------------------------------------------------------------
@@ -883,7 +859,7 @@
       use ppgrid,      only : pcols, pver
       use cam_history, only : outfld
 
-      use physics_buffer,only: physics_buffer_desc, pbuf_set_field, pbuf_get_field
+      use physics_buffer,only: physics_buffer_desc, pbuf_get_field
 
       implicit none
 
@@ -897,10 +873,8 @@
                              cusp, &
                              alfa1, &
                              alfa2, &
-                             alfa3, &
                              flux1, &
-                             flux2, &
-                             flux3
+                             flux2
       real(r8), dimension(pcols,pver), intent(in) :: &
                              tn, &                     ! midpoint neutral temperature (K)
                              pmid                      ! midpoint pressure (Pa)
@@ -922,7 +896,7 @@
 !-----------------------------------------------------------------------
       real(r8), parameter :: const0        = 1.e-20_r8
 
-      integer  :: i, k
+      integer  :: k
       real(r8), dimension(ncol) :: &
         p0ez, &
         press, &                                   ! pressure at interface levels (dyne/cm^2)
@@ -931,29 +905,19 @@
         xalfa2, &
         xcusp, &
         xdrizl, &                                  ! input to sub aion
-        xalfa_sp, &
-        xalfa3, &
-        flux1_ion, &
-        flux2_ion, &
         cusp_ion, &
         drizl_ion, &                               ! output from sub aion
         alfa1_ion, &
         alfa2_ion, &
-        alfa3_ion, &                               ! output from sub aion
-        alfasp_bion, &                             ! output from sub bion
         barm_t, &
         qsum, &
         denom, &
-        p0ez_mbar, &
-        tk_mbar, &
         barm, &
         falfa1, &
         falfa2, &
         fcusp, &
         fdrizl, &
-        falfa_sp, &
-        xn2, &
-        falfa3
+        xn2
       real(r8), dimension(ncol) :: &
         qo2p_aur, &
         qop_aur, &
@@ -992,8 +956,6 @@ level_loop : &
 !-----------------------------------------------------------------------
 ! 	... initialize (whole array operations):
 !-----------------------------------------------------------------------
-             flux1_ion(:) = const0
-             flux2_ion(:) = const0
              alfa1_ion(:) = const0
              alfa2_ion(:) = const0
              cusp_ion(:)  = const0
@@ -1016,42 +978,6 @@ level_loop : &
                        + fcusp(:)*cusp_ion (:) &     ! s9*s5
                        + fdrizl(:)*drizl_ion(:)       ! s10*s6
           endwhere
-!-----------------------------------------------------------------------
-! 	... include solar protons if add_sproton is set, 
-!           and high energy electrons if add_helectron is set
-!-----------------------------------------------------------------------
-!-----------------------------------------------------------------------
-! 	... solar protons
-!-----------------------------------------------------------------------
-          if( add_sproton ) then
-             if( flx_sp > 1.e-19_r8 ) then
-                where( do_aurora(:) )
-                   p0ez_mbar(:) = press(:)/(boltz_cgs*tempi(:)*barm(:))/avo
-                   tk_mbar(:)   = gask*tempi(:)/(grav*barm(:))*p0ez_mbar(:)
-                   xalfa_sp(:)  = ((tk_mbar(:)/.00271_r8)**.58140_r8)/alfa_sp
-                endwhere
-                call bion( xalfa_sp, alfasp_bion, do_aurora, ncol )
-                where( do_aurora(:) )
-                   falfa_sp(:) = drizl(:)*p0ez_mbar(:)*flx_sp*1.e6_r8/(tk_mbar(:)*35._r8)
-                   qsum(:)     = qsum(:) + falfa_sp(:)*alfasp_bion(:)
-                endwhere
-             end if
-          end if
-!-----------------------------------------------------------------------
-! 	... high energy electrons
-!-----------------------------------------------------------------------
-          if( add_helectron ) then
-             if( e30 > 1.e-19_r8 ) then
-                where( do_aurora(:) )
-                   xalfa3(:) = p0ez(:)/alfa3(:)        ! alfa3(:)==alfa30
-                endwhere
-                call aion( xalfa3, alfa3_ion, do_aurora, ncol )
-                where( do_aurora(:) )
-                   falfa3(:) = alfa3(:)*flux3(:)  ! s13 (high energy electrons)
-                   qsum(:)   = qsum(:) + falfa3(:)*alfa3_ion(:)
-                endwhere
-             end if
-          end if
 
 !-----------------------------------------------------------------------
 ! 	... form production
@@ -1100,16 +1026,15 @@ level_loop : &
 
       end subroutine aurora_ions
 
-      subroutine total_ion_prod( drizl, cusp, alfa1, alfa2, alfa3, &
-                                 flux1, flux2, flux3, tn, o2, &
-                                 o1, mbar, tpions, pmid, do_aurora, &
-                                 ncol, lchnk )
+      subroutine total_ion_prod( drizl, cusp, alfa1, alfa2, &
+                                 flux1, flux2, tn, &
+                                 mbar, tpions, pmid, do_aurora, &
+                                 ncol )
 !-----------------------------------------------------------------------
 ! 	... calculate auroral additions to ionization rates
 !-----------------------------------------------------------------------
 
       use ppgrid,      only : pcols, pver
-      use cam_history, only : outfld
 
       implicit none
 
@@ -1117,22 +1042,17 @@ level_loop : &
 ! 	... dummy arguments
 !-----------------------------------------------------------------------
       integer, intent(in) :: ncol
-      integer, intent(in) :: lchnk
       real(r8), intent(in), dimension(ncol) :: &
                              drizl, &
                              cusp, &
                              alfa1, &
                              alfa2, &
-                             alfa3, &
                              flux1, &
-                             flux2, &
-                             flux3
+                             flux2
       real(r8), dimension(pcols,pver), intent(in) :: &
                              tn, &                     ! midpoint neutral temperature (K)
                              pmid                      ! midpoint pressure (Pa)
       real(r8), dimension(ncol,pver), intent(in) :: &
-                             o2, &                     ! midpoint o2 concentration (kg/kg)
-                             o1, &                     ! midpoint o  concentration (kg/kg)
                              mbar                      ! mean molecular mass (g/mole)
       real(r8), dimension(ncol,pver), intent(inout) :: &
                              tpions                    ! total ion production (1/s)
@@ -1143,7 +1063,7 @@ level_loop : &
 !-----------------------------------------------------------------------
       real(r8), parameter :: const0        = 1.e-20_r8
 
-      integer  :: i, k
+      integer  :: k
       real(r8), dimension(ncol) :: &
         p0ez, &
         press, &                                   ! pressure at interface levels (dyne/cm^2)
@@ -1152,36 +1072,17 @@ level_loop : &
         xalfa2, &
         xcusp, &
         xdrizl, &                                  ! input to sub aion
-        xalfa_sp, &
-        xalfa3, &
-        flux1_ion, &
-        flux2_ion, &
         cusp_ion, &
         drizl_ion, &                               ! output from sub aion
         alfa1_ion, &
         alfa2_ion, &
-        alfa3_ion, &                               ! output from sub aion
-        alfasp_bion, &                             ! output from sub bion
         barm_t, &
         qsum, &
-        denom, &
-        p0ez_mbar, &
-        tk_mbar, &
         barm, &
         falfa1, &
         falfa2, &
-        fcusp, &
-        fdrizl, &
-        falfa_sp, &
-        xn2, &
-        falfa3
-      real(r8), dimension(ncol) :: &
-        qo2p_aur, &
-        qop_aur, &
-        qn2p_aur                                   ! auroral ionization for O2+, O+, N2+
-      real(r8) :: qia(5)                           ! low energy proton source (not in use, 1/02)
+        fcusp
 
-      qia(:)      = 0._r8
       tpions(:,:) = 0._r8
 
 level_loop : &
@@ -1199,8 +1100,6 @@ level_loop : &
 !-----------------------------------------------------------------------
 ! 	... initiliaze (whole array operations):
 !-----------------------------------------------------------------------
-             flux1_ion(:) = const0
-             flux2_ion(:) = const0
              alfa1_ion(:) = const0
              alfa2_ion(:) = const0
              cusp_ion(:)  = const0
@@ -1217,48 +1116,11 @@ level_loop : &
              falfa1(:) = alfa1(:)*flux1(:)  ! s7
              falfa2(:) = alfa2(:)*flux2(:)  ! s8
              fcusp (:) = cusp(:)*alfac*fc   ! s9
-             fdrizl(:) = drizl(:)*alfad*fd  ! s10
              qsum(:)   = falfa1(:)*alfa1_ion(:) &    ! s7*s3
                        + falfa2(:)*alfa2_ion(:) &    ! s8*s4
                        + fcusp(:)*cusp_ion (:) &     ! s9*s5
                        + drizl(:)*drizl_ion(:)       ! s10*s6
           endwhere
-!-----------------------------------------------------------------------
-! 	... include solar protons if add_sproton is set, 
-!           and high energy electrons if add_helectron is set
-!-----------------------------------------------------------------------
-!-----------------------------------------------------------------------
-! 	... solar protons
-!-----------------------------------------------------------------------
-          if( add_sproton ) then
-             if( flx_sp > 1.e-19_r8 ) then
-                where( do_aurora(:) )
-                   p0ez_mbar(:) = press(:)/(boltz_cgs*tempi(:)*barm(:))/avo
-                   tk_mbar(:)   = gask*tempi(:)/(grav*barm(:))*p0ez_mbar(:)
-                   xalfa_sp(:)  = ((tk_mbar(:)/.00271_r8)**.58140_r8)/alfa_sp
-                endwhere
-                call bion( xalfa_sp, alfasp_bion, do_aurora, ncol )
-                where( do_aurora(:) )
-                   falfa_sp(:) = drizl(:)*p0ez_mbar(:)*flx_sp*1.e6_r8/(tk_mbar(:)*35._r8)
-                   qsum(:)     = qsum(:) + falfa_sp(:)*alfasp_bion(:)
-                endwhere
-             end if
-          end if
-!-----------------------------------------------------------------------
-! 	... high energy electrons
-!-----------------------------------------------------------------------
-          if( add_helectron ) then
-             if( e30 > 1.e-19_r8 ) then
-                where( do_aurora(:) )
-                   xalfa3(:) = p0ez(:)/alfa3(:)        ! alfa3(:)==alfa30
-                endwhere
-                call aion( xalfa3, alfa3_ion, do_aurora, ncol )
-                where( do_aurora(:) )
-                   falfa3(:) = alfa3(:)*flux3(:)  ! s13 (high energy electrons)
-                   qsum(:)   = qsum(:) + falfa3(:)*alfa3_ion(:)
-                endwhere
-             end if
-          end if
 
 !-----------------------------------------------------------------------
 ! 	... form production
@@ -1310,43 +1172,5 @@ level_loop : &
       endwhere
 
       end subroutine aion
-
-      subroutine bion( si, so, do_aurora, ncol )
-!-----------------------------------------------------------------------
-! Calculates integrated f(x) needed for total auroral ionization.
-! See equations (10-12) in Roble,1987.
-! Use the identity x**y = exp(y*ln(x)) for performance 
-! (fewer (1/2) trancendental functions are required).
-!-----------------------------------------------------------------------
-
-      implicit none
-
-!------------------------------------------------------------------------
-! 	... dummy arguments
-!------------------------------------------------------------------------
-      integer, intent(in)   :: ncol
-      real(r8), intent(in)  :: si(ncol)
-      real(r8), intent(out) :: so(ncol)
-      logical,  intent(in)  :: do_aurora(ncol)
-
-!------------------------------------------------------------------------
-! 	... local variables
-!------------------------------------------------------------------------
-      real(r8), parameter :: cc(8) = &
-        (/ 0.12718_r8, 4.9119_r8, 1.8429_r8, 0.99336_r8, 0.52472_r8, &
-           1.5565_r8,  .85732_r8, 1.4116_r8 /)
-
-      real(r8) :: xlog(ncol)
-
-      where( do_aurora(:) )
-         xlog(:) = log( si(:) )
-         so(:)   = cc(1)*exp( cc(2)*xlog(:) - cc(3)*exp( cc(4)*xlog(:) ) ) &
-                   + cc(5)*exp( cc(6)*xlog(:) - cc(7)*exp( cc(8)*xlog(:) ) )
-      elsewhere
-         so(:) = 0._r8
-      endwhere
-
-      end subroutine bion
-
 
       end module mo_aurora

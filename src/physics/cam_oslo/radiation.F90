@@ -108,6 +108,12 @@ type rad_out_t
    real(r8) :: liq_icld_vistau(pcols,pver)  ! in-cld liq cloud optical depth (only during day, night = fillvalue)
    real(r8) :: ice_icld_vistau(pcols,pver)  ! in-cld ice cloud optical depth (only during day, night = fillvalue)
    real(r8) :: snow_icld_vistau(pcols,pver) ! snow in-cloud visible sw optical depth for output on history files
+
+   real(r8) :: cld_tau_cloudsim(pcols,pver)
+   real(r8) :: aer_tau400(pcols,0:pver)
+   real(r8) :: aer_tau550(pcols,0:pver)
+   real(r8) :: aer_tau700(pcols,0:pver)
+   
 end type rad_out_t
 
 ! Namelist variables
@@ -1031,6 +1037,7 @@ subroutine radiation_tend( &
          rd%tot_icld_vistau(:ncol,:) = c_cld_tau(idx_sw_diag,:ncol,:)
          rd%liq_icld_vistau(:ncol,:) = liq_tau(idx_sw_diag,:ncol,:)
          rd%ice_icld_vistau(:ncol,:) = ice_tau(idx_sw_diag,:ncol,:)
+
          if (cldfsnow_idx > 0) then
             rd%snow_icld_vistau(:ncol,:) = snow_tau(idx_sw_diag,:ncol,:)
        endif
@@ -1186,6 +1193,11 @@ subroutine radiation_tend( &
 #endif ! DIRIND
 
                
+               rd%cld_tau_cloudsim(:ncol,:) = cld_tau(rrtmg_sw_cloudsim_band,:ncol,:)
+               rd%aer_tau550(:ncol,:)       = aer_tau(:ncol,:,idx_sw_diag)
+               rd%aer_tau400(:ncol,:)       = aer_tau(:ncol,:,idx_sw_diag+1)
+               rd%aer_tau700(:ncol,:)       = aer_tau(:ncol,:,idx_sw_diag-1)
+
                call rad_rrtmg_sw( &
                   lchnk, ncol, num_rrtmg_levs, r_state, state%pmid,          &
                   cldfprime, &
@@ -1392,7 +1404,7 @@ subroutine radiation_tend( &
     end if   ! if (dosw .or. dolw) then
 
     ! output rad inputs and resulting heating rates
-   call rad_data_write(pbuf, state, cam_in, coszrs)
+    call rad_data_write(  pbuf, state, cam_in, coszrs )
 
     ! Compute net radiative heating tendency
     call radheat_tend(state, pbuf,  ptend, qrl, qrs, fsns, &

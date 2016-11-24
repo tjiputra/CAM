@@ -31,8 +31,8 @@ use cam_logfile,     only: iulog
 use error_messages,  only: alloc_err	
 use cam_abortutils,  only: endrun
 
-use modal_aero_data, only: lmassptr_amode, nspec_amode, ntot_amode, numptr_amode, &
-                           species_class, spec_class_aerosol, spec_class_gas
+use modal_aero_data, only: lmassptr_amode, nspec_amode, ntot_amode, numptr_amode
+use constituents,    only: cnst_species_class, cnst_spec_class_aerosol, cnst_spec_class_gas
  
 implicit none
 private
@@ -300,7 +300,7 @@ subroutine ma_convproc_intr( state, ptend, pbuf, ztodt,             &
    sflxec(:,:) = 0.0_r8
    sflxed(:,:) = 0.0_r8
    do l = 1, pcnst
-      if ( (species_class(l) == spec_class_aerosol) .and. ptend%lq(l) ) then
+      if ( (cnst_species_class(l) == cnst_spec_class_aerosol) .and. ptend%lq(l) ) then
          sflxec(1:ncol,l) = qsrflx_mzaer2cnvpr(1:ncol,l,1) 
          sflxed(1:ncol,l) = qsrflx_mzaer2cnvpr(1:ncol,l,2) 
       end if
@@ -343,8 +343,8 @@ subroutine ma_convproc_intr( state, ptend, pbuf, ztodt,             &
             ptend%lq(l) = .true.
          end if
 
-         if ((species_class(l) == spec_class_aerosol) .or. &
-            (species_class(l) == spec_class_gas    )) then
+         if ((cnst_species_class(l) == cnst_spec_class_aerosol) .or. &
+             (cnst_species_class(l) == cnst_spec_class_gas    )) then
             ! these used for history file wetdep diagnostics
             sflxic(1:ncol,l) = sflxic(1:ncol,l) + qsrflx(1:ncol,l,4) 
             sflxid(1:ncol,l) = sflxid(1:ncol,l) + qsrflx(1:ncol,l,4) 
@@ -352,7 +352,7 @@ subroutine ma_convproc_intr( state, ptend, pbuf, ztodt,             &
             sflxed(1:ncol,l) = sflxed(1:ncol,l) + qsrflx(1:ncol,l,5) 
          end if
 
-         if (species_class(l) == spec_class_aerosol) then
+         if (cnst_species_class(l) == cnst_spec_class_aerosol) then
             ! this used for surface coupling
             aerdepwetis(1:ncol,l) = aerdepwetis(1:ncol,l) &
                + qsrflx(1:ncol,l,4) + qsrflx(1:ncol,l,5) 
@@ -381,13 +381,13 @@ subroutine ma_convproc_intr( state, ptend, pbuf, ztodt,             &
             ptend%lq(l) = .true.
          end if
 
-         if ((species_class(l) == spec_class_aerosol) .or. &
-            (species_class(l) == spec_class_gas    )) then
+         if ((cnst_species_class(l) == cnst_spec_class_aerosol) .or. &
+             (cnst_species_class(l) == cnst_spec_class_gas    )) then
             sflxic(1:ncol,l) = sflxic(1:ncol,l) + qsrflx(1:ncol,l,4) 
             sflxec(1:ncol,l) = sflxec(1:ncol,l) + qsrflx(1:ncol,l,5) 
          end if
 
-         if (species_class(l) == spec_class_aerosol) then
+         if (cnst_species_class(l) == cnst_spec_class_aerosol) then
             aerdepwetis(1:ncol,l) = aerdepwetis(1:ncol,l) &
                + qsrflx(1:ncol,l,4) + qsrflx(1:ncol,l,5) 
          end if
@@ -525,9 +525,9 @@ subroutine ma_convproc_dp_intr(                &
    ! turn on/off calculations for aerosols and trace gases
    do l = 1, pcnst
       dotend(l) = .false.
-      if (species_class(l) == spec_class_aerosol) then
+      if (cnst_species_class(l) == cnst_spec_class_aerosol) then
          if (convproc_do_aer) dotend(l) = .true.
-      else if (species_class(l) == spec_class_gas) then
+      else if (cnst_species_class(l) == cnst_spec_class_gas) then
          if (convproc_do_gas) dotend(l) = .true.
       end if
    end do
@@ -749,9 +749,9 @@ subroutine ma_convproc_sh_intr(                 &
    ! turn on/off calculations for aerosols and trace gases
    do l = 1, pcnst
       dotend(l) = .false.
-      if (species_class(l) == spec_class_aerosol) then
+      if (cnst_species_class(l) == cnst_spec_class_aerosol) then
          if (convproc_do_aer) dotend(l) = .true.
-      else if (species_class(l) == spec_class_gas) then
+      else if (cnst_species_class(l) == cnst_spec_class_gas) then
          if (convproc_do_gas) dotend(l) = .true.
       end if
    end do

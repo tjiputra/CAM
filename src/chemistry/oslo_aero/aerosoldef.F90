@@ -7,7 +7,6 @@ module aerosoldef
 ! Modified Spring 2015 by cka to include a version of RM's treatment of soa. (Makkonen et al. 2012)
 ! Modified Summer 2015 by ak to include a new treatment of sea-salt (Salter et al. 2015)
 
-
    use commondefinitions
    use modal_aero_data, only: qqcw_set_ptr
    use mo_tracname, only : solsym

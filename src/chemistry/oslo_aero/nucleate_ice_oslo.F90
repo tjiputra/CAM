@@ -11,8 +11,8 @@ use shr_kind_mod,   only: r8=>shr_kind_r8
 use spmd_utils,     only: masterproc
 use ppgrid,         only: pcols, pver
 use physconst,      only: pi, rair, tmelt
-use constituents,   only: cnst_get_ind
-use physics_types,  only: physics_state
+use constituents,   only: pcnst, cnst_get_ind
+use physics_types,  only: physics_state, physics_ptend, physics_ptend_init 
 use physics_buffer, only: physics_buffer_desc, pbuf_get_index, pbuf_old_tim_idx, pbuf_get_field
 use phys_control,   only: use_hetfrz_classnuc
 use physics_buffer, only: pbuf_add_field, dtype_r8, pbuf_old_tim_idx, &
@@ -28,6 +28,11 @@ use cam_abortutils, only: endrun
 
 use nucleate_ice,   only: nucleati_init, nucleati
 
+use aerosoldef,     only:  l_dst_a2, l_dst_a3, & 
+                           MODE_IDX_DST_A2, MODE_IDX_DST_A3, &
+                           rhopart
+use modal_aero_data, only: qqcw_get_field
+use const          , only: volumeToNumber
 
 implicit none
 private
@@ -43,7 +48,9 @@ public :: &
 ! Namelist variables
 logical, public, protected :: use_preexisting_ice = .false.
 logical                    :: hist_preexisting_ice = .false.
+logical                    :: nucleate_ice_incloud = .false. 
 real(r8)                   :: nucleate_ice_subgrid
+real(r8)                   :: nucleate_ice_strat = 0.0_r8  
 
 ! Vars set via init method.
 real(r8) :: mincld      ! minimum allowed cloud fraction
@@ -65,7 +72,7 @@ integer :: &
 
 ! modal aerosols
 logical :: clim_modal_aero = .TRUE.
-
+logical :: lq(pcnst) = .false. ! set flags true for constituents with non-zero tendencies
 
 !===============================================================================
 contains
@@ -75,7 +82,7 @@ subroutine nucleate_ice_oslo_readnl(nlfile)
 
   use namelist_utils,  only: find_group_name
   use units,           only: getunit, freeunit
-  use mpishorthand
+  use spmd_utils,      only: mpicom, masterprocid, mpi_logical, mpi_real8
 
   character(len=*), intent(in) :: nlfile  ! filepath for file containing namelist input
 
@@ -84,7 +91,7 @@ subroutine nucleate_ice_oslo_readnl(nlfile)
   character(len=*), parameter :: subname = 'nucleate_ice_cam_readnl'
 
   namelist /nucleate_ice_nl/ use_preexisting_ice, hist_preexisting_ice, &
-       nucleate_ice_subgrid
+       nucleate_ice_subgrid, nucleate_ice_strat, nucleate_ice_incloud 
 
   !-----------------------------------------------------------------------------
 
@@ -103,12 +110,12 @@ subroutine nucleate_ice_oslo_readnl(nlfile)
 
   end if
 
-#ifdef SPMD
-  ! Broadcast namelist variables
-  call mpibcast(use_preexisting_ice,  1, mpilog, 0, mpicom)
-  call mpibcast(hist_preexisting_ice, 1, mpilog, 0, mpicom)
-  call mpibcast(nucleate_ice_subgrid, 1, mpir8, 0, mpicom)
-#endif
+ ! Broadcast namelist variables
+ call mpi_bcast(use_preexisting_ice,  1, mpi_logical,masterprocid, mpicom, ierr)
+ call mpi_bcast(hist_preexisting_ice, 1, mpi_logical,masterprocid, mpicom, ierr)
+ call mpi_bcast(nucleate_ice_subgrid, 1, mpi_real8,  masterprocid, mpicom, ierr)
+ call mpi_bcast(nucleate_ice_strat,   1, mpi_real8,  masterprocid, mpicom, ierr)
+ call mpi_bcast(nucleate_ice_incloud, 1, mpi_logical,masterprocid, mpicom, ierr)
 
 end subroutine nucleate_ice_oslo_readnl
 
@@ -147,14 +154,18 @@ subroutine nucleate_ice_oslo_init(mincld_in, bulk_scale_in)
    call addfld('NIDEP', (/ 'lev' /), 'A', '1/m3', 'Activated Ice Number Concentation due to deposition nucleation')
    call addfld('NIIMM', (/ 'lev' /), 'A', '1/m3', 'Activated Ice Number Concentation due to immersion freezing')
    call addfld('NIMEY', (/ 'lev' /), 'A', '1/m3', 'Activated Ice Number Concentation due to meyers deposition')
+   call addfld('NIREGM',(/ 'lev' /), 'A', 'C', 'Ice Nucleamtion Temperature Threshold for Regime') 
+
 
    if (use_preexisting_ice) then
       call addfld('fhom',      (/ 'lev' /), 'A','fraction', 'Fraction of cirrus where homogeneous freezing occur'   ) 
       call addfld ('WICE',     (/ 'lev' /), 'A','m/s','Vertical velocity Reduction caused by preexisting ice'  )
       call addfld ('WEFF',     (/ 'lev' /), 'A','m/s','Effective Vertical velocity for ice nucleation' )
-      call addfld ('INnso4',   (/ 'lev' /), 'A','1/m3','Number Concentation so4 used for ice_nucleation')
-      call addfld ('INnbc',    (/ 'lev' /), 'A','1/m3','Number Concentation bc  used for ice_nucleation')
-      call addfld ('INndust',  (/ 'lev' /), 'A','1/m3','Number Concentation dustused for ice_nucleation')
+      call addfld ('INnso4',   (/ 'lev' /), 'A','1/m3','Number Concentation so4 (in) to ice_nucleation')
+      call addfld ('INnbc',    (/ 'lev' /), 'A','1/m3','Number Concentation bc (in) to ice_nucleation')
+      call addfld ('INndust',  (/ 'lev' /), 'A','1/m3','Number Concentation dust (in) to for ice_nucleation')
+      call addfld ('INondust',  (/ 'lev' /), 'A','1/m3','Number Concentation dust (out) from ice_nucleation')  
+
       call addfld ('INhet',    (/ 'lev' /), 'A','1/m3', &
                 'contribution for in-cloud ice number density increase by het nucleation in ice cloud')
       call addfld ('INhom',    (/ 'lev' /), 'A','1/m3', &
@@ -171,6 +182,7 @@ subroutine nucleate_ice_oslo_init(mincld_in, bulk_scale_in)
          call add_default ('INnso4  ', 1, ' ')
          call add_default ('INnbc   ', 1, ' ')
          call add_default ('INndust ', 1, ' ')
+         call add_default ('INondust', 1, ' ')
          call add_default ('INhet   ', 1, ' ')
          call add_default ('INhom   ', 1, ' ')
          call add_default ('INFrehom', 1, ' ')
@@ -179,8 +191,10 @@ subroutine nucleate_ice_oslo_init(mincld_in, bulk_scale_in)
    end if
 
 
+   lq(l_dst_a2) = .TRUE.
+   lq(l_dst_a3) = .TRUE.
 
-   call nucleati_init(use_preexisting_ice, use_hetfrz_classnuc, iulog, pi, &
+   call nucleati_init(use_preexisting_ice, use_hetfrz_classnuc, nucleate_ice_incloud, iulog, pi, &
         mincld, nucleate_ice_subgrid)
 
    ! get indices for fields in the physics buffer
@@ -191,7 +205,7 @@ end subroutine nucleate_ice_oslo_init
 !================================================================================================
 
 subroutine nucleate_ice_oslo_calc( &
-   state, wsubi, pbuf &
+   state, wsubi, pbuf, dtime, ptend  &
    , numberConcentration)
 
    use aerosoldef, only : MODE_IDX_DST_A2, MODE_IDX_DST_A3 &
@@ -203,6 +217,8 @@ subroutine nucleate_ice_oslo_calc( &
    type(physics_state), target, intent(in)    :: state
    real(r8),                    intent(in)    :: wsubi(:,:)
    type(physics_buffer_desc),   pointer       :: pbuf(:)
+   real(r8),                    intent(in)    :: dtime
+   type(physics_ptend),         intent(out)   :: ptend
  
    ! local workspace
 
@@ -221,6 +237,8 @@ subroutine nucleate_ice_oslo_calc( &
    real(r8), pointer :: ni(:,:)         ! cloud ice number conc (1/kg)
    real(r8), pointer :: pmid(:,:)       ! pressure at layer midpoints (pa)
 
+   real(r8), pointer :: cld_dst_a2(:,:) ! mmr cld dst a2
+   real(r8), pointer :: cld_dst_a3(:,:) ! mass m.r. of coarse dust
 
    real(r8), pointer :: ast(:,:)
    real(r8) :: icecldf(pcols,pver)  ! ice cloud fraction
@@ -244,6 +262,14 @@ subroutine nucleate_ice_oslo_calc( &
    real(r8) :: wght
    real(r8) :: dmc
    real(r8) :: ssmc
+   real(r8) :: oso4_num
+   real(r8) :: odst_num
+   real(r8) :: osoot_num
+   real(r8) :: dso4_num                              ! tuning factor for increased so4
+   real(r8) :: ramp                                  ! ---------- " ----------------
+   real(r8) :: dust_coarse_fraction                  ! fraction of dust in coarse (a3) mode
+   real(r8) :: masslost                              ! [kg/kg] tmp variable for mass lost
+   real(r8) :: numberFromSmallDustMode               ! [#/cm3] number of dust activated from small mode
 
    ! For pre-existing ice
    real(r8) :: fhom(pcols,pver)    ! how much fraction of cloud can reach Shom
@@ -252,6 +278,7 @@ subroutine nucleate_ice_oslo_calc( &
    real(r8) :: INnso4(pcols,pver)   ! #/m3, so4 aerosol number used for ice nucleation
    real(r8) :: INnbc(pcols,pver)    ! #/m3, bc aerosol number used for ice nucleation
    real(r8) :: INndust(pcols,pver)  ! #/m3, dust aerosol number used for ice nucleation
+   real(r8) :: INondust(pcols,pver)  ! #/m3, dust aerosol number used for ice nuclation
    real(r8) :: INhet(pcols,pver)    ! #/m3, ice number from het freezing
    real(r8) :: INhom(pcols,pver)    ! #/m3, ice number from hom freezing
    real(r8) :: INFrehom(pcols,pver) !  hom freezing occurence frequency.  1 occur, 0 not occur.
@@ -262,6 +289,7 @@ subroutine nucleate_ice_oslo_calc( &
    real(r8) :: niimm(pcols,pver) !output number conc of ice nuclei due to immersion freezing (hetero nuc) (1/m3)
    real(r8) :: nidep(pcols,pver) !output number conc of ice nuclei due to deoposion nucleation (hetero nuc) (1/m3)
    real(r8) :: nimey(pcols,pver) !output number conc of ice nuclei due to meyers deposition (1/m3)
+   real(r8) :: regm(pcols,pver)  !output temperature thershold for nucleation regime
 
 
    !-------------------------------------------------------------------------------
@@ -280,6 +308,11 @@ subroutine nucleate_ice_oslo_calc( &
          rho(i,k) = pmid(i,k)/(rair*t(i,k))
       end do
    end do
+
+   call physics_ptend_init(ptend, state%psetcols, 'nucleatei', lq=lq) 
+
+   cld_dst_a2 => qqcw_get_field(pbuf, l_dst_a2, lchnk, .true.)
+   cld_dst_a3 => qqcw_get_field(pbuf, l_dst_a2, lchnk, .true.) 
 
    itim_old = pbuf_old_tim_idx()
    call pbuf_get_field(pbuf, ast_idx, ast, start=(/1,1,itim_old/), kount=(/pcols,pver,1/))
@@ -305,6 +338,7 @@ subroutine nucleate_ice_oslo_calc( &
       INnso4(:,:)   = 0.0_r8
       INnbc(:,:)    = 0.0_r8
       INndust(:,:)  = 0.0_r8
+      INondust(:,:)  = 0.0_r8
       INhet(:,:)    = 0.0_r8
       INhom(:,:)    = 0.0_r8
       INFrehom(:,:) = 0.0_r8
@@ -352,6 +386,9 @@ subroutine nucleate_ice_oslo_calc( &
 
                dst_num = (numberConcentration(i,k,MODE_IDX_DST_A2) &
                           + numberConcentration(i,k,MODE_IDX_DST_A3))*1.0e-6_r8
+               !Oslo aerosols have two modes.. Need mode-fractions
+               dust_coarse_fraction = numberConcentration(i,k,MODE_IDX_DST_A3)*1.e-6_r8 / (dst_num+1.e-100_r8)
+   
 
                so4_num = (numberConcentration(i,k,MODE_IDX_SO4_AC))*1.0e-6_r8 
 
@@ -364,9 +401,64 @@ subroutine nucleate_ice_oslo_calc( &
                qc(i,k), qi(i,k), ni(i,k), rho(i,k),                      &
                so4_num, dst_num, soot_num,                               &
                naai(i,k), nihf(i,k), niimm(i,k), nidep(i,k), nimey(i,k), &
-               wice(i,k), weff(i,k), fhom(i,k))
+               wice(i,k), weff(i,k), fhom(i,k), regm(i,k),               &
+               oso4_num, odst_num, osoot_num)
+
+            ! Move aerosol used for nucleation from interstial to cloudborne, 
+            ! otherwise the same coarse mode aerosols will be available again
+            ! in the next timestep and will supress homogeneous freezing.
+            if (use_preexisting_ice) then
+
+               numberFromSmallDustMode = 0.0_r8
+               
+               !Assume the coarse aerosols were activated first
+               !so only remove small ones if more than large ones are activated
+               if(odst_num .gt. dst_num*dust_coarse_fraction)then
+
+                  !A2-mode
+                  numberFromSmallDustMode = odst_num - dst_num*dust_coarse_fraction
+
+                  masslost = (odst_num               & !all removed
+                     - dst_num*dust_coarse_fraction) & !fraction to coarse mode
+                     / volumeToNumber(MODE_IDX_DST_A2) &
+                     * rhopart(l_dst_a2) & 
+                     /rho(i,k)*1e6_r8 
+
+                  ptend%q(i,k,l_dst_a2) = -masslost/ dtime
+                  cld_dst_a2(i,k) = cld_dst_a2(i,k) + masslost
+
+               end if
+
+               ! Coarse mode (is always lost)  
+               masslost = (odst_num - numberFromSmallDustMode) &
+                  / volumeToNumber(MODE_IDX_DST_A3) &
+                  * rhopart(l_dst_a3) & 
+                  / rho(i,k)*1e6_r8 
+                 
+                  ptend%q(i,k,l_dst_a3) = -masslost/ dtime
+                  cld_dst_a3(i,k) = cld_dst_a3(i,k) + masslost
+
+            end if
+
+            ! Liu&Penner does not generate enough nucleation in the polar winter
+            ! startosphere, which affects surface area density, dehydration and
+            ! ozone chemistry. As a short term work around, assume a larger
+            ! fraction of the sulfates nucleate in the polar stratosphere.
+            if (pmid(i,k) <= 12500._r8 .and. pmid(i,k) > 100._r8 .and. abs(state%lat(i)) >= 60._r8 * pi / 180._r8) then
+               ramp = 1._r8 - min(1._r8, max(0._r8, (pmid(i,k) - 10000._r8) / 2500._r8))
+
+               if (oso4_num > 0._r8) then
+                  dso4_num = (max(oso4_num, ramp * nucleate_ice_strat * so4_num) - oso4_num) * 1e6_r8 / rho(i,k)
+                  naai(i,k) = naai(i,k) + dso4_num / icldm(i,k)
+                  nihf(i,k) = nihf(i,k) + dso4_num
+               end if
+            end if
 
             naai_hom(i,k) = nihf(i,k)
+
+            if (.not. nucleate_ice_incloud) then
+              naai_hom(i,k) = naai_hom(i,k) / icldm(i,k)
+            end if
 
             ! output activated ice (convert from #/kg -> #/m3)
             nihf(i,k)     = nihf(i,k) *rho(i,k)
@@ -378,8 +470,9 @@ subroutine nucleate_ice_oslo_calc( &
                INnso4(i,k) =so4_num*1e6_r8  ! (convert from #/cm3 -> #/m3)
                INnbc(i,k)  =soot_num*1e6_r8
                INndust(i,k)=dst_num*1e6_r8
+               INondust(i,k)=odst_num*1e6_r8
                INFreIN(i,k)=1.0_r8          ! 1,ice nucleation occur
-               INhet(i,k) = niimm(i,k) + nidep(i,k)   ! #/m3, nimey not in cirrus
+               INhet(i,k) = (niimm(i,k) + nidep(i,k))   ! #/m3, nimey not in cirrus
                INhom(i,k) = nihf(i,k)                 ! #/m3
                if (INhom(i,k).gt.1e3_r8)   then ! > 1/L
                   INFrehom(i,k)=1.0_r8       ! 1, hom freezing occur
@@ -390,6 +483,7 @@ subroutine nucleate_ice_oslo_calc( &
                   INnso4(i,k) =0.0_r8
                   INnbc(i,k)  =0.0_r8
                   INndust(i,k)=0.0_r8
+                  INondust(i,k)=0.0_r8
                   INFreIN(i,k)=0.0_r8
                   INhet(i,k) = 0.0_r8
                   INhom(i,k) = 0.0_r8
@@ -409,6 +503,7 @@ subroutine nucleate_ice_oslo_calc( &
    call outfld('NIIMM', niimm, pcols, lchnk)
    call outfld('NIDEP', nidep, pcols, lchnk)
    call outfld('NIMEY', nimey, pcols, lchnk)
+   call outfld('NIREGM', regm, pcols, lchnk)
 
    if (use_preexisting_ice) then
       call outfld( 'fhom' , fhom, pcols, lchnk)
@@ -417,6 +512,7 @@ subroutine nucleate_ice_oslo_calc( &
       call outfld('INnso4  ',INnso4 , pcols,lchnk)
       call outfld('INnbc   ',INnbc  , pcols,lchnk)
       call outfld('INndust ',INndust, pcols,lchnk)
+      call outfld('INondust ',INondust, pcols,lchnk)
       call outfld('INhet   ',INhet  , pcols,lchnk)
       call outfld('INhom   ',INhom  , pcols,lchnk)
       call outfld('INFrehom',INFrehom,pcols,lchnk)

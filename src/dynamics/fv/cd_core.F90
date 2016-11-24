@@ -2,6 +2,7 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
                    delp,   pe,     pk,  ns,  dt,                  &
                    ptopin, umax,   pi, ae,  cp,  akap,            &
                    iord_c, jord_c, iord_d, jord_d,   ipe,         &
+                   div24del2flag, del2coef,                       &
                    om,     hs,     cx3  ,  cy3, mfx, mfy,         &
                    delpf, uc, vc, ptc, dpt, ptk,                  &
                    wz3, pkc, wz,  hsxy, ptxy, pkxy,               &
@@ -25,7 +26,6 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
    use dynamics_vars,     only: T_FVDYCORE_GRID
    use FVperf_module,     only: FVstartclock, FVstopclock, FVbarrierclock
    use cam_logfile,       only: iulog
-   use fv_control_mod,    only: div24del2flag, del2coef
    use spmd_utils,        only: masterproc
    use cam_abortutils,    only: endrun
 
@@ -78,6 +78,8 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
    real(r8), intent(in) :: dt                !small time step in seconds
    real(r8), intent(in) :: cp
    real(r8), intent(in) :: akap
+   integer,  intent(in) :: div24del2flag
+   real(r8), intent(in) :: del2coef
 
    ! Input time independent arrays:
    real(r8), intent(in) ::        &

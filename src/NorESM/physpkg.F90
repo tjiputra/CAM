@@ -33,9 +33,6 @@ module physpkg
   use scamMod,          only: single_column, scm_crm_mode
   use flux_avg,         only: flux_avg_init
   use infnan,           only: posinf, assignment(=)
-#ifdef SPMD
-  use mpishorthand
-#endif
   use perf_mod
   use cam_logfile,     only: iulog
   use camsrfexch,      only: cam_export
@@ -66,7 +63,6 @@ module physpkg
   logical           :: state_debug_checks  ! Debug physics_state.
   logical           :: clim_modal_aero     ! climate controled by prognostic or prescribed modal aerosols
   logical           :: prog_modal_aero     ! Prognostic modal aerosols present
-  logical           :: micro_do_icesupersat
 
   !  Physics buffer index
   integer ::  teout_idx          = 0  
@@ -107,6 +103,7 @@ subroutine phys_register
     !            A. Gettelman, Nov 2010 - put micro/macro physics into separate routines
     ! 
     !-----------------------------------------------------------------------
+    use cam_abortutils,     only: endrun
     use physics_buffer, only: pbuf_init_time
     use physics_buffer,     only: pbuf_add_field, dtype_r8, pbuf_register_subcol
     use shr_kind_mod,       only: r8 => shr_kind_r8
@@ -152,6 +149,9 @@ subroutine phys_register
     use rad_constituents,   only: rad_cnst_get_info ! Added to query if it is a modal aero sim or not
     use subcol,             only: subcol_register
     use subcol_utils,       only: is_subcol_on
+    use dyn_comp,           only: dyn_register
+    use spcam_drivers,      only: spcam_register
+    use offline_driver,     only: offline_driver_reg
 
     !---------------------------Local variables-----------------------------
     !
@@ -167,8 +167,7 @@ subroutine phys_register
                       cld_macmic_num_steps_out = cld_macmic_num_steps, &
                       do_clubb_sgs_out         = do_clubb_sgs,     &
                       use_subcol_microp_out    = use_subcol_microp, &
-                      state_debug_checks_out   = state_debug_checks, &
-                      micro_do_icesupersat_out = micro_do_icesupersat)
+                      state_debug_checks_out   = state_debug_checks)
 
     ! Initialize dyn_time_lvls
     call pbuf_init_time()
@@ -203,8 +202,8 @@ subroutine phys_register
     ! check energy package
     call check_energy_register
 
-    ! If using an ideal/adiabatic physics option, the CAM physics parameterizations 
-    ! aren't called.
+    ! If using a simple physics option (e.g., held_suarez, adiabatic),
+    ! the normal CAM physics parameterizations are not called.
     if (moist_physics) then
 
        ! register fluxes for saving across time
@@ -301,6 +300,9 @@ subroutine phys_register
        !  shallow convection
        call convect_shallow_register
 
+
+       call spcam_register
+
        ! radiation
        call radiation_register
        call cloud_diagnostics_register
@@ -310,6 +312,9 @@ subroutine phys_register
 
        ! vertical diffusion
        call vd_register()
+    else
+       ! held_suarez/adiabatic physics option should be in simple_physics
+       call endrun('phys_register: moist_physics configuration error')
     end if
 
     ! Register diagnostics PBUF
@@ -321,18 +326,22 @@ subroutine phys_register
     ! Register test tracers
     call tracers_register()
 
+    call dyn_register()
+
     ! All tracers registered, check that the dimensions are correct
     call cnst_chk_dim()
 
     ! ***NOTE*** No registering constituents after the call to cnst_chk_dim.
 
-end subroutine phys_register
+    call offline_driver_reg()
+
+  end subroutine phys_register
 
 
 
   !======================================================================= 
 
-subroutine phys_inidat( cam_out, pbuf2d )
+  subroutine phys_inidat( cam_out, pbuf2d )
     use cam_abortutils,      only: endrun
 
     use physics_buffer,      only: pbuf_get_index, pbuf_get_field, physics_buffer_desc, pbuf_set_field, dyn_time_lvls
@@ -380,12 +389,7 @@ subroutine phys_inidat( cam_out, pbuf2d )
 
     allocate(tptr(1:pcols,begchunk:endchunk))
 
-    if (aqua_planet .or. .not. associated(fh_topo)) then
-       call pbuf_set_field(pbuf2d, sgh_idx, 0._r8)
-       call pbuf_set_field(pbuf2d, sgh30_idx, 0._r8)
-       call pbuf_set_field(pbuf2d, landm_idx, 0._r8)
-    else
-
+    if (associated(fh_topo) .and. .not. aqua_planet) then
        call infld('SGH', fh_topo, dim1name, dim2name, 1, pcols, begchunk, endchunk, &
             tptr, found, gridname='physgrid')
        if(.not. found) call endrun('ERROR: SGH not found on topo file')
@@ -412,6 +416,10 @@ subroutine phys_inidat( cam_out, pbuf2d )
 
        call pbuf_set_field(pbuf2d, landm_idx, tptr)
 
+    else
+      call pbuf_set_field(pbuf2d, sgh_idx, 0._r8)
+      call pbuf_set_field(pbuf2d, sgh30_idx, 0._r8)
+      call pbuf_set_field(pbuf2d, landm_idx, 0._r8)
     end if
 
     call infld('PBLH', fh_ini, dim1name, dim2name, 1, pcols, begchunk, endchunk, &
@@ -657,10 +665,10 @@ subroutine phys_inidat( cam_out, pbuf2d )
     end if
 
     call initialize_short_lived_species(fh_ini, pbuf2d)
-end subroutine phys_inidat
+  end subroutine phys_inidat
 
 
-subroutine phys_init( phys_state, phys_tend, pbuf2d, cam_out )
+  subroutine phys_init( phys_state, phys_tend, pbuf2d, cam_out )
 
     !----------------------------------------------------------------------- 
     ! 
@@ -703,6 +711,7 @@ subroutine phys_init( phys_state, phys_tend, pbuf2d, cam_out )
     use microp_aero,        only: microp_aero_init
     use macrop_driver,      only: macrop_driver_init
     use conv_water,         only: conv_water_init
+    use spcam_drivers,      only: spcam_init
     use tracers,            only: tracers_init
     use aoa_tracers,        only: aoa_tracers_init
     use rayleigh_friction,  only: rayleigh_friction_init
@@ -715,17 +724,18 @@ subroutine phys_init( phys_state, phys_tend, pbuf2d, cam_out )
     use subcol,             only: subcol_init
     use qbo,                only: qbo_init
     use iondrag,            only: iondrag_init, do_waccm_ions
-    use spedata,            only: spe_run
-    use mo_apex,            only: mo_apex_init
 #if ( defined OFFLINE_DYN )
     use metdata,            only: metdata_phys_init
 #endif
-    use ionosphere,	   only: ionos_init  ! Initialization of ionosphere module (WACCM-X)
+    use epp_ionization,     only: epp_ionization_init, epp_ionization_active
+    use ionosphere,         only: ionos_init  ! Initialization of ionosphere module (WACCM-X)
     use majorsp_diffusion,  only: mspd_init   ! Initialization of major species diffusion module (WACCM-X)
     use clubb_intr,         only: clubb_ini_cam
     use sslt_rebin,         only: sslt_rebin_init
     use tropopause,         only: tropopause_init
     use solar_data,         only: solar_data_init
+    use cam_abortutils,     only: endrun
+
    ! Input/output arguments
     type(physics_state), pointer       :: phys_state(:)
     type(physics_tend ), pointer       :: phys_tend(:)
@@ -769,9 +779,14 @@ subroutine phys_init( phys_state, phys_tend, pbuf2d, cam_out )
 
     teout_idx = pbuf_get_index( 'TEOUT')
 
-    ! For adiabatic or ideal physics don't need to initialize any of the
-    ! parameterizations below:
-    if (adiabatic .or. ideal_phys) return
+    ! adiabatic or ideal physics should be only used if in simple_physics
+    if (adiabatic .or. ideal_phys) then
+      if (adiabatic) then
+        call endrun('phys_init: adiabatic configuration error')
+      else
+        call endrun('phys_init: ideal_phys configuration error')
+      end if
+    end if
 
     if (initial_run) then
        call phys_inidat(cam_out, pbuf2d) 
@@ -849,18 +864,22 @@ subroutine phys_init( phys_state, phys_tend, pbuf2d, cam_out )
        call microp_aero_init()
        call microp_driver_init(pbuf2d)
        call conv_water_init
+    elseif( microp_scheme == 'SPCAM_m2005') then
+       call conv_water_init
     end if
 
 
     ! initiate CLUBB within CAM
     if (do_clubb_sgs) call clubb_ini_cam(pbuf2d)
 
+    call spcam_init(pbuf2d)
+
     call qbo_init
 
     call iondrag_init(pref_mid)
     ! Geomagnetic module -- after iondrag_init
-    if (spe_run .or. do_waccm_ions) then
-      call mo_apex_init(phys_state)
+    if (epp_ionization_active) then
+      call epp_ionization_init()
     endif
 
 #if ( defined OFFLINE_DYN )
@@ -890,13 +909,13 @@ subroutine phys_init( phys_state, phys_tend, pbuf2d, cam_out )
 
     end if
 
-end subroutine phys_init
+  end subroutine phys_init
 
   !
   !-----------------------------------------------------------------------
   !
 
-subroutine phys_run1(phys_state, ztodt, phys_tend, pbuf2d,  cam_in, cam_out)
+  subroutine phys_run1(phys_state, ztodt, phys_tend, pbuf2d,  cam_in, cam_out)
     !----------------------------------------------------------------------- 
     ! 
     ! Purpose: 
@@ -906,7 +925,9 @@ subroutine phys_run1(phys_state, ztodt, phys_tend, pbuf2d,  cam_in, cam_out)
     use time_manager,   only: get_nstep
     use cam_diagnostics,only: diag_allocate, diag_physvar_ic
     use check_energy,   only: check_energy_gmean
-
+    use phys_control,   only: phys_getopts
+    use spcam_drivers,  only: tphysbc_spcam
+    use spmd_utils,     only: mpicom
     use physics_buffer,         only: physics_buffer_desc, pbuf_get_chunk, pbuf_allocate
 #if (defined BFB_CAM_SCAM_IOP )
     use cam_history,    only: outfld
@@ -935,9 +956,7 @@ subroutine phys_run1(phys_state, ztodt, phys_tend, pbuf2d,  cam_in, cam_out)
     integer :: c                                 ! indices
     integer :: ncol                              ! number of columns
     integer :: nstep                             ! current timestep number
-#if (! defined SPMD)
-    integer  :: mpicom = 0
-#endif
+    logical :: use_spcam
     type(physics_buffer_desc), pointer :: phys_buffer_chunk(:)
 
     call t_startf ('physpkg_st1')
@@ -962,11 +981,6 @@ subroutine phys_run1(phys_state, ztodt, phys_tend, pbuf2d,  cam_in, cam_out)
 
     call t_stopf ('physpkg_st1')
 
-    if ( adiabatic .or. ideal_phys )then
-       call t_startf ('bc_physics')
-       call phys_run1_adiabatic_or_ideal(ztodt, phys_state, phys_tend,  pbuf2d)
-       call t_stopf ('bc_physics')
-    else
        call t_startf ('physpkg_st1')
 
        call pbuf_allocate(pbuf2d, 'physpkg')
@@ -1000,6 +1014,8 @@ subroutine phys_run1(phys_state, ztodt, phys_tend, pbuf2d,  cam_in, cam_out)
        call t_startf ('bc_physics')
        call t_adj_detailf(+1)
 
+    call phys_getopts( use_spcam_out = use_spcam)
+
 !$OMP PARALLEL DO PRIVATE (C, phys_buffer_chunk)
        do c=begchunk, endchunk
           !
@@ -1011,9 +1027,15 @@ subroutine phys_run1(phys_state, ztodt, phys_tend, pbuf2d,  cam_in, cam_out)
           call diag_physvar_ic ( c,  phys_buffer_chunk, cam_out(c), cam_in(c) )
           call t_stopf ('diag_physvar_ic')
 
-          call tphysbc (ztodt, phys_state(c),           &
-                       phys_tend(c), phys_buffer_chunk, &
-                       cam_out(c), cam_in(c) )
+      if (use_spcam) then
+        call tphysbc_spcam (ztodt, phys_state(c),     &
+             phys_tend(c), phys_buffer_chunk, &
+             cam_out(c), cam_in(c) )
+      else
+        call tphysbc (ztodt, phys_state(c),           &
+             phys_tend(c), phys_buffer_chunk, &
+             cam_out(c), cam_in(c) )
+      end if
 
        end do
 
@@ -1026,100 +1048,14 @@ subroutine phys_run1(phys_state, ztodt, phys_tend, pbuf2d,  cam_in, cam_out)
 #ifdef TRACER_CHECK
        call gmean_mass ('between DRY', phys_state)
 #endif
-    end if
 
-end subroutine phys_run1
-
-  !
-  !-----------------------------------------------------------------------
-  !
-
-subroutine phys_run1_adiabatic_or_ideal(ztodt, phys_state, phys_tend,  pbuf2d)
-    !----------------------------------------------------------------------- 
-    ! 
-    ! Purpose: 
-    ! Physics for adiabatic or idealized physics case.
-    ! 
-    !-----------------------------------------------------------------------
-    use physics_buffer, only : physics_buffer_desc, pbuf_set_field, pbuf_get_chunk, pbuf_old_tim_idx
-    use time_manager,     only: get_nstep
-    use cam_diagnostics,  only: diag_phys_writeout
-    use check_energy,     only: check_energy_fix, check_energy_chng
-    use dycore,           only: dycore_is
-
-    !
-    ! Input arguments
-    !
-    real(r8), intent(in) :: ztodt            ! physics time step unless nstep=0
-    !
-    ! Input/Output arguments
-    !
-    type(physics_state), intent(inout), dimension(begchunk:endchunk) :: phys_state
-    type(physics_tend ), intent(inout), dimension(begchunk:endchunk) :: phys_tend
-
-    type(physics_buffer_desc), pointer :: pbuf2d(:,:)
-    !-----------------------------------------------------------------------
-    !---------------------------Local workspace-----------------------------
-    !
-    integer             :: c               ! indices
-    integer             :: nstep           ! current timestep number
-    type(physics_ptend) :: ptend(begchunk:endchunk) ! indivdual parameterization tendencies
-    real(r8)            :: flx_heat(pcols) ! effective sensible heat flux
-    real(r8)            :: zero(pcols)     ! array of zeros
-
-    ! physics buffer field for total energy
-    real(r8), pointer, dimension(:) :: teout
-    logical, SAVE :: first_exec_of_phys_run1_adiabatic_or_ideal  = .TRUE.
-
-    logical :: lglobal=.TRUE.
-    integer :: energy_conservation_type
-    !-----------------------------------------------------------------------
-
-    nstep = get_nstep()
-    zero  = 0._r8
-
-    call phys_getopts(energy_conservation_type_out = energy_conservation_type)
-
-    ! Associate pointers with physics buffer fields
-    if (first_exec_of_phys_run1_adiabatic_or_ideal) then
-       first_exec_of_phys_run1_adiabatic_or_ideal  = .FALSE.
-    endif
-
-!$OMP PARALLEL DO PRIVATE (C, FLX_HEAT)
-    do c=begchunk, endchunk
-
-       ! Initialize the physics tendencies to zero.
-       call physics_tend_init(phys_tend(c))
-
-       ! Dump dynamics variables to history buffers
-       call diag_phys_writeout(phys_state(c))
-
-       if (dycore_is('LR') .or. dycore_is('SE') ) then
-          call check_energy_fix(phys_state(c), ptend(c), nstep, flx_heat)
-          call physics_update(phys_state(c), ptend(c), ztodt, phys_tend(c))
-            call check_energy_chng(phys_state(c), phys_tend(c), "chkengyfix", nstep, ztodt, &
-               zero, zero, zero, flx_heat)
-          call physics_ptend_dealloc(ptend(c))
-       end if
-
-       if ( ideal_phys )then
-          call t_startf('tphysidl')
-          call tphysidl(ztodt, phys_state(c), phys_tend(c))
-          call t_stopf('tphysidl')
-       end if
-
-       ! Save total enery after physics for energy conservation checks
-       call pbuf_set_field(pbuf_get_chunk(pbuf2d, c), teout_idx, phys_state(c)%te_cur)
-
-    end do
-
-end subroutine phys_run1_adiabatic_or_ideal
+  end subroutine phys_run1
 
   !
   !-----------------------------------------------------------------------
   !
 
-subroutine phys_run2(phys_state, ztodt, phys_tend, pbuf2d,  cam_out, &
+  subroutine phys_run2(phys_state, ztodt, phys_tend, pbuf2d,  cam_out, &
        cam_in )
     !----------------------------------------------------------------------- 
     ! 
@@ -1129,11 +1065,10 @@ subroutine phys_run2(phys_state, ztodt, phys_tend, pbuf2d,  cam_out, &
     !-----------------------------------------------------------------------
     use physics_buffer,         only: physics_buffer_desc, pbuf_get_chunk, pbuf_deallocate, pbuf_update_tim_idx
     use mo_lightning,   only: lightning_no_prod
-
-
-    use cam_diagnostics,only: diag_deallocate, diag_surf
+    use cam_diagnostics, only: diag_deallocate, diag_surf
     use physconst,      only: stebol, latvap
     use carma_intr,     only: carma_accumulate_stats
+    use spmd_utils,      only: mpicom
 #if ( defined OFFLINE_DYN )
     use metdata,        only: get_met_srf2
 #endif
@@ -1156,9 +1091,6 @@ subroutine phys_run2(phys_state, ztodt, phys_tend, pbuf2d,  cam_out, &
     !
     integer :: c                                 ! chunk index
     integer :: ncol                              ! number of columns
-#if (! defined SPMD)
-    integer  :: mpicom = 0
-#endif
     type(physics_buffer_desc),pointer, dimension(:)     :: phys_buffer_chunk
     !
     ! If exit condition just return
@@ -1166,7 +1098,6 @@ subroutine phys_run2(phys_state, ztodt, phys_tend, pbuf2d,  cam_out, &
 
     if(single_column.and.scm_crm_mode) return
 
-    if ( adiabatic .or. ideal_phys ) return
     !-----------------------------------------------------------------------
     ! Tendency physics after coupler 
     ! Not necessary at terminal timestep.
@@ -1222,13 +1153,13 @@ subroutine phys_run2(phys_state, ztodt, phys_tend, pbuf2d,  cam_out, &
     call diag_deallocate()
     call t_stopf ('physpkg_st2')
 
-end subroutine phys_run2
+  end subroutine phys_run2
 
   !
   !----------------------------------------------------------------------- 
   !
 
-subroutine phys_final( phys_state, phys_tend, pbuf2d )
+  subroutine phys_final( phys_state, phys_tend, pbuf2d )
     use physics_buffer, only : physics_buffer_desc, pbuf_deallocate
     use chemistry, only : chem_final
     use carma_intr, only : carma_final
@@ -1254,10 +1185,10 @@ subroutine phys_final( phys_state, phys_tend, pbuf2d )
     call carma_final
     call wv_sat_final
 
-end subroutine phys_final
+  end subroutine phys_final
 
 
-subroutine tphysac (ztodt,   cam_in,  &
+  subroutine tphysac (ztodt,   cam_in,  &
        cam_out,  state,   tend,    pbuf)
     !----------------------------------------------------------------------- 
     ! 
@@ -1301,7 +1232,7 @@ subroutine tphysac (ztodt,   cam_in,  &
     use cam_control_mod,    only: aqua_planet 
     use mo_gas_phase_chemdr,only: map2chm
     use clybry_fam,         only: clybry_fam_set
-    use charge_neutrality,  only: charge_fix
+    use charge_neutrality,  only: charge_balance
     use qbo,                only: qbo_relax
     use iondrag,            only: iondrag_calc, do_waccm_ions
     use perf_mod
@@ -1543,7 +1474,7 @@ subroutine tphysac (ztodt,   cam_in,  &
     !---------------------------------------------------------------------------------
     !	... enforce charge neutrality
     !---------------------------------------------------------------------------------
-    call charge_fix(state, pbuf)
+    call charge_balance(state, pbuf)
 
     !===================================================
     ! Gravity wave drag
@@ -1585,7 +1516,7 @@ subroutine tphysac (ztodt,   cam_in,  &
     ! Enforce charge neutrality after O+ change from ionos_tend
     !---------------------------------------------------------------------------------
     if( waccmx_is('ionosphere') ) then
-       call charge_fix(state, pbuf)
+       call charge_balance(state, pbuf)
     endif
 
     ! Check energy integrals
@@ -1656,13 +1587,14 @@ subroutine tphysac (ztodt,   cam_in,  &
 !    call diag_phys_tend_writeout (state, pbuf,  tend, ztodt, tmp_q, tmp_cldliq, tmp_cldice, &
 !         qini, cldliqini, cldiceini)
     call diag_phys_tend_writeout (state, pbuf,  tend, ztodt, tmp_q, tmp_cldliq, tmp_cldice, &
-         tmp_cldnc,tmp_cldni,qini, cldliqini, cldiceini, cldncini, cldniini, eflx,dsema ) !+tht 05.11.2015 added D
+         tmp_cldnc,tmp_cldni,qini, cldliqini, cldiceini, cldncini, cldniini ) 
+    !++alfgr add these if needed later, eflx,dsema ) !+tht 05.11.2015 added D
 !AL
     call clybry_fam_set( ncol, lchnk, map2chm, state%q, pbuf )
 
-end subroutine tphysac
+  end subroutine tphysac
 
-subroutine tphysbc (ztodt, state,  &
+  subroutine tphysbc (ztodt, state,  &
        tend,    pbuf,              &
        cam_out, cam_in )
     !----------------------------------------------------------------------- 
@@ -1770,11 +1702,9 @@ subroutine tphysbc (ztodt, state,  &
     real(r8) dlf(pcols,pver)                   ! Detraining cld H20 from shallow + deep convections
     real(r8) dlf2(pcols,pver)                  ! Detraining cld H20 from shallow convections
     real(r8) pflx(pcols,pverp)                 ! Conv rain flux thru out btm of lev
-    real(r8) rtdt                              ! 1./ztodt
 
     integer lchnk                              ! chunk identifier
     integer ncol                               ! number of atmospheric columns
-    integer ierr
 
     integer  i,k,m                             ! Longitude, level, constituent indices
     integer :: ixcldice, ixcldliq              ! constituent indices for cloud liquid and ice water.
@@ -1848,7 +1778,6 @@ subroutine tphysbc (ztodt, state,  &
     logical :: lglobal, lclutter
 !-tht
     ! Debug physics_state.
-    logical :: state_debug_checks
     integer :: energy_conservation_type
 
 #ifdef AEROCOM
@@ -1908,8 +1837,6 @@ subroutine tphysbc (ztodt, state,  &
 
     lchnk = state%lchnk
     ncol  = state%ncol
-
-    rtdt = 1._r8/ztodt
 
     nstep = get_nstep()
 
@@ -2157,21 +2084,6 @@ subroutine tphysbc (ztodt, state,  &
 
        do macmic_it = 1, cld_macmic_num_steps
 
-          if (micro_do_icesupersat) then 
-
-            !===================================================
-            ! Aerosol Activation
-            !===================================================
-            call t_startf('microp_aero_run')
-            call microp_aero_run(state, ptend, cld_macmic_ztodt, pbuf)
-            call t_stopf('microp_aero_run')
-
-            call physics_ptend_scale(ptend, 1._r8/cld_macmic_num_steps, ncol)
-
-            call physics_update(state, ptend, ztodt, tend)
-            call check_energy_chng(state, tend, "mp_aero_tend", nstep, ztodt, zero, zero, zero, zero)      
-
-          endif
        !===================================================
        ! Calculate macrophysical tendency (sedimentation, detrain, cloud fraction)
        !===================================================
@@ -2256,16 +2168,11 @@ subroutine tphysbc (ztodt, state,  &
              call check_energy_timestep_init(state_sc, tend_sc, pbuf, col_type_subcol)
           end if
 
-          if (.not. micro_do_icesupersat) then 
-
        call t_startf('microp_aero_run')
             call microp_aero_run(state, ptend_aero, cld_macmic_ztodt, pbuf)
        call t_stopf('microp_aero_run')
 
-          endif
-
        call t_startf('microp_tend')
-
 
           if (use_subcol_microp) then
              call microp_driver_tend(state_sc, ptend_sc, cld_macmic_ztodt, pbuf)
@@ -2295,10 +2202,8 @@ subroutine tphysbc (ztodt, state,  &
              call microp_driver_tend(state, ptend, cld_macmic_ztodt, pbuf)
        end if
           ! combine aero and micro tendencies for the grid
-          if (.not. micro_do_icesupersat) then
              call physics_ptend_sum(ptend_aero, ptend, ncol)
        call physics_ptend_dealloc(ptend_aero)
-          endif
 
           ! Have to scale and apply for full timestep to get tend right
           ! (see above note for macrophysics).
@@ -2529,7 +2434,7 @@ subroutine tphysbc (ztodt, state,  &
     call diag_export(cam_out)
     call t_stopf('diag_export')
 
-end subroutine tphysbc
+  end subroutine tphysbc
 
 subroutine phys_timestep_init(phys_state, cam_in, cam_out, pbuf2d)
 !-----------------------------------------------------------------------------------
@@ -2563,7 +2468,9 @@ subroutine phys_timestep_init(phys_state, cam_in, cam_out, pbuf2d)
   use aerodep_flx,         only: aerodep_flx_adv
   use aircraft_emit,       only: aircraft_emit_adv
   use prescribed_volcaero, only: prescribed_volcaero_adv
-  use prescribed_strataero, only: prescribed_strataero_adv
+  use prescribed_strataero,only: prescribed_strataero_adv
+  use mo_apex,             only: mo_apex_init
+  use epp_ionization,      only: epp_ionization_active
 #ifdef OSLO_AERO
   use oslo_ocean_intr,     only: oslo_ocean_time
 #endif
@@ -2579,6 +2486,11 @@ subroutine phys_timestep_init(phys_state, cam_in, cam_out, pbuf2d)
   !-----------------------------------------------------------------------------
 
   if (single_column) call scam_use_iop_srf(cam_in)
+
+  ! update geomagnetic coordinates
+  if (epp_ionization_active .or. do_waccm_ions) then
+     call mo_apex_init(phys_state)
+  endif
 
   ! Chemistry surface values
   call chem_surfvals_set()

@@ -4,7 +4,9 @@
 ! ... Basic aerosol mode parameters and arrays
 !--------------------------------------------------------------
       use shr_kind_mod,    only: r8 => shr_kind_r8
-      use constituents,    only: pcnst, cnst_mw, cnst_name, cnst_get_ind, cnst_set_convtran2
+      use constituents,    only: pcnst, cnst_mw, cnst_name, cnst_get_ind, cnst_set_convtran2, &
+                                 cnst_set_spec_class, cnst_spec_class_aerosol, cnst_spec_class_undefined, &
+                                 cnst_species_class, cnst_spec_class_gas
       use physics_buffer,  only: pbuf_add_field, dtype_r8
       use time_manager,    only: is_first_step
       use phys_control,    only: phys_getopts
@@ -105,19 +107,6 @@
            lptr2_soa_g_amode(:)
 
       real(r8), public, protected :: specmw_so4_amode
-
-      integer, public, parameter :: spec_class_undefined = 0
-
-      integer, public, parameter :: spec_class_cldphysics = 1
-
-      integer, public, parameter :: spec_class_aerosol = 2
-
-      integer, public, parameter :: spec_class_gas = 3
-
-      integer, public, parameter :: spec_class_other = 4
-
-      ! indicates species class ( cldphysics, aerosol, gas )
-      integer, public, protected :: species_class(pcnst) = spec_class_undefined
 
       logical, public, protected :: soa_multi_species = .false.
 
@@ -286,8 +275,6 @@
     call phys_getopts(convproc_do_aer_out = convproc_do_aer)
     if (convproc_do_aer) cam_do_aero_conv = .false.
 
-    species_class(:pcnst) = spec_class_undefined
-
     do m = 1, ntot_amode
        write(modechr,fmt='(I1)') m
        xname_numptr = 'num_a'//modechr
@@ -319,7 +306,7 @@
           call endrun('modal_aero_data_reg: numptr_amode(m) .gt. pcnst')
        end if
 
-       species_class(numptr_amode(m)) = spec_class_aerosol
+       call cnst_set_spec_class(numptr_amode(m), cnst_spec_class_aerosol)
        call cnst_set_convtran2(numptr_amode(m), cam_do_aero_conv)
 
        numptrcw_amode(m) = numptr_amode(m)  !use the same index for Q and QQCW arrays
@@ -354,7 +341,7 @@
              write(iulog,'(10(a8,1x))')(cnst_name(i),i=1,pcnst)
              call endrun('modal_aero_data_reg: lmassptr_amode(l,m) .le. 0')
           end if
-          species_class(lmassptr_amode(l,m)) = spec_class_aerosol
+          call cnst_set_spec_class(lmassptr_amode(l,m), cnst_spec_class_aerosol)
           call cnst_set_convtran2(lmassptr_amode(l,m), cam_do_aero_conv)
 
           lmassptrcw_amode(l,m) = lmassptr_amode(l,m)  !use the same index for Q and QQCW arrays
@@ -393,8 +380,8 @@
     do i = 1, gas_pcnst
        call cnst_get_ind(solsym(i), idx, abort=.false.)
        if (idx > 0) then
-          if (species_class(idx) == spec_class_undefined) then
-             species_class(idx) = spec_class_gas
+          if (cnst_species_class(idx) == cnst_spec_class_undefined) then
+             call cnst_set_spec_class(i, cnst_spec_class_gas)
           end if
        end if
     end do
@@ -439,7 +426,9 @@
 
        !-----------------------------------------------------------------------
 
-
+       do i=1, pcnst
+         call cnst_set_spec_class(i, cnst_spec_class_undefined)
+       end do
 
        ! Mode specific properties.
        do m = 1, ntot_amode

@@ -241,6 +241,7 @@ implicit none
    real(r8) :: qconff(pcols,pver),qevapff(pcols,pver)
    real(r8) :: qconbb(pcols,pver),qevapbb(pcols,pver)
    real(r8) :: qconbg(pcols,pver),qevapbg(pcols,pver)
+   real(r8) :: qcon(pcols,pver),qevap(pcols,pver)
 
    real(r8) :: qqcwsrflx(pcols,pcnstxx,nsrflx)
 
@@ -370,6 +371,8 @@ implicit none
    qevapbb(:,:) = 0.0_r8
    qconbg(:,:) = 0.0_r8
    qevapbg(:,:) = 0.0_r8
+   qcon(:,:) = 0.0_r8
+   qevap(:,:) = 0.0_r8
 !---------------------------------------------------
 
 ! compute gas-to-aerosol mass transfer rates
@@ -655,6 +658,13 @@ implicit none
 
                         endif ! jsoa
                      endif !nsoa
+                     if (nsoa.eq.5) then !check for current SOA package
+                           if (dqdt_soa(n,jsoa).ge.0.0_r8) then
+                              qcon(i,k)=qcon(i,k)+dqdt_soa(n,jsoa)*(adv_mass(l)/mwdry)
+                           elseif(dqdt_soa(n,jsoa).lt.0.0_r8) then
+                              qevap(i,k)=qevap(i,k)+dqdt_soa(n,jsoa)*(adv_mass(l)/mwdry)
+                           endif
+                     endif !nsoa
 !---------------------------------------------------------------------------------------------------------------------
                   end if
                end if
@@ -864,6 +874,11 @@ implicit none
 ! diagnostics end ---------------------------------------------------------
 
 !-----Outfld for condensation/evaporation------------------------------
+   if (nsoa.eq.5) then !check for current SOA package
+      call outfld(trim('qcon_gaex'), qcon(:,:), pcols, lchnk )
+      call outfld(trim('qevap_gaex'), qevap(:,:), pcols, lchnk )
+   endif
+!-----------------------------------------------------------------------
    if (nsoa.eq.15) then !check for current SOA package
       call outfld(trim('qconff_gaex'), qconff(:,:), pcols, lchnk )
       call outfld(trim('qevapff_gaex'), qevapff(:,:), pcols, lchnk )
@@ -1155,6 +1170,19 @@ implicit none
          p0_soa_298 (1) = 1.0e-10_r8
          p0_soa_298 (2) = 1.0e-10_r8 
          delh_vap_soa(:) = 156.0e3_r8
+      elseif(ntot_soaspec ==5) then
+         ! 5 volatility bins for each of the a combined SOA classes ( including biomass burning, fossil fuel, biogenic)
+         p0_soa_298 (1) = 9.7831E-13_r8 !soaff0 C*=0.01ug/m3
+         p0_soa_298 (2) = 9.7831E-12_r8 !soaff1 C*=0.10ug/m3
+         p0_soa_298 (3) = 9.7831E-11_r8 !soaff2 C*=1.0ug/m3
+         p0_soa_298 (4) = 9.7831E-10_r8 !soaff3 C*=10.0ug/m3
+         p0_soa_298 (5) = 9.7831E-9_r8  !soaff4 C*=100.0ug/m3
+
+         delh_vap_soa(1) = 153.0e3_r8
+         delh_vap_soa(2) = 142.0e3_r8
+         delh_vap_soa(3) = 131.0e3_r8
+         delh_vap_soa(4) = 120.0e3_r8
+         delh_vap_soa(5) = 109.0e3_r8
       elseif(ntot_soaspec ==15) then
          !  
          ! 5 volatility bins for each of the 3 SOA classes ( biomass burning, fossil fuel, biogenic)
@@ -1689,6 +1717,21 @@ aa_iqfrm: do iqfrm = -1, nspec_amode(mfrm)
       endif
       if ( masterproc ) write(*,'(3(a,3x))') 'qevapbg addfld', fieldname, unit 
 
+      fieldname=trim('qcon_gaex')
+      long_name = trim('3D fields for SOA condensation')
+      call addfld(fieldname, (/'lev'/), 'A', unit, long_name )
+      if ( history_aerosol ) then
+         call add_default( fieldname,  1, ' ' )
+      endif
+      if ( masterproc ) write(*,'(3(a,3x))') 'qcon addfld', fieldname, unit
+
+      fieldname=trim('qevap_gaex')
+      long_name = trim('3D fields for Biogenic SOA evaporation')
+      call addfld(fieldname, (/'lev'/), 'A', unit, long_name )
+      if ( history_aerosol ) then
+         call add_default( fieldname,  1, ' ' )
+      endif
+      if ( masterproc ) write(*,'(3(a,3x))') 'qevap addfld', fieldname, unit 
 !------------------------------------------------------------------------------
 
 !  define history fields for basic gas-aer exchange

@@ -524,12 +524,12 @@ module interpolation
     real( kind = core_rknd ), intent(out) :: arrout            ! output array (interpolated)   
     
     !---------------------------Local variables-----------------------------
-    integer i,k               ! indices
-    integer kupper            ! Level indices for interpolation
-    real( kind = core_rknd ) dpu              ! upper level pressure difference
-    real( kind = core_rknd ) dpl              ! lower level pressure difference
-    logical found             ! true if input levels found   	
-    logical error             ! true if error     
+    integer :: k                 ! indices
+    integer :: kupper            ! Level indices for interpolation
+    real( kind = core_rknd ) :: dpu              ! upper level pressure difference
+    real( kind = core_rknd ) :: dpl              ! lower level pressure difference
+    logical :: found             ! true if input levels found   	
+    logical :: error             ! true if error     
     !-----------------------------------------------------------------
     !
     ! Initialize index array and logical flags

@@ -30,7 +30,7 @@ module iondrag
 
   use shr_kind_mod ,only: r8 => shr_kind_r8
   use ppgrid       ,only: pcols, pver
-  use cam_history  ,only: addfld, add_default, outfld
+  use cam_history  ,only: addfld, add_default, outfld, horiz_only
   use physics_types,only: physics_state, physics_ptend, physics_ptend_init
   
   use physics_buffer, only : pbuf_get_index, physics_buffer_desc, pbuf_get_field
@@ -40,12 +40,13 @@ module iondrag
   use interpolate_data, only: lininterp
   use spmd_utils,       only: masterproc
 
+  use phys_control, only: waccmx_is
+
   implicit none
 
   save
 
   private                         ! Make default type private to the module
-
 
   !-------------------------------------------------------------------------------
   ! Public interfaces:
@@ -79,11 +80,13 @@ module iondrag
   integer  :: id_elec, id_n
 
   !Physics buffer indices
-  integer :: ue_idx      = 0
-  integer :: ve_idx      = 0
   integer :: PedConduct_idx  = 0
   integer :: HallConduct_idx = 0
-
+  integer :: ui_idx      = 0 ! index to zonal drift from edynamo
+  integer :: vi_idx      = 0 ! index to meridional drift from edynamo
+  integer :: wi_idx      = 0 ! index to vertical drift from edynamo
+  integer :: indxTe  = -1    ! pbuf index for electron temperature
+  integer :: indxTi  = -1    ! pbuf index for ion temperature
 
   logical  :: xo2_slvd, xo1_slvd, o2p_slvd, op_slvd, nop_slvd, elec_slvd, n_slvd
 
@@ -126,6 +129,7 @@ module iondrag
 
   logical doiodrg
   logical, protected :: do_waccm_ions = .false.
+  logical :: use_dynamo_drifts = .false.
 
   !
   ! Data statement for ALAMXX
@@ -194,7 +198,6 @@ contains
 !-----------------------------------------------------------------------
     use exbdrift,        only: exbdrift_register
     use physics_buffer,  only: pbuf_add_field, dtype_r8
-    use phys_control,    only: waccmx_is
 
     ! E and B fields
     call exbdrift_register()
@@ -263,7 +266,7 @@ contains
     !-------------------------------------------------------------------------------
     real(r8), intent(in) :: pref_mid(pver)
 
-    integer :: k
+    integer :: k, err
 
     integer :: cnst_ids(7)
 
@@ -378,8 +381,14 @@ contains
     call addfld('UIONTEND',(/ 'lev' /),'A','M/S2','u-tendency due to ion drag')
     call addfld('VIONTEND',(/ 'lev' /),'A','M/S2','v-tendency due to ion drag')
 
-    ue_idx = pbuf_get_index('UE')
-    ve_idx = pbuf_get_index('VE')
+!
+! Indices to 3d ion drifts calculated by edynamo:
+    ui_idx = pbuf_get_index('UI')
+    vi_idx = pbuf_get_index('VI')
+    wi_idx = pbuf_get_index('WI')
+
+    indxTe = pbuf_get_index( 'ElecTemp',errcode=err )
+    indxTi = pbuf_get_index( 'IonTemp',errcode=err )
 
   end subroutine iondrag_init
 
@@ -441,11 +450,15 @@ contains
     !-------------------------------------------------------------------------------
     ! Set up fields to history files.
     !-------------------------------------------------------------------------------
+    call addfld('BNORTH',  horiz_only,  'I', 'nT', 'northward component of magnetic field (nT)')
+    call addfld('BEAST' ,  horiz_only,  'I', 'nT', 'eastward component of magnetic field (nT)')
+    call addfld('BDOWN' ,  horiz_only,  'I', 'nT', 'downward component of magnetic field (nT)')
+    call addfld('BMAG'  ,  horiz_only,  'I', 'nT', 'magnetic field magnitude (nT)' )
 
     call addfld('QIONSUM',   (/ 'lev' /), 'I','S-1' ,'Ion prod sum')
     call addfld('ELECDEN',   (/ 'lev' /), 'I','CM-3','NE (ion sum)')
-    call addfld( 'SIGMAPED', (/ 'lev' /), 'I', 'siemens/m', 'Pederson conductivity' )
-    call addfld( 'SIGMAHAL', (/ 'lev' /), 'I', 'siemens/m', 'Hall conductivity' )
+    call addfld('SIGMAPED',  (/ 'lev' /), 'I', 'siemens/m', 'Pederson conductivity' )
+    call addfld('SIGMAHAL',  (/ 'lev' /), 'I', 'siemens/m', 'Hall conductivity' )
     call addfld('LAMDA1'  ,  (/ 'lev' /), 'I' ,'S-1','LAMDA PED')
     call addfld('LAMDA2'  ,  (/ 'lev' /), 'I' ,'S-1','LAMDA HALL')
 
@@ -453,6 +466,7 @@ contains
     call addfld('LYY',       (/ 'lev' /), 'I','S-1','LYY')
     call addfld('LXY',       (/ 'lev' /), 'I','S-1','LXY')
     call addfld('LYX',       (/ 'lev' /), 'I','S-1','LYX')
+
     !
     ! Joule heating, and tn before and after joule heating tendencies are applied:
     !
@@ -460,6 +474,19 @@ contains
     if (history_waccm) then
        call add_default( 'QJOULE  ', 1, ' ' )                                ! joule heating (K/s)
     end if
+!
+! 3d drifts from either edynamo or exbdrift.
+!
+    if (use_dynamo_drifts) then
+      call addfld('UI',(/ 'lev' /),'I','m/s', 'UI Zonal ion drift from edynamo') 
+      call addfld('VI',(/ 'lev' /),'I','m/s', 'VI Meridional ion drift from edynamo')
+      call addfld('WI',(/ 'lev' /),'I','m/s', 'WI Meridional ion drift from edynamo')
+    else
+      call addfld('UI',(/ 'lev' /),'I','m/s', 'UI Zonal empirical ExB drift from exbdrift')
+      call addfld('VI',(/ 'lev' /),'I','m/s', 'VI Meridional empirical ExB drift from exbdrift')
+      call addfld('WI',(/ 'lev' /),'I','m/s', 'WI Meridional empirical ExB drift from exbdrift')
+    endif
+
 
   end subroutine ions_init
 
@@ -564,7 +591,7 @@ contains
     use exbdrift,      only: get_exbdrift
     use short_lived_species, only: slvd_pbf_ndx => pbf_idx
     use physics_buffer, only : physics_buffer_desc, pbuf_get_field, pbuf_set_field
-    use phys_control,  only: waccmx_is
+    use time_manager,   only : is_first_step
 
     !-------------------------------------------------------------------------------
     ! dummy arguments
@@ -581,6 +608,7 @@ contains
     ! Local variables
     !-------------------------------------------------------------------------------
     integer :: i,k ! loop indices
+
     real(r8) :: sqrt_te                              ! sqrt(te)
     real(r8) :: sqrt_tnti                            ! sqrt(tnti)
     real(r8) :: wrk
@@ -610,9 +638,7 @@ contains
     ! real(r8),parameter :: rmi_o2p_kg = 1._r8/(rmass_o2p*amu)  
     ! real(r8),parameter :: rmi_nop_kg = 1._r8/(rmass_nop*amu)
 
-    real(r8) :: tn      (pcols,pver)   ! neutral gas temperature (deg K)
-    real(r8) :: ti      (pcols,pver)   ! ion temperature (deg K)
-    real(r8) :: te      (pcols,pver)   ! electron temperature (deg K)
+    real(r8), target :: tn(pcols,pver) ! neutral gas temperature (deg K)
     real(r8) :: xo2     (pcols,pver)   ! O2  (mmr)
     real(r8) :: xo1     (pcols,pver)   ! O   (mmr)
     real(r8) :: xn2     (pcols,pver)   ! N2  (mmr)
@@ -628,7 +654,7 @@ contains
     real(r8) :: o2p_cm3 (pcols,pver)   ! O2+ (cm-3)
     real(r8) :: op_cm3  (pcols,pver)   ! O+  (cm-3)
     real(r8) :: nop_cm3 (pcols,pver)   ! NO+ (cm-3)
-    real(r8) :: ne      (pcols,pver)   ! electron density (assume o2p+op+nop)
+    real(r8) :: ne_sigmas(pcols,pver)  ! electron density for conductivities
     real(r8) :: lamda1  (pcols,pver)   ! sigped*b**2/rho
     real(r8) :: lamda2  (pcols,pver)   ! sighal*b**2/rho
     real(r8) :: lxxnorot(pcols,pver)   ! XX before rotation
@@ -694,7 +720,15 @@ contains
 
     real(r8), dimension(:,:), pointer :: q_elec, q_xo1,  q_xo2, q_o2p, q_op, q_nop
 
+    real(r8), dimension(:,:), pointer :: tE  	 ! electron temperature in pbuf (K) 
+    real(r8), dimension(:,:), pointer :: tI   	 ! ion temperature in pbuf (K) 
+
     if (.not.doiodrg) return
+
+    call outfld ('BNORTH', bnorth(:,lchnk), pcols, lchnk )
+    call outfld ('BEAST' , beast(:,lchnk),  pcols, lchnk )
+    call outfld ('BDOWN' , bdown(:,lchnk),  pcols, lchnk )
+    call outfld ('BMAG'  , bmag(:,lchnk),   pcols, lchnk )
 
     if ( elec_slvd ) then
       call pbuf_get_field(pbuf, slvd_pbf_ndx, q_elec, start=(/1,1,id_elec/), kount=(/pcols,pver,1/) )
@@ -733,8 +767,6 @@ contains
     do k = 1,pver
        do i = 1,ncol
           tn (i,k) = state%t(i,k)
-          ti (i,k) = tn(i,k)                 ! assume ti==tn for now (waccm2, 1/04)
-          te (i,k) = tn(i,k)                 ! assume te==tn for now (waccm2, 1/04)
           xo2(i,k) = q_xo2(i,k)              ! o2  (mmr)
           xo1(i,k) = q_xo1(i,k)              ! o   (mmr)
           xn2(i,k) = 1._r8 - (xo2(i,k) + xo1(i,k)) ! n2  (mmr)
@@ -745,22 +777,30 @@ contains
        end do
     end do
 
-    ! call outfld ('TN      ',tn  ,pcols,lchnk)
-    ! call outfld ('XO2     ',xo2 ,pcols,lchnk)
-    ! call outfld ('XO      ',xo1 ,pcols,lchnk)
-    ! call outfld ('XN2     ',xn2 ,pcols,lchnk)
-    ! call outfld ('O2P     ',o2p ,pcols,lchnk)
-    ! call outfld ('OP      ',op  ,pcols,lchnk)
-    ! call outfld ('NOP     ',nop ,pcols,lchnk)
+    !--------------------------------------------------------------------------------------------------
+    ! For WACCM-X, grab electron (TE) and ion (TI) temperatures from pbuf from ionosphere module
+    !--------------------------------------------------------------------------------------------------
+    if ( indxTe>0 .and. indxTi>0 .and. .not. is_first_step() ) then
+      call pbuf_get_field(pbuf, indxTe, tE)
+      call pbuf_get_field(pbuf, indxTi, tI)
+    else
+       tE => tn
+       tI => tn
+    endif
+
     qout(:ncol,:) = o2p(:ncol,:) + op(:ncol,:) + nop(:ncol,:)
     call outfld ('QIONSUM ', qout, pcols, lchnk)
 
     !-------------------------------------------------------------------------------
-    ! calculate ExB drift velocities
+    ! calculate empirical ExB drift velocities if not using edynamo drifts
+    ! (if edynamo calculated the drifts, then they are already in pbuf%ui, etc.)
     !-------------------------------------------------------------------------------
-    call t_startf ( 'exbdrift' )
-    call get_exbdrift( lchnk, ncol, pbuf)
-    call t_stopf  ( 'exbdrift' )
+    if (.not.use_dynamo_drifts) then
+      call t_startf ( 'exbdrift' )
+      call get_exbdrift( lchnk, ncol, pbuf)
+      call t_stopf  ( 'exbdrift' )
+    endif
+
     !-------------------------------------------------------------------------------
 
     do i = 1,ncol
@@ -820,7 +860,7 @@ contains
     !-------------------------------------------------------------------------------
     do k = 1,pver
        do i = 1,ncol
-          tnti(i,k) = 0.5_r8*(ti(i,k) + tn(i,k))           ! ave of tn & ti
+          tnti(i,k) = 0.5_r8*(tI(i,k) + tn(i,k))           ! ave of tn & ti
           sqrt_tnti = sqrt( tnti(i,k) )
           wrk       = log10( tnti(i,k) )
           !-------------------------------------------------------------------------------
@@ -846,18 +886,6 @@ contains
        end do
     end do
 
-    ! call outfld ('N_O2P_O2',rnu_o2p_o2,pcols,lchnk)
-    ! call outfld ('N_OP_O2 ',rnu_op_o2 ,pcols,lchnk)
-    ! call outfld ('N_NOP_O2',rnu_nop_o2,pcols,lchnk)
-
-    ! call outfld ('N_O2P_O ',rnu_o2p_o ,pcols,lchnk)
-    ! call outfld ('N_OP_O  ',rnu_op_o  ,pcols,lchnk)
-    ! call outfld ('N_NOP_O ',rnu_nop_o ,pcols,lchnk)
-
-    ! call outfld ('N_O2P_N2',rnu_o2p_n2,pcols,lchnk)
-    ! call outfld ('N_OP_N2 ',rnu_op_n2 ,pcols,lchnk)
-    ! call outfld ('N_NOP_N2',rnu_nop_n2,pcols,lchnk)
-    !
     !-------------------------------------------------------------------------------
     ! Sub set_mean_mass (mo_mean_mass.F90) returns barm(ncol,pver) in g/mole,
     !   however, set_mean_mass sometimes returns zero in top(?) four values 
@@ -875,22 +903,22 @@ contains
           press(i)     = 10._r8*state%pmid(i,k) ! from Pa to dyne/cm^2
           !     barm(i,k)   = 1._r8 / (xo2(i,k)*rmi_o2 + xo1(i,k)*rmi_o1 + xn2(i,k)*rmi_n2)
           xnmbar(i,k)  = press(i)*barm(i,k)/(boltzmann*tn(i,k)) 
-          o2_cm3(i,k)  = xo2(i,k)*xnmbar(i,k)*rmi_o2    ! o2 (cm-3)
-          o1_cm3(i,k)  = xo1(i,k)*xnmbar(i,k)*rmi_o1    ! o  (cm-3)
-          n2_cm3(i,k)  = xn2(i,k)*xnmbar(i,k)*rmi_n2    ! n2 (cm-3)
+          o2_cm3(i,k)  = xo2(i,k)*xnmbar(i,k)*rmi_o2   ! o2 (cm-3)
+          o1_cm3(i,k)  = xo1(i,k)*xnmbar(i,k)*rmi_o1   ! o  (cm-3)
+          n2_cm3(i,k)  = xn2(i,k)*xnmbar(i,k)*rmi_n2   ! n2 (cm-3)
           o2p_cm3(i,k) = o2p(i,k)*xnmbar(i,k)*rmi_o2p  ! o2+ (cm-3)
           op_cm3 (i,k) = op (i,k)*xnmbar(i,k)*rmi_op   ! o+  (cm-3)
           nop_cm3(i,k) = nop(i,k)*xnmbar(i,k)*rmi_nop  ! no+ (cm-3)
-          ne(i,k)      = q_elec(i,k)*xnmbar(i,k)*rmi_elec  ! e (cm-3)
+!
+!----------------------------------------------------------------------------------
+! btf 7/8/15: q_elec is no longer used for Ne for conductivity calculations.
+!   old: ne(i,k) = q_elec(i,k)*xnmbar(i,k)*rmi_elec  ! e (cm-3)
+!   new: Use sum of the 3 major ion number densities (as in tiegcm)
+!----------------------------------------------------------------------------------
+! 
+          ne_sigmas(i,k)      = op_cm3(i,k) + o2p_cm3(i,k) + nop_cm3(i,k)
        end do
     end do
-
-    ! call outfld ('O2_CM3  ',o2_cm3 ,pcols,lchnk)
-    ! call outfld ('O1_CM3  ',o1_cm3 ,pcols,lchnk)
-    ! call outfld ('N2_CM3  ',n2_cm3 ,pcols,lchnk)
-    ! call outfld ('O2P_CM3 ',o2p_cm3,pcols,lchnk)
-    ! call outfld ('OP_CM3  ',op_cm3 ,pcols,lchnk)
-    ! call outfld ('NOP_CM3 ',nop_cm3,pcols,lchnk)
 
     !-------------------------------------------------------------------------------
     ! Multiply collision freq by neutral number density and sum for each ion:
@@ -913,18 +941,13 @@ contains
           !-------------------------------------------------------------------------------
           ! Electron collision frequency (s-1):
           !-------------------------------------------------------------------------------
-          sqrt_te = sqrt(te(i,k))
+          sqrt_te = sqrt(tE(i,k))
           rnu_ne(i,k) = & 
-               2.33e-11_r8*n2_cm3(i,k)*te(i,k)*(1._r8 - 1.21e-4_r8*te(i,k)) &
+               2.33e-11_r8*n2_cm3(i,k)*tE(i,k)*(1._r8 - 1.21e-4_r8*tE(i,k)) &
                + 1.82e-10_r8*o2_cm3(i,k)*sqrt_te*(1._r8 + 3.60e-2_r8*sqrt_te) &
-               + 8.90e-11_r8*o1_cm3(i,k)*sqrt_te*(1._r8 + 5.70e-4_r8*te(i,k))
+               + 8.90e-11_r8*o1_cm3(i,k)*sqrt_te*(1._r8 + 5.70e-4_r8*tE(i,k))
        end do
     end do
-
-    ! call outfld ('COLL_O2P',rnu_o2p,pcols,lchnk)
-    ! call outfld ('COLL_OP ',rnu_op ,pcols,lchnk)
-    ! call outfld ('COLL_NOP',rnu_nop,pcols,lchnk)
-    ! call outfld ('COLL_NE ',rnu_ne ,pcols,lchnk)
 
     !-------------------------------------------------------------------------------
     ! Ratio of collision to gyro frequencies for o2+, o+, no+, ne:
@@ -938,11 +961,6 @@ contains
        end do
     end do
 
-    ! call outfld ('RNU_O2P ',rnu_o2p,pcols,lchnk)
-    ! call outfld ('RNU_OP  ',rnu_op ,pcols,lchnk)
-    ! call outfld ('RNU_NOP ',rnu_nop,pcols,lchnk)
-    ! call outfld ('RNU_NE  ',rnu_ne ,pcols,lchnk)
-
     !-------------------------------------------------------------------------------
     ! Calculate pedersen and Hall conductivities (siemens/m):
     !
@@ -952,30 +970,27 @@ contains
 
     do k = 1,pver
        do i = 1,ncol
-          !-------------------------------------------------------------------------------
-          ! ne = electron density assuming charge neutrality (cm-3):
-          !-------------------------------------------------------------------------------
-          !     ne(i,k) = op_cm3(i,k) + o2p_cm3(i,k) + nop_cm3(i,k)
+ 
           !-------------------------------------------------------------------------------
           ! Pedersen conductivity (siemens/m):
           !-------------------------------------------------------------------------------
           sigma_ped(i,k) = qe_fac(i)                           &
-               *((op_cm3   (i,k)*rnu_op (i,k)/(1._r8 + rnu_op (i,k)**2)) &
-               + (o2p_cm3(i,k)*rnu_o2p(i,k)/(1._r8 + rnu_o2p(i,k)**2)) &
-               + (nop_cm3(i,k)*rnu_nop(i,k)/(1._r8 + rnu_nop(i,k)**2)) &
-               + (ne     (i,k)*rnu_ne (i,k)/(1._r8 + rnu_ne (i,k)**2)))
+               *((op_cm3 (i,k)*rnu_op (i,k)/(1._r8 + rnu_op (i,k)**2)) &
+               + (o2p_cm3  (i,k)*rnu_o2p(i,k)/(1._r8 + rnu_o2p(i,k)**2)) &
+               + (nop_cm3  (i,k)*rnu_nop(i,k)/(1._r8 + rnu_nop(i,k)**2)) &
+               + (ne_sigmas(i,k)*rnu_ne (i,k)/(1._r8 + rnu_ne (i,k)**2)))
           !-------------------------------------------------------------------------------
           ! Hall conductivity (siemens/m):
           !-------------------------------------------------------------------------------
           sigma_hall(i,k) = qe_fac(i)           &
-               *(ne       (i,k)/(1._r8 + rnu_ne (i,k)**2) &
-               - op_cm3 (i,k)/(1._r8 + rnu_op (i,k)**2) &
-               - o2p_cm3(i,k)/(1._r8 + rnu_o2p(i,k)**2) &
-               - nop_cm3(i,k)/(1._r8 + rnu_nop(i,k)**2))
+               *(ne_sigmas(i,k)/(1._r8 + rnu_ne (i,k)**2) &
+               - op_cm3   (i,k)/(1._r8 + rnu_op (i,k)**2) &
+               - o2p_cm3  (i,k)/(1._r8 + rnu_o2p(i,k)**2) &
+               - nop_cm3  (i,k)/(1._r8 + rnu_nop(i,k)**2))
        end do
     end do
 
-    call outfld ('ELECDEN ',ne        ,pcols,lchnk)
+    call outfld ('ELECDEN ',ne_sigmas ,pcols,lchnk)
     call outfld ('SIGMAPED',sigma_ped ,pcols,lchnk)
     call outfld ('SIGMAHAL',sigma_hall,pcols,lchnk)
 
@@ -1176,16 +1191,20 @@ contains
     real(r8) :: dv(pcols,pver)             ! meridional ion drag tendency
     real(r8) :: dui(pcols,pver)            ! zonal ion drag tendency
     real(r8) :: dvi(pcols,pver)            ! meridional ion drag tendency
-    real(r8), pointer :: ue(:)             ! pointer to pbuf
-    real(r8), pointer :: ve(:)             ! pointer to pbuf
+    real(r8), pointer :: ui(:,:)           ! pointer to 3d zonal ion drift from edynamo
+    real(r8), pointer :: vi(:,:)           ! pointer to 3d meridional ion drift from edynamo
+    real(r8), pointer :: wi(:,:)           ! pointer to 3d vertical ion drift from edynamo
 
     !-------------------------------------------------------------------------------
-    ! Get ion ExB drift from physics buffer (they were defined by exbdrift module)
-    ! Ion drifts are 2d arrays, i.e., no vertical dimension.
+    ! Get ion ExB drift from physics buffer (they were defined by either the exbdrift 
+    !   module in chemistry (2d), or the dynamo module in dynamics dpie_coupling (3d), 
+    !   depending on the switch use_dynamo_drifts (edyn_init.F90). If using dynamo drifts, 
+    !   they were put into pbuf by dp_coupling. If using empirical exbdrifts, then
+    !   they are redundant in the vertical dimension (i.e., 2d only).
     !-------------------------------------------------------------------------------
-
-    call pbuf_get_field(pbuf, ue_idx, ue     )
-    call pbuf_get_field(pbuf, ve_idx, ve     )
+    call pbuf_get_field(pbuf, ui_idx, ui)
+    call pbuf_get_field(pbuf, vi_idx, vi)
+    call pbuf_get_field(pbuf, wi_idx, wi)
 
     dti = 1._r8/delt
     !-------------------------------------------------------------------------------
@@ -1202,9 +1221,11 @@ contains
           !   bz=-5, nstep=24 min, nsplit=4 (6 min dynamics): crashed after 2 days.
           !   bz=-5, nstep=24 min, nsplit=6 (4 min dynamics): 5 day run succeeded.
           ! See comments in efield module re bz < 0 (efield.F90).
+          ! Ion drifts are from edynamo if use_dynamo_drifts=true, exbdrift otherwise.
           !-------------------------------------------------------------------------------
-          us      = ue(i) - state%u(i,k)
-          vs      = ve(i) - state%v(i,k)
+          us = ui(i,k) - state%u(i,k)
+          vs = vi(i,k) - state%v(i,k)
+
           !-------------------------------------------------------------------------------
           ! Exclude ue,ve drift momentum source to avoid crashes when bz < 0 and 
           ! full 30 min timestep (partial ion-drag):
@@ -1240,6 +1261,15 @@ contains
        ptend%u(:ncol,k) = 0._r8
        ptend%v(:ncol,k) = 0._r8
     end do
+
+!
+! Ion drifts are either empirical (use_dynamo_drifts==false), or from edynamo
+! (use_dynamo_drifts==true). See addfld calls in this source file.
+! If empirical, the drifts will be 2d (i.e., redundant in the vertical dimension)
+!
+    call outfld ( 'UI', ui, pcols, lchnk )
+    call outfld ( 'VI', vi, pcols, lchnk )
+    call outfld ( 'WI', wi, pcols, lchnk )
 
     call outfld ( 'UIONTEND', dui, pcols, lchnk )      ! u ion drag tendency
     call outfld ( 'VIONTEND', dvi, pcols, lchnk )      ! v ion drag tendency
@@ -1281,20 +1311,16 @@ contains
     real(r8) :: max_q
     real(r8) :: qjoule(pcols,pver)         ! joule heating
     real(r8) :: qout(pcols,pver)           ! temp for outfld
-    real(r8), pointer :: ue(:)             ! pointer to pbuf
-    real(r8), pointer :: ve(:)             ! pointer to pbuf
+    real(r8), pointer :: ui(:,:)           ! pointer to pbuf
+    real(r8), pointer :: vi(:,:)           ! pointer to pbuf
 
     !-------------------------------------------------------------------------------
     ! Get ion velocities from physics buffer (they were defined by exbdrift module)
     ! Ion velocities are 2d arrays, i.e., no vertical dimension.
     !-------------------------------------------------------------------------------
-    call pbuf_get_field(pbuf, ue_idx, ue     )
-    call pbuf_get_field(pbuf, ve_idx, ve     )
-
-    ! write(iulog,"(/,'qjoule: lchnk=',i5,' pcols=',i4,' ncol=',i4)") lchnk,pcols,ncol
-    ! write(iulog,"('qjoule: ue=',/,(6e12.4))") ue
-    ! write(iulog,"('qjoule: ve=',/,(6e12.4))") ve
-
+    call pbuf_get_field(pbuf, ui_idx, ui     )
+    call pbuf_get_field(pbuf, vi_idx, vi     )
+ 
     do k = ntop_lev,nbot_lev
        !   write(iulog,"('qjoule: k=',i3,' u=',/,(6e12.4))") k,state%u(:,k)
        !   write(iulog,"('qjoule: k=',i3,' v=',/,(6e12.4))") k,state%v(:,k)
@@ -1303,8 +1329,8 @@ contains
        !   write(iulog,"('qjoule: k=',i3,' lyx=',/,(6e12.4))") k,lyx(:,k)
        !   write(iulog,"('qjoule: k=',i3,' lyy=',/,(6e12.4))") k,lyy(:,k)
        do i = 1,ncol
-          us           = ue(i) - state%u(i,k)
-          vs           = ve(i) - state%v(i,k)
+          us           = ui(i,k) - state%u(i,k)
+          vs           = vi(i,k) - state%v(i,k)
           qjoule(i,k)  = us*us*lxx(i,k) + us*vs*(lxy(i,k) - lyx(i,k)) + vs*vs*lyy(i,k)
           ptend%s(i,k) = qjoule(i,k)        ! joule heating tendency
           !     ptend%s(i,k) = 0._r8              ! no joule heating tendency
@@ -1330,8 +1356,8 @@ contains
        write(iulog,*) 'jouleheat_tend: dt,t,max% dt/t = ',qjoule(i,k)/cpairv(i,k,lchnk),state%t(i,k),max_q, &
             ' @ lchnk,i,k = ',lchnk,max_ind(:)
        write(iulog,*) 'jouleheat_tend: lxx,xy,yx,yy   = ',lxx(i,k),lxy(i,k),lyx(i,k),lyy(i,k)
-       write(iulog,*) 'jouleheat_tend: u,ue,v,ve      = ',state%u(i,k),ue(i),state%v(i,k),ve(i)
-       write(iulog,*) 'jouleheat_tend: us,vs          = ',ue(i) - state%u(i,k),ve(i) - state%v(i,k)
+       write(iulog,*) 'jouleheat_tend: u,ui,v,vi      = ',state%u(i,k),ui(i,k),state%v(i,k),vi(i,k)
+       write(iulog,*) 'jouleheat_tend: us,vs          = ',ui(i,k) - state%u(i,k),vi(i,k) - state%v(i,k)
        write(iulog,*) 'jouleheat_tend: du,dv          = ',ptend%u(i,k),ptend%v(i,k)
        write(iulog,*) 'jouleheat_tend: dt'
        write(iulog,'(1p,5g15.7)') qjoule(max_ind(1),ntop_lev:nbot_lev)/cpairv(max_ind(1),ntop_lev:nbot_lev,lchnk)

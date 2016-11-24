@@ -7,8 +7,8 @@ module dp_coupling
   use cam_history,    only: outfld, write_inithist, hist_fld_active
   use dimensions_mod, only: np, npsq, nelemd, nlev
   use dof_mod,        only: UniquePoints, PutUniquePoints
-  use dyn_comp,       only: dyn_export_t, dyn_import_t, TimeLevel
-  use dyn_grid,       only: get_gcol_block_d
+  use dyn_comp,       only: dyn_export_t, dyn_import_t
+  use dyn_grid,       only: get_gcol_block_d, TimeLevel
   use element_mod,    only: element_t
   use kinds,          only: real_kind, int_kind
   use shr_kind_mod,   only: r8=>shr_kind_r8

@@ -18,7 +18,8 @@
 <solar_parms_file>atm/waccm/solar/wasolar_c150720.nc</solar_parms_file>
 
 <!-- Solar protons -->
-<spe_data_file>atm/waccm/solar/spes_1963-2014_c150717.nc</spe_data_file>
+<epp_spe_filepath>atm/waccm/solar/spes_1963-2014_c150717.nc</epp_spe_filepath>
+<epp_spe_varname>'Prod'</epp_spe_varname>
 
 <!-- QBO settings --> 
 <qbo_cyclic>.false.</qbo_cyclic>
@@ -96,7 +97,7 @@
   'bc_a1    -> $INPUTDATA_ROOT/atm/cam/chem/trop_mozart_aero/emis/ar5_mam3_bc_surf_1850-2005_c090804.nc',
   'num_a1   -> $INPUTDATA_ROOT/atm/cam/chem/trop_mozart_aero/emis/ar5_mam3_num_a1_surf_1850-2005_c090804.nc',
   'num_a2   -> $INPUTDATA_ROOT/atm/cam/chem/trop_mozart_aero/emis/ar5_mam3_num_a2_surf_1850-2005_c090804.nc',
-  'pom_a1   -> $INPUTDATA_ROOT/atm/cam/chem/trop_mozart_aero/emis/ar5_mam3_oc_surf_1850-2005_c090804.nc',
+  'pom_a1   -> $INPUTDATA_ROOT/atm/cam/chem/trop_mozart_aero/emis/ar5_mam3_pom_surf_1850-2005_c130424.nc',
   'so4_a1   -> $INPUTDATA_ROOT/atm/cam/chem/trop_mozart_aero/emis/ar5_mam3_so4_a1_surf_1850-2005_c090804.nc',
   'so4_a2   -> $INPUTDATA_ROOT/atm/cam/chem/trop_mozart_aero/emis/ar5_mam3_so4_a2_surf_1850-2005_c090804.nc'
 </srf_emis_specifier>
@@ -111,7 +112,7 @@
  'C2H4 = ethene', 'C3H8 = propane', 'C3H6 = propene', 'BIGALK = pentane + hexane + heptane + tricyclene',
  'BIGENE = butene', 'MEK = butanone_2', 'TOLUENE = toluene'
 </megan_specifier>
-<megan_factors_file>'atm/cam/chem/trop_mozart/emis/megan21_emis_factors_c20130304.nc'</megan_factors_file>
+<megan_factors_file>'atm/cam/chem/trop_mozart/emis/megan21_emis_factors_79pft_c20150518.nc'</megan_factors_file>
 <megan_mapped_emisfctrs>.false.</megan_mapped_emisfctrs>
 
 <dust_emis_fact>0.35D0</dust_emis_fact>
@@ -147,7 +148,7 @@
   'DUV', 'DVV', 'EKGW', 'FLNS', 'FLNSC', 'FLNT', 'FLNTC', 'FSDS', 'FSDSC', 'FSNS', 'FSNSC', 'FSNT', 'FSNTC', 'SHFLX',
   'SOLIN', 'FLDS', 'LANDFRAC', 'LHFLX', 'OCNFRAC', 'PRECC', 'PRECL', 'PRECT', 'QFLX', 'QRL', 'QRLNLTE', 'QRS',
   'QCP', 'QTHERMAL', 'QRL_TOT', 'QRS_TOT', 'QJOULE', 'QNO', 'QRS_AUR', 'QRS_CO2NIR', 'QRS_EUV', 'TREFHT',
-  'TTGW', 'SWCF', 'UE', 'VE', 'UIONTEND', 'VIONTEND', 'DTCORE', 'FRONTGF:I', 'BUTGWSPEC', 'BTAUE', 'BTAUW',
+  'TTGW', 'SWCF', 'UI', 'VI', 'UIONTEND', 'VIONTEND', 'DTCORE', 'FRONTGF:I', 'BUTGWSPEC', 'BTAUE', 'BTAUW',
   'BTAUN', 'BTAUS', 'TAUE', 'TAUW', 'TAUN', 'TAUS', 'TAUGWX', 'TAUGWY', 'TAUX', 'TAUY', 'SNOWHLND', 'SNOWHICE',
   'ICEFRAC', 'FSDSC', 'RAD_ICE', 'RAD_LNAT', 'RAD_SULFC', 'H2SO4M_C', 'SAD_ICE', 'SAD_LNAT', 'SAD_TROP',
   'SAD_SULFC', 'SAD', 'VEL_NAT2', 

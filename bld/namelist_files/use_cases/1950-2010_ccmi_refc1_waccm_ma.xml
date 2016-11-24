@@ -18,7 +18,8 @@
 <solar_parms_file>atm/waccm/solar/wasolar_c140602.nc</solar_parms_file>
 
 <!-- Solar protons -->
-<spe_data_file>atm/waccm/solar/spes_1963-2014_c150717.nc</spe_data_file>
+<epp_spe_filepath>atm/waccm/solar/spes_1963-2014_c150717.nc</epp_spe_filepath>
+<epp_spe_varname>'Prod'</epp_spe_varname>
 
 <!-- QBO settings --> 
 <qbo_cyclic>.false.</qbo_cyclic>
@@ -34,7 +35,7 @@
 <flbc_type>'SERIAL'</flbc_type>
 <flbc_list>
  'CCL4', 'CF2CLBR', 'CF3BR', 'CFC11', 'CFC113', 'CFC12', 'CH3BR', 'CH3CCL3', 'CH3CL', 'CH4', 'CO2', 'H2',
- 'HCFC22', 'N2O', 'CFC114', 'CFC115', 'HCFC141B', 'HCFC142B', 'CH2BR2', 'CHBR3', 'H1202', 'H2402', 'SF6'
+ 'HCFC22', 'N2O', 'CFC114', 'CFC115', 'HCFC141B', 'HCFC142B', 'CH2BR2', 'CHBR3', 'H1202', 'H2402'
 </flbc_list>
 
 <!-- Tropospheric Aerosols -->
@@ -66,13 +67,6 @@
   'CH2O     -> $INPUTDATA_ROOT/atm/cam/chem/emis/ccmi_1960-2008/maccity_maccity_corrdates_CH2O_woBiog_1960-2008_1.9x2.5_mol_c130314.nc',
   'CO       -> $INPUTDATA_ROOT/atm/cam/chem/emis/ccmi_1960-2008/maccity_maccity_corrdates_CO_woBiog_1960-2008_1.9x2.5_mol_c130314.nc',
   'NO       -> $INPUTDATA_ROOT/atm/cam/chem/emis/ccmi_1960-2008/maccity_maccity_corrdates_NO_1960-2008_1.9x2.5_mol_c130314.nc',
-  'SF6em    -> $INPUTDATA_ROOT/atm/cam/chem/emis/ccmi_tracers/v42_SF6_1850-2100_IPCC_2.1.9x2.5_monthly_c130822.nc',
-  'SO2t     -> $INPUTDATA_ROOT/atm/cam/chem/emis/ccmi_tracers/maccity_maccity_corrdates_SO2_1850-2100_c130409.nc',
-  'CO_25    -> $INPUTDATA_ROOT/atm/cam/chem/emis/ccmi_tracers/RETRO_ANTHRO_V2_2000_CO_aggregated_ann_1850-2100_c130430.nc',
-  'CO_50    -> $INPUTDATA_ROOT/atm/cam/chem/emis/ccmi_tracers/RETRO_ANTHRO_V2_2000_CO_aggregated_ann_1850-2100_c130430.nc',
-  'E90      -> $INPUTDATA_ROOT/atm/cam/chem/emis/ccmi_tracers/emis_e90_global_1.9x2.5_ann_1850-2100_c130710.nc',
-  'E90_NH   -> $INPUTDATA_ROOT/atm/cam/chem/emis/ccmi_tracers/emis_e90_nh_1.9x2.5_ann_1850-2100_c130710.nc',
-  'E90_SH   -> $INPUTDATA_ROOT/atm/cam/chem/emis/ccmi_tracers/emis_e90_sh_1.9x2.5_ann_1850-2100_c130710.nc',
 </srf_emis_specifier>
 <srf_emis_type>'INTERP_MISSING_MONTHS'</srf_emis_type>
 
@@ -101,7 +95,7 @@
   'CLDLOW', 'CLDMED', 'CLDTOT', 'CLOUD', 'ZMMU', 'DTCOND', 'DTV', 'DUV', 'DVV', 'EKGW', 'FLNS', 'FLNSC', 'FLNT',
   'FLNTC', 'FSDS', 'FSDSC', 'FSNS', 'FSNSC', 'FSNT', 'FSNTC', 'SHFLX', 'SOLIN', 'FLDS', 'LANDFRAC', 'LHFLX', 'OCNFRAC',
   'PRECC', 'PRECL', 'QFLX', 'QPERT', 'QRL', 'QRLNLTE', 'QRS', 'QCP', 'QTHERMAL', 'QRL_TOT', 'QRS_TOT', 'QJOULE',
-  'QNO', 'QRS_AUR', 'QRS_CO2NIR', 'QRS_EUV', 'TREFHT', 'TTGW', 'SWCF', 'UE', 'VE', 'UIONTEND', 'VIONTEND',
+  'QNO', 'QRS_AUR', 'QRS_CO2NIR', 'QRS_EUV', 'TREFHT', 'TTGW', 'SWCF', 'UI', 'VI', 'UIONTEND', 'VIONTEND',
   'DTCORE', 'FRONTGF:I', 'BUTGWSPEC', 'BTAUE', 'BTAUW', 'BTAUN', 'BTAUS', 'TAUE', 'TAUW', 'TAUN', 'TAUS',
   'TAUGWX', 'TAUGWY', 'TAUX', 'TAUY', 'SNOWHLND', 'SNOWHICE', 'ICEFRAC', 'FSDSC', 'RAD_ICE', 'RAD_LNAT',
   'RAD_SULFC', 'H2SO4M_C', 'SAD_ICE', 'SAD_LNAT', 'SAD_TROP', 'SAD_SULFC', 'SAD', 'VEL_NAT2', 'VOLC_MMR',
@@ -109,11 +103,10 @@
   'T_12_COS', 'T_12_SIN', 'U_24_COS', 'U_24_SIN', 'U_12_COS', 'U_12_SIN', 'V_24_COS', 'V_24_SIN',
   'V_12_COS', 'V_12_SIN', 'PS_24_COS', 'PS_24_SIN', 'PS_12_COS', 'PS_12_SIN', 'QRS_TOT_24_COS',
   'QRS_TOT_24_SIN', 'QRS_TOT_12_COS', 'QRS_TOT_12_SIN', 'DTCOND_24_SIN', 'DTCOND_24_COS',
-  'DTCOND_12_SIN', 'DTCOND_12_COS', 'UTGWORO', 'UTGWSPEC', 'VERT', 'VTGWORO', 'VTGWSPEC', 'HORZ', 'SFNO',
-  'SFCO', 'SFCH2O', 'SFSO2t', 'SFCO_25', 'SFCO_50', 'SFE90', 'SFE90_NH', 'SFE90_SH', 
+  'DTCOND_12_SIN', 'DTCOND_12_COS', 'UTGWORO', 'UTGWSPEC', 'VERT', 'VTGWORO', 'VTGWSPEC', 'HORZ', 
   'NO2_XFRC', 'NO2_CLXF', 'DTWR_BRONO2', 'DTWR_CH2O', 'DTWR_CH3OOH', 'DTWR_CLONO2',
   'DTWR_COF2', 'DTWR_COFCL', 'DTWR_H2O2', 'DTWR_HBR', 'DTWR_HCL', 'DTWR_HF', 'DTWR_HNO3', 'DTWR_HO2NO2',
-  'DTWR_HOBR', 'DTWR_HOCL', 'DTWR_NH_50W', 'DTWR_SO2t', 'DF_CH3OOH', 'DF_CH2O', 'DF_CO', 'DF_H2O2', 'DF_NO2', 'DF_HNO3', 'DF_NO',
+  'DTWR_HOBR', 'DTWR_HOCL', 'DF_CH3OOH', 'DF_CH2O', 'DF_CO', 'DF_H2O2', 'DF_NO2', 'DF_HNO3', 'DF_NO',
   'DF_HO2NO2', 'DF_NOY', 'jo3_a','jo3_b', 'jno2', 'r_jo2_a', 'r_jo2_b', 'r_jo3_a', 'r_jo3_b', 'r_O_O', 'r_O_O3', 'r_H_O3', 'r_HO2_O',
   'r_HO2_O3', 'r_OH_O3', 'r_OH_O', 'r_O1D_H2O', 'r_jh2o_a', 'r_jh2o_b', 'r_jh2o_c', 'r_jno3_b', 'r_NO2_O',
   'r_jhno3', 'r_NO2_OH', 'r_jno2', 'r_N_NO', 'r_N_O2', 'r_jn2o', 'r_O1D_N2Oa', 'r_O1D_N2Ob', 'r_N_NO2a',
@@ -138,14 +131,13 @@
   'HCFC141B_CHML', 'HCFC142B_CHML', 'CH3BR_CHML', 'CHBR3_CHML', 'CH2BR2_CHML', 'CF3BR_CHML',
   'CF2CLBR_CHML', 'H1202_CHML', 'H2402_CHML', 'OddOx_Ox_Loss', 'OddOx_HOx_Loss', 'OddOx_NOx_Loss',
   'OddOx_CLOxBROx_Loss', 'OddOx_Loss_Tot', 'OddOx_Prod_Tot', 'O3_Prod', 'O3_Loss', 'O3_CHMP', 'O3_CHML',
-  'RO2_NO_sum', 'RO2_HO2_sum', 'NH_5', 'NH_50', 'NH_50W', 'AOA_NH', 'ST80_25', 'CO_25', 'CO_50', 'E90',
-  'E90_NH', 'E90_SH', 'SO2t', 'SF6', 'SF6em', 'O3S', 'r_HNO3_OH', 'r_CLO_HO2',
+  'RO2_NO_sum', 'RO2_HO2_sum', 'r_HNO3_OH', 'r_CLO_HO2',
   'jco2', 'jeuv_26', 'PRECTMX', 'TREFHTMX', 'TREFHTMN'
 </fincl1>
 <fincl2>
   'PS', 'PHIS', 'SZA', 'Z3', 'T', 'U', 'V', 'OMEGA', 'CLOUD', 'CLDLIQ', 'CLDICE', 'ASDIR', 'FLNT', 'PSL', 'FSDS', 'FSDSC',
   'CONCLD', 'SNOWHLND', 'SNOWHICE', 'TROP_Z', 'TROP_T', 'TROP_P', 'DTCOND', 'DTV', 'QRS_TOT', 'QRL_TOT', 'CH4',
-  'N2O', 'CFC11', 'CFC12', 'CH3CL', 'CH3BR', 'AOA1', 'AOA2',  'SF6', 'SF6em', 'O3S', 'E90', 'E90_NH', 'E90_SH', 
+  'N2O', 'CFC11', 'CFC12', 'CH3CL', 'CH3BR', 'AOA1', 'AOA2', 
   'CO2', 'CO', 'CH2O', 'CH3OOH', 'O', 'O1D', 'O2', 'O3', 'H', 'OH', 'HO2', 'H2O2',
   'H2', 'H2O', 'TOTH', 'N', 'NO', 'NO2', 'NO3', 'N2O5', 'HNO3', 'HNO3_TOTAL', 'HNO3_STS', 'HNO3_NAT', 'HNO3_GAS',
   'HO2NO2', 'NOY', 'CL', 'CLO', 'OCLO', 'CL2', 'CL2O2', 'HOCL', 'CLONO2', 'HCL', 'HCL_TOTAL', 'HCL_GAS', 'HCL_STS',
@@ -188,8 +180,7 @@
   'PS', 'PHIS', 'SZA', 'Z3', 'T', 'U', 'V', 'TROP_Z', 'TROP_T', 'TROP_P', 'O3', 'H2O', 'NOY', 'NO2', 'HNO3', 'CO', 'HCL',
   'HF', 'COF2', 'COFCL', 'FOY', 'TFY', 'CLOY', 'TCLY', 'BROY', 'TBRY', 'CCL4', 'CF2CLBR', 'CF3BR', 'CFC11', 'CFC113',
   'CFC12', 'CH3BR', 'CH3CCL3', 'CH3CL', 'CH4', 'CO2', 'H2', 'HCFC22', 'N2O', 'CFC114', 'CFC115', 'HCFC141B',
-  'HCFC142B', 'CH2BR2', 'CHBR3', 'H1202', 'H2402', 'AOA1', 'AOA2', 'SF6', 'SF6em', 'NH_5', 'NH_50', 'NH_50W', 'AOA_NH', 'ST80_25', 'O3S',
-  'CO_25', 'CO_50', 'SO2t', 'E90', 'E90_NH', 'E90_SH', 'OddOx_Ox_Loss', 'OddOx_HOx_Loss', 'OddOx_NOx_Loss',
+  'HCFC142B', 'CH2BR2', 'CHBR3', 'H1202', 'H2402', 'AOA1', 'AOA2','OddOx_Ox_Loss', 'OddOx_HOx_Loss', 'OddOx_NOx_Loss',
   'OddOx_CLOxBROx_Loss', 'OddOx_Loss_Tot', 'OddOx_Prod_Tot', 'O3_Prod', 'O3_Loss', 'O3_CHMP', 'O3_CHML',
   'RO2_NO_sum', 'RO2_HO2_sum', 'MASS', 'DO3CHM', 'DO3CHM_TRP', 'DO3CHM_LMS', 'SAD', 'SAD_TROP', 'SAD_SULFC',
   'SAD_LNAT', 'SAD_ICE'

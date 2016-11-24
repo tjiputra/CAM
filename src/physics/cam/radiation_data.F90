@@ -26,6 +26,7 @@ module radiation_data
   public :: rad_data_init
   public :: rad_data_write
   public :: rad_data_read
+  public :: rad_data_enable
 
   integer :: cld_ifld,rel_ifld,rei_ifld
   integer :: dei_ifld,mu_ifld,lambdac_ifld,iciwp_ifld,iclwp_ifld
@@ -106,6 +107,8 @@ module radiation_data
   integer :: qrlin_idx = -1
   integer :: tropp_idx = -1
 
+  logical :: enabled = .false.
+
 contains
 
 
@@ -166,8 +169,15 @@ contains
     call mpibcast (rad_data_avgflag,      1,   mpichar , 0, mpicom)
 #endif
     do_fdh = rad_data_fdh
+    enabled = rad_data_output
 
   end subroutine rad_data_readnl
+
+  !================================================================================================
+  !================================================================================================
+  subroutine rad_data_enable()
+    enabled = .true.
+  end subroutine rad_data_enable
 
   !================================================================================================
   !================================================================================================
@@ -190,6 +200,8 @@ contains
     character(len=16)  :: microp_scheme  ! microphysics scheme
     character(len=16)  :: rad_scheme
    
+    if (.not.enabled) return
+
     call phys_getopts(microp_scheme_out=microp_scheme, radiation_scheme_out=rad_scheme)
     mg_microphys =  (trim(microp_scheme) == 'MG')
 
@@ -502,6 +514,7 @@ contains
     real(r8), pointer, dimension(:,:,:) :: dgnumwet_ptr
     real(r8), pointer, dimension(:,:,:) :: qaerwat_ptr
 
+    if (.not.enabled) return
     call pbuf_get_field(pbuf, qrs_ifld, qrs )    
     call pbuf_get_field(pbuf, qrl_ifld, qrl )
 

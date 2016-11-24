@@ -397,7 +397,7 @@ ifeq ($(FC_TYPE),intel)
   CFLAGS        += -std=gnu99
 
   FC_FLAGS      := -ftz -convert big_endian -fp-model source \
-                   -no-opt-dynamic-align -assume realloc_lhs -xHost
+                   -qno-opt-dynamic-align -assume realloc_lhs -xHost
   FC_FLAGS_O3OPT:= $(FC_FLAGS)
   FC_FLAGS_NOOPT:= -ftz -convert big_endian -O0
   FREEFLAGS     := 
@@ -419,11 +419,11 @@ ifeq ($(FC_TYPE),intel)
   endif
 
   ifeq ($(SMP),TRUE)
-    FC_FLAGS       += -openmp
-    FC_FLAGS_NOOPT += -openmp
-    FC_FLAGS_O3OPT += -openmp
-    CFLAGS         += -openmp
-    LDFLAGS        += -openmp
+    FC_FLAGS       += -qopenmp
+    FC_FLAGS_NOOPT += -qopenmp
+    FC_FLAGS_O3OPT += -qopenmp
+    CFLAGS         += -qopenmp
+    LDFLAGS        += -qopenmp
   endif
 
   FFLAGS      := $(cpp_path) $(mod_path) $(CPPDEF) $(FC_FLAGS)
@@ -452,8 +452,6 @@ derivative_mod.o: derivative_mod.F90
 bndry_mod.o: bndry_mod.F90
 	$(FC) -c $(FREEFLAGS) $(FFLAGS_O3OPT) $<
 prim_advance_mod.o: prim_advance_mod.F90
-	$(FC) -c $(FREEFLAGS) $(FFLAGS_O3OPT) $<
-uwshcu.o: uwshcu.F90
 	$(FC) -c $(FREEFLAGS) $(FFLAGS_O3OPT) $<
 
 endif
@@ -598,7 +596,7 @@ ifeq ($(FC_TYPE), nag)
   # Bit of a pain: MPI functions are overloaded, so must specify
   # not to check them. -mismatch_all is alternative, but less
   # targeted option.
-  nag_mismatch_flag := -wmismatch=mpi_send,mpi_recv,mpi_bcast,mpi_allreduce,mpi_reduce,mpi_isend,mpi_irecv,mpi_irsend,mpi_rsend,mpi_gatherv,mpi_scatterv,mpi_allgather,mpi_alltoallv,mpibcast,mpiscatterv
+  nag_mismatch_flag := -wmismatch=mpi_send,mpi_recv,mpi_bcast,mpi_allreduce,mpi_reduce,mpi_isend,mpi_irecv,mpi_irsend,mpi_rsend,mpi_gatherv,mpi_scatterv,mpi_allgather,mpi_alltoallv,mpi_alltoallw,mpibcast,mpiscatterv
   FC_FLAGS      := $(nag_mismatch_flag) -Wp,-macro=no_com
   FC_FLAGS_NOOPT:= $(FC_FLAGS)
 
@@ -748,8 +746,8 @@ ifeq ($(UNAMES),Darwin)
     FIXEDFLAGS  := -fixed -132
 
     ifeq ($(SMP),TRUE)
-      FFLAGS += -openmp
-      LDFLAGS += -openmp
+      FFLAGS += -qopenmp
+      LDFLAGS += -qopenmp
     endif  
 
     ifeq ($(SPMD),TRUE)

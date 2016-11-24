@@ -1,16 +1,17 @@
 module opttab
 
-! Purpose: To read in SW look-up tables and calculate optical properties for the aerosols
-!   For subroutine interpol.
+!Purpose: To read in SW look-up tables for calculation of aerosol optical properties, 
+!   and to define the grid for discrete input-values in these look-up tables. 
 
-!   Modified for new wavelength bands and look-up tables 
-!   by Alf Kirkevaag in December 2013.
-!   Updated for reading inout files with extra header info - Alf Kirkevaag, May 2015
-!   Extended for new SOA treatment - Alf Kirkevaag, August 2015
+!   Modified for new wavelength bands and look-up tables - Alf Kirkevaag Dec. 2013.
+!   Updated for reading inout files with extra header info - Alf Kirkevaag, May 2015.
+!   Extended for new SOA treatment - Alf Kirkevaag, August 2015.
 !   Added output (ASCII) Jabuary 2016: #ifdef COLTST4INTCONS -> extinction 
 !   koefficients (wrt. all added mass including condensed water vapour) are 
 !   written out for checking against the look-up tables (using xmgrace), e.g. 
 !   as function of RH (to be changed to whatever parameter the user is interested in)
+!   Modified for optimized added masses and mass fractions for concentrations from 
+!   condensation, coagulation or cloud-processing - Alf Kirkevaag, May 2016. 
 
 #include <preprocessorDefinitions.h>
 
@@ -26,67 +27,20 @@ module opttab
   public initopt
 
 
-!     Array bounds in the tabulated optical parameters  
-!CAM4-Oslo   integer, public, parameter :: nbands=12    ! number of aerosol spectral bands
-   integer, public, parameter :: nbands=14    ! number of aerosol spectral bands in SW
-   integer, public, parameter :: nbmp1=11     ! number of first non-background mode
+!  integer, public, parameter :: nbands=12    ! number of aerosol spectral bands in CAM4-Oslo
+  integer, public, parameter :: nbands=14    ! number of aerosol spectral bands in SW
+  integer, public, parameter :: nbmp1=11     ! number of first non-background mode
 
-!soa
-   real(r8), public, dimension(6) :: fombg = (/ 0.0_r8, 0.1_r8,  0.3_r8, 0.5_r8, 0.7_r8, 0.999_r8    /)
-   real(r8), public, dimension(6) :: fbcbg = (/ 0.0_r8, 0.1_r8,  0.3_r8, 0.5_r8, 0.7_r8, 0.999_r8    /)
-!soa
-   real(r8), public, dimension(6) :: fac = (/ 0.0_r8, 0.1_r8,  0.3_r8, 0.5_r8, 0.7_r8, 0.999_r8    /)
-   real(r8), public, dimension(6) :: fbc = (/ 0.0_r8, 0.01_r8, 0.1_r8, 0.3_r8, 0.7_r8, 0.999_r8    /)
-   real(r8), public, dimension(6) :: faq = (/ 0.0_r8, 0.25_r8, 0.5_r8, 0.75_r8,0.85_r8,1.0_r8      /)
-   real(r8), public, dimension(10) :: rh = (/ 0.0_r8, 0.37_r8, 0.47_r8,0.65_r8,0.75_r8,            &
-!test_old                                      0.8_r8, 0.85_r8, 0.9_r8, 0.95_r8,0.98_r8             /)
-                                      0.8_r8, 0.85_r8, 0.9_r8, 0.95_r8,0.995_r8             /)
-   real(r8), public, dimension(9) :: S   = (/ 1.0005_r8, 1.001_r8,  1.0015_r8, 1.002_r8,           &
-                                      1.0025_r8, 1.003_r8,  1.005_r8,  1.008_r8,  1.01_r8  /)  
-
-
-!        real(r8), public, dimension(5:10,6) :: cat = reshape ( (/ &
-!   1.e-10_r8, 1.e-10_r8, 1.e-10_r8, 1.e-10_r8, 1.e-10_r8, 1.e-10_r8, & 
-!   5.e-4_r8 , 0.01_r8  , 0.02_r8  , 1.e-4_r8 , 0.005_r8 , 0.02_r8  , &
-!   2.e-3_r8 , 0.05_r8  , 0.1_r8   , 6.e-4_r8 , 0.025_r8 , 0.1_r8   , &
-!   0.01_r8  , 0.2_r8   , 0.5_r8   , 2.5e-3_r8, 0.1_r8   , 0.5_r8   , &
-!   0.04_r8  , 0.8_r8   , 2.0_r8   , 1.e-2_r8 , 0.4_r8   , 2.0_r8   , &
-!   0.15_r8  , 4.0_r8   , 8.0_r8   , 3.5e-2_r8, 2.0_r8   , 8.0_r8     &
-!                                                      /), (/6,6/) )
-
-!  With look-up tables for the Salter et al. 2015) sea-salt parametrisation: 
-        real(r8), public, dimension(5:10,6) :: cat = reshape ( (/ &
-   1.e-10_r8, 1.e-10_r8, 1.e-10_r8, 1.e-10_r8, 1.e-10_r8, 1.e-10_r8, & 
-   5.e-4_r8 , 0.01_r8  , 0.02_r8  , 5.e-4_r8 , 0.01_r8  , 0.02_r8  , &
-   2.e-3_r8 , 0.05_r8  , 0.1_r8   , 2.e-3_r8 , 0.05_r8  , 0.1_r8   , &
-   0.01_r8  , 0.2_r8   , 0.5_r8   , 0.01_r8  , 0.2_r8   , 0.5_r8   , &
-   0.04_r8  , 0.8_r8   , 2.0_r8   , 0.04_r8  , 0.8_r8   , 2.0_r8   , &
-   0.15_r8  , 4.0_r8   , 8.0_r8   , 0.15_r8  , 4.0_r8   , 8.0_r8     &
-                                                      /), (/6,6/) )
-
-        real(r8), public, dimension(4,16) :: cate = reshape ( (/ &
-   1.e-10_r8, 1.e-10_r8, 1.e-10_r8, 1.e-10_r8*1.904e-3_r8, & 
-   1.e-5_r8 , 1.e-5_r8 , 1.e-4_r8 , 0.01_r8*1.904e-3_r8  , &
-   2.e-5_r8 , 2.e-5_r8 , 2.e-4_r8 , 0.05_r8*1.904e-3_r8  , &
-   4.e-5_r8 , 4.e-5_r8 , 4.e-4_r8 , 0.1_r8*1.904e-3_r8   , &
-   8.e-5_r8 , 8.e-5_r8 , 8.e-4_r8 , 0.2_r8*1.904e-3_r8   , &
-   1.5e-4_r8, 1.5e-4_r8, 1.5e-3_r8, 0.4_r8*1.904e-3_r8   , &
-   3.e-4_r8 , 3.e-4_r8 , 3.e-3_r8 , 0.7_r8*1.904e-3_r8   , &
-   6.e-4_r8 , 6.e-4_r8 , 6.e-3_r8 , 1.0_r8*1.904e-3_r8   , &
-   1.2e-3_r8, 1.2e-3_r8, 1.2e-2_r8, 1.5_r8*1.904e-3_r8   , &
-   2.5e-3_r8, 2.5e-3_r8, 2.5e-2_r8, 2.5_r8*1.904e-3_r8   , &
-   5.e-3_r8 , 5.e-3_r8 , 5.e-2_r8 , 5.0_r8*1.904e-3_r8   , &
-   1.e-2_r8 , 1.e-2_r8 , 0.1_r8   , 10.0_r8*1.904e-3_r8  , &
-   2.e-2_r8 , 2.e-2_r8 , 0.2_r8   , 25.0_r8*1.904e-3_r8  , &
-   4.e-2_r8 , 4.e-2_r8 , 0.4_r8   , 50.0_r8*1.904e-3_r8  , &
-   8.e-2_r8 , 8.e-2_r8 , 0.8_r8   , 100.0_r8*1.904e-3_r8 , &
-   0.15_r8  , 0.15_r8  , 1.5_r8   , 500.0_r8*1.904e-3_r8 /), (/4,16/) )
+  real(r8), public, dimension(10)     :: rh
+  real(r8), public, dimension(6)      :: fombg, fbcbg, fac, fbc, faq
+  real(r8), public, dimension(4,16)   :: cate
+  real(r8), public, dimension(5:10,6) :: cat
    
   real(r8), public :: om1(nbands,10,6,16,6)
   real(r8), public :: g1 (nbands,10,6,16,6)
   real(r8), public :: be1(nbands,10,6,16,6)
   real(r8), public :: ke1(nbands,10,6,16,6)
-!
+
   real(r8), public :: om2to3(nbands,10,16,6,2:3)
   real(r8), public :: g2to3 (nbands,10,16,6,2:3)
   real(r8), public :: be2to3(nbands,10,16,6,2:3)
@@ -107,9 +61,10 @@ module opttab
   real(r8), public :: be5to10(nbands,10,6,6,6,6,5:10)
   real(r8), public :: ke5to10(nbands,10,6,6,6,6,5:10)
 
-  real(r8), public :: e,eps
+  real(r8), public :: e, eps
   parameter (e=2.718281828_r8, eps=1.0e-30_r8)
   
+
  contains
 
 subroutine initopt
@@ -126,27 +81,77 @@ subroutine initopt
 !---------------------------------------------------------------
 
       use oslo_control, only : oslo_getopts, dir_string_length
-!   use shr_kind_mod, only: r8 => shr_kind_r8
-!   use inpgraer
 
+      implicit none
 
-!   implicit none
-
-!     Tabulating the 'kcomp'-files to save computing time.
-
-
-      integer kcomp, iwl, irelh, ictot, ifac, ifbc, ifaq
+      integer kcomp, iwl, irelh, ictot, ifac, ifbc, ifaq, i
       integer ifombg, ifbcbg                                  ! soa
       integer ik, ic, ifil, lin, linmax
       real(r8) catot, relh, frac, fabc, fraq, frombg, frbcbg
       real(r8) ssa, ass, ext, spext
       real(r8) :: eps2 = 1.e-2_r8
+      real(r8) :: eps3 = 1.e-3_r8
       real(r8) :: eps4 = 1.e-4_r8
       real(r8) :: eps6 = 1.e-6_r8
       real(r8) :: eps7 = 1.e-7_r8
       character(len=dir_string_length) :: aerotab_table_dir
 
+!     Defining array bounds for tabulated optical parameters (and r and sigma) 
+!     relative humidity (only 0 value used for r and sigma tables):
+      rh = (/ 0.0_r8, 0.37_r8, 0.47_r8, 0.65_r8, 0.75_r8, 0.8_r8, 0.85_r8, 0.9_r8, 0.95_r8, 0.995_r8 /)
+!     mass fractions internal mixtures in background (fombg and fbcbg) and mass added to the 
+!     background modes (fac, faq, faq)
+      fombg = (/ 0.0_r8, 0.2_r8,  0.4_r8, 0.6_r8, 0.8_r8, 1.0_r8  /)
+      fac =   (/ 0.0_r8, 0.2_r8,  0.4_r8, 0.6_r8, 0.8_r8, 1.0_r8  /)
+      faq =   (/ 0.0_r8, 0.2_r8,  0.4_r8, 0.6_r8, 0.8_r8, 1.0_r8  /)
+!     with more weight on low fractions (thus a logaritmic f axis) for BC, 
+!     which is less ambundant than sulfate and OC, and the first value 
+!     corresponding to a clean background mode:
+      fbcbg(1)=1.e-10_r8
+      fbc(1)=1.e-10_r8
+      do i=2,6
+        fbcbg(i)=10**((i-1)/4.0_r8-1.25_r8)
+        fbc(i)=fbcbg(i)
+      end do
+!     and most weight on small concentrations for added mass onto the background: 
+      do kcomp=1,4
+        cate(kcomp,1)=1.e-10_r8
+        do i=2,16
+          if(kcomp.eq.1) then
+            cate(kcomp,i)=10.0_r8**((i-1)/3.0_r8-6.222_r8)
+          elseif(kcomp.eq.2) then
+            cate(kcomp,i)=10.0_r8**((i-1)/3.0_r8-6.523_r8)
+          elseif(kcomp.eq.3) then
+            cate(kcomp,i)=1.0e-10_r8  ! not used
+          else
+            cate(kcomp,i)=10.0_r8**((i-1)/3.0_r8-4.301_r8)
+          endif
+        end do
+      end do
+      do kcomp=5,10
+        cat(kcomp,1) =1.e-10_r8
+        do i=2,6
+          if(kcomp.eq.5) then
+            cat(kcomp,i)=10.0_r8**((i-1)-3.824_r8)
+          elseif(kcomp.eq.6) then
+            cat(kcomp,i)=10.0_r8**((i-1)-3.523_r8)
+          elseif(kcomp.eq.7) then
+!x            cat(kcomp,i)=10.0_r8**((i-1)-2.921_r8)
+            cat(kcomp,i)=10.0_r8**((i-1)-3.699_r8)
+          elseif(kcomp.eq.8) then
+            cat(kcomp,i)=10.0_r8**((i-1)-4.921_r8)
+          elseif(kcomp.eq.9) then
+            cat(kcomp,i)=10.0_r8**((i-1)-3.301_r8)
+          else
+!x            cat(kcomp,i)=10.0_r8**((i-1)-3.000_r8)
+            cat(kcomp,i)=10.0_r8**((i-1)-3.699_r8)
+          endif
+        end do
+      end do
+
       call oslo_getopts(aerotab_table_dir_out= aerotab_table_dir)
+
+!     Opening the 'kcomp'-files:
 
 !ccccccccc1ccccccccc2ccccccccc3ccccccccc4ccccccccc5ccccccccc6ccccccccc7cc
 
@@ -221,7 +226,6 @@ subroutine initopt
       open(101, file='check-kcomp1.out')
 #endif
 
-!soa      linmax = nbands*10*16   ! 14*10*16
       linmax = nbands*10*6*16*6   ! 14*10*6*16*6
       do ifil = 1,1
         do lin = 1,linmax 
@@ -285,9 +289,9 @@ subroutine initopt
     do kcomp=1,1
     do iwl=1,nbands
     do irelh=1,10
-    do ifombg=1,6   !soa
+    do ifombg=1,6
     do ictot=1,16
-    do ifac=1,6     !soa
+    do ifac=1,6
      if(be1(iwl,irelh,ifombg,ictot,ifac)<=0.0_r8) then
       write(iulog,*) 'be1 =', iwl, irelh, ifombg, ictot, be1(iwl,irelh,ifombg,ictot,ifac)
       write(iulog,*) 'Error in initialization of be1'
@@ -315,9 +319,9 @@ subroutine initopt
       open(103, file='check-kcomp3.out')
 #endif
 
-!soa        linmax=nbands*10*16*6
-        linmax=nbands*10*16*6
-      do ifil = 2,3
+      linmax=nbands*10*16*6
+!      do ifil = 2,3
+      do ifil = 2,2
         do lin = 1,linmax
 
           read(39+ifil,997) kcomp, iwl, relh, catot, frac, &
@@ -368,6 +372,21 @@ subroutine initopt
         end do  ! lin
       enddo     ! ifil
 
+!   Prescribed dummy values for kcomp=3
+    kcomp=3
+    do iwl=1,nbands
+    do irelh=1,10
+    do ictot=1,16
+    do ifac=1,6
+          om2to3(iwl,irelh,ictot,ifac,kcomp)=0.999_r8    
+          g2to3 (iwl,irelh,ictot,ifac,kcomp)=0.5_r8
+          be2to3(iwl,irelh,ictot,ifac,kcomp)=0.0001_r8    ! unit km^-1
+          ke2to3(iwl,irelh,ictot,ifac,kcomp)=1.0_r8       ! unit m^2/g
+    enddo
+    enddo
+    enddo
+    enddo
+
     do kcomp=2,3
     do iwl=1,nbands
     do irelh=1,10
@@ -393,7 +412,6 @@ subroutine initopt
         write(iulog,*)'modes 2-3 ok' 
 
 !ccccccccc1ccccccccc2ccccccccc3ccccccccc4ccccccccc5ccccccccc6ccccccccc7cc
-!soa       Mode 4 (BC&OC + condesate from H2SO4 + wet phase (NH4)2SO4)
 !       Mode 4 (BC&OC + condensate from H2SO4 and SOA + wet phase (NH4)2SO4)
 !ccccccccc1ccccccccc2ccccccccc3ccccccccc4ccccccccc5ccccccccc6ccccccccc7cc
 
@@ -402,7 +420,6 @@ subroutine initopt
 #endif
 
         ifil = 4
-!soa        linmax = nbands*10*16*6*6 
         linmax = nbands*10*6*16*6*6 
         do lin = 1,linmax
 
@@ -442,7 +459,9 @@ subroutine initopt
   111     continue
 
  	  do ic=1,6
-	   if(abs(frbcbg-fbcbg(ic))<eps4) then
+!	   if(abs(frbcbg-fbcbg(ic))<eps4) then
+!	   if(abs(frbcbg-fbcbg(ic))<eps3) then
+	   if(abs((frbcbg-fbcbg(ic))/fbcbg(ic))<eps2) then
 	    ifbcbg=ic
 	    goto 112
 	   endif
@@ -470,7 +489,7 @@ subroutine initopt
 
     do iwl=1,nbands
     do irelh=1,10
-    do ifbcbg=1,6   !soa
+    do ifbcbg=1,6
     do ictot=1,16
     do ifac=1,6
     do ifaq=1,6
@@ -522,7 +541,8 @@ subroutine initopt
    11     continue
 
  	  do ic=1,6
-	   if(abs(catot-cat(kcomp,ic))<eps6) then
+!	   if(abs(catot-cat(kcomp,ic))<eps6) then
+	   if(abs((catot-cat(kcomp,ic))/cat(kcomp,ic))<eps2) then
 	    ictot=ic
 	    goto 21
 	   endif
@@ -538,7 +558,8 @@ subroutine initopt
    31     continue
 
  	  do ic=1,6
-	   if(abs(fabc-fbc(ic))<eps4) then
+!	   if(abs(fabc-fbc(ic))<eps4) then
+	   if(abs((fabc-fbc(ic))/fbc(ic))<eps2) then
 	    ifbc=ic
 	    goto 41
 	   endif
@@ -584,6 +605,7 @@ subroutine initopt
      if(be5to10(iwl,irelh,ictot,ifac,ifbc,ifaq,kcomp)<=0.0_r8) then
       write(iulog,*) 'be5to10 =', iwl, irelh, ictot, ifac, ifbc, ifaq, be5to10(iwl,irelh,ictot,ifac,ifbc,ifaq,kcomp)
       write(iulog,*) 'Error in initialization of be5to10'
+      write(iulog,*) 'kcomp, abs((fabc-fbc)/fbc) =', kcomp, abs((fabc-fbc(ic))/fbc(ic))
       stop
      endif
     enddo

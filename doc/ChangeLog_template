@@ -32,6 +32,8 @@ appropriate machine below.  All failed tests must be justified.
 
 yellowstone/intel:
 
+yellowstone/intel/aux_cam:
+
 hobart/nag:
 
 hobart/pgi or jaguar/pgi:

@@ -8,7 +8,7 @@ module aero_model
   use shr_kind_mod,   only: r8 => shr_kind_r8
   use constituents,   only: pcnst, cnst_name, cnst_get_ind
   use ppgrid,         only: pcols, pver, pverp
-  use phys_control,   only: phys_getopts
+  use phys_control,   only: phys_getopts, cam_physpkg_is
   use cam_abortutils, only: endrun
   use cam_logfile,    only: iulog
   use perf_mod,       only: t_startf, t_stopf
@@ -556,16 +556,21 @@ end subroutine aero_model_init
     real(r8) :: mmr_tend_pcols(pcols, pver, gas_pcnst)
 
     integer  :: cond_vap_idx
-    real(r8) ::  aqso4(nmodes_aq_chem,pcols)               ! aqueous phase chemistry
-    real(r8) ::  aqh2so4(nmodes_aq_chem,pcols)             ! aqueous phase chemistry
-    real(r8) ::  aqso4_h2o2(pcols)                     ! SO4 aqueous phase chemistry due to H2O2
-    real(r8) ::  aqso4_o3(pcols)                       ! SO4 aqueous phase chemistry due to O3
+    real(r8) ::  aqso4(ncol,nmodes_aq_chem)           ! aqueous phase chemistry
+    real(r8) ::  aqh2so4(ncol,nmodes_aq_chem)         ! aqueous phase chemistry
+    real(r8) ::  aqso4_h2o2(ncol)                     ! SO4 aqueous phase chemistry due to H2O2
+    real(r8) ::  aqso4_o3(ncol)                       ! SO4 aqueous phase chemistry due to O3
     real(r8) ::  xphlwc(ncol,pver)                    ! pH value multiplied by lwc
     real(r8) ::  delt_inverse                         ! 1 / timestep
 
     real(r8), pointer :: pblh(:)
+
+    logical :: is_spcam_m2005
    
     nstep = get_nstep()
+
+
+    is_spcam_m2005   = cam_physpkg_is('spcam_m2005')
 
     delt_inverse = 1.0_r8 / delt
 
@@ -601,9 +606,13 @@ end subroutine aero_model_init
     del_soa_lv_gasprod(1:ncol,:) = vmr(1:ncol,:,ndx_soa_lv) - vmr0(1:ncol,:,ndx_soa_lv)
     del_soa_sv_gasprod(1:ncol,:) = vmr(1:ncol,:,ndx_soa_sv) - vmr0(1:ncol,:,ndx_soa_sv)
 
-    !Save intermediate concentrations
-    dvmrdt_sv1 = vmr
-    dvmrcwdt_sv1 = vmrcw
+    if (.not. is_spcam_m2005) then  ! regular CAM
+      dvmrdt(:ncol,:,:) = vmr(:ncol,:,:)
+      dvmrcwdt(:ncol,:,:) = vmrcw(:ncol,:,:)
+
+      !Save intermediate concentrations
+      dvmrdt_sv1 = vmr
+      dvmrcwdt_sv1 = vmrcw
 
     ! aqueous chemistry ...
 
@@ -665,6 +674,15 @@ end subroutine aero_model_init
           call outfld( name, wrk(:ncol), ncol, lchnk )
        end if
     enddo
+
+   else if (is_spcam_m2005) then  ! SPCAM ECPP
+! when ECPP is used, aqueous chemistry is done in ECPP,
+! and not updated here.
+! Minghuai Wang, 2010-02 (Minghuai.Wang@pnl.gov)
+!
+      dvmrdt = 0.0_r8
+      dvmrcwdt = 0.0_r8
+   endif
 
    !condensation
    call vmr2mmr( vmr, mmr_tend_ncols, mbar, ncol )

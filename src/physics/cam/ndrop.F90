@@ -13,8 +13,8 @@ use shr_kind_mod,     only: r8 => shr_kind_r8
 use spmd_utils,       only: masterproc
 use ppgrid,           only: pcols, pver, pverp
 use physconst,        only: pi, rhoh2o, mwh2o, r_universal, rh2o, &
-                            gravit, latvap, cpair, rair
-use constituents,     only: pcnst, cnst_get_ind
+                            gravit, latvap, cpair, epsilo, rair
+use constituents,     only: pcnst, cnst_get_ind, cnst_name, cnst_spec_class_gas, cnst_species_class
 use physics_types,    only: physics_state, physics_ptend, physics_ptend_init
 use physics_buffer,   only: physics_buffer_desc, pbuf_get_index, pbuf_get_field
 
@@ -33,7 +33,7 @@ implicit none
 private
 save
 
-public ndrop_init, dropmixnuc, activate_modal
+public ndrop_init, dropmixnuc, activate_modal, loadaer
 
 real(r8), allocatable :: alogsig(:)     ! natl log of geometric standard dev of aerosol
 real(r8), allocatable :: exp45logsig(:)
@@ -289,7 +289,7 @@ end subroutine ndrop_init
 
 subroutine dropmixnuc( &
    state, ptend, dtmicro, pbuf, wsub, &
-   cldn, cldo, tendnd, factnum)
+   cldn, cldo, cldliqf, tendnd, factnum, from_spcam)
 
    ! vertical diffusion and nucleation of cloud droplets
    ! assume cloud presence controlled by cloud fraction
@@ -306,6 +306,8 @@ subroutine dropmixnuc( &
    real(r8), intent(in) :: wsub(pcols,pver)    ! subgrid vertical velocity
    real(r8), intent(in) :: cldn(pcols,pver)    ! cloud fraction
    real(r8), intent(in) :: cldo(pcols,pver)    ! cloud fraction on previous time step
+   real(r8), intent(in) :: cldliqf(pcols,pver) ! liquid cloud fraction (liquid / (liquid + ice))
+   logical,  intent(in),optional :: from_spcam ! value insignificant - if variable present, is called from spcam
 
    ! output arguments
    real(r8), intent(out) :: tendnd(pcols,pver) ! change in droplet number concentration (#/kg/s)
@@ -347,6 +349,8 @@ subroutine dropmixnuc( &
    real(r8) :: arg
    real(r8) :: dtinv
    real(r8) :: dtmin, tinv, dtt
+   real(r8) :: lcldn(pcols,pver)
+   real(r8) :: lcldo(pcols,pver)
 
    real(r8) :: zs(pver) ! inverse of distance between levels (m)
    real(r8) :: qcld(pver) ! cloud droplet number mixing ratio (#/kg)
@@ -383,6 +387,7 @@ subroutine dropmixnuc( &
    real(r8) :: ndropcol(pcols)               ! column droplet number (#/m2)
    real(r8) :: cldo_tmp, cldn_tmp
    real(r8) :: tau_cld_regenerate
+   real(r8) :: zeroaer(pver)
    real(r8) :: taumix_internal_pver_inv ! 1/(internal mixing time scale for k=pver) (1/s)
 
 
@@ -415,6 +420,14 @@ subroutine dropmixnuc( &
    real(r8), allocatable :: coltend_cw(:,:)    ! column tendency
    real(r8) :: ccn(pcols,pver,psat)    ! number conc of aerosols activated at supersat
 
+   !for gas species turbulent mixing
+   real(r8), pointer :: rgas(:, :, :)
+   real(r8), allocatable :: rgascol(:, :, :)
+   real(r8), allocatable :: coltendgas(:)
+   real(r8) :: zerogas(pver)
+   character*200 fieldnamegas
+
+   logical  :: called_from_spcam
    !-------------------------------------------------------------------------------
 
    sq2pi = sqrt(2._r8*pi)
@@ -433,6 +446,12 @@ subroutine dropmixnuc( &
 
    call pbuf_get_field(pbuf, kvh_idx, kvh)
 
+   ! Create the liquid weighted cloud fractions that were passsed in
+   ! before. This doesn't seem like the best variable, since the cloud could
+   ! have liquid condensate, but the part of it that is changing could be the
+   ! ice portion; however, this is what was done before.
+   lcldo = cldo * cldliqf
+   lcldn = cldn * cldliqf
 
 
    arg = 1.0_r8
@@ -479,8 +498,16 @@ subroutine dropmixnuc( &
       end do
    end do
 
+   called_from_spcam = (present(from_spcam)) 
+
+   if (called_from_spcam) then
+      rgas  => state%q
+      allocate(rgascol(pver, pcnst, 2))
+      allocate(coltendgas(pcols))
+   endif
+
    factnum = 0._r8
-   wtke    = 0._r8
+   wtke = 0._r8
 
    if (prog_modal_aero) then
       ! aerosol tendencies
@@ -555,34 +582,54 @@ subroutine dropmixnuc( &
          end do
       end do
 
+
+      if (called_from_spcam) then
+      !
+      ! In the MMF model, turbulent mixing for tracer species are turned off.
+      ! So the turbulent for gas species mixing are added here.
+      ! (Previously, it had the turbulent mixing for aerosol species)
+      !
+         do m=1, pcnst
+            if (cnst_species_class(m) == cnst_spec_class_gas) rgascol(:,m,nsav) = rgas(i,:,m)
+         end do
+
+      endif
+
       ! droplet nucleation/aerosol activation
 
       ! tau_cld_regenerate = time scale for regeneration of cloudy air 
       !    by (horizontal) exchange with clear air
       tau_cld_regenerate = 3600.0_r8 * 3.0_r8 
 
+      if (called_from_spcam) then
+      ! when this is called  in the MMF part, no cloud regeneration and decay.
+      ! set the time scale be very long so that no cloud regeneration.
+           tau_cld_regenerate = 3600.0_r8 * 24.0_r8 * 365.0_r8
+      endif
+
+
       ! k-loop for growing/shrinking cloud calcs .............................
       ! grow_shrink_main_k_loop: &
       do k = top_lev, pver
 
-         ! shrinking cloud ......................................................
-         !    treat the reduction of cloud fraction from when cldn(i,k) < cldo(i,k)
-         !    and also dissipate the portion of the cloud that will be regenerated
-         cldo_tmp = cldo(i,k)
-         cldn_tmp = cldn(i,k) * exp( -dtmicro/tau_cld_regenerate )
-         !    alternate formulation
-         !    cldn_tmp = cldn(i,k) * max( 0.0_r8, (1.0_r8-dtmicro/tau_cld_regenerate) )
+         ! This code was designed for liquid clouds, but the cloudbourne
+         ! aerosol can be either from liquid or ice clouds. For the ice clouds,
+         ! we do not do regeneration, but as cloud fraction decreases the
+         ! aerosols should be returned interstitial. The lack of a liquid cloud
+         ! should not mean that all of the aerosol is realease. Therefor a
+         ! section has been added for shrinking ice clouds and checks were added
+         ! to protect ice cloudbourne aerosols from being released when no
+         ! liquid cloud is present.
+
+         ! shrinking ice cloud ......................................................
+         cldo_tmp = cldo(i,k) * (1._r8 - cldliqf(i,k))
+         cldn_tmp = cldn(i,k) * (1._r8 - cldliqf(i,k))
 
          if (cldn_tmp < cldo_tmp) then
-            !  droplet loss in decaying cloud
-            !++ sungsup
-            nsource(i,k) = nsource(i,k) + qcld(k)*(cldn_tmp - cldo_tmp)/cldo_tmp*dtinv
-            qcld(k)      = qcld(k)*(1._r8 + (cldn_tmp - cldo_tmp)/cldo_tmp)
-            !-- sungsup
 
             ! convert activated aerosol to interstitial in decaying cloud
 
-            dumc = (cldn_tmp - cldo_tmp)/cldo_tmp
+            dumc = (cldn_tmp - cldo_tmp)/cldo_tmp * (1._r8 - cldliqf(i,k))
             do m = 1, ntot_amode
                mm = mam_idx(m,0)
                dact   = raercol_cw(k,mm,nsav)*dumc
@@ -597,11 +644,44 @@ subroutine dropmixnuc( &
             end do
          end if
 
-         ! growing cloud ......................................................
+         ! shrinking liquid cloud ......................................................
+         !    treat the reduction of cloud fraction from when cldn(i,k) < cldo(i,k)
+         !    and also dissipate the portion of the cloud that will be regenerated
+         cldo_tmp = lcldo(i,k)
+         cldn_tmp = lcldn(i,k) * exp( -dtmicro/tau_cld_regenerate )
+         !    alternate formulation
+         !    cldn_tmp = cldn(i,k) * max( 0.0_r8, (1.0_r8-dtmicro/tau_cld_regenerate) )
+
+         ! fraction is also provided. 
+         if (cldn_tmp < cldo_tmp) then
+            !  droplet loss in decaying cloud
+            !++ sungsup
+            nsource(i,k) = nsource(i,k) + qcld(k)*(cldn_tmp - cldo_tmp)/cldo_tmp*cldliqf(i,k)*dtinv
+            qcld(k)      = qcld(k)*(1._r8 + (cldn_tmp - cldo_tmp)/cldo_tmp)
+            !-- sungsup
+
+            ! convert activated aerosol to interstitial in decaying cloud
+
+            dumc = (cldn_tmp - cldo_tmp)/cldo_tmp * cldliqf(i,k)
+            do m = 1, ntot_amode
+               mm = mam_idx(m,0)
+               dact   = raercol_cw(k,mm,nsav)*dumc
+               raercol_cw(k,mm,nsav) = raercol_cw(k,mm,nsav) + dact   ! cloud-borne aerosol
+               raercol(k,mm,nsav)    = raercol(k,mm,nsav) - dact
+               do l = 1, nspec_amode(m)
+                  mm = mam_idx(m,l)
+                  dact    = raercol_cw(k,mm,nsav)*dumc
+                  raercol_cw(k,mm,nsav) = raercol_cw(k,mm,nsav) + dact  ! cloud-borne aerosol
+                  raercol(k,mm,nsav)    = raercol(k,mm,nsav) - dact
+               end do
+            end do
+         end if
+
+         ! growing liquid cloud ......................................................
          !    treat the increase of cloud fraction from when cldn(i,k) > cldo(i,k)
          !    and also regenerate part of the cloud 
          cldo_tmp = cldn_tmp
-         cldn_tmp = cldn(i,k)
+         cldn_tmp = lcldn(i,k)
 
          if (cldn_tmp-cldo_tmp > 0.01_r8) then
 
@@ -610,7 +690,7 @@ subroutine dropmixnuc( &
             wmix  = 0._r8
             wmin  = 0._r8
             wmax  = 10._r8
-            wdiab = 0
+            wdiab = 0._r8
 
             ! load aerosol properties, assuming external mixtures
 
@@ -669,16 +749,16 @@ subroutine dropmixnuc( &
          kp1 = min0(k+1, pver)
          taumix_internal_pver_inv = 0.0_r8
 
-         if (cldn(i,k) > 0.01_r8) then
+         if (lcldn(i,k) > 0.01_r8) then
 
-            wdiab = 0
+            wdiab = 0._r8
             wmix  = 0._r8                       ! single updraft
             wbar  = wtke(i,k)                   ! single updraft
             if (k == pver) wbar = wtke_cen(i,k) ! single updraft
             wmax  = 10._r8
             wmin  = 0._r8
 
-            if (cldn(i,k) - cldn(i,kp1) > 0.01_r8 .or. k == pver) then
+            if (lcldn(i,k) - lcldn(i,kp1) > 0.01_r8 .or. k == pver) then
 
                ! cloud base
 
@@ -695,7 +775,7 @@ subroutine dropmixnuc( &
                !      fluxes calculated in explmix.
                ekd(k) = wbar/zs(k)
 
-               alogarg = max(1.e-20_r8, 1/cldn(i,k) - 1._r8)
+               alogarg = max(1.e-20_r8, 1._r8/lcldn(i,k) - 1._r8)
                wmin    = wbar + wmix*0.25_r8*sq2pi*log(alogarg)
                phase   = 1   ! interstitial
 
@@ -720,9 +800,9 @@ subroutine dropmixnuc( &
                factnum(i,k,:) = fn
 
                if (k < pver) then
-                  dumc = cldn(i,k) - cldn(i,kp1)
+                  dumc = lcldn(i,k) - lcldn(i,kp1)
                else
-                  dumc = cldn(i,k)
+                  dumc = lcldn(i,k)
                endif
 
                fluxntot = 0
@@ -792,24 +872,27 @@ subroutine dropmixnuc( &
 
          else
 
-            ! no cloud
-
+            ! no liquid cloud
             nsource(i,k) = nsource(i,k) - qcld(k)*dtinv
             qcld(k)      = 0
 
-            ! convert activated aerosol to interstitial in decaying cloud
+            if (cldn(i,k) < 0.01_r8) then
+               ! no ice cloud either
 
-            do m = 1, ntot_amode
-               mm = mam_idx(m,0)
-               raercol(k,mm,nsav)    = raercol(k,mm,nsav) + raercol_cw(k,mm,nsav)  ! cloud-borne aerosol
-               raercol_cw(k,mm,nsav) = 0._r8
+               ! convert activated aerosol to interstitial in decaying cloud
 
-               do l = 1, nspec_amode(m)
-                  mm = mam_idx(m,l)
-                  raercol(k,mm,nsav)    = raercol(k,mm,nsav) + raercol_cw(k,mm,nsav) ! cloud-borne aerosol
+               do m = 1, ntot_amode
+                  mm = mam_idx(m,0)
+                  raercol(k,mm,nsav)    = raercol(k,mm,nsav) + raercol_cw(k,mm,nsav)  ! cloud-borne aerosol
                   raercol_cw(k,mm,nsav) = 0._r8
+
+                  do l = 1, nspec_amode(m)
+                     mm = mam_idx(m,l)
+                     raercol(k,mm,nsav)    = raercol(k,mm,nsav) + raercol_cw(k,mm,nsav) ! cloud-borne aerosol
+                     raercol_cw(k,mm,nsav) = 0._r8
+                  end do
                end do
-            end do
+            end if
          end if
 
       end do  ! old_cloud_main_k_loop
@@ -979,13 +1062,28 @@ subroutine dropmixnuc( &
             end do
          end do
 
+         if (called_from_spcam) then
+         !
+         ! turbulent mixing for gas species .
+         !
+               do m=1, pcnst
+                  if (cnst_species_class(m) == cnst_spec_class_gas) then
+                    flxconv = 0.0_r8
+                    zerogas(:) = 0.0_r8
+                    call explmix(rgascol(1,m,nnew),zerogas,ekkp,ekkm,overlapp,overlapm,  &
+                                 rgascol(1,m,nsav),zero, flxconv, pver,dtmix,&
+                                   .true., zerogas)
+                  end if
+               end do
+         endif
+
       end do ! old_cloud_nsubmix_loop
 
-      ! evaporate particles again if no cloud
+      ! evaporate particles again if no cloud (either ice or liquid)
 
       do k = top_lev, pver
          if (cldn(i,k) == 0._r8) then
-            ! no cloud
+            ! no ice or liquid cloud
             qcld(k)=0._r8
 
             ! convert activated aerosol to interstitial in decaying cloud
@@ -1039,6 +1137,18 @@ subroutine dropmixnuc( &
 
       end if
 
+      if (called_from_spcam) then
+      !
+      ! Gas tendency
+      !
+           do m=1, pcnst
+              if (cnst_species_class(m) == cnst_spec_class_gas) then
+                ptend%lq(m) = .true.
+                ptend%q(i, :, m) = (rgascol(:,m,nnew)-rgas(i,:,m)) * dtinv
+              end if
+           end do
+      endif
+
    end do  ! overall_main_i_loop
    ! end of main loop over i/longitude ....................................
 
@@ -1046,6 +1156,11 @@ subroutine dropmixnuc( &
    call outfld('NDROPSRC', nsource,  pcols, lchnk)
    call outfld('NDROPMIX', ndropmix, pcols, lchnk)
    call outfld('WTKE    ', wtke,     pcols, lchnk)
+
+   if(called_from_spcam) then  
+        call outfld('SPLCLOUD  ', cldn    , pcols, lchnk   )
+        call outfld('SPKVH     ', kvh     , pcols, lchnk   )
+   endif
 
    call ccncalc(state, pbuf, cs, ccn)
    do l = 1, psat
@@ -1061,6 +1176,22 @@ subroutine dropmixnuc( &
             call outfld(fieldname_cw(mm), coltend_cw(:,mm), pcols, lchnk)
          end do
       end do
+   end if
+
+   if(called_from_spcam) then
+   !
+   ! output column-integrated Gas tendency (this should be zero)
+   !
+        do m=1, pcnst
+            if (cnst_species_class(m) == cnst_spec_class_gas) then
+              do i=1, ncol
+                 coltendgas(i) = sum( pdel(i,:)*ptend%q(i,:,m) )/gravit
+              end do
+              fieldnamegas = trim(cnst_name(m)) // '_mixnuc1sp'
+              call outfld( trim(fieldnamegas), coltendgas, pcols, lchnk)
+            end if
+        end do
+        deallocate(rgascol, coltendgas)
    end if
 
    deallocate( &

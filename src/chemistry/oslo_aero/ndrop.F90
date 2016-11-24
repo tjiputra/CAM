@@ -13,8 +13,8 @@ use shr_kind_mod,     only: r8 => shr_kind_r8
 use spmd_utils,       only: masterproc
 use ppgrid,           only: pcols, pver, pverp
 use physconst,        only: pi, rhoh2o, mwh2o, r_universal, rh2o, &
-                            gravit, latvap, cpair, rair
-use constituents,     only: pcnst, cnst_get_ind, cnst_name
+                            gravit, latvap, cpair, epsilo, rair
+use constituents,     only: pcnst, cnst_get_ind, cnst_name, cnst_spec_class_gas, cnst_species_class
 use physics_types,    only: physics_state, physics_ptend, physics_ptend_init
 use physics_buffer,   only: physics_buffer_desc, pbuf_get_index, pbuf_get_field
 
@@ -45,7 +45,7 @@ implicit none
 private
 save
 
-public ndrop_init, dropmixnuc
+public ndrop_init, dropmixnuc, activate_modal, loadaer
 
 #ifndef OSLO_AERO
 real(r8), allocatable :: alogsig(:)     ! natl log of geometric standard dev of aerosol
@@ -336,6 +336,8 @@ subroutine ndrop_init
                call add_default(fieldname_cw(mm), 1, ' ')
             end if
 
+
+
          end if
             
       end do
@@ -387,7 +389,7 @@ end subroutine ndrop_init
 
 subroutine dropmixnuc( &
    state, ptend, dtmicro, pbuf, wsub,          &  ! Input
-   cldn, cldo,                                 &
+   cldn, cldo, cldliqf,                                &
    !++ MH_2015/09/07
    hasAerosol, &
    CProcessModes, f_c, f_bc, f_aq, f_so4_cond, &
@@ -399,7 +401,8 @@ subroutine dropmixnuc( &
    !-- MH_2015/09/07
    tendnd,                                     &  ! Output
    !++ MH_2015/04/10
-   fn_in )
+   fn_in,                                      & 
+   from_spcam )
    !-- MH_2015/04/10
 
    ! vertical diffusion and nucleation of cloud droplets
@@ -417,6 +420,8 @@ subroutine dropmixnuc( &
    real(r8), intent(in) :: wsub(pcols,pver)    ! subgrid vertical velocity
    real(r8), intent(in) :: cldn(pcols,pver)    ! cloud fraction
    real(r8), intent(in) :: cldo(pcols,pver)    ! cloud fraction on previous time step
+   real(r8), intent(in) :: cldliqf(pcols,pver) ! liquid cloud fraction (liquid / (liquid + ice))
+   logical,  intent(in),optional :: from_spcam ! value insignificant - if variable present, is called from spcam
 
 !++ MH_2015/09/07
    logical, intent(in)  :: hasAerosol(pcols, pver, nmodes)
@@ -478,6 +483,8 @@ subroutine dropmixnuc( &
    real(r8) :: arg
    real(r8) :: dtinv
    real(r8) :: dtmin, tinv, dtt
+   real(r8) :: lcldn(pcols,pver)
+   real(r8) :: lcldo(pcols,pver)
 
    real(r8) :: zs(pver) ! inverse of distance between levels (m)
    real(r8) :: qcld(pver) ! cloud droplet number mixing ratio (#/kg)
@@ -514,6 +521,7 @@ subroutine dropmixnuc( &
    real(r8) :: ndropcol(pcols)               ! column droplet number (#/m2)
    real(r8) :: cldo_tmp, cldn_tmp
    real(r8) :: tau_cld_regenerate
+   real(r8) :: zeroaer(pver)
    real(r8) :: taumix_internal_pver_inv ! 1/(internal mixing time scale for k=pver) (1/s)
 
 
@@ -555,6 +563,15 @@ subroutine dropmixnuc( &
    real(r8), allocatable :: coltend_cw(:,:)    ! column tendency
    real(r8) :: ccn(pcols,pver,psat)    ! number conc of aerosols activated at supersat
 
+   !for gas species turbulent mixing
+   real(r8), pointer :: rgas(:, :, :)
+   real(r8), allocatable :: rgascol(:, :, :)
+   real(r8), allocatable :: coltendgas(:)
+   real(r8) :: zerogas(pver)
+   character*200 fieldnamegas
+
+   logical  :: called_from_spcam
+   !-------------------------------------------------------------------------------
 #ifdef OSLO_AERO
    real(r8)       :: numberMedianRadius(pcols,pver,nmodes)
    real(r8)       :: sigma(pcols,pver,nmodes)                 ![-] sigma
@@ -609,6 +626,12 @@ subroutine dropmixnuc( &
 
    call pbuf_get_field(pbuf, kvh_idx, kvh)
 
+   ! Create the liquid weighted cloud fractions that were passsed in
+   ! before. This doesn't seem like the best variable, since the cloud could
+   ! have liquid condensate, but the part of it that is changing could be the
+   ! ice portion; however, this is what was done before.
+   lcldo = cldo * cldliqf
+   lcldn = cldn * cldliqf
 
 
    arg = 1.0_r8
@@ -690,6 +713,13 @@ subroutine dropmixnuc( &
    end do
 #endif
 
+   called_from_spcam = (present(from_spcam)) 
+
+   if (called_from_spcam) then
+      rgas  => state%q
+      allocate(rgascol(pver, pcnst, 2))
+      allocate(coltendgas(pcols))
+   endif
    wtke = 0._r8
 
    if (prog_modal_aero) then
@@ -962,34 +992,87 @@ subroutine dropmixnuc( &
    end do
 #endif
 
+
+      if (called_from_spcam) then
+      !
+      ! In the MMF model, turbulent mixing for tracer species are turned off.
+      ! So the turbulent for gas species mixing are added here.
+      ! (Previously, it had the turbulent mixing for aerosol species)
+      !
+         do m=1, pcnst
+            if (cnst_species_class(m) == cnst_spec_class_gas) rgascol(:,m,nsav) = rgas(i,:,m)
+         end do
+
+      endif
+
       ! droplet nucleation/aerosol activation
 
       ! tau_cld_regenerate = time scale for regeneration of cloudy air 
       !    by (horizontal) exchange with clear air
       tau_cld_regenerate = 3600.0_r8 * 3.0_r8 
 
+      if (called_from_spcam) then
+      ! when this is called  in the MMF part, no cloud regeneration and decay.
+      ! set the time scale be very long so that no cloud regeneration.
+           tau_cld_regenerate = 3600.0_r8 * 24.0_r8 * 365.0_r8
+      endif
+
+
       ! k-loop for growing/shrinking cloud calcs .............................
       ! grow_shrink_main_k_loop: &
       do k = top_lev, pver
 
-         ! shrinking cloud ......................................................
+         ! This code was designed for liquid clouds, but the cloudbourne
+         ! aerosol can be either from liquid or ice clouds. For the ice clouds,
+         ! we do not do regeneration, but as cloud fraction decreases the
+         ! aerosols should be returned interstitial. The lack of a liquid cloud
+         ! should not mean that all of the aerosol is realease. Therefor a
+         ! section has been added for shrinking ice clouds and checks were added
+         ! to protect ice cloudbourne aerosols from being released when no
+         ! liquid cloud is present.
+
+         ! shrinking ice cloud ......................................................
+         cldo_tmp = cldo(i,k) * (1._r8 - cldliqf(i,k))
+         cldn_tmp = cldn(i,k) * (1._r8 - cldliqf(i,k))
+
+         if (cldn_tmp < cldo_tmp) then
+
+            ! convert activated aerosol to interstitial in decaying cloud
+
+            dumc = (cldn_tmp - cldo_tmp)/cldo_tmp * (1._r8 - cldliqf(i,k))
+            do m = 1, ntot_amode
+               mm = mam_idx(m,0)
+               dact   = raercol_cw(k,mm,nsav)*dumc
+               raercol_cw(k,mm,nsav) = raercol_cw(k,mm,nsav) + dact   ! cloud-borne aerosol
+               raercol(k,mm,nsav)    = raercol(k,mm,nsav) - dact
+               do l = 1, nspec_amode(m)
+                  mm = mam_idx(m,l)
+                  dact    = raercol_cw(k,mm,nsav)*dumc
+                  raercol_cw(k,mm,nsav) = raercol_cw(k,mm,nsav) + dact  ! cloud-borne aerosol
+                  raercol(k,mm,nsav)    = raercol(k,mm,nsav) - dact
+               end do
+            end do
+         end if
+
+         ! shrinking liquid cloud ......................................................
          !    treat the reduction of cloud fraction from when cldn(i,k) < cldo(i,k)
          !    and also dissipate the portion of the cloud that will be regenerated
-         cldo_tmp = cldo(i,k)
-         cldn_tmp = cldn(i,k) * exp( -dtmicro/tau_cld_regenerate )
+         cldo_tmp = lcldo(i,k)
+         cldn_tmp = lcldn(i,k) * exp( -dtmicro/tau_cld_regenerate )
          !    alternate formulation
          !    cldn_tmp = cldn(i,k) * max( 0.0_r8, (1.0_r8-dtmicro/tau_cld_regenerate) )
 
+         ! fraction is also provided. 
          if (cldn_tmp < cldo_tmp) then
             !  droplet loss in decaying cloud
             !++ sungsup
-            nsource(i,k) = nsource(i,k) + qcld(k)*(cldn_tmp - cldo_tmp)/cldo_tmp*dtinv
+            nsource(i,k) = nsource(i,k) + qcld(k)*(cldn_tmp - cldo_tmp)/cldo_tmp*cldliqf(i,k)*dtinv
             qcld(k)      = qcld(k)*(1._r8 + (cldn_tmp - cldo_tmp)/cldo_tmp)
             !-- sungsup
 
             ! convert activated aerosol to interstitial in decaying cloud
 
-            dumc = (cldn_tmp - cldo_tmp)/cldo_tmp
+            dumc = (cldn_tmp - cldo_tmp)/cldo_tmp * cldliqf(i,k)
             do m = 1, ntot_amode
                mm = mam_idx(m,0)
                dact   = raercol_cw(k,mm,nsav)*dumc
@@ -1012,7 +1095,7 @@ subroutine dropmixnuc( &
          !    treat the increase of cloud fraction from when cldn(i,k) > cldo(i,k)
          !    and also regenerate part of the cloud 
          cldo_tmp = cldn_tmp
-         cldn_tmp = cldn(i,k)
+         cldn_tmp = lcldn(i,k)
 
          if (cldn_tmp-cldo_tmp > 0.01_r8) then
 
@@ -1174,7 +1257,7 @@ subroutine dropmixnuc( &
          kp1 = min0(k+1, pver)
          taumix_internal_pver_inv = 0.0_r8
 
-         if (cldn(i,k) > 0.01_r8) then
+         if (lcldn(i,k) > 0.01_r8) then
 
             wdiab = 0._r8
             wmix  = 0._r8                       ! single updraft
@@ -1183,7 +1266,7 @@ subroutine dropmixnuc( &
             wmax  = 10._r8
             wmin  = 0._r8
 
-            if (cldn(i,k) - cldn(i,kp1) > 0.01_r8 .or. k == pver) then
+            if (lcldn(i,k) - lcldn(i,kp1) > 0.01_r8 .or. k == pver) then
 
                ! cloud base
 
@@ -1200,7 +1283,7 @@ subroutine dropmixnuc( &
                !      fluxes calculated in explmix.
                ekd(k) = wbar/zs(k)
 
-               alogarg = max(1.e-20_r8, 1/cldn(i,k) - 1._r8)
+               alogarg = max(1.e-20_r8, 1._r8/lcldn(i,k) - 1._r8)
                wmin    = wbar + wmix*0.25_r8*sq2pi*log(alogarg)
                phase   = 1   ! interstitial
 #ifdef OSLO_AERO
@@ -1266,9 +1349,9 @@ subroutine dropmixnuc( &
             !we are here because there are more clouds above, and some
             !aerosols go into  that layer! ==> calculate additional cloud fraction
                if (k < pver) then
-                  dumc = cldn(i,k) - cldn(i,kp1)
+                  dumc = lcldn(i,k) - lcldn(i,kp1)
                else
-                  dumc = cldn(i,k)
+                  dumc = lcldn(i,k)
                endif
 
 #ifdef OSLO_AERO
@@ -1369,30 +1452,34 @@ subroutine dropmixnuc( &
 
          else  ! i.e: cldn(i,k) < 0.01_r8
 
-            ! no cloud
+            ! no liquid cloud
 
             nsource(i,k) = nsource(i,k) - qcld(k)*dtinv
             qcld(k)      = 0.0_r8
 
+            if (cldn(i,k) < 0.01_r8) then
+               ! no ice cloud either
+
             ! convert activated aerosol to interstitial in decaying cloud
 
-            do m = 1, ntot_amode
-               mm = mam_idx(m,0)
-               raercol(k,mm,nsav)    = raercol(k,mm,nsav) + raercol_cw(k,mm,nsav)  ! cloud-borne aerosol
-               raercol_cw(k,mm,nsav) = 0._r8
-
-               do l = 1, nspec_amode(m)
-                  mm = mam_idx(m,l)
-#ifdef EXTRATESTS
-              if(i.eq.iDebug .and. getTracerIndex(m,l,.false.).eq.lDebug)then
-               print*,"no cloud", k,  raercol(k,mm,nsav) , raercol_cw(k,mm,nsav)
-              endif
-#endif
-                  raercol(k,mm,nsav)    = raercol(k,mm,nsav) + raercol_cw(k,mm,nsav) ! cloud-borne aerosol
+               do m = 1, ntot_amode
+                  mm = mam_idx(m,0)
+                  raercol(k,mm,nsav)    = raercol(k,mm,nsav) + raercol_cw(k,mm,nsav)  ! cloud-borne aerosol
                   raercol_cw(k,mm,nsav) = 0._r8
-               end do
-            end do
 
+                  do l = 1, nspec_amode(m)
+                     mm = mam_idx(m,l)
+#ifdef EXTRATESTS
+                 if(i.eq.iDebug .and. getTracerIndex(m,l,.false.).eq.lDebug)then
+                  print*,"no cloud", k,  raercol(k,mm,nsav) , raercol_cw(k,mm,nsav)
+                 endif
+#endif
+                     raercol(k,mm,nsav)    = raercol(k,mm,nsav) + raercol_cw(k,mm,nsav) ! cloud-borne aerosol
+                     raercol_cw(k,mm,nsav) = 0._r8
+                  end do
+               end do
+
+            end if
          end if
 
       end do  ! old_cloud_main_k_loop
@@ -1632,6 +1719,21 @@ subroutine dropmixnuc( &
             end do
          end do
 #endif
+         if (called_from_spcam) then
+         !
+         ! turbulent mixing for gas species .
+         !
+               do m=1, pcnst
+                  if (cnst_species_class(m) == cnst_spec_class_gas) then
+                    flxconv = 0.0_r8
+                    zerogas(:) = 0.0_r8
+                    call explmix(rgascol(1,m,nnew),zerogas,ekkp,ekkm,overlapp,overlapm,  &
+                                 rgascol(1,m,nsav),zero, flxconv, pver,dtmix,&
+                                   .true., zerogas)
+                  end if
+               end do
+         endif
+
 #ifdef OSLO_AERO
          do lptr2=1,n_aerosol_tracers
             source(top_lev:pver-1) = mact_tracer(top_lev:pver-1,lptr2) &
@@ -1696,7 +1798,7 @@ subroutine dropmixnuc( &
 
       do k = top_lev, pver
          if (cldn(i,k) == 0._r8) then
-            ! no cloud
+            ! no ice or liquid cloud
             qcld(k)=0._r8
 
             ! convert activated aerosol to interstitial in decaying cloud
@@ -1960,6 +2062,18 @@ subroutine dropmixnuc( &
 
       end if  !prog_modal_aero
 
+      if (called_from_spcam) then
+      !
+      ! Gas tendency
+      !
+           do m=1, pcnst
+              if (cnst_species_class(m) == cnst_spec_class_gas) then
+                ptend%lq(m) = .true.
+                ptend%q(i, :, m) = (rgascol(:,m,nnew)-rgas(i,:,m)) * dtinv
+              end if
+           end do
+      endif
+
    end do  ! overall_main_i_loop
 
 #ifdef EXTRATESTS
@@ -1994,12 +2108,28 @@ subroutine dropmixnuc( &
       do m = 1, ntot_amode
          do l = 0, nspec_amode(m)
             mm = mam_idx(m,l)
-            call outfld(trim(fieldname(mm)),    coltend(:,mm),    pcols, lchnk)
-            call outfld(trim(fieldname_cw(mm)), coltend_cw(:,mm), pcols, lchnk)
+            call outfld(fieldname(mm),    coltend(:,mm),    pcols, lchnk)
+            call outfld(fieldname_cw(mm), coltend_cw(:,mm), pcols, lchnk)
          end do
       end do
    end if
 #endif
+
+   if(called_from_spcam) then
+   !
+   ! output column-integrated Gas tendency (this should be zero)
+   !
+        do m=1, pcnst
+            if (cnst_species_class(m) == cnst_spec_class_gas) then
+              do i=1, ncol
+                 coltendgas(i) = sum( pdel(i,:)*ptend%q(i,:,m) )/gravit
+              end do
+              fieldnamegas = trim(cnst_name(m)) // '_mixnuc1sp'
+              call outfld( trim(fieldnamegas), coltendgas, pcols, lchnk)
+            end if
+        end do
+        deallocate(rgascol, coltendgas)
+   end if
 
 #ifdef OSLO_AERO
    tendencyCounted(:)=.FALSE.
@@ -2145,26 +2275,26 @@ subroutine activate_modal(wbar, sigw, wdiab, wminf, wmaxf, tair, rhoair,  &
 
    !      input
 
-   real(r8) :: wbar          ! grid cell mean vertical velocity (m/s)
-   real(r8) :: sigw          ! subgrid standard deviation of vertical vel (m/s)
-   real(r8) :: wdiab         ! diabatic vertical velocity (0 if adiabatic)
-   real(r8) :: wminf         ! minimum updraft velocity for integration (m/s)
-   real(r8) :: wmaxf         ! maximum updraft velocity for integration (m/s)
-   real(r8) :: tair          ! air temperature (K)
-   real(r8) :: rhoair        ! air density (kg/m3)
-   real(r8) :: na(:)      ! aerosol number concentration (/m3)
-   integer  :: nmode      ! number of aerosol modes
-   real(r8) :: volume(:)  ! aerosol volume concentration (m3/m3)
-   real(r8) :: hygro(:)   ! hygroscopicity of aerosol mode
+   real(r8), intent(in) :: wbar          ! grid cell mean vertical velocity (m/s)
+   real(r8), intent(in) :: sigw          ! subgrid standard deviation of vertical vel (m/s)
+   real(r8), intent(in) :: wdiab         ! diabatic vertical velocity (0 if adiabatic)
+   real(r8), intent(in) :: wminf         ! minimum updraft velocity for integration (m/s)
+   real(r8), intent(in) :: wmaxf         ! maximum updraft velocity for integration (m/s)
+   real(r8), intent(in) :: tair          ! air temperature (K)
+   real(r8), intent(in) :: rhoair        ! air density (kg/m3)
+   real(r8), intent(in) :: na(:)      ! aerosol number concentration (/m3)
+   integer,  intent(in) :: nmode      ! number of aerosol modes
+   real(r8), intent(in) :: volume(:)  ! aerosol volume concentration (m3/m3)
+   real(r8), intent(in) :: hygro(:)   ! hygroscopicity of aerosol mode
    real(r8), intent(in), optional :: lnsigman(:)
 
    !      output
 
-   real(r8) :: fn(:)      ! number fraction of aerosols activated
-   real(r8) :: fm(:)      ! mass fraction of aerosols activated
-   real(r8) :: fluxn(:)   ! flux of activated aerosol number fraction into cloud (cm/s)
-   real(r8) :: fluxm(:)   ! flux of activated aerosol mass fraction into cloud (cm/s)
-   real(r8) :: flux_fullact   ! flux of activated aerosol fraction assuming 100% activation (cm/s)
+   real(r8), intent(out) :: fn(:)      ! number fraction of aerosols activated
+   real(r8), intent(out) :: fm(:)      ! mass fraction of aerosols activated
+   real(r8), intent(out) :: fluxn(:)   ! flux of activated aerosol number fraction into cloud (cm/s)
+   real(r8), intent(out) :: fluxm(:)   ! flux of activated aerosol mass fraction into cloud (cm/s)
+   real(r8), intent(out) :: flux_fullact   ! flux of activated aerosol fraction assuming 100% activation (cm/s)
    !    rce-comment
    !    used for consistency check -- this should match (ekd(k)*zs(k))
    !    also, fluxm/flux_fullact gives fraction of aerosol mass flux

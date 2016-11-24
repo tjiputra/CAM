@@ -443,19 +443,19 @@ CONTAINS
     use dyn_comp,        only: dyn_init, dyn_import_t, dyn_export_t
     use cam_pio_utils,   only: pio_subsystem
     use dyn_comp,        only: dyn_init
-    use prognostics,     only: initialize_prognostics, n3, n3m1
+    use prognostics,     only: n3, n3m1
     use pmgrid,          only: plon, plat, plevp, plev, beglat, endlat
     use constituents,    only: pcnst
     use sld_control_mod, only: tmass0
-    use scanslt,         only: slt_alloc, hw1, hw2, hw3, alpha   
+    use scanslt,         only: hw1, hw2, hw3, alpha   
     use comspe,          only: lnpstar
 
     !
     ! Input arguments
     !
     type(file_desc_t), intent(inout) :: File     ! PIO file handle
-    type(dyn_import_t) :: dyn_in    ! not used by this dycore, included for compatibility
-    type(dyn_export_t) :: dyn_out ! not used by this dycore, included for compatibility    
+    type(dyn_import_t), intent(out)  :: dyn_in
+    type(dyn_export_t), intent(out)  :: dyn_out
 
     ! Local workspace
     !
@@ -472,10 +472,7 @@ CONTAINS
     integer(kind=pio_offset_kind) :: t
     integer, pointer :: ldof(:)
 
-    call dyn_init(file)
-
-    call initialize_prognostics
-    call slt_alloc()
+    call dyn_init(dyn_in, dyn_out)
 
     dims4d(1) = plon
     dims4d(2) = plev

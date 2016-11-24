@@ -20,6 +20,7 @@ module offline_driver
   public :: offline_driver_run
   public :: offline_driver_dorun
   public :: offline_driver_readnl
+  public :: offline_driver_reg
 
   integer :: recno = 1
   logical, protected :: offline_driver_dorun = .false.
@@ -31,6 +32,13 @@ module offline_driver
   type(drv_input_data_t) :: curr_indata
 
 contains
+
+!================================================================================
+!================================================================================
+  subroutine offline_driver_reg()
+    use unit_driver, only: unit_driver_reg
+    call unit_driver_reg()
+  end subroutine offline_driver_reg
 
 !================================================================================
 !================================================================================

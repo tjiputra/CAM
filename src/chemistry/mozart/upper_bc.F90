@@ -10,9 +10,8 @@ module upper_bc
 !---------------------------------------------------------------------------------
 
   use shr_kind_mod, only: r8 => shr_kind_r8
-  use ppgrid,       only: pcols, pver, pverp
+  use ppgrid,       only: pcols, pverp
   use constituents, only: pcnst
-  use physconst,    only: rair, mwdry
   use cam_logfile,  only: iulog
   use spmd_utils,   only: masterproc
   use ref_pres,     only: ptop_ref
@@ -153,12 +152,9 @@ end subroutine ubc_setopts
     use mo_tgcm_ubc, only: tgcm_ubc_inti
     use mo_snoe,     only: snoe_inti
     use mo_msis_ubc, only: msis_ubc_inti
-    use time_manager,only: get_step_size
-    use constituents,only: cnst_get_ind, cnst_mw !Needed for ubc_flux
-    use physics_buffer, only : physics_buffer_desc
+    use constituents,only: cnst_get_ind
 
 !---------------------------Local workspace-----------------------------
-    integer :: steps_per_day
     logical :: zonal_avg
 !-----------------------------------------------------------------------
     apply_upper_bc = ptop_ref<1._r8 ! Pa
@@ -168,7 +164,6 @@ end subroutine ubc_setopts
     call cnst_get_ind('F', f_ndx, abort=.false.)
     call cnst_get_ind('HF', hf_ndx, abort=.false.)
 
-    steps_per_day = 86400/get_step_size()
     zonal_avg     = .false.
 
 !-----------------------------------------------------------------------
@@ -186,7 +181,7 @@ end subroutine ubc_setopts
 !-----------------------------------------------------------------------
 !	... initialize the msis module
 !-----------------------------------------------------------------------
-    call msis_ubc_inti( zonal_avg, steps_per_day )
+    call msis_ubc_inti( zonal_avg )
     if (masterproc) write(iulog,*) 'ubc_init: after msis_ubc_inti'
 
   end subroutine ubc_init

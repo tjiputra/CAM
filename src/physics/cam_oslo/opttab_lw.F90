@@ -1,10 +1,12 @@
 module opttab_lw
 
-! Purpose: To read in LW look-up tables and calculate optical properties for the aerosols
-! for the subroutine interpol*_lw.
+!Purpose: To read in LW look-up tables for calculation of aerosol optical properties, 
+!   The grid for discrete input-values in the look-up tables is defined in opptab. 
 
 !   Based on opttab.F90 and modified for new wavelength bands and look-up tables 
 !   by Alf Kirkevaag in January 2014, and extended to include SOA in August 2015.
+!   Modified for optimized added masses and mass fractions for concentrations from 
+!   condensation, coagulation or cloud-processing - Alf Kirkevaag, May 2016. 
 
 
   use shr_kind_mod, only: r8 => shr_kind_r8
@@ -47,27 +49,26 @@ subroutine initopt_lw
 !---------------------------------------------------------------
 
     use oslo_control, only: oslo_getopts, dir_string_length
-!   use shr_kind_mod, only: r8 => shr_kind_r8
-!   use inpgraer
 
 
 !   implicit none
 
-!     Tabulating the 'kcomp'-files to save computing time.
-
       integer kcomp, iwl, irelh, ictot, ifac, ifbc, ifaq
-      integer ifombg, ifbcbg                                  ! soa
+      integer ifombg, ifbcbg
       integer ic, ifil, lin, linmax
       real(r8) catot, relh, frac, fabc, fraq, frombg, frbcbg
       real(r8) spabs
       real(r8) rh2(10)
       real(r8) :: eps2 = 1.e-2_r8
+      real(r8) :: eps3 = 1.e-3_r8
       real(r8) :: eps4 = 1.e-4_r8
       real(r8) :: eps6 = 1.e-6_r8
       real(r8) :: eps7 = 1.e-7_r8
       character(len=dir_string_length) :: aerotab_table_dir
 
       call oslo_getopts(aerotab_table_dir_out = aerotab_table_dir)
+
+!     Opening the 'lwkcomp'-files:
 
 !ccccccccc1ccccccccc2ccccccccc3ccccccccc4ccccccccc5ccccccccc6ccccccccc7cc
 
@@ -129,12 +130,10 @@ subroutine initopt_lw
 
 
 !ccccccccc1ccccccccc2ccccccccc3ccccccccc4ccccccccc5ccccccccc6ccccccccc7cc
-!soa       New mode 1 (SO4 + condensate from H2SO4 and SOA)
 !       Mode 1 (H2SO4 + condesate from H2SO4 and SOA)
 !ccccccccc1ccccccccc2ccccccccc3ccccccccc4ccccccccc5ccccccccc6ccccccccc7cc
 
         ifil = 1
-!soa        linmax=nlwbands*10*16*6
         linmax=nlwbands*10*6*16*6
         do lin = 1,linmax
 
@@ -198,13 +197,12 @@ subroutine initopt_lw
 
 
 !ccccccccc1ccccccccc2ccccccccc3ccccccccc4ccccccccc5ccccccccc6ccccccccc7cc
-!soa       Modes 2 to 3 (BC/OC + condensate from H2SO4)
 !       Modes 2 to 3 (BC or OC + condensate from H2SO4 and SOA)
 !ccccccccc1ccccccccc2ccccccccc3ccccccccc4ccccccccc5ccccccccc6ccccccccc7cc
 
-!soa      linmax = nlwbands*10*16 
       linmax = nlwbands*10*16*6 
-      do ifil = 2,3
+!      do ifil = 2,3
+      do ifil = 2,2
         do lin = 1,linmax 
 
           read(39+ifil,994) kcomp, iwl, relh, catot, frac, spabs
@@ -242,10 +240,23 @@ subroutine initopt_lw
         end do  ! lin
       end do    ! ifil
 
-    do kcomp=2,3
+!   Prescribed dummy values for kcomp=3
+    kcomp=3
     do iwl=1,nlwbands
     do irelh=1,10
     do ictot=1,16
+    do ifac=1,6
+          ka2to3(iwl,irelh,ictot,ifac,kcomp)=1.0_r8
+    enddo
+    enddo
+    enddo
+    enddo
+
+    do kcomp=2,2
+    do iwl=1,nlwbands
+    do irelh=1,10
+    do ictot=1,16
+    do ifac=1,6
      if(ka2to3(iwl,irelh,ictot,ifac,kcomp)<=0.0_r8) then
       write(iulog,*) 'ka2to3 =', iwl, irelh, ictot, ifac, ka2to3(iwl,irelh,ictot,ifac,kcomp)
       write(iulog,*) 'Error in initialization of ka2to3'
@@ -255,17 +266,16 @@ subroutine initopt_lw
     enddo
     enddo
     enddo
+    enddo
 
         write(iulog,*)'lw mode 2-3 ok' 
 
 
 !ccccccccc1ccccccccc2ccccccccc3ccccccccc4ccccccccc5ccccccccc6ccccccccc7cc
-!soa       Mode 4 (BC&OC + condesate from H2SO4 + wetphase (NH4)2SO4)
 !       Mode 4 (BC&OC + condesate from H2SO4 and SOA + wetphase (NH4)2SO4)
 !ccccccccc1ccccccccc2ccccccccc3ccccccccc4ccccccccc5ccccccccc6ccccccccc7cc
 
         ifil = 4
-!soa        linmax = nlwbands*10*16*6*6 
         linmax = nlwbands*10*6*16*6*6 
         do lin = 1,linmax
 
@@ -280,7 +290,9 @@ subroutine initopt_lw
    81     continue
 
  	  do ic=1,6
-	   if(abs(frbcbg-fbcbg(ic))<eps4) then
+!	   if(abs(frbcbg-fbcbg(ic))<eps4) then
+!	   if(abs(frbcbg-fbcbg(ic))<eps3) then
+	   if(abs((frbcbg-fbcbg(ic))/fbcbg(ic))<eps2) then
 	    ifbcbg=ic
 	    goto 92
 	   endif
@@ -354,7 +366,8 @@ subroutine initopt_lw
    11     continue
 
  	  do ic=1,6
-	   if(abs(catot-cat(kcomp,ic))<eps6) then
+!	   if(abs(catot-cat(kcomp,ic))<eps6) then
+	   if(abs((catot-cat(kcomp,ic))/cat(kcomp,ic))<eps2) then
 	    ictot=ic
 	    goto 21
 	   endif
@@ -370,7 +383,8 @@ subroutine initopt_lw
    31     continue
 
  	  do ic=1,6
-	   if(abs(fabc-fbc(ic))<eps4) then
+!	   if(abs(fabc-fbc(ic))<eps4) then
+	   if(abs((fabc-fbc(ic))/fbc(ic))<eps2) then
 	    ifbc=ic
 	    goto 41
 	   endif

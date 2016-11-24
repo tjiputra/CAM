@@ -28,9 +28,12 @@ plotf=png  # chosen output format for figures (ps, eps, pdf, png)
 #pthI=/lustre/mnt/alfg/condTimeStep/R554SoaNucl/atm/hist/
 #fnmI=R554SoaNucl.cam.h0.1981-01.nc                 # first file to be used
 #fnmpI=R554SoaNucl.cam.h0.1981                        # all files fnmpI_PD* are used
-pthI=/media/BackupAK/NorESM2output/PDndgMG15MegVadSOA/
-fnmI=PDndgMG15MegVadSOA.cam.h0.1983-01.nc 
-fnmpI=PDndgMG15MegVadSOA.cam.h0.19
+#pthI=/media/BackupAK/NorESM2output/PDndgMG15MegVadSOA/
+#fnmI=PDndgMG15MegVadSOA.cam.h0.1983-01.nc 
+#fnmpI=PDndgMG15MegVadSOA.cam.h0.19
+pthI=/media/BackupAK/NorESM2output/PD_MG15MegVadSOA/clim3-12corr/
+fnmI=PD_MG15MegVadSOA.cam.h0.climyr3-12_01.nc
+fnmpI=PD_MG15MegVadSOA.cam.h0.clim
 #
 #pthII=/lustre/mnt/alfg/condTimeStep/R566SoaNucl/atm/hist/
 #fnmII=R566SoaNucl.cam.h0.1981-01.nc                 # first file to be used
@@ -38,9 +41,12 @@ fnmpI=PDndgMG15MegVadSOA.cam.h0.19
 #pthII=/media/BackupAK/NorESM2output/PD_MG15MegVadSOA/
 #fnmII=PD_MG15MegVadSOA.cam.h0.0010-01.nc
 #fnmpII=PD_MG15MegVadSOA.cam.h0.00
-pthII=/media/BackupAK/NorESM2output/PD_MG15MegVadSOA/clim3-12corr/
-fnmII=PD_MG15MegVadSOA.cam.h0.climyr3-12_01.nc
-fnmpII=PD_MG15MegVadSOA.cam.h0.clim
+#pthII=/media/BackupAK/NorESM2output/PD_MG15MegVadSOA/clim3-12corr/
+#fnmII=PD_MG15MegVadSOA.cam.h0.climyr3-12_01.nc
+#fnmpII=PD_MG15MegVadSOA.cam.h0.clim
+pthII=/media/BackupAK/NorESM2output/PDaug16UVPSndg/yr18-19/
+fnmII=PDaug16UVPSndg.cam.h0.0018-01.nc
+fnmpII=PDaug16UVPSndg.cam.h0.00
 #
 # Paths and names of input files necessary for forcing plots (PI case)):
 #pthI_PI=/vol/fou/atmos2/alfk/hexagon/aerocomA2noresm_r128/
@@ -49,9 +55,12 @@ fnmpII=PD_MG15MegVadSOA.cam.h0.clim
 #pthI_PI=/media/BackupAK/NorESM2output/SOA_r610_PI/
 #fnmI_PI=SOA_r610_PI.cam.h0.1984-12.nc
 #fnmpI_PI=SOA_r610_PI.cam.h0.19
-pthI_PI=/media/BackupAK/NorESM2output/PIndgMG15MegVadSOA/
-fnmI_PI=PIndgMG15MegVadSOA.cam.h0.1983-01.nc
-fnmpI_PI=PIndgMG15MegVadSOA.cam.h0.19
+#pthI_PI=/media/BackupAK/NorESM2output/PIndgMG15MegVadSOA/
+#fnmI_PI=PIndgMG15MegVadSOA.cam.h0.1983-01.nc
+#fnmpI_PI=PIndgMG15MegVadSOA.cam.h0.19
+pthI_PI=/media/BackupAK/NorESM2output/PI_MG15MegVadSOA/clim3-12corr/
+fnmI_PI=PI_MG15MegVadSOA.cam.h0.climyr3-12_01.nc
+fnmpI_PI=PI_MG15MegVadSOA.cam.h0.clim
 #
 #pthII_PI=/media/BackupAK/NorESM2output/PI1850R516/
 #fnmII_PI=PI1850R516.cam.h0.1984-12.nc                 # first file to be used
@@ -59,28 +68,23 @@ fnmpI_PI=PIndgMG15MegVadSOA.cam.h0.19
 #pthII_PI=/media/BackupAK/NorESM2output/PI_MG15MegVadSOA/
 #fnmII_PI=PI_MG15MegVadSOA.cam.h0.0010-01.nc
 #fnmpII_PI=PI_MG15MegVadSOA.cam.h0.00
-pthII_PI=/media/BackupAK/NorESM2output/PI_MG15MegVadSOA/clim3-12corr/
-fnmII_PI=PI_MG15MegVadSOA.cam.h0.climyr3-12_01.nc
-fnmpII_PI=PI_MG15MegVadSOA.cam.h0.clim
+#pthII_PI=/media/BackupAK/NorESM2output/PI_MG15MegVadSOA/clim3-12corr/
+#fnmII_PI=PI_MG15MegVadSOA.cam.h0.climyr3-12_01.nc
+#fnmpII_PI=PI_MG15MegVadSOA.cam.h0.clim
+pthII_PI=/media/BackupAK/NorESM2output/PIaug16UVPSndg/yr18-19/
+fnmII_PI=PIaug16UVPSndg.cam.h0.0018-01.nc
+fnmpII_PI=PIaug16UVPSndg.cam.h0.00
 #
 #ModelI=CAM4-Oslo  # gives CAM4-Oslo vs. new CAM5-Oslo comparison plots
 ModelI=CAM5-Oslo  # gives CAM5-Oslo Revision N vs. CAM5-Oslo Revision M comparison plots
 #**********************************************************************************************
 #No changes by the user should be necessary below...
 
-
 echo ''
 echo 'Running Emis_ModIvsModII.ncl'
 echo ''
 for I in {0..5};do
  ncl plot_type=$I format=\"$plotf\" filepath_I=\"$pthI\" filename_I=\"$fnmI\" filepath_II=\"$pthII\" filename_II=\"$fnmII\" filenamep_I=\"$fnmpI\" filenamep_II=\"$fnmpII\" ModI=\"$ModelI\" Emis_ModIvsModII.ncl
-done
-
-echo ''
-echo 'Running ERF_ModIvsModII.ncl'
-echo ''
-for I in {0..5};do
-ncl  plot_type=$I format=\"$plotf\" filepathPD_I=\"$pthI\" filenamePD_I=\"$fnmI\" filepathPD_II=\"$pthII\" filenamePD_II=\"$fnmII\" filenamepPD_I=\"$fnmpI\" filenamepPD_II=\"$fnmpII\" filepathPI_I=\"$pthI_PI\" filenamePI_I=\"$fnmI_PI\" filepathPI_II=\"$pthII_PI\" filenamePI_II=\"$fnmII_PI\" filenamepPI_I=\"$fnmpI_PI\" filenamepPI_II=\"$fnmpII_PI\" ModI=\"$ModelI\" ERF_ModIvsModII.ncl 
 done
 
 echo ''
@@ -93,36 +97,8 @@ done
 echo ''
 echo 'Running Load_ModIvsModII.ncl'
 echo ''
-for I in {0..6};do
- ncl plot_type=$I format=\"$plotf\" filepath_I=\"$pthI\" filename_I=\"$fnmI\" filepath_II=\"$pthII\" filename_II=\"$fnmII\" filenamep_I=\"$fnmpI\" filenamep_II=\"$fnmpII\" ModI=\"$ModelI\" Load_ModIvsModII.ncl
-done
-
-echo ''
-echo 'Running divPD-PI_Zonal_ModIvsModII.ncl'
-echo ''
-for I in {0..6};do
-ncl  plot_type=$I format=\"$plotf\" filepathPD_I=\"$pthI\" filenamePD_I=\"$fnmI\" filepathPD_II=\"$pthII\" filenamePD_II=\"$fnmII\" filenamepPD_I=\"$fnmpI\" filenamepPD_II=\"$fnmpII\" filepathPI_I=\"$pthI_PI\" filenamePI_I=\"$fnmI_PI\" filepathPI_II=\"$pthII_PI\" filenamePI_II=\"$fnmII_PI\" filenamepPI_I=\"$fnmpI_PI\" filenamepPI_II=\"$fnmpII_PI\" ModI=\"$ModelI\" divPD-PI_Zonal_ModIvsModII.ncl 
-done
-
-echo ''
-echo 'Running PM_ModIvsModII.ncl'
-echo ''
-for I in {1..5};do
-ncl  plot_type=$I format=\"$plotf\" filepathPD_I=\"$pthI\" filenamePD_I=\"$fnmI\" filepathPD_II=\"$pthII\" filenamePD_II=\"$fnmII\" filenamepPD_I=\"$fnmpI\" filenamepPD_II=\"$fnmpII\" filepathPI_I=\"$pthI_PI\" filenamePI_I=\"$fnmI_PI\" filepathPI_II=\"$pthII_PI\" filenamePI_II=\"$fnmII_PI\" filenamepPI_I=\"$fnmpI_PI\" filenamepPI_II=\"$fnmpII_PI\" ModI=\"$ModelI\" PM_ModIvsModII.ncl 
-done
-
-echo ''
-echo 'Running RadBudg_ModIvsModII.ncl'
-echo ''
-for I in {1..3};do
-ncl  plot_type=$I format=\"$plotf\" filepathPD_I=\"$pthI\" filenamePD_I=\"$fnmI\" filepathPD_II=\"$pthII\" filenamePD_II=\"$fnmII\" filenamepPD_I=\"$fnmpI\" filenamepPD_II=\"$fnmpII\" filepathPI_I=\"$pthI_PI\" filenamePI_I=\"$fnmI_PI\" filepathPI_II=\"$pthII_PI\" filenamePI_II=\"$fnmII_PI\" filenamepPI_I=\"$fnmpI_PI\" filenamepPI_II=\"$fnmpII_PI\" ModI=\"$ModelI\" RadBudg_ModIvsModII.ncl 
-done
-
-echo ''
-echo 'Running divPD-PI_ModIvsModII.ncl'
-echo ''
 for I in {0..7};do
-ncl  plot_type=$I format=\"$plotf\" filepathPD_I=\"$pthI\" filenamePD_I=\"$fnmI\" filepathPD_II=\"$pthII\" filenamePD_II=\"$fnmII\" filenamepPD_I=\"$fnmpI\" filenamepPD_II=\"$fnmpII\" filepathPI_I=\"$pthI_PI\" filenamePI_I=\"$fnmI_PI\" filepathPI_II=\"$pthII_PI\" filenamePI_II=\"$fnmII_PI\" filenamepPI_I=\"$fnmpI_PI\" filenamepPI_II=\"$fnmpII_PI\" ModI=\"$ModelI\" divPD-PI_ModIvsModII.ncl 
+ ncl plot_type=$I format=\"$plotf\" filepath_I=\"$pthI\" filename_I=\"$fnmI\" filepath_II=\"$pthII\" filename_II=\"$fnmII\" filenamep_I=\"$fnmpI\" filenamep_II=\"$fnmpII\" ModI=\"$ModelI\" Load_ModIvsModII.ncl
 done
 
 echo ''
@@ -186,6 +162,41 @@ echo 'Running ZonalModepar_ModIvsModII.ncl'
 echo ''
 for I in {1..9};do
  ncl plot_type=$I format=\"$plotf\" filepath_I=\"$pthI\" filename_I=\"$fnmI\" filepath_II=\"$pthII\" filename_II=\"$fnmII\" filenamep_I=\"$fnmpI\" filenamep_II=\"$fnmpII\" ModI=\"$ModelI\" ZonalModepar_ModIvsModII.ncl
+done
+
+echo ''
+echo 'Running PM_ModIvsModII.ncl'
+echo ''
+for I in {1..5};do
+ncl  plot_type=$I format=\"$plotf\" filepathPD_I=\"$pthI\" filenamePD_I=\"$fnmI\" filepathPD_II=\"$pthII\" filenamePD_II=\"$fnmII\" filenamepPD_I=\"$fnmpI\" filenamepPD_II=\"$fnmpII\" filepathPI_I=\"$pthI_PI\" filenamePI_I=\"$fnmI_PI\" filepathPI_II=\"$pthII_PI\" filenamePI_II=\"$fnmII_PI\" filenamepPI_I=\"$fnmpI_PI\" filenamepPI_II=\"$fnmpII_PI\" ModI=\"$ModelI\" PM_ModIvsModII.ncl 
+done
+
+echo ''
+echo 'Running RadBudg_ModIvsModII.ncl'
+echo ''
+for I in {1..3};do
+ncl  plot_type=$I format=\"$plotf\" filepathPD_I=\"$pthI\" filenamePD_I=\"$fnmI\" filepathPD_II=\"$pthII\" filenamePD_II=\"$fnmII\" filenamepPD_I=\"$fnmpI\" filenamepPD_II=\"$fnmpII\" filepathPI_I=\"$pthI_PI\" filenamePI_I=\"$fnmI_PI\" filepathPI_II=\"$pthII_PI\" filenamePI_II=\"$fnmII_PI\" filenamepPI_I=\"$fnmpI_PI\" filenamepPI_II=\"$fnmpII_PI\" ModI=\"$ModelI\" RadBudg_ModIvsModII.ncl 
+done
+
+echo ''
+echo 'Running divPD-PI_ModIvsModII.ncl'
+echo ''
+for I in {0..7};do
+ncl  plot_type=$I format=\"$plotf\" filepathPD_I=\"$pthI\" filenamePD_I=\"$fnmI\" filepathPD_II=\"$pthII\" filenamePD_II=\"$fnmII\" filenamepPD_I=\"$fnmpI\" filenamepPD_II=\"$fnmpII\" filepathPI_I=\"$pthI_PI\" filenamePI_I=\"$fnmI_PI\" filepathPI_II=\"$pthII_PI\" filenamePI_II=\"$fnmII_PI\" filenamepPI_I=\"$fnmpI_PI\" filenamepPI_II=\"$fnmpII_PI\" ModI=\"$ModelI\" divPD-PI_ModIvsModII.ncl 
+done
+
+echo ''
+echo 'Running divPD-PI_Zonal_ModIvsModII.ncl'
+echo ''
+for I in {0..6};do
+ncl  plot_type=$I format=\"$plotf\" filepathPD_I=\"$pthI\" filenamePD_I=\"$fnmI\" filepathPD_II=\"$pthII\" filenamePD_II=\"$fnmII\" filenamepPD_I=\"$fnmpI\" filenamepPD_II=\"$fnmpII\" filepathPI_I=\"$pthI_PI\" filenamePI_I=\"$fnmI_PI\" filepathPI_II=\"$pthII_PI\" filenamePI_II=\"$fnmII_PI\" filenamepPI_I=\"$fnmpI_PI\" filenamepPI_II=\"$fnmpII_PI\" ModI=\"$ModelI\" divPD-PI_Zonal_ModIvsModII.ncl 
+done
+
+echo ''
+echo 'Running ERF_ModIvsModII.ncl'
+echo ''
+for I in {0..6};do
+ncl  plot_type=$I format=\"$plotf\" filepathPD_I=\"$pthI\" filenamePD_I=\"$fnmI\" filepathPD_II=\"$pthII\" filenamePD_II=\"$fnmII\" filenamepPD_I=\"$fnmpI\" filenamepPD_II=\"$fnmpII\" filepathPI_I=\"$pthI_PI\" filenamePI_I=\"$fnmI_PI\" filepathPI_II=\"$pthII_PI\" filenamePI_II=\"$fnmII_PI\" filenamepPI_I=\"$fnmpI_PI\" filenamepPI_II=\"$fnmpII_PI\" ModI=\"$ModelI\" ERF_ModIvsModII.ncl 
 done
 
 echo ''

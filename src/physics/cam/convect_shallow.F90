@@ -25,8 +25,6 @@
    public :: &
              convect_shallow_register,       & ! Register fields in physics buffer
              convect_shallow_init,           & ! Initialize shallow module
-             convect_shallow_init_cnst,	     & ! 
-             convect_shallow_implements_cnst,&
              convect_shallow_tend,           & ! Return tendencies
              convect_shallow_use_shfrc	       ! 
 
@@ -89,6 +87,8 @@
   
   call phys_getopts( shallow_scheme_out = shallow_scheme, microp_scheme_out = microp_scheme)
                      
+  ! SPCAM registers its own fields
+  if (shallow_scheme == 'SPCAM') return
 
   call pbuf_add_field('ICWMRSH',    'physpkg' ,dtype_r8,(/pcols,pver/),       icwmrsh_idx )
   call pbuf_add_field('RPRDSH',     'physpkg' ,dtype_r8,(/pcols,pver/),       rprdsh_idx )
@@ -165,6 +165,9 @@
   integer k
   character(len=16)          :: eddy_scheme
     
+  ! SPCAM does its own convection
+  if (shallow_scheme == 'SPCAM') return
+
   ! ------------------------------------------------- !
   ! Variables for detailed abalysis of UW-ShCu scheme !
   ! ------------------------------------------------- !
@@ -316,56 +319,6 @@
   rprddp_idx   = pbuf_get_index('RPRDDP')
 
   end subroutine convect_shallow_init
-
-!==================================================================================================
-
-function convect_shallow_implements_cnst(name)
-
-   ! Return true if specified constituent is implemented by a shallow convetion package
-
-   use unicon_cam, only: unicon_implements_cnst
-
-   character(len=*), intent(in) :: name          ! constituent name
-   logical :: convect_shallow_implements_cnst    ! return value
-   
-   integer :: m
-   !-----------------------------------------------------------------------
-
-   select case (shallow_scheme)
-
-   case('UNICON')
-      convect_shallow_implements_cnst = unicon_implements_cnst(name)
-
-   case default
-      convect_shallow_implements_cnst = .false.
-
-   end select
-
-end function convect_shallow_implements_cnst
-
-!==================================================================================================
-
-subroutine convect_shallow_init_cnst(name, q, gcid)
-
-  ! Initialize constituents if they are not read from the initial file
-
-   use unicon_cam, only: unicon_init_cnst
-
-   character(len=*), intent(in)  :: name     ! constituent name
-   real(r8),         intent(out) :: q(:,:)   ! mass mixing ratio (gcol, plev)
-   integer,          intent(in)  :: gcid(:)  ! global column id
-   !-----------------------------------------------------------------------
-
-   select case (shallow_scheme)
-
-   case('UNICON')
-      call unicon_init_cnst(name, q, gcid)
-
-   case default
-
-   end select
-
-end subroutine convect_shallow_init_cnst
 
 !==================================================================================================
 

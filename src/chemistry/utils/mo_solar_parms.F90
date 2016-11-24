@@ -97,8 +97,6 @@ contains
     integer  :: wrk_date
     integer  :: yr, mon, day, ncsec
     real(r8) :: wrk_time
-    real(r8), allocatable :: bz(:)
-    integer  :: ndx(1)
     character(len=256) :: locfn
     integer :: ierr
 
@@ -141,15 +139,15 @@ contains
     end do
     tim_ndx = n - 1
     dels    = (wrk_time - times(tim_ndx))/(times(tim_ndx+1) - times(tim_ndx))
-    if(masterproc) write(iulog,*) 'solar_parms_init: tim_ndx, dels, times(tim_ndx:tim_ndx+1) = ', &
-                                                     tim_ndx, dels, dates(tim_ndx:tim_ndx+1)
+    if (masterproc) write(iulog,"('solar_parms_init: set tim_ndx,dels = ',i12,g24.16)") tim_ndx, dels
+    if(masterproc) write(iulog, "('solar_parms_init: tim_ndx, dels, times(tim_ndx:tim_ndx+1) = ', i12, 3g24.16 )" )&
+                                                     tim_ndx, dels, times(tim_ndx:tim_ndx+1)
     if(masterproc) write(iulog,*) '--------------------------------------------------'
     if(masterproc) write(iulog,*) ' '
     !---------------------------------------------------------------
     !	... allocate and read solar parms
     !---------------------------------------------------------------
-    allocate( f107(ntimes), f107a(ntimes), &
-         kp(ntimes), ap(ntimes), stat=astat )
+    allocate( f107(ntimes), f107a(ntimes), kp(ntimes), ap(ntimes), stat=astat )
     if( astat /= 0 ) then
        call alloc_err( astat, 'solar_parms_init', 'f107 ... ap ', ntimes )
     end if
@@ -203,12 +201,13 @@ subroutine solar_parms_timestep_init
     end do
     tim_ndx = n - 1
     dels    = (wrk_time - times(tim_ndx))/(times(tim_ndx+1) - times(tim_ndx))
+    if (masterproc) write(iulog,"('solar_parms_timestep_init: set tim_ndx,dels = ',i12,g24.16)") tim_ndx, dels
  end if
 
 
 end subroutine solar_parms_timestep_init
 
-subroutine solar_parms_get( f107_s, f107a_s, ap_s, kp_s, hp_s )
+subroutine solar_parms_get( f107_s, f107a_s, ap_s, kp_s )
   !---------------------------------------------------------------
   !	... set,retrieve solar parmaters
   !---------------------------------------------------------------
@@ -222,7 +221,6 @@ subroutine solar_parms_get( f107_s, f107a_s, ap_s, kp_s, hp_s )
  real(r8), optional, intent(out) :: f107a_s                  ! averaged solar euv factor
  real(r8), optional, intent(out) :: ap_s                     ! solar mag factor
  real(r8), optional, intent(out) :: kp_s                     ! solar mag factor
- real(r8), optional, intent(out) :: hp_s                     ! hemispheric power
 
  !---------------------------------------------------------------
  !	... local variables
@@ -244,10 +242,6 @@ subroutine solar_parms_get( f107_s, f107a_s, ap_s, kp_s, hp_s )
  end if
  if( present( ap_s ) ) then
     ap_s  =  ap(tim_ndx) + dels*(ap(tnp) - ap(tim_ndx))
- end if
- if( present( hp_s ) ) then
-    wkp  =  kp(tim_ndx) + dels*(kp(tnp) - kp(tim_ndx))
-    hp_s = max( 3._r8,-2.78_r8 + 9.39_r8*wkp )
  end if
 
 end subroutine solar_parms_get

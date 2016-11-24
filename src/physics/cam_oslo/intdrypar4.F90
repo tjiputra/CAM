@@ -17,18 +17,12 @@ subroutine intdrypar4 (lchnk, ncol, Nnatk, xfbcbgnin, xfbcbgin, Camk, xfacin, xf
 !
    integer, intent(in) :: lchnk                     ! chunk identifier
    integer, intent(in) :: ncol                      ! number of atmospheric columns
-!ak16jan15+
-!   integer, intent(in) :: mplus10                   ! mode number (0) or number + 10 (1)
-!ak16jan15-
    real(r8), intent(in) :: Nnatk(pcols,pver,0:nmodes) ! modal aerosol number concentration  
    real(r8), intent(in) :: Camk(pcols,pver,nbmodes) ! modal internally mixed (cond+aq) SO4 conc.
-!soa   real(r8), intent(in) :: xfacin(pcols,pver)       ! BC/(BC+OC) for he background mode
    real(r8), intent(in) :: xfacin(pcols,pver,4)     ! modal (OC+BC)/(SO4+BC+OC)=SOA/(Sulfate+SOA)
    real(r8), intent(in) :: xfaqin(pcols,pver)       ! SO4(aq)/SO4
-!soa
    real(r8), intent(in) :: xfbcbgin(pcols,pver)     ! mass fraction BC/(BC+OC) for the background mode (4)
    real(r8), intent(in) :: xfbcbgnin(pcols,pver)    ! mass fraction BC/(BC+OC) for the background mode (14)
-!soa
 !
 ! Input-Output arguments
 !
@@ -84,14 +78,7 @@ subroutine intdrypar4 (lchnk, ncol, Nnatk, xfbcbgnin, xfbcbgin, Camk, xfacin, xf
 
 !       Mode 4, BC&OC(Ait):
 
-!ak16jan15        kcomp=4
-!ak16jan15+
-!        if(mplus10==0) then
           kcomp=4
-!        else
-!          kcomp=14
-!        endif 
-!ak16jan15-
 
 !      initialize output fields
       do k=1,pver
@@ -246,6 +233,8 @@ subroutine intdrypar4 (lchnk, ncol, Nnatk, xfbcbgnin, xfbcbgin, Camk, xfacin, xf
 
 !     finally, interpolation in the fbcbg dimension 
       opt = (d2mx(1)*opt1+dxm1(1)*opt2)*invd(1)
+
+!      if(k.eq.1) write(*,*) 'opt4 =', opt
 
 !      write(*,*) 'Before array'
 

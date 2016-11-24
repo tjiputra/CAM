@@ -49,8 +49,6 @@ module mo_chm_diags
   real(r8), parameter :: N_molwgt = 14.00674_r8
   real(r8), parameter :: S_molwgt = 32.066_r8
 
-  character(len=32) :: chempkg
-
 contains
 
   subroutine chm_diags_inti
@@ -82,8 +80,7 @@ contains
     !-----------------------------------------------------------------------
 
     call phys_getopts( history_aerosol_out = history_aerosol, &
-                       history_amwg_out    = history_amwg,  &
-                       cam_chempkg_out     = chempkg   )
+                       history_amwg_out    = history_amwg )
 
     id_bry     = get_spc_ndx( 'BRY' )
     id_cly     = get_spc_ndx( 'CLY' )

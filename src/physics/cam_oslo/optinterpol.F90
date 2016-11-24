@@ -1,16 +1,18 @@
 module optinterpol
 
-! Purpose: To read in look-up tables and calculate SW optical properties for the aerosols
-!    For subroutine interpol:
+! Purpose: To interpolate between look-up table entries for SW optical aerosol properties.
 
-! Updated for new kcomp1.out including condensed SOA - Alf Kirkevaag, May 2013
+!     Optimized for speed by Arild Burud and Egil Storen (NoSerC), June-July 2002
+!--------------------------------------------------------------------------------
+
+! Updated for new kcomp1.out including condensed SOA - Alf Kirkevaag, May 2013.
 ! Extended for new SOA treatment for  kcomp1-4.out and treating SOA as coagulated OC
-! for kcomp5-10 - Alf Kirkevaag, August 2015
+! for kcomp5-10 - Alf Kirkevaag, August 2015, and also rewritten to a more generalized
+! for for interpolations using common subroutines interpol*dim.
 
   use shr_kind_mod, only: r8 => shr_kind_r8
   use opttab
   use opttab_lw
-!  use aerosoldef, only: nmodes, nbmodes
   use commondefinitions, only: nmodes, nbmodes
   implicit none
 
@@ -28,9 +30,6 @@ module optinterpol
 !********************************************************************************************
 
 subroutine interpol0 (lchnk, ncol, daylight, Nnatk, omega, gass, bex, ske, lw_on, kabs)
-
-!   Rewritten for CAM by Alf Kirkevaag in Feb. 2004, and 
-!   modified for new aerosol schemes in January 2006.
 
    use ppgrid
    use shr_kind_mod, only: r8 => shr_kind_r8
@@ -86,7 +85,6 @@ subroutine interpol0 (lchnk, ncol, daylight, Nnatk, omega, gass, bex, ske, lw_on
           do icol=1,ncol
 
 !           if(Nnatk(icol,k,kcomp)>0.0_r8) then
-!lw           if(daylight(icol).and.Nnatk(icol,k,kcomp)>0.0_r8) then
            if(daylight(icol)) then
            do i=1,nbands   ! i = wavelength index
               omega(icol,k,kcomp,i)=om0(i)
@@ -106,11 +104,9 @@ subroutine interpol0 (lchnk, ncol, daylight, Nnatk, omega, gass, bex, ske, lw_on
         do k=1,pver
           do icol=1,ncol
 
-!lw           if(Nnatk(icol,k,kcomp)>0.0_r8) then
             do i=1,nlwbands   ! i = wavelength index
                kabs(icol,k,kcomp,i)=ka0(i)
             end do            ! i
-!lw           endif  ! N>0         
 
           end do ! icol
         end do ! k
@@ -126,23 +122,6 @@ end subroutine interpol0
 subroutine interpol1 (lchnk, ncol, daylight, xrh, irh1, irh2, &
                       mplus10, Nnatk, xfombgin, &
                       Camk, xfacin, omega, gass, bex, ske, lw_on, kabs, cxstot)
-
-!     Optimized for speed by Arild Burud/NoSerC, June 2002
-!---------------------------------------------------------------
-!   Modified by Egil Storen/NoSerC July 2002.
-!   The sequence of the indices in arrays om1, g1, be1 and ke1
-!   (common block /tab1/) has been rearranged to avoid cache
-!   problems while running subroutine interpol1.
-!   Files also involved by this modification: initopt.F
-!   and opttab.h. 
-!---------------------------------------------------------------
-!   Rewritten for CAM by Alf Kirkevaag in Feb. 2004, and 
-!   modified (interpol1->interpol4) for new aerosol schemes 
-!   in November 2005. Extended to include SOA in August 2015
-!   (old interpol4 has been used as a template for new interpol1,
-!   since these two have arrays with the same number of dimensions,
-!   before rewriting it all to a more readable form including a
-!   subroutine that can be generalized).
 
 
    use ppgrid
@@ -222,9 +201,6 @@ subroutine interpol1 (lchnk, ncol, daylight, xrh, irh1, irh2, &
       do k=1,pver
         do icol=1,ncol
 
-!            if(Nnatk(icol,k,kc10)>0.0_r8) then
-!lw            if(daylight(icol)) then
-
           xct(icol,k)  = min(max(Camk(icol,k,kcomp) &
                  /(Nnatk(icol,k,kc10)+eps),cate(kcomp,1)),cate(kcomp,16))
           xfac(icol,k) = min(max(xfacin(icol,k,kcomp),fac(1)),fac(6))
@@ -236,39 +212,36 @@ subroutine interpol1 (lchnk, ncol, daylight, xrh, irh1, irh2, &
 
 !        if(icol.eq.1) then
 !          write(*,*) 'dir: k, kc10, cxs =', k, kc10, cxs(icol,k)
-!        endif
 
-!      write(*,*) 'Before cate-loop', kc10
-      do ictot=1,15
+!         write(*,*) 'Before cate-loop', kc10
+          do ictot=1,15
             if(xct(icol,k)>=cate(kcomp,ictot).and. &
             xct(icol,k) <= cate(kcomp,ictot+1)) then
              ict1(icol,k)=ictot
              ict2(icol,k)=ictot+1
             endif
-      end do ! ictot
+          end do ! ictot
 
-!      write(*,*) 'Before fac-loop', kcomp
-      do ifac=1,5
+!         write(*,*) 'Before fac-loop', kcomp
+          do ifac=1,5
             if(xfac(icol,k)>=fac(ifac).and. &
              xfac(icol,k) <= fac(ifac+1)) then
              ifac1(icol,k)=ifac
              ifac2(icol,k)=ifac+1
             endif
-      end do ! ifac
+          end do ! ifac
 
-!      write(*,*) 'Before fombg-loop', kcomp
-      do ifombg=1,5
+!         write(*,*) 'Before fombg-loop', kcomp
+          do ifombg=1,5
             if(xfombg(icol,k) >= fombg(ifombg).and. &
             xfombg(icol,k) <= fombg(ifombg+1)) then
              ifombg1(icol,k)=ifombg
              ifombg2(icol,k)=ifombg+1
             endif
-      end do ! ifombg
+          end do ! ifombg
 
-!lw            endif ! daylight
-
-          end do ! icol
-        end do ! k
+        end do ! icol
+      end do ! k
 
 
 !      write(*,*) 'Before init-loop', kc10
@@ -292,9 +265,6 @@ subroutine interpol1 (lchnk, ncol, daylight, xrh, irh1, irh2, &
          
         do k=1,pver
           do icol=1,ncol
-
-!           if(Nnatk(icol,k,kc10)>0.0_r8) then
-!lw           if(daylight(icol)) then
 
 !      Collect all the vector elements into temporary storage
 !      to avoid cache conflicts and excessive cross-referencing
@@ -573,11 +543,6 @@ subroutine interpol2to3 (lchnk, ncol, daylight, xrh, irh1, irh2, &
                          mplus10, Nnatk, Camk, xfacsoain, &
                          omega, gass, bex, ske, lw_on, kabs, cxstot)
 
-!   Extended to include SOA in August 2015
-!   (old interpol1wsoa has been used as a template for new interpol2to3,
-!   since these two have arrays with the same number of dimensions, before 
-!   rewriting it all to a more readable form including a subroutine that 
-!   can be generalized).
 
    use ppgrid
    use shr_kind_mod, only: r8 => shr_kind_r8
@@ -639,7 +604,8 @@ subroutine interpol2to3 (lchnk, ncol, daylight, xrh, irh1, irh2, &
       end do
 
 !      write(*,*) 'Before kcomp-loop'
-        do kcomp=2,3
+!      do kcomp=2,3
+      do kcomp=2,2
 
            if(mplus10==0) then
              kc10=kcomp
@@ -647,10 +613,8 @@ subroutine interpol2to3 (lchnk, ncol, daylight, xrh, irh1, irh2, &
              kc10=kcomp+10
            endif 
 
-      do k=1,pver
-        do icol=1,ncol
-
-!lw            if(daylight(icol)) then
+        do k=1,pver
+         do icol=1,ncol
 
           xct(icol,k)  = min(max(Camk(icol,k,kcomp) &
                  /(Nnatk(icol,k,kc10)+eps),cate(kcomp,1)),cate(kcomp,16))
@@ -665,27 +629,25 @@ subroutine interpol2to3 (lchnk, ncol, daylight, xrh, irh1, irh2, &
 !          write(*,*) 'k, kcomp, xct =', k, kc10, xct(icol,k)
 !        endif
 
-!      write(*,*) 'Before cate-loop', kc10
-      do ictot=1,15
+!         write(*,*) 'Before cate-loop', kc10
+          do ictot=1,15
             if(xct(icol,k)>=cate(kcomp,ictot).and. &
             xct(icol,k) <= cate(kcomp,ictot+1)) then
              ict1(icol,k)=ictot
              ict2(icol,k)=ictot+1
             endif
-      end do ! ictot
+          end do ! ictot
 
-!      write(*,*) 'Before fac-loop', kcomp
-      do ifac=1,5
+!         write(*,*) 'Before fac-loop', kcomp
+          do ifac=1,5
             if(xfac(icol,k)>=fac(ifac).and. &
              xfac(icol,k) <= fac(ifac+1)) then
              ifac1(icol,k)=ifac
              ifac2(icol,k)=ifac+1
             endif
-      end do ! ifac
+          end do ! ifac
 
-!lw            endif ! daylight
-
-          end do ! icol
+         end do ! icol
         end do ! k
 
 !      write(*,*) 'Before init-loop', kc10
@@ -709,8 +671,6 @@ subroutine interpol2to3 (lchnk, ncol, daylight, xrh, irh1, irh2, &
           
         do k=1,pver
           do icol=1,ncol
-
-!lw           if(daylight(icol)) then
 
 !      Collect all the vector elements into temporary storage
 !      to avoid cache conflicts and excessive cross-referencing
@@ -917,7 +877,7 @@ subroutine interpol2to3 (lchnk, ncol, daylight, xrh, irh1, irh2, &
 !       write(*,*) 'kcomp, bex(1,26,kcomp,4)=', kcomp, bex(1,26,kcomp,4)
 !       write(*,*) 'kcomp, ske(1,26,kcomp,4)=', kcomp, ske(1,26,kcomp,4)
 
-        end do  ! kcomp
+      end do  ! kcomp
 
       return
 end subroutine interpol2to3
@@ -927,23 +887,6 @@ end subroutine interpol2to3
 subroutine interpol4 (lchnk, ncol, daylight, xrh, irh1, irh2, &
                       mplus10, Nnatk, xfbcbgin, &
                       Camk, xfacin, xfaqin, omega, gass, bex, ske, lw_on, kabs, cxstot)
-
-!     Optimized for speed by Arild Burud/NoSerC, June 2002
-!---------------------------------------------------------------
-!   Modified by Egil Storen/NoSerC July 2002.
-!   The sequence of the indices in arrays om1, g1, be1 and ke1
-!   (common block /tab1/) has been rearranged to avoid cache
-!   problems while running subroutine interpol1.
-!   Files also involved by this modification: initopt.F
-!   and opttab.h. 
-!---------------------------------------------------------------
-!   Rewritten for CAM by Alf Kirkevaag in Feb. 2004, and 
-!   modified (interpol1->interpol6to10) for new aerosol schemes 
-!   in October 2005. Extended to include SOA in August 2015.
-!   (old interpol5to10 has been used as a template for new interpol4,
-!   since these two have arrays with the same number of dimensions,
-!   before rewriting it all to a more readable form including a 
-!   subroutine that can be generalized).
 
 
    use ppgrid
@@ -1028,7 +971,6 @@ subroutine interpol4 (lchnk, ncol, daylight, xrh, irh1, irh2, &
             xfaq(icol,k) = 0.0_r8
 
 !            if(Nnatk(icol,k,kcomp)>0.0_r8) then
-!lw            if(daylight(icol)) then
 
           xct(icol,k)  = min(max(Camk(icol,k,kcomp) &
                  /(Nnatk(icol,k,kc10)+eps),cate(kcomp,1)),cate(kcomp,16))
@@ -1044,46 +986,44 @@ subroutine interpol4 (lchnk, ncol, daylight, xrh, irh1, irh2, &
 !          write(*,*) 'dir: k, kcomp, cxs =', k, kcomp, cxs(icol,k)
 !        endif
 
-!      write(*,*) 'Before cate-loop', kc10
-      do ictot=1,15
+!        write(*,*) 'Before cate-loop', kc10
+         do ictot=1,15
             if(xct(icol,k)>=cate(kcomp,ictot).and. &
             xct(icol,k) <= cate(kcomp,ictot+1)) then
              ict1(icol,k)=ictot
              ict2(icol,k)=ictot+1
             endif
-      end do ! ictot
+         end do ! ictot
 
-!      write(*,*) 'Before fac-loop', kc10
-      do ifac=1,5
+!        write(*,*) 'Before fac-loop', kc10
+         do ifac=1,5
             if(xfac(icol,k)>=fac(ifac).and. &
              xfac(icol,k) <= fac(ifac+1)) then
              ifac1(icol,k)=ifac
              ifac2(icol,k)=ifac+1
             endif
-      end do ! ifac
+         end do ! ifac
 
-!      write(*,*) 'Before fbcbg-loop', kc10
-      do ifbcbg=1,5
+!        write(*,*) 'Before fbcbg-loop', kc10
+         do ifbcbg=1,5
             if(xfbcbg(icol,k) >= fbcbg(ifbcbg).and. &
              xfbcbg(icol,k) <= fbcbg(ifbcbg+1)) then
              ifbcbg1(icol,k)=ifbcbg
              ifbcbg2(icol,k)=ifbcbg+1
             endif
-      end do ! ifbcbg
+         end do ! ifbcbg
 
-!      write(*,*) 'Before faq-loop', kc10
-      do ifaq=1,5
+!        write(*,*) 'Before faq-loop', kc10
+         do ifaq=1,5
             if(xfaq(icol,k) >= faq(ifaq).and. &
             xfaq(icol,k) <= faq(ifaq+1)) then
              ifaq1(icol,k)=ifaq
              ifaq2(icol,k)=ifaq+1
             endif
-      end do ! ifaq
+         end do ! ifaq
 
-!lw            endif ! daylight
-
-          end do ! icol
-        end do ! k
+        end do ! icol
+      end do ! k
 
 !      write(*,*) 'Before init-loop', kc10
         do i=1,nbands
@@ -1106,9 +1046,6 @@ subroutine interpol4 (lchnk, ncol, daylight, xrh, irh1, irh2, &
          
         do k=1,pver
           do icol=1,ncol
-
-!           if(Nnatk(icol,k,kcomp)>0.0_r8) then
-!lw           if(daylight(icol)) then
 
 !      Collect all the vector elements into temporary storage
 !      to avoid cache conflicts and excessive cross-referencing
@@ -1447,7 +1384,7 @@ subroutine interpol4 (lchnk, ncol, daylight, xrh, irh1, irh2, &
 !       write(*,*) 'kcomp, bex(1,26,kc10,4)=', kcomp, bex(1,26,kc10,4)
 !       write(*,*) 'kcomp, ske(1,26,kc10,4)=', kcomp, ske(1,26,kc10,4)
 
-        end do  ! kcomp
+      end do  ! kcomp
 
       return
 end subroutine interpol4
@@ -1459,22 +1396,6 @@ subroutine interpol5to10 (lchnk, ncol, daylight, xrh, irh1, irh2, &
                           Nnatk, Camk, &
                           xfacin, xfbcin, xfaqin, omega, gass, bex, ske, lw_on, kabs, cxstot)
 
-!     Optimized for speed by Arild Burud/NoSerC, June 2002
-!---------------------------------------------------------------
-!   Modified by Egil Storen/NoSerC July 2002.
-!   The sequence of the indices in arrays om1, g1, be1 and ke1
-!   (common block /tab1/) has been rearranged to avoid cache
-!   problems while running subroutine interpol1.
-!   Files also involved by this modification: initopt.F
-!   and opttab.h. 
-!---------------------------------------------------------------
-!   Rewritten for CAM by Alf Kirkevaag in Feb. 2004, and 
-!   modified (interpol1->interpol6to10) for new aerosol schemes 
-!   in October 2005.
-!---------------------------------------------------------------
-!   Rewritten by Alf Kirkevaag August 2015 to a more readable 
-!   generalized form (using a common subroutine).
-!---------------------------------------------------------------
 
    use ppgrid
    use shr_kind_mod, only: r8 => shr_kind_r8
@@ -1550,9 +1471,6 @@ subroutine interpol5to10 (lchnk, ncol, daylight, xrh, irh1, irh2, &
             xfbc(icol,k,kcomp) = 0.0_r8
             xfaq(icol,k,kcomp) = 0.0_r8
 
-!            if(Nnatk(icol,k,kcomp)>0.0_r8) then
-!lw            if(daylight(icol)) then
-
           xct(icol,k)  = min(max(Camk(icol,k,kcomp) &
                  /(Nnatk(icol,k,kcomp)+eps),cat(kcomp,1)),cat(kcomp,6))
           xfac(icol,k,kcomp) = min(max(xfacin(icol,k,kcomp),fac(1)),fac(6))
@@ -1567,46 +1485,44 @@ subroutine interpol5to10 (lchnk, ncol, daylight, xrh, irh1, irh2, &
 !          write(*,*) 'dir: k, kcomp, cxs =', k, kcomp, cxs(icol,k)
 !        endif
 
-!      write(*,*) 'Before cat-loop', kcomp
-      do ictot=1,5
+!        write(*,*) 'Before cat-loop', kcomp
+         do ictot=1,5
             if(xct(icol,k)>=cat(kcomp,ictot).and. &
             xct(icol,k) <= cat(kcomp,ictot+1)) then
              ict1(icol,k)=ictot
              ict2(icol,k)=ictot+1
             endif
-      end do ! ictot
+         end do ! ictot
 
-!      write(*,*) 'Before fac-loop', kcomp
-      do ifac=1,5
+!        write(*,*) 'Before fac-loop', kcomp
+         do ifac=1,5
             if(xfac(icol,k,kcomp)>=fac(ifac).and. &
              xfac(icol,k,kcomp) <= fac(ifac+1)) then
              ifac1(icol,k)=ifac
              ifac2(icol,k)=ifac+1
             endif
-      end do ! ifac
+         end do ! ifac
 
-!      write(*,*) 'Before fbc-loop', kcomp
-      do ifbc=1,5
+!        write(*,*) 'Before fbc-loop', kcomp
+         do ifbc=1,5
             if(xfbc(icol,k,kcomp) >= fbc(ifbc).and. &
              xfbc(icol,k,kcomp) <= fbc(ifbc+1)) then
              ifbc1(icol,k)=ifbc
              ifbc2(icol,k)=ifbc+1
             endif
-      end do ! ifbc
+         end do ! ifbc
 
-!      write(*,*) 'Before faq-loop', kcomp
-      do ifaq=1,5
+!        write(*,*) 'Before faq-loop', kcomp
+         do ifaq=1,5
             if(xfaq(icol,k,kcomp) >= faq(ifaq).and. &
             xfaq(icol,k,kcomp) <= faq(ifaq+1)) then
              ifaq1(icol,k)=ifaq
              ifaq2(icol,k)=ifaq+1
             endif
-      end do ! ifaq
+         end do ! ifaq
 
-!lw            endif ! daylight
-
-          end do ! icol
-        end do ! k
+        end do ! icol
+      end do ! k
 
 
 !      write(*,*) 'Before init-loop', kcomp
@@ -1630,9 +1546,6 @@ subroutine interpol5to10 (lchnk, ncol, daylight, xrh, irh1, irh2, &
          
         do k=1,pver
           do icol=1,ncol
-
-!           if(Nnatk(icol,k,kcomp)>0.0_r8) then
-!lw           if(daylight(icol)) then
 
 !      Collect all the vector elements into temporary storage
 !      to avoid cache conflicts and excessive cross-referencing
@@ -1972,7 +1885,7 @@ subroutine interpol5to10 (lchnk, ncol, daylight, xrh, irh1, irh2, &
 !       write(*,*) 'kcomp, bex(1,26,kcomp,4)=', kcomp, bex(1,26,kcomp,4)
 !       write(*,*) 'kcomp, ske(1,26,kcomp,4)=', kcomp, ske(1,26,kcomp,4)
 
-        end do  ! kcomp
+      end do  ! kcomp
 
       return
 end subroutine interpol5to10

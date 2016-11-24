@@ -1,216 +1,295 @@
-#! /usr/bin/env perl
-use strict;
-use Cwd;
+#!/usr/bin/env python
 
-if ($#ARGV == -1) {
-    die " ERROR cam.buildexe: must specify a caseroot input argument";
-}
-my ($CASEROOT) = @ARGV;
-chdir "${CASEROOT}";
+"""
+build namelist input for cam
+"""
+import sys, os, time
 
-my $CIMEROOT		= `./xmlquery  CIMEROOT 		-value`;
-my $SRCROOT		= `./xmlquery  SRCROOT			-value`;
-my $DIN_LOC_ROOT	= `./xmlquery  DIN_LOC_ROOT		-value`;
-my $EXEROOT		= `./xmlquery  EXEROOT 		        -value`;
-my $ATM_GRID		= `./xmlquery  ATM_GRID			-value`;
-my $ATM_NCPL		= `./xmlquery  ATM_NCPL			-value`;
-my $BUILD_COMPLETE	= `./xmlquery  BUILD_COMPLETE		-value`;
-my $CAM_CONFIG_OPTS	= `./xmlquery  CAM_CONFIG_OPTS		-value`;
-my $CAM_NAMELIST_OPTS	= `./xmlquery  CAM_NAMELIST_OPTS	-value`;
-my $CAM_NML_USE_CASE	= `./xmlquery  CAM_NML_USE_CASE		-value`;
-my $CAM_DYCORE		= `./xmlquery  CAM_DYCORE		-value`;
-my $CCSM_CO2_PPMV	= `./xmlquery  CCSM_CO2_PPMV		-value`;
-my $COMP_INTERFACE	= `./xmlquery  COMP_INTERFACE		-value`;
-my $COMP_OCN		= `./xmlquery  COMP_OCN			-value`;
-my $DEBUG		= `./xmlquery  DEBUG			-value`;
-my $MPILIB		= `./xmlquery  MPILIB			-value`;
-my $NTHRDS_ATM		= `./xmlquery  NTHRDS_ATM		-value`;
-my $NTASKS_ATM		= `./xmlquery  NTASKS_ATM		-value`;
-my $NINST_ATM		= `./xmlquery  NINST_ATM		-value`;
-my $PTS_MODE		= `./xmlquery  PTS_MODE			-value`;
-my $PTS_LON		= `./xmlquery  PTS_LON			-value`;
-my $PTS_LAT		= `./xmlquery  PTS_LAT			-value`;
-my $RUNDIR		= `./xmlquery  RUNDIR			-value`;
-my $RUN_TYPE		= `./xmlquery  RUN_TYPE			-value`;
-my $RUN_STARTDATE	= `./xmlquery  RUN_STARTDATE		-value`;
-my $RUN_REFCASE	        = `./xmlquery  RUN_REFCASE		-value`;
-my $RUN_REFDATE	        = `./xmlquery  RUN_REFDATE		-value`;
-my $RUN_REFTOD	        = `./xmlquery  RUN_REFTOD		-value`;
-my $DOCN_MODE		= `./xmlquery  DOCN_MODE		-value`;
-my $COMPILER		= `./xmlquery  COMPILER                 -value`; # for chem preprocessor 
+_CIMEROOT = os.environ.get("CIMEROOT")
+if _CIMEROOT is None:
+    raise SystemExit("ERROR: must set CIMEROOT environment variable")
 
-my @dirs = ("${CIMEROOT}/utils/perl5lib");
-unshift @INC, @dirs;
-require Config::SetupTools;
-my $sysmod; 
+_LIBDIR = os.path.join(_CIMEROOT, "scripts", "Tools")
+sys.path.append(_LIBDIR)
 
-if (! -d "$CASEROOT/Buildconf/camconf" ) {
-    $sysmod = "mkdir $CASEROOT/Buildconf/camconf";
-    system($sysmod) == 0 or die "ERROR cam.buildnml: $sysmod failed: $?\n";
-}
-chdir "$CASEROOT/Buildconf/camconf";
+from standard_script_setup          import *
+from CIME.XML.standard_module_setup import *
+from CIME.buildnml                  import create_namelist_infile
+from CIME.case                      import Case
+from CIME.utils                     import expect, run_cmd
+import shutil, re
 
-#--------------------------------------------------------------------
-# Invoke cam configure - output will go in $CASEROOT/Buildconf/camconf
-#--------------------------------------------------------------------
+logger = logging.getLogger(__name__)
 
-# level information for CAM is part of the atm grid name - and must be stripped out
-my $nlev=''; 
-if ($ATM_GRID =~ /(.+)z(\d+)/) {
-    $ATM_GRID = $1;
-    $nlev="-nlev $2";
-}
+###############################################################################
+def parse_command_line(args):
+###############################################################################
 
-# The following translation is hard-wired for backwards compatibility
-# to support the differences between how the scripts specify the land grid
-# and how it is specified internally
-if ($ATM_GRID eq 'T31' ) {$ATM_GRID = '48x96'};
-if ($ATM_GRID eq 'T42' ) {$ATM_GRID = '64x128'};
-if ($ATM_GRID eq 'T85' ) {$ATM_GRID = '128x256'};
-if ($ATM_GRID eq 'T341') {$ATM_GRID = '512x1024'};
+    parser = argparse.ArgumentParser()
 
-if ($BUILD_COMPLETE eq 'FALSE') {
-    # Some settings for single column mode.
-    my $scm = "";
-    if ($PTS_MODE eq 'TRUE') {$scm = "-scam -nosmp";}
-    my $spmd = '-spmd';
-    if ($MPILIB eq 'mpi-serial') {$spmd = "-nospmd";}
-    my $smp = '-smp';
-    if ($NTHRDS_ATM == 1) {$smp = "-nosmp";}
+    CIME.utils.setup_standard_logging_options(parser)
 
-    # The ocean component setting is only used by CAM to do attribute matching for
-    # setting default tuning parameter values.  In SOM mode we want to use the same
-    # tunings as the fully coupled B compset, so set the ocean component to pop in
-    # that case.
-    my $ocn = $COMP_OCN;
-    if ($DOCN_MODE eq 'som') {$ocn = "pop";}
-    my $comp;
-    if ($COMP_INTERFACE eq 'MCT' ) {$comp = "mct";}
-    if ($COMP_INTERFACE eq 'ESMF') {$comp = "esmf";}
-    my $CAM_LIB_DIRS = "";
-    if ("$CAM_CONFIG_OPTS" =~ /.*cosp.*/) {
-	$CAM_LIB_DIRS = "-cosp_libdir $EXEROOT/atm/obj/cosp";
-    }
+    parser.add_argument("caseroot", default=os.getcwd(),
+                        help="Case directory")
 
-    $sysmod = "$SRCROOT/components/cam/bld/configure -s -fc_type $COMPILER -ccsm_seq -ice none " .
-              " -ocn $ocn -comp_intf $comp $scm -spmd $spmd -smp $smp -dyn $CAM_DYCORE "          .
-              " -res $ATM_GRID $nlev $CAM_LIB_DIRS $CAM_CONFIG_OPTS"                              ;
-    system($sysmod) == 0 or die "ERROR cam.buildnml: $sysmod failed: $?\n";
+    args = parser.parse_args()
 
-} else {
+    CIME.utils.handle_standard_logging_options(args)
 
-    # Verify that we have a config_cache file.
-    if (! -e "$CASEROOT/Buildconf/camconf/config_cache.xml") {
-	die "ERROR cam.buildnml: Build is complete but config_cache.xml is missing \n".
-            " Cannot run build-namelist; try cleaning build and building again.";
-    }
-}
+    return args.caseroot
 
-#--------------------------------------------------------------------
-# Invoke cam build-namelist - output will go in $CASEROOT/Buidlconf/camconf
-#--------------------------------------------------------------------
+###############################################################################
+def _main_func():
+###############################################################################
 
-my $ignore = "-ignore_ic_date";
-if (($RUN_STARTDATE =~ /.*-01-01.*/) || ($RUN_STARTDATE =~ /.*-09-01.*/)) { $ignore = "-ignore_ic_year";}
+    caseroot = parse_command_line(sys.argv)
 
-my $usecase = "-use_case $CAM_NML_USE_CASE";
-if ($CAM_NML_USE_CASE eq 'UNSET') { $usecase = " ";}
+    case = Case(caseroot)
 
-my $inst_string;
-my $inst_counter = 1;
-while ($inst_counter <= $NINST_ATM) {
+    CIMEROOT            = case.get_value("CIMEROOT")
+    SRCROOT             = case.get_value("SRCROOT")
+    DIN_LOC_ROOT        = case.get_value("DIN_LOC_ROOT")
+    EXEROOT             = case.get_value("EXEROOT")
+    ATM_GRID            = case.get_value("ATM_GRID")
+    ATM_NCPL            = case.get_value("ATM_NCPL")
+    BUILD_COMPLETE      = case.get_value("BUILD_COMPLETE")
+    CAM_CONFIG_OPTS     = case.get_value("CAM_CONFIG_OPTS")
+    CAM_NAMELIST_OPTS   = case.get_value("CAM_NAMELIST_OPTS")
+    CAM_NML_USE_CASE    = case.get_value("CAM_NML_USE_CASE")
+    CAM_DYCORE          = case.get_value("CAM_DYCORE")
+    CCSM_CO2_PPMV       = case.get_value("CCSM_CO2_PPMV")
+    COMP_INTERFACE      = case.get_value("COMP_INTERFACE")
+    COMP_OCN            = case.get_value("COMP_OCN")
+    DEBUG               = case.get_value("DEBUG")
+    MPILIB              = case.get_value("MPILIB")
+    NTHRDS_ATM          = case.get_value("NTHRDS_ATM")
+    NTASKS_ATM          = case.get_value("NTASKS_ATM")
+    NINST_ATM           = case.get_value("NINST_ATM")
+    PTS_MODE            = case.get_value("PTS_MODE")
+    PTS_LON             = case.get_value("PTS_LON")
+    PTS_LAT             = case.get_value("PTS_LAT")
+    RUNDIR              = case.get_value("RUNDIR")
+    RUN_TYPE            = case.get_value("RUN_TYPE")
+    RUN_STARTDATE       = case.get_value("RUN_STARTDATE")
+    RUN_REFCASE         = case.get_value("RUN_REFCASE")
+    RUN_REFDATE         = case.get_value("RUN_REFDATE")
+    RUN_REFTOD          = case.get_value("RUN_REFTOD")
+    DOCN_MODE           = case.get_value("DOCN_MODE")
+    COMPILER            = case.get_value("COMPILER") # for chem preprocessor
 
-    # -----------------------------------------------------
-    # determine instance string 
-    # -----------------------------------------------------
+    #--------------------------------------------------------------------
+    # Invoke cam configure - output will go in $CASEROOT/Buildconf/camconf
+    #--------------------------------------------------------------------
 
-    $inst_string = "";       
-    if ($NINST_ATM > 1) {
-	$inst_string = `printf _%04d $inst_counter`;
+    camconf = os.path.join(caseroot, "Buildconf", "camconf")
 
-	# If multi-instance case does not have restart file, use single-case restart
-	# for each instance
-	if ( (! -e "$RUNDIR/rpointer.atm${inst_string}") && (-e "$RUNDIR/rpointer.atm") ) {
-	    $sysmod = "cp -v $RUNDIR/rpointer.atm $RUNDIR/rpointer.atm${inst_string}";
-	    system($sysmod) == 0 or die "ERROR cam.buildnml: $sysmod failed: $?\n";
-	}
-    }
+    # level information for CAM is part of the atm grid name - and must be stripped out
+    nlev = ''
+    match = re.match('(.+)z(\d+)',ATM_GRID)
+    if match:
+        ATM_GRID = match.groups()[0]
+        nlev = match.groups()[1]
 
-    # -----------------------------------------------------
-    # create camconf/namelist
-    # -----------------------------------------------------
+    # The following translation is hard-wired for backwards compatibility
+    # to support the differences between how the scripts specify the land grid
+    # and how it is specified internally
 
-    my $ncdata;
-    if ($RUN_TYPE eq 'hybrid') {
-	if (-e "${RUN_REFCASE}.cam${inst_string}.i.${RUN_REFDATE}-${RUN_REFTOD}.nc") {
-	    $ncdata = "\'${RUN_REFCASE}.cam${inst_string}.i.${RUN_REFDATE}-${RUN_REFTOD}.nc\'";
-	} else  {
-	    $ncdata = "\'${RUN_REFCASE}.cam.i.${RUN_REFDATE}-${RUN_REFTOD}.nc\'";
-	}
-	if ($inst_string != "") {print "WARNING: $ncdata is being used\n"};
-    }
-    my $cam_branch_file;
-    if ($RUN_TYPE eq 'branch') {
-	if (-e "${RUNDIR}/${RUN_REFCASE}.cam${inst_string}.r.${RUN_REFDATE}-${RUN_REFTOD}.nc") {
-	    $cam_branch_file = "\'${RUNDIR}/${RUN_REFCASE}.cam${inst_string}.r.${RUN_REFDATE}-${RUN_REFTOD}.nc\'";
-	} else {
-	    $cam_branch_file = "\'${RUNDIR}/${RUN_REFCASE}.cam.r.${RUN_REFDATE}-${RUN_REFTOD}.nc\'";
-	    if ($inst_string) {	print "WARNING: $cam_branch_file is being used \n";}
-	}
-    }
+    if ATM_GRID == 'T31':
+        ATM_GRID = '48x96'
+    if ATM_GRID == 'T42':
+        ATM_GRID = '64x128'
+    if ATM_GRID == 'T85':
+        ATM_GRID = '128x256'
+    if ATM_GRID == 'T341':
+        ATM_GRID = '512x1024'
 
-    my $dtime = ( 3600 * 24 ) / $ATM_NCPL;
-    my $start_ymd = `echo $RUN_STARTDATE | sed s/-//g `;
-    my $ntasks = $NTASKS_ATM/$NINST_ATM;
+    if not BUILD_COMPLETE:
 
-    my $infile_text = "";
-    $infile_text .= " dtime = $dtime \n";
-    $infile_text .= " co2vmr = ${CCSM_CO2_PPMV}e-6\n";
-    $infile_text .= " start_ymd = $start_ymd";
-    if ($ncdata)          {$infile_text .= " ncdata = $ncdata \n";}
-    if ($cam_branch_file) {$infile_text .= " cam_branch_file = $cam_branch_file \n";}
-    if ($DEBUG eq 'TRUE') {$infile_text .= " state_debug_checks = .true. \n"}
+        # if need to build - then construct configure command
+        config_opts = ["-s", "-fc_type", COMPILER, "-ccsm_seq",
+                       "-dyn", CAM_DYCORE, "-res", ATM_GRID,
+                       "-usr_src", os.path.join(caseroot, "SourceMods", "src.cam")]
 
-    SetupTools::create_namelist_infile("$CASEROOT", 
-				       "$CASEROOT/user_nl_cam${inst_string}", 
-				       "$CASEROOT/Buildconf/camconf/namelist", 
-				       "$infile_text");
+        if nlev:
+            config_opts += ["-nlev", nlev]
 
-    # -----------------------------------------------------
-    # call build-namelist
-    # -----------------------------------------------------
+        # Some settings for single column mode.
+        if PTS_MODE:
+            config_opts.append("-scam")
 
-    if (-e "$CASEROOT/Buildconf/cam.input_data_list") {
-	$sysmod = "rm $CASEROOT/Buildconf/cam.input_data_list";
-	system($sysmod) == 0 or die "ERROR cam.buildnml: $sysmod failed: $?\n";
-    }
+        if MPILIB == 'mpi-serial':
+            config_opts.append("-nospmd")
+        else:
+            config_opts.append("-spmd")
 
-    $sysmod = "$SRCROOT/components/cam/bld/build-namelist ";
-    $sysmod = "$sysmod -infile $CASEROOT/Buildconf/camconf/namelist ";
-    $sysmod = "$sysmod -csmdata $DIN_LOC_ROOT $ignore $usecase ";
-    $sysmod = "$sysmod -inputdata $CASEROOT/Buildconf/cam.input_data_list";
-    $sysmod = "$sysmod -ntasks $ntasks";
-    $sysmod = "$sysmod -namelist \" \&atmexp $CAM_NAMELIST_OPTS \/\" ";
-    system($sysmod) == 0 or die "ERROR cam.buildnml: $sysmod failed: $?\n";
+        if int(NTHRDS_ATM) == 1 or PTS_MODE:
+            config_opts.append("-nosmp")
+        else:
+            config_opts.append("-smp")
 
-    # -----------------------------------------------------
-    # move atm_in to $RUNDIR
-    # -----------------------------------------------------
+        # The ocean component setting is only used by CAM to do attribute matching for
+        # setting default tuning parameter values.  In SOM mode we want to use the same
+        # tunings as the fully coupled B compset, so set the ocean component to pop in
+        # that case.
 
-    if (-d ${RUNDIR}) {
-	$sysmod = "cp $CASEROOT/Buildconf/camconf/atm_in  ${RUNDIR}/atm_in${inst_string}";
-	system($sysmod) == 0 or die "ERROR cam.buildnml: $sysmod failed: $?\n";
+        ocn = COMP_OCN
+        if DOCN_MODE == 'som':
+            config_opts += ["-ocn", "pop"]
+        else:
+            config_opts += ["-ocn", COMP_OCN]
 
-	$sysmod = "cp $CASEROOT/Buildconf/camconf/drv_flds_in ${RUNDIR}/drv_flds_in";
-	system($sysmod) == 0 or die "ERROR cam.buildnml: $sysmod failed: $?\n";
-    }
+        if COMP_INTERFACE == 'ESMF':
+            config_opts += ["-comp_intf", "esmf"]
+        elif COMP_INTERFACE == 'MCT':
+            config_opts += ["-comp_intf", "mct"]
+        else:
+            expect(False, "COMP_INTERFACE not recognized; must be ESMF or MCT.")
 
-    # -----------------------------------------------------
-    # increment instance counter
-    # -----------------------------------------------------
+        # Add user options.
+        config_opts += CAM_CONFIG_OPTS.split(" ")
 
-    $inst_counter = $inst_counter + 1;
-}
+        if "-cosp" in config_opts:
+            config_opts += ["-cosp_libdir",
+                            os.path.join(EXEROOT,"atm","obj","cosp")]
 
-exit(0);
+        # Construct the command itself.
+        cmd = os.path.join(SRCROOT,"components","cam","bld","configure") + " " \
+              + " ".join(config_opts)
 
+        if not os.path.isdir(camconf):
+            os.makedirs(camconf)
+
+        run_cmd_no_fail(cmd, from_dir=camconf)
+
+    else:
+
+        # Verify that we have a config_cache file.
+        filename = os.path.join(camconf, "config_cache.xml")
+        expect(os.path.isfile(filename),
+               " Cannot run build-namelist; try cleaning build and building again.")
+
+    #--------------------------------------------------------------------
+    # Invoke cam build-namelist - output will go in $CASEROOT/Buildconf/camconf
+    #--------------------------------------------------------------------
+
+    ninst = int(NINST_ATM)
+    for inst_counter in range(1, ninst+1):
+
+        # -----------------------------------------------------
+        # determine instance string
+        # -----------------------------------------------------
+
+        inst_string = ""
+        if ninst > 1:
+            single_case_rpointer = os.path.join(RUNDIR, "rpointer.atm")
+            inst_string = '_%04d' % inst_counter
+            instance_rpointer = os.path.join(RUNDIR,"rpointer.atm"+inst_string)
+
+            # If multi-instance case does not have restart file, use
+            # single-case restart for each instance
+
+            if os.path.isfile(single_case_rpointer) and \
+               not os.path.isfile(instance_rpointer):
+                shutil.copy(single_case_rpointer, instance_rpointer)
+
+        # -----------------------------------------------------
+        # create camconf/namelist
+        # -----------------------------------------------------
+
+        infile_lines = []
+
+        # This simplifies the filename mangling for different cases.
+        def create_ic_filename(inst_string, i_or_r):
+            return "%s.cam%s.%s.%s-%s.nc" % \
+                (RUN_REFCASE, inst_string, i_or_r, RUN_REFDATE, RUN_REFTOD)
+
+        if RUN_TYPE == 'hybrid':
+            ncdata = create_ic_filename(inst_string, 'i')
+            # Fallback if no instance-specific file is found.
+            if not os.path.isfile(os.path.join(RUNDIR, ncdata)):
+                ncdata = create_ic_filename('', 'i')
+            infile_lines.append(" ncdata = '" + ncdata + "'")
+            if ninst > 1:
+                logger.info("%s is being used for ncdata" % ncdata)
+
+        if RUN_TYPE == 'branch':
+            cam_branch_file = create_ic_filename(inst_string, 'r')
+            # Fallback if no instance-specific file is found.
+            if not os.path.isfile(os.path.join(RUNDIR, cam_branch_file)):
+                cam_branch_file = create_ic_filename('', 'r')
+            infile_lines.append(" cam_branch_file = '" + cam_branch_file + "'")
+            if ninst > 1:
+                logger.info("%s is being used for cam_branch_file" % cam_branch_file)
+
+        dtime = ( 3600 * 24 ) / int(ATM_NCPL)
+        infile_lines.append(" dtime = " + str(dtime))
+        start_ymd = RUN_STARTDATE.replace('-','')
+        infile_lines.append(" start_ymd = " + start_ymd)
+
+        infile_lines.append(" co2vmr = " + str(float(CCSM_CO2_PPMV) * 1.e-6))
+
+        if DEBUG:
+            infile_lines.append(" state_debug_checks = .true.")
+
+        user_nl_file = os.path.join(caseroot, "user_nl_cam" + inst_string)
+        namelist_infile = os.path.join(camconf, "namelist")
+
+        create_namelist_infile(case, user_nl_file, namelist_infile,
+                               "\n".join(infile_lines))
+
+        # -----------------------------------------------------
+        # call build-namelist
+        # -----------------------------------------------------
+
+        ntasks = int(NTASKS_ATM) / ninst
+
+        buildnl_opts = ["-ntasks", str(ntasks), "-csmdata", DIN_LOC_ROOT,
+                        "-infile", os.path.join(camconf, "namelist")]
+
+        if ('-01-01' in RUN_STARTDATE) or ('-09-01' in RUN_STARTDATE):
+            buildnl_opts.append("-ignore_ic_year")
+        else:
+            buildnl_opts.append("-ignore_ic_date")
+
+        if CAM_NML_USE_CASE != 'UNSET':
+            buildnl_opts += ["-use_case", CAM_NML_USE_CASE]
+
+        input_data_list = os.path.join(caseroot, "Buildconf", "cam.input_data_list")
+        if os.path.isfile(input_data_list):
+            os.remove(input_data_list)
+        buildnl_opts += ["-inputdata", input_data_list]
+
+        buildnl_opts += ["-namelist",
+                         '" &atmexp ' + CAM_NAMELIST_OPTS + '/" ']
+
+        cmd = os.path.join(SRCROOT, "components", "cam", "bld", "build-namelist")
+        cmd += " " + " ".join(buildnl_opts)
+
+        rc, out, err = run_cmd(cmd, from_dir=camconf)
+        expect(rc==0,"Command %s failed rc=%d\nout=%s\nerr=%s"%(cmd,rc,out,err))
+
+        # -----------------------------------------------------
+        # copy resolved namelist, atm_in, to RUNDIR
+        # -----------------------------------------------------
+
+        if os.path.isdir(RUNDIR):
+            file1 = os.path.join(camconf, "atm_in")
+            file2 = os.path.join(RUNDIR, "atm_in")
+            if ninst > 1:
+                file2 += inst_string
+            logger.debug("CAM namelist copy: file1 %s file2 %s " %(file1, file2))
+            shutil.copy(file1,file2)
+
+        # -----------------------------------------------------
+        # copy drv_flds_in to RUNDIR if it does not exist
+        # -----------------------------------------------------
+
+        file1 = os.path.join(camconf, "drv_flds_in")
+        file2 = os.path.join(RUNDIR, "drv_flds_in")
+        if (os.path.isfile(file1)) and (not os.path.isfile(file2)):
+            shutil.copy(file1,file2)
+
+###############################################################################
+
+if __name__ == "__main__":
+    _main_func()

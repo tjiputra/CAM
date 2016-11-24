@@ -1,11 +1,11 @@
 module commap
 
-   use shr_kind_mod, only: r8 => shr_kind_r8
-   use pmgrid, only: plon, splon, plat
+   use shr_kind_mod, only: r8=>shr_kind_r8
+   use pmgrid,       only: plon, splon, plat
 
    real(r8), target :: w(plat)                  ! integration weights for physics grid
    real(r8), target :: w_staggered(plat-1)      ! integration weights for the staggered wind arrays
-!
+
    real(r8), target :: clat(plat)               ! model latitudes (radians)
    real(r8), target :: clat_staggered (plat-1)  ! model latitudes on staggered grid (radians)
    real(r8), target :: clon(plon,plat)          ! model longitudes (radians)

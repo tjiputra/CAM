@@ -1,5 +1,3 @@
-!soasubroutine intdrypar1to3 (lchnk, ncol, Nnatk, Camk,                  & 
-
 subroutine intdrypar2to3 (lchnk, ncol, Nnatk, Camk, xfacsoain,       & 
            cintbg, cintbg05, cintbg125, cintbc, cintbc05, cintbc125, & 
            cintoc, cintoc05, cintoc125, cintsc, cintsc05, cintsc125, &
@@ -93,6 +91,10 @@ subroutine intdrypar2to3 (lchnk, ncol, Nnatk, Camk, xfacsoain,       &
         vaerol(icol,k,kcomp)=0.0_r8
          end do
        end do
+ 
+        end do ! kcomp
+
+        do kcomp=2,2
 
 !      write(*,*) 'Before x-loop'
       do k=1,pver
@@ -173,6 +175,8 @@ subroutine intdrypar2to3 (lchnk, ncol, Nnatk, Camk, xfacsoain,       &
 !     finally, interpolation in the cat dimension 
       opt = (d2mx(1)*opt1+dxm1(1)*opt2)*invd(1)
 
+!      if(k.eq.1) write(*,*) 'opt2to3 =', opt
+
 !      write(*,*) 'Before array'
 
        if(iv==1) then
@@ -226,7 +230,8 @@ subroutine intdrypar2to3 (lchnk, ncol, Nnatk, Camk, xfacsoain,       &
 !      Dry parameters for externally mixed modes modes 12-13,  
 !      BC(n) and OC(n):
 
-        do kcomp=12,13
+        do kcomp=12,13    ! using dummy initialization for kcomp=3
+!        do kcomp=12,12
 
         do k=1,pver 
           do icol=1,ncol

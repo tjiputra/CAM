@@ -132,6 +132,10 @@ subroutine intdrypar0 (lchnk, ncol, Nnatk,                             &
        cknlt05(icol,k,kcomp) = a0cintbg05
        ckngt125(icol,k,kcomp)= a0cintbg125
 
+!       if(k.eq.1.or.k.eq.pver) write(*,*) 'cknorm =', cknorm(icol,k,kcomp)
+!       if(k.eq.1.or.k.eq.pver) write(*,*) 'cknlt05 =', cknlt05(icol,k,kcomp)
+!       if(k.eq.1.or.k.eq.pver) write(*,*) 'ckngt125 =', ckngt125(icol,k,kcomp)
+
        end do ! icol
       end do ! k
 

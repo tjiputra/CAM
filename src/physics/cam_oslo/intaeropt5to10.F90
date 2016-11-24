@@ -35,6 +35,8 @@ subroutine intaeropt5to10 (lchnk, ncol, xrh, irh1, irh2, Nnatk, Camk, xfacin, xf
 ! Output arguments: Modal total and absorption extiction coefficients (for AeroCom)
 ! for 550nm (1) and 865nm (2), and for r<1um (lt1) and r>1um (gt1).
 ! March 2009: + backscatter coefficient, backsc550 (km-1 sr-1).
+! Rewritten by Alf Kirkevaag September 2015 to a more generalized for for 
+! interpolations using common subroutines interpol*dim.
 !
    real(r8), intent(out) :: &
      bext440(pcols,pver,0:nbmodes), babs440(pcols,pver,0:nbmodes), &
@@ -376,6 +378,7 @@ subroutine intaeropt5to10 (lchnk, ncol, xrh, irh1, irh2, Nnatk, Camk, xfacin, xf
         end do  ! kcomp
 
       return
+
 end subroutine intaeropt5to10
 
 

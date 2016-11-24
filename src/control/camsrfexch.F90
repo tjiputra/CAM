@@ -457,23 +457,39 @@ subroutine cam_export(state,cam_out,pbuf)
    lchnk = state%lchnk
    ncol  = state%ncol
 
-   prec_dp_idx = pbuf_get_index('PREC_DP')
-   snow_dp_idx = pbuf_get_index('SNOW_DP')
-   prec_sh_idx = pbuf_get_index('PREC_SH')
-   snow_sh_idx = pbuf_get_index('SNOW_SH')
-   prec_sed_idx = pbuf_get_index('PREC_SED')
-   snow_sed_idx = pbuf_get_index('SNOW_SED')
-   prec_pcw_idx = pbuf_get_index('PREC_PCW')
-   snow_pcw_idx = pbuf_get_index('SNOW_PCW')
+   prec_dp_idx = pbuf_get_index('PREC_DP', errcode=i)
+   snow_dp_idx = pbuf_get_index('SNOW_DP', errcode=i)
+   prec_sh_idx = pbuf_get_index('PREC_SH', errcode=i)
+   snow_sh_idx = pbuf_get_index('SNOW_SH', errcode=i)
+   prec_sed_idx = pbuf_get_index('PREC_SED', errcode=i)
+   snow_sed_idx = pbuf_get_index('SNOW_SED', errcode=i)
+   prec_pcw_idx = pbuf_get_index('PREC_PCW', errcode=i)
+   snow_pcw_idx = pbuf_get_index('SNOW_PCW', errcode=i)
 
-   call pbuf_get_field(pbuf, prec_dp_idx, prec_dp)
-   call pbuf_get_field(pbuf, snow_dp_idx, snow_dp)
-   call pbuf_get_field(pbuf, prec_sh_idx, prec_sh)
-   call pbuf_get_field(pbuf, snow_sh_idx, snow_sh)
-   call pbuf_get_field(pbuf, prec_sed_idx, prec_sed)
-   call pbuf_get_field(pbuf, snow_sed_idx, snow_sed)
-   call pbuf_get_field(pbuf, prec_pcw_idx, prec_pcw)
-   call pbuf_get_field(pbuf, snow_pcw_idx, snow_pcw)
+   if (prec_dp_idx > 0) then
+     call pbuf_get_field(pbuf, prec_dp_idx, prec_dp)
+   end if
+   if (snow_dp_idx > 0) then
+     call pbuf_get_field(pbuf, snow_dp_idx, snow_dp)
+   end if
+   if (prec_sh_idx > 0) then
+     call pbuf_get_field(pbuf, prec_sh_idx, prec_sh)
+   end if
+   if (snow_sh_idx > 0) then
+     call pbuf_get_field(pbuf, snow_sh_idx, snow_sh)
+   end if
+   if (prec_sed_idx > 0) then
+     call pbuf_get_field(pbuf, prec_sed_idx, prec_sed)
+   end if
+   if (snow_sed_idx > 0) then
+     call pbuf_get_field(pbuf, snow_sed_idx, snow_sed)
+   end if
+   if (prec_pcw_idx > 0) then
+     call pbuf_get_field(pbuf, prec_pcw_idx, prec_pcw)
+   end if
+   if (snow_pcw_idx > 0) then
+     call pbuf_get_field(pbuf, snow_pcw_idx, snow_pcw)
+   end if
 
    do i=1,ncol
       cam_out%tbot(i)  = state%t(i,pver)
@@ -502,10 +518,34 @@ subroutine cam_export(state,cam_out,pbuf)
    ! Compute total convective and stratiform precipitation and snow rates
    !
    do i=1,ncol
-      cam_out%precc (i) = prec_dp(i)  + prec_sh(i)
-      cam_out%precl (i) = prec_sed(i) + prec_pcw(i)
-      cam_out%precsc(i) = snow_dp(i)  + snow_sh(i)
-      cam_out%precsl(i) = snow_sed(i) + snow_pcw(i)
+      cam_out%precc (i) = 0._r8
+      cam_out%precl (i) = 0._r8
+      cam_out%precsc(i) = 0._r8
+      cam_out%precsl(i) = 0._r8
+      if (prec_dp_idx > 0) then
+        cam_out%precc (i) = cam_out%precc (i) + prec_dp(i)
+      end if
+      if (prec_sh_idx > 0) then
+        cam_out%precc (i) = cam_out%precc (i) + prec_sh(i)
+      end if
+      if (prec_sed_idx > 0) then
+        cam_out%precl (i) = cam_out%precl (i) + prec_sed(i)
+      end if
+      if (prec_pcw_idx > 0) then
+        cam_out%precl (i) = cam_out%precl (i) + prec_pcw(i)
+      end if
+      if (snow_dp_idx > 0) then
+        cam_out%precsc(i) = cam_out%precsc(i) + snow_dp(i)
+      end if
+      if (snow_sh_idx > 0) then
+        cam_out%precsc(i) = cam_out%precsc(i) + snow_sh(i)
+      end if
+      if (snow_sed_idx > 0) then
+        cam_out%precsl(i) = cam_out%precsl(i) + snow_sed(i)
+      end if
+      if (snow_pcw_idx > 0) then
+        cam_out%precsl(i) = cam_out%precsl(i) + snow_pcw(i)
+      end if
 
       ! jrm These checks should not be necessary if they exist in the parameterizations
       if (cam_out%precc(i) .lt.0._r8) cam_out%precc(i)=0._r8

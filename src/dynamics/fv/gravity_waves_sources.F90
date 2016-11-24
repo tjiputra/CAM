@@ -1,12 +1,13 @@
 module gravity_waves_sources
 
   use shr_kind_mod, only: r8 => shr_kind_r8
-  use pmgrid, only: plev, plevp, beglatxy, endlatxy, beglonxy, endlonxy
+  use pmgrid, only: plev, plevp
   use hycoef, only         : hypi
 
   implicit none
   save
   private
+
   public :: gws_src_fnct
 
   ! ghosting added by Francis Vitt -- 7 July 2008
@@ -19,51 +20,54 @@ module gravity_waves_sources
 
 !=================================================================
 
-    subroutine gws_src_fnct (u3,v3,pt, q3, pe, grid, frontgf, frontga)
+    subroutine gws_src_fnct(grid, u3,v3,pt, q3, pe, frontgf, frontga)
 
+      use dynamics_vars, only: t_fvdycore_grid
       use physconst,     only: zvir, cappa, aearth => rearth
-      use ppgrid,        only: pcols
-      use dynamics_vars, only: T_FVDYCORE_GRID
 
       implicit none
 
 ! Input/Output arguments
-      real(r8), intent(in) :: u3(beglonxy:endlonxy,plev,beglatxy:endlatxy)          ! zonal velocity
-      real(r8), intent(in) :: v3(beglonxy:endlonxy,plev,beglatxy:endlatxy)          ! meridional velocity
-      real(r8), intent(in) :: pt(beglonxy:endlonxy,beglatxy:endlatxy,plev)          ! virtual temperature
-      real(r8), intent(in) :: q3(beglonxy:endlonxy,beglatxy:endlatxy,plev)          ! water constituent
-      real(r8), intent(in) :: pe(beglonxy:endlonxy,plevp,beglatxy:endlatxy)         ! interface pressure
-      type (T_FVDYCORE_GRID), intent(in) :: grid    ! grid for XY decomp
+      type (t_fvdycore_grid), intent(in) :: grid    ! grid for XY decomp
+      real(r8), intent(in) :: u3(grid%ifirstxy:grid%ilastxy,plev,grid%jfirstxy:grid%jlastxy)          ! zonal velocity
+      real(r8), intent(in) :: v3(grid%ifirstxy:grid%ilastxy,plev,grid%jfirstxy:grid%jlastxy)          ! meridional velocity
+      real(r8), intent(in) :: pt(grid%ifirstxy:grid%ilastxy,grid%jfirstxy:grid%jlastxy,plev)          ! virtual temperature
+      real(r8), intent(in) :: q3(grid%ifirstxy:grid%ilastxy,grid%jfirstxy:grid%jlastxy,plev)          ! water constituent
+      real(r8), intent(in) :: pe(grid%ifirstxy:grid%ilastxy,plevp,grid%jfirstxy:grid%jlastxy)         ! interface pressure
 
-      real(r8), intent(out) :: frontgf(beglonxy:endlonxy,plev,beglatxy:endlatxy)    ! Frontogenesis function
-      real(r8), intent(out) :: frontga(beglonxy:endlonxy,plev,beglatxy:endlatxy)    ! Frontogenesis angle
+      real(r8), intent(out) :: frontgf(grid%ifirstxy:grid%ilastxy,plev,grid%jfirstxy:grid%jlastxy)    ! Frontogenesis function
+      real(r8), intent(out) :: frontga(grid%ifirstxy:grid%ilastxy,plev,grid%jfirstxy:grid%jlastxy)    ! Frontogenesis angle
 
 ! Locals
       real(r8) :: psurf_ref                        ! surface reference pressure
 
-      real(r8) :: ptemp(beglonxy:endlonxy,plev,beglatxy:endlatxy)       ! temperature
-      real(r8) :: pm(beglonxy:endlonxy   ,plev,beglatxy:endlatxy)       ! mid-point pressure
+      real(r8) :: ptemp(grid%ifirstxy:grid%ilastxy,plev,grid%jfirstxy:grid%jlastxy)       ! temperature
+      real(r8) :: pm(grid%ifirstxy:grid%ilastxy   ,plev,grid%jfirstxy:grid%jlastxy)       ! mid-point pressure
       real(r8) :: pexf                                ! Exner function
-      real(r8) :: dummy
 
-      real(r8) :: pty(beglonxy:endlonxy,plev,beglatxy:endlatxy)         ! temperature meridional gradient
-      real(r8) :: ptx(beglonxy:endlonxy,plev,beglatxy:endlatxy)         ! temperature zonal gradient
+      real(r8) :: pty(grid%ifirstxy:grid%ilastxy,plev,grid%jfirstxy:grid%jlastxy)         ! temperature meridional gradient
+      real(r8) :: ptx(grid%ifirstxy:grid%ilastxy,plev,grid%jfirstxy:grid%jlastxy)         ! temperature zonal gradient
 
-      real(r8) :: uy(beglonxy:endlonxy,plev,beglatxy:endlatxy)         ! U-wind meridional gradient
-      real(r8) :: ux(beglonxy:endlonxy,plev,beglatxy:endlatxy)         ! U-wind zonal gradient
+      real(r8) :: uy(grid%ifirstxy:grid%ilastxy,plev,grid%jfirstxy:grid%jlastxy)         ! U-wind meridional gradient
+      real(r8) :: ux(grid%ifirstxy:grid%ilastxy,plev,grid%jfirstxy:grid%jlastxy)         ! U-wind zonal gradient
 
-      real(r8) :: vy(beglonxy:endlonxy,plev,beglatxy:endlatxy)         ! V-wind meridional gradient
-      real(r8) :: vx(beglonxy:endlonxy,plev,beglatxy:endlatxy)         ! V-wind zonal gradient
+      real(r8) :: vy(grid%ifirstxy:grid%ilastxy,plev,grid%jfirstxy:grid%jlastxy)         ! V-wind meridional gradient
+      real(r8) :: vx(grid%ifirstxy:grid%ilastxy,plev,grid%jfirstxy:grid%jlastxy)         ! V-wind zonal gradient
 
-      real(r8) :: ptg(beglonxy-1:endlonxy+1,plev,beglatxy-1:endlatxy+1)  ! temperature ghosted
-      real(r8) ::  ug(beglonxy-1:endlonxy+1,plev,beglatxy-1:endlatxy+1)  ! U-wind ghosted
-      real(r8) ::  vg(beglonxy-1:endlonxy+1,plev,beglatxy-1:endlatxy+1)  ! V-wind ghosted
+      real(r8) :: ptg(grid%ifirstxy-1:grid%ilastxy+1,plev,grid%jfirstxy-1:grid%jlastxy+1)  ! temperature ghosted
+      real(r8) ::  ug(grid%ifirstxy-1:grid%ilastxy+1,plev,grid%jfirstxy-1:grid%jlastxy+1)  ! U-wind ghosted
+      real(r8) ::  vg(grid%ifirstxy-1:grid%ilastxy+1,plev,grid%jfirstxy-1:grid%jlastxy+1)  ! V-wind ghosted
 
       real(r8) :: tglat                               ! tangent-latitude
       integer  :: i,j,k
       integer  :: im, ip
-
+      integer  :: beglatxy, endlatxy, beglonxy, endlonxy
 !-----------------------------------------------------------------------------------------
+
+      beglatxy = grid%jfirstxy
+      endlatxy = grid%jlastxy
+      beglonxy = grid%ifirstxy
+      endlonxy = grid%ilastxy
 
       pty(:,:,:) = 0._r8
       ptx(:,:,:) = 0._r8
@@ -92,9 +96,9 @@ module gravity_waves_sources
          end do
       end do
 
-      call ghost_array( ptemp, ptg, grid )
-      call ghost_array( u3, ug, grid )
-      call ghost_array( v3, vg, grid )
+      call ghost_array(grid, ptemp, ptg)
+      call ghost_array(grid, u3, ug)
+      call ghost_array(grid, v3, vg)
 
       !$omp parallel do private (i,j,k)
       do k=1, plev
@@ -176,7 +180,7 @@ module gravity_waves_sources
 
     end subroutine gws_src_fnct
 
-    subroutine ghost_array( x, xg, grid )
+    subroutine ghost_array(grid, x, xg)
 
       ! subroutine added by Francis Vitt -- 7 July 2008
 
@@ -189,15 +193,15 @@ module gravity_waves_sources
 
       ! Input/Output arguments
       type (T_FVDYCORE_GRID), intent(in) :: grid    ! grid for XY decomp
-      real(r8), intent(in)  :: x(beglonxy:endlonxy,plev,beglatxy:endlatxy)          ! zonal velocity
-      real(r8), intent(out) :: xg(beglonxy-1:endlonxy+1,plev,beglatxy-1:endlatxy+1)          ! zonal velocity
+      real(r8), intent(in)  :: x(grid%ifirstxy:grid%ilastxy,plev,grid%jfirstxy:grid%jlastxy)          ! zonal velocity
+      real(r8), intent(out) :: xg(grid%ifirstxy-1:grid%ilastxy+1,plev,grid%jfirstxy-1:grid%jlastxy+1)          ! zonal velocity
 
       ! local variables
-      real(r8) :: north(beglonxy:endlonxy,plev)
-      real(r8) :: south(beglonxy:endlonxy,plev)
-      real(r8) :: east(plev,beglatxy:endlatxy)
-      real(r8) :: west(plev,beglatxy:endlatxy)
-      integer  :: im, jm, km, ifirstxy, ilastxy, jfirstxy, jlastxy, iam, myidxy_y, nprxy_x, nprxy_y
+      real(r8) :: north(grid%ifirstxy:grid%ilastxy,plev)
+      real(r8) :: south(grid%ifirstxy:grid%ilastxy,plev)
+      real(r8) :: east(plev,grid%jfirstxy:grid%jlastxy)
+      real(r8) :: west(plev,grid%jfirstxy:grid%jlastxy)
+      integer  :: im, jm, km, ifirstxy, ilastxy, jfirstxy, jlastxy, iam, myidxy_y, nprxy_x
       integer  :: itot, dest, src, j, k
 
       im = grid%im
@@ -212,7 +216,6 @@ module gravity_waves_sources
       iam      = grid%iam
       myidxy_y = grid%myidxy_y
       nprxy_x  = grid%nprxy_x
-      nprxy_y  = grid%nprxy_y
       itot = ilastxy-ifirstxy+1
 
       xg(ifirstxy:ilastxy,:,jfirstxy:jlastxy) = x(ifirstxy:ilastxy,:,jfirstxy:jlastxy)

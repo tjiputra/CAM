@@ -165,7 +165,6 @@
       use parutilitiesmodule, only : parexchangevector
       use mod_comm, only : blockdescriptor, get_partneroffset,      &
                            mp_sendirr, mp_recvirr, max_nparcels
-      use spmd_dyn, only: npes_yz
 #endif
 
       implicit none
@@ -217,7 +216,7 @@
       integer :: im,jm,km, ifirst, ilast, jfirst, jlast, kfirst, klast
       real(r8):: ptop
 
-      integer :: npr_y, npr_z, myid_y, myid_z
+      integer :: npr_y, npr_z, npes_yz, myid_y, myid_z
       integer :: twod_decomp, mod_geopk
 
 #if (DSIZE == 16)
@@ -279,8 +278,9 @@
       myid_y = grid%myid_y
       myid_z = grid%myid_z
 
-      npr_y = grid%npr_y
-      npr_z = grid%npr_z
+      npr_y   = grid%npr_y
+      npr_z   = grid%npr_z
+      npes_yz = grid%npes_yz
 
       twod_decomp = grid%twod_decomp
       mod_geopk   = grid%mod_geopk

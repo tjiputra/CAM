@@ -449,18 +449,18 @@ contains
        m = lptr_so4_cw_amode(n)
        l = m - loffset
        if (l > 0) then
-          aqso4(n,:)=0._r8
+          aqso4(:,n)=0._r8
           do k=1,pver
              do i=1,ncol
-                aqso4(n,i)=aqso4(n,i)+dqdt_aqso4(i,k,l)*adv_mass(l)/mbar(i,k) &
+                aqso4(i,n)=aqso4(i,n)+dqdt_aqso4(i,k,l)*adv_mass(l)/mbar(i,k) &
                      *pdel(i,k)/gravit ! kg/m2/s
              enddo
           enddo
 
-          aqh2so4(n,:)=0._r8
+          aqh2so4(:,n)=0._r8
           do k=1,pver
              do i=1,ncol
-                aqh2so4(n,i)=aqh2so4(n,i)+dqdt_aqh2so4(i,k,l)*adv_mass(l)/mbar(i,k) &
+                aqh2so4(i,n)=aqh2so4(i,n)+dqdt_aqh2so4(i,k,l)*adv_mass(l)/mbar(i,k) &
                      *pdel(i,k)/gravit ! kg/m2/s
              enddo
           enddo
