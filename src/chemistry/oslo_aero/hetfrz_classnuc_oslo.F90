@@ -873,9 +873,9 @@ subroutine get_aer_num(qaerpt, qaercwpt, rhoair,           &   ! input
         awcam(1) = 0._r8
     end if
     if (awcam(1) >0._r8) then
-      awfacm(1) = f_acm(num_bc_idx)
+        awfacm(1) = f_acm(num_bc_idx) 
     else
-      awfacm(1) = 0.0_r8
+        awfacm(1) = 0._r8
     end if
 
 
