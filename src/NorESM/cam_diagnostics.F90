@@ -307,11 +307,6 @@ contains
    call addfld ('ASYMMVIS',(/'lev'/),'A','unitless','Aerosol assymetry factor in visible wavelength band')    
    call addfld ('EXTVIS  ',(/'lev'/),'A','1/km    ','Aerosol extinction')     
    call addfld ('AKCXS   ',horiz_only,'A','mg/m2   ','Scheme excess aerosol mass burden')     
-   call addfld ('CDNC    ',(/'lev'/),'A','1/CM3   ', 'Cloud Droplet Number Concentration')
-   call addfld ('CLDFOC  ',(/'lev'/),'A','FRACTION','Frequency of Warm Cloud Occurence')
-   call addfld ('REFFL   ',(/'lev'/),'A','uM      ','Effective Radius of Cloud Droplets')
-   call addfld ('REHANA  ',horiz_only,'A','uM      ','Effective radius as seen from satellite')
-   call addfld ('FOCHANA ',horiz_only,'A','FRACTION','Frequency of Occurrence of Clouds with REHANA /= 0')
    call addfld ('RELH    ',(/'lev'/),'A', 'unitless','Fictive relative humidity')
 #ifdef COLTST4INTCONS 
 ! optical depth for each mode/mixture:
@@ -660,11 +655,6 @@ contains
    call add_default ('ASYMMVIS', 1, ' ')
    call add_default ('EXTVIS  ', 1, ' ')
    call add_default ('AKCXS   ', 1, ' ')
-   call add_default ('CDNC    ', 1, ' ')
-   call add_default ('CLDFOC  ', 1, ' ')
-   call add_default ('REFFL   ', 1, ' ')
-   call add_default ('REHANA  ', 1, ' ')
-   call add_default ('FOCHANA ', 1, ' ')
    call add_default ('RELH    ', 1, ' ')
 #ifdef AEROFFL
      call add_default ('FSNT_DRF', 1, ' ')
