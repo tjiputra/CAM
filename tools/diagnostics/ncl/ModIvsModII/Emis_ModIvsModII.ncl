@@ -78,10 +78,10 @@ if (plot_type.eq.0) then
  if(ModI.eq."CAM4-Oslo") then
    load_I=(/(f1_I[:]->EMI_SO4)/)*1.e12     ; variable to be plotted from I
  else
-   load_I=(/(f1_I[:]->SFSO4_A1)/)/3.06 + (/(f1_I[:]->SFSO4_A2)/)/4.12 + (/(f1_I[:]->SFSO4_AC)/)/3.06  + (/(f1_I[:]->SFSO4_NA)/)/3.06 + (/(f1_I[:]->SFSO4_PR)/)/3.06 + (/(f1_I[:]->SO4_PR_CLXF)/)/3.06
+   load_I=(/(f1_I[:]->SFSO4_A1)/)/3.06 + (/(f1_I[:]->SFSO4_A2)/)/3.59 + (/(f1_I[:]->SFSO4_AC)/)/3.06  + (/(f1_I[:]->SFSO4_NA)/)/3.06 + (/(f1_I[:]->SFSO4_PR)/)/3.06 + (/(f1_I[:]->SO4_PR_CLXF)/)/3.06
    load_I = load_I*1.e12
  end if 
- load_II=(/(f1_II[:]->SFSO4_A1)/)/3.06 + (/(f1_II[:]->SFSO4_A2)/)/4.12 + (/(f1_II[:]->SFSO4_AC)/)/3.06  + (/(f1_II[:]->SFSO4_NA)/)/3.06 + (/(f1_II[:]->SFSO4_PR)/)/3.06 + (/(f1_II[:]->SO4_PR_CLXF)/)/3.06
+ load_II=(/(f1_II[:]->SFSO4_A1)/)/3.06 + (/(f1_II[:]->SFSO4_A2)/)/3.59 + (/(f1_II[:]->SFSO4_AC)/)/3.06  + (/(f1_II[:]->SFSO4_NA)/)/3.06 + (/(f1_II[:]->SFSO4_PR)/)/3.06 + (/(f1_II[:]->SO4_PR_CLXF)/)/3.06
  load_II = load_II*1.e12
  else if (plot_type.eq.2) then
  var="EMI_BC"                     ; name of input-variable and plot
@@ -150,7 +150,7 @@ if (plot_type.eq.0) then
  xdims_II = dimsizes(gw0_II)
  ;print(xdims_I)
  ydims_II = dimsizes(load_IIa)
-; print(ydims_II)
+ ;print(ydims_II)
  do i=0,dimsizes(gw0_II)-1
  load_IIa(:,i,:)=load_II(:,i,:)*coffa*dlon_II*gw0_II(i)
  end do
