@@ -112,16 +112,16 @@ begin
    load_I=(/f1_I[:]->C_SO4/)                                 ; variable to be plotted from I
    netloss_I=(/f1_I[:]->WET_SO4/)+(/f1_I[:]->DRY_SO4/)        ; variable to be plotted from I
  else
-   load_I=(/(f1_I[:]->cb_SO4_A1)/)/3.06 + (/(f1_I[:]->cb_SO4_A2)/)/4.12 + (/(f1_I[:]->cb_SO4_AC)/)/3.06 + (/(f1_I[:]->cb_SO4_NA)/)/3.06 + (/(f1_I[:]->cb_SO4_PR)/)/3.06 + (/(f1_I[:]->cb_SO4_A1_OCW)/)/3.06 + (/(f1_I[:]->cb_SO4_A2_OCW)/)/4.12 + (/(f1_I[:]->cb_SO4_AC_OCW)/)/3.06 + (/(f1_I[:]->cb_SO4_NA_OCW)/)/3.06 + (/(f1_I[:]->cb_SO4_PR_OCW)/)/3.06
-   wet_I=(/f1_I[:]->SO4_A1SFWET/)/3.06 + (/f1_I[:]->SO4_A2SFWET/)/4.12 + (/f1_I[:]->SO4_ACSFWET/)/3.06  + (/f1_I[:]->SO4_NASFWET/)/3.06 + (/f1_I[:]->SO4_PRSFWET/)/3.06 + (/f1_I[:]->SO4_A1_OCWSFWET/)/3.06 + (/f1_I[:]->SO4_A2_OCWSFWET/)/4.12 + (/f1_I[:]->SO4_AC_OCWSFWET/)/3.06 + (/f1_I[:]->SO4_NA_OCWSFWET/)/3.06 + (/f1_I[:]->SO4_PR_OCWSFWET/)/3.06 
+   load_I=(/(f1_I[:]->cb_SO4_A1)/)/3.06 + (/(f1_I[:]->cb_SO4_A2)/)/3.59 + (/(f1_I[:]->cb_SO4_AC)/)/3.06 + (/(f1_I[:]->cb_SO4_NA)/)/3.06 + (/(f1_I[:]->cb_SO4_PR)/)/3.06 + (/(f1_I[:]->cb_SO4_A1_OCW)/)/3.06 + (/(f1_I[:]->cb_SO4_A2_OCW)/)/3.59 + (/(f1_I[:]->cb_SO4_AC_OCW)/)/3.06 + (/(f1_I[:]->cb_SO4_NA_OCW)/)/3.06 + (/(f1_I[:]->cb_SO4_PR_OCW)/)/3.06
+   wet_I=(/f1_I[:]->SO4_A1SFWET/)/3.06 + (/f1_I[:]->SO4_A2SFWET/)/3.59 + (/f1_I[:]->SO4_ACSFWET/)/3.06  + (/f1_I[:]->SO4_NASFWET/)/3.06 + (/f1_I[:]->SO4_PRSFWET/)/3.06 + (/f1_I[:]->SO4_A1_OCWSFWET/)/3.06 + (/f1_I[:]->SO4_A2_OCWSFWET/)/3.59 + (/f1_I[:]->SO4_AC_OCWSFWET/)/3.06 + (/f1_I[:]->SO4_NA_OCWSFWET/)/3.06 + (/f1_I[:]->SO4_PR_OCWSFWET/)/3.06 
    wet_I=-wet_I
-   dry_I=(/f1_I[:]->SO4_A1DDF/)/3.06 + (/f1_I[:]->SO4_A2DDF/)/4.12 + (/f1_I[:]->SO4_ACDDF/)/3.06 + (/f1_I[:]->SO4_NADDF/) + (/f1_I[:]->SO4_PRDDF/)/3.06 + (/f1_I[:]->SO4_A1_OCWDDF/)/3.06 + (/f1_I[:]->SO4_A2_OCWDDF/)/4.12 + (/f1_I[:]->SO4_AC_OCWDDF/) /3.06+ (/f1_I[:]->SO4_NA_OCWDDF/)/3.06 + (/f1_I[:]->SO4_PR_OCWDDF/)/3.06
+   dry_I=(/f1_I[:]->SO4_A1DDF/)/3.06 + (/f1_I[:]->SO4_A2DDF/)/3.59 + (/f1_I[:]->SO4_ACDDF/)/3.06 + (/f1_I[:]->SO4_NADDF/) + (/f1_I[:]->SO4_PRDDF/)/3.06 + (/f1_I[:]->SO4_A1_OCWDDF/)/3.06 + (/f1_I[:]->SO4_A2_OCWDDF/)/3.59 + (/f1_I[:]->SO4_AC_OCWDDF/) /3.06+ (/f1_I[:]->SO4_NA_OCWDDF/)/3.06 + (/f1_I[:]->SO4_PR_OCWDDF/)/3.06
    netloss_I=-(wet_I+dry_I)
  end if
- load_II=(/(f1_II[:]->cb_SO4_A1)/)/3.06 + (/(f1_II[:]->cb_SO4_A2)/)/4.12 + (/(f1_II[:]->cb_SO4_AC)/)/3.06 + (/(f1_II[:]->cb_SO4_NA)/)/3.06 + (/(f1_II[:]->cb_SO4_PR)/)/3.06 + (/(f1_II[:]->cb_SO4_A1_OCW)/)/3.06 + (/(f1_II[:]->cb_SO4_A2_OCW)/)/4.12 + (/(f1_II[:]->cb_SO4_AC_OCW)/)/3.06 + (/(f1_II[:]->cb_SO4_NA_OCW)/)/3.06 + (/(f1_II[:]->cb_SO4_PR_OCW)/)/3.06
- wet_II=(/f1_II[:]->SO4_A1SFWET/)/3.06 + (/f1_II[:]->SO4_A2SFWET/)/4.12 + (/f1_II[:]->SO4_ACSFWET/)/3.06  +  (/f1_II[:]->SO4_NASFWET/)/3.06  + (/f1_II[:]->SO4_PRSFWET/)/3.06  + (/f1_II[:]->SO4_A1_OCWSFWET/)/3.06  + (/f1_II[:]->SO4_A2_OCWSFWET/)/4.12 + (/f1_II[:]->SO4_AC_OCWSFWET/)/3.06   + (/f1_II[:]->SO4_NA_OCWSFWET/)/3.06  + (/f1_II[:]->SO4_PR_OCWSFWET/)/3.06 
+ load_II=(/(f1_II[:]->cb_SO4_A1)/)/3.06 + (/(f1_II[:]->cb_SO4_A2)/)/3.59 + (/(f1_II[:]->cb_SO4_AC)/)/3.06 + (/(f1_II[:]->cb_SO4_NA)/)/3.06 + (/(f1_II[:]->cb_SO4_PR)/)/3.06 + (/(f1_II[:]->cb_SO4_A1_OCW)/)/3.06 + (/(f1_II[:]->cb_SO4_A2_OCW)/)/3.59 + (/(f1_II[:]->cb_SO4_AC_OCW)/)/3.06 + (/(f1_II[:]->cb_SO4_NA_OCW)/)/3.06 + (/(f1_II[:]->cb_SO4_PR_OCW)/)/3.06
+ wet_II=(/f1_II[:]->SO4_A1SFWET/)/3.06 + (/f1_II[:]->SO4_A2SFWET/)/3.59 + (/f1_II[:]->SO4_ACSFWET/)/3.06  +  (/f1_II[:]->SO4_NASFWET/)/3.06  + (/f1_II[:]->SO4_PRSFWET/)/3.06  + (/f1_II[:]->SO4_A1_OCWSFWET/)/3.06  + (/f1_II[:]->SO4_A2_OCWSFWET/)/3.59 + (/f1_II[:]->SO4_AC_OCWSFWET/)/3.06   + (/f1_II[:]->SO4_NA_OCWSFWET/)/3.06  + (/f1_II[:]->SO4_PR_OCWSFWET/)/3.06 
  wet_II=-wet_II
- dry_II=(/f1_II[:]->SO4_A1DDF/)/3.06  + (/f1_II[:]->SO4_A2DDF/)/4.12 + (/f1_II[:]->SO4_ACDDF/)/3.06 + (/f1_II[:]->SO4_NADDF/) + (/f1_II[:]->SO4_PRDDF/)/3.06 + (/f1_II[:]->SO4_A1_OCWDDF/)/3.06 + (/f1_II[:]->SO4_A2_OCWDDF/)/4.12 + (/f1_II[:]->SO4_AC_OCWDDF/) /3.06 + (/f1_II[:]->SO4_NA_OCWDDF/)/3.06 + (/f1_II[:]->SO4_PR_OCWDDF/)/3.06
+ dry_II=(/f1_II[:]->SO4_A1DDF/)/3.06  + (/f1_II[:]->SO4_A2DDF/)/3.59 + (/f1_II[:]->SO4_ACDDF/)/3.06 + (/f1_II[:]->SO4_NADDF/) + (/f1_II[:]->SO4_PRDDF/)/3.06 + (/f1_II[:]->SO4_A1_OCWDDF/)/3.06 + (/f1_II[:]->SO4_A2_OCWDDF/)/3.59 + (/f1_II[:]->SO4_AC_OCWDDF/) /3.06 + (/f1_II[:]->SO4_NA_OCWDDF/)/3.06 + (/f1_II[:]->SO4_PR_OCWDDF/)/3.06
  netloss_II=-(wet_II+dry_II)
  else if (plot_type.eq.2) then
  var="Lifetime_BC"                        ; name of input-variable and plot

@@ -77,10 +77,10 @@ begin
  if(ModI.eq."CAM4-Oslo") then
    load_I=(/(f1_I[:]->C_SO4)/)*1.e6     ; variable to be plotted from I
  else
-   load_I=(/(f1_I[:]->cb_SO4_A1)/)/3.06 + (/(f1_I[:]->cb_SO4_A2)/)/4.12 + (/(f1_I[:]->cb_SO4_AC)/)/3.06 + (/(f1_I[:]->cb_SO4_NA)/)/3.06 + (/(f1_I[:]->cb_SO4_PR)/)/3.06 + (/(f1_I[:]->cb_SO4_A1_OCW)/)/3.06 + (/(f1_I[:]->cb_SO4_A2_OCW)/)/4.12 + (/(f1_I[:]->cb_SO4_AC_OCW)/)/3.06 + (/(f1_I[:]->cb_SO4_NA_OCW)/)/3.06 + (/(f1_I[:]->cb_SO4_PR_OCW)/)/3.06
+   load_I=(/(f1_I[:]->cb_SO4_A1)/)/3.06 + (/(f1_I[:]->cb_SO4_A2)/)/3.59 + (/(f1_I[:]->cb_SO4_AC)/)/3.06 + (/(f1_I[:]->cb_SO4_NA)/)/3.06 + (/(f1_I[:]->cb_SO4_PR)/)/3.06 + (/(f1_I[:]->cb_SO4_A1_OCW)/)/3.06 + (/(f1_I[:]->cb_SO4_A2_OCW)/)/3.59 + (/(f1_I[:]->cb_SO4_AC_OCW)/)/3.06 + (/(f1_I[:]->cb_SO4_NA_OCW)/)/3.06 + (/(f1_I[:]->cb_SO4_PR_OCW)/)/3.06
    load_I = load_I*1.e6
  end if
- load_II=(/(f1_II[:]->cb_SO4_A1)/)/3.06 + (/(f1_II[:]->cb_SO4_A2)/)/4.12 + (/(f1_II[:]->cb_SO4_AC)/)/3.06 +  (/(f1_II[:]->cb_SO4_NA)/)/3.06 + (/(f1_II[:]->cb_SO4_PR)/)/3.06 + (/(f1_II[:]->cb_SO4_A1_OCW)/)/3.06 + (/(f1_II[:]->cb_SO4_A2_OCW)/)/4.12 + (/(f1_II[:]->cb_SO4_AC_OCW)/)/3.06  + (/(f1_II[:]->cb_SO4_NA_OCW)/)/3.06 + (/(f1_II[:]->cb_SO4_PR_OCW)/)/3.06
+ load_II=(/(f1_II[:]->cb_SO4_A1)/)/3.06 + (/(f1_II[:]->cb_SO4_A2)/)/3.59 + (/(f1_II[:]->cb_SO4_AC)/)/3.06 +  (/(f1_II[:]->cb_SO4_NA)/)/3.06 + (/(f1_II[:]->cb_SO4_PR)/)/3.06 + (/(f1_II[:]->cb_SO4_A1_OCW)/)/3.06 + (/(f1_II[:]->cb_SO4_A2_OCW)/)/3.59 + (/(f1_II[:]->cb_SO4_AC_OCW)/)/3.06  + (/(f1_II[:]->cb_SO4_NA_OCW)/)/3.06 + (/(f1_II[:]->cb_SO4_PR_OCW)/)/3.06
  load_II = load_II*1.e6
  else if (plot_type.eq.2) then
  var="C_BC"               ; name of input-variable and plot
@@ -171,7 +171,6 @@ begin
 ; Defining color scales for each load variable
 if (var .eq. "C_SO2" .or.  var .eq. "C_SO4") then
  digg=(/0.1,0.2,0.3,0.5,1,2,3,5,10,20/)                      ; C_SO2 & C_SO4
-; else if (var .eq. "C_BC") then
  else if (var .eq. "C_BC") then
   digg=(/0.03,0.05,0.1,0.2,0.3,0.5,1,2,3,5/)                 ; C_BC
   else if (var .eq. "C_POM" .or. var .eq. "C_SS") then

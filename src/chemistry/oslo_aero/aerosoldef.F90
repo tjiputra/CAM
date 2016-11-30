@@ -109,7 +109,8 @@ module aerosoldef
 
    !Radius used for the modes in the lifeCycle MAY ASSUME SOME GROWTH ALREADY HAPPENED
    real(r8), parameter, public, dimension(0:nmodes) :: lifeCycleNumberMedianRadius = &
-                                1.e-6_r8*(/ 0.1_r8, 0.02_r8, 0.0118_r8, 0.04_r8,   0.04_r8,   0.075_r8, &
+!BCsizes                                1.e-6_r8*(/ 0.1_r8, 0.02_r8, 0.0118_r8, 0.04_r8,   0.04_r8,   0.075_r8, &
+                                1.e-6_r8*(/ 0.0626_r8, 0.025_r8, 0.025_r8, 0.04_r8,   0.06_r8,   0.075_r8, &
                                               0.22_r8,   0.63_r8,   0.0475_r8,  0.30_r8,   0.75_r8,  &    ! Salter et al. (2015)
                                              0.0118_r8, 0.0118_r8, 0.04_r8,   0.04_r8    /)
 

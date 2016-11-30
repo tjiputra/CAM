@@ -155,10 +155,10 @@ begin
  sink_II= -(/f1_II[:]->WD_A_SO2/)/1.998 \   ;kg/m2/sec (positive in output file)
           -(/f1_II[:]->DF_SO2/)/1.998 \     ;kg/m2/sec (positive in output file)  
           +(/f1_II[:]->AQ_SO2/)/1.998 \     ;kg/m2/ses (negative in output file)
-          +(/f1_II[:]->GS_SO2/)/1.998 - (/f1_II[:]->SO2_CLXF/)/1.998 - so2_formed_from_dms_as_s_II + (/f1_II[:]->WD_A_SO2/)/1.998  ; net chemical loss (gas phase)
+          +(/f1_II[:]->GS_SO2/)/1.998 - (/f1_II[:]->SO2_CLXF/)/1.998 - so2_formed_from_dms_as_s_II; net chemical loss (gas phase)
 
  chlossg_II = (/f1_II[:]->GS_SO2/)/1.998 - (/f1_II[:]->SO2_CLXF/)/1.998 \ 
-            - so2_formed_from_dms_as_s_II + (/f1_II[:]->WD_A_SO2/)/1.998  ; net chemical loss (gas phase)
+            - so2_formed_from_dms_as_s_II   ; net chemical loss (gas phase)
 
  chloss_II = chlossg_II + (/f1_II[:]->AQ_SO2/)/1.998                     ; net chemical loss (gas and wet-phase)
  else if (plot_type.eq.1) then

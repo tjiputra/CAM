@@ -4,7 +4,7 @@ module opttab
 !   and to define the grid for discrete input-values in these look-up tables. 
 
 !   Modified for new wavelength bands and look-up tables - Alf Kirkevaag Dec. 2013.
-!   Updated for reading inout files with extra header info - Alf Kirkevaag, May 2015.
+!   Updated for reading input files with extra header info - Alf Kirkevaag, May 2015.
 !   Extended for new SOA treatment - Alf Kirkevaag, August 2015.
 !   Added output (ASCII) Jabuary 2016: #ifdef COLTST4INTCONS -> extinction 
 !   koefficients (wrt. all added mass including condensed water vapour) are 
@@ -12,6 +12,7 @@ module opttab
 !   as function of RH (to be changed to whatever parameter the user is interested in)
 !   Modified for optimized added masses and mass fractions for concentrations from 
 !   condensation, coagulation or cloud-processing - Alf Kirkevaag, May 2016. 
+!   Modified cate values for kcomp=2 (as  in AeroTab) - Alf Kirkevaag October 2016.  
 
 #include <preprocessorDefinitions.h>
 
@@ -117,10 +118,11 @@ subroutine initopt
       do kcomp=1,4
         cate(kcomp,1)=1.e-10_r8
         do i=2,16
-          if(kcomp.eq.1) then
+!o          if(kcomp.eq.1) then
+          if(kcomp.eq.1.or.kcomp.eq.2) then
             cate(kcomp,i)=10.0_r8**((i-1)/3.0_r8-6.222_r8)
-          elseif(kcomp.eq.2) then
-            cate(kcomp,i)=10.0_r8**((i-1)/3.0_r8-6.523_r8)
+!o          elseif(kcomp.eq.2) then
+!o            cate(kcomp,i)=10.0_r8**((i-1)/3.0_r8-6.523_r8)
           elseif(kcomp.eq.3) then
             cate(kcomp,i)=1.0e-10_r8  ! not used
           else

@@ -8,32 +8,33 @@ subroutine coltst4intcons (lchnk, ncol, qm1, deltah_km, rhoda, fnbc, &
 !      (use of aerodryk*.out look-up tables) and calculations directly 
 !      from the qm1 array. Made by Alf Kirkevag 8/12-2015.
 
-!      Note on initial test results:
 !      Due to a problem with initialization of some values (seemingly), 
 !      the output variables COLR* (column burden ratio for tracers *)
 !      should not be checked for the first output file from an initial run.
-!      Results from month 2 in a test simulation with 2000 aerosol emissions
+!      Initial test results after coorecting a bug in AeroTab October 2016:
+!      Results from month 5 in a test simulation with 2000 aerosol emissions
 !      and f10_f10 resolution (10x15_10x15) gave the following globally 
 !      averaged COLR* values:
 !
-! COLRBC0 = 0.9999355 ;
-! COLRBC12 = 1.000637 ;
-! COLRBC14 = 0.9980373 ;
-! COLRBC2 = 1.000637 ;
-! COLRBC4 = 0.9985162 ;
-! COLRBCAC = 0.9798372 ;
-! COLROC14 = 0.9981593 ;
-! COLROC4 = 0.9984542 ;
-! COLROCAC = 0.8353693 ;
-! COLRSUL1 = 1.03683 ;
-! COLRSUL5 = 1.03876 ;
-! COLRSULA = 0.9857506 ;
+! COLRBC0 = 1.000015 ;
+! COLRBC12 = 0.9991855 ;
+! COLRBC14 = 0.9992678 ;
+! COLRBC2 = 0.9991855 ;
+! COLRBC4 = 0.9997123 ;
+! COLRBCAC = 1.000379 ;
+! COLROC14 = 0.9989312 ;
+! COLROC4 = 0.9995964 ;
+! COLROCAC = 0.9993698 ;
+! COLRSUL1 = 1.034586 ;
+! COLRSUL5 = 1.03905 ;
+! COLRSULA = 1.000236 ;
 !
 ! with regional variations within 0.01 for all tracers except for the 
-! externally mixed tracers so4_na (COLRSUL5 = 1.01 - 1.04) and so4_pr 
-! (COLRSUL5 = 1.035 - 1.039) and the internally mixed bc_ac (COLRBCAC 
-!  = 0.74 - 1.0006) and "om_ac + soa_a1" (COLROCAC = 0.81 - 0.93). The 
-! COLROCAC values are suspiciously low and should be checked more closely.
+! externally mixed tracers so4_na (COLRSUL1 = 1.02 - 1.04) and so4_pr 
+! (COLRSUL5 = 1.035 - 1.039). The biases for COLRSUL1 and COLRSUL5 are
+! consistent with a ratio between mass density for sulfuric acid and 
+! ammonium sulfate (1841/1769=1.041), and that CAM5-Olso does not take 
+! into account the former. 
 
    use ppgrid
    use shr_kind_mod, only: r8 => shr_kind_r8

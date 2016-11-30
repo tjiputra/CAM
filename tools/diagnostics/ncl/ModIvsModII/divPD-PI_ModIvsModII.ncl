@@ -92,12 +92,12 @@ begin
  if(ModI.eq."CAM4-Oslo") then
    forc_I=((/(f1PD_I[:]->C_SO4)/)-(/(f1PI_I[:]->C_SO4)/))*1.e6
  else
-   forc_I=(/(f1PD_I[:]->cb_SO4_A1)/)/3.06 + (/(f1PD_I[:]->cb_SO4_A2)/)/4.12 + (/(f1PD_I[:]->cb_SO4_AC)/)/3.06 + (/(f1PD_I[:]->cb_SO4_NA)/)/3.06 + (/(f1PD_I[:]->cb_SO4_PR)/)/3.06 + (/(f1PD_I[:]->cb_SO4_A1_OCW)/)/3.06 + (/(f1PD_I[:]->cb_SO4_A2_OCW)/)/4.12 + (/(f1PD_I[:]->cb_SO4_AC_OCW)/)/3.06 + (/(f1PD_I[:]->cb_SO4_NA_OCW)/)/3.06 + (/(f1PD_I[:]->cb_SO4_PR_OCW)/)/3.06
-   forc_I=forc_I-((/(f1PI_I[:]->cb_SO4_A1)/)/3.06 + (/(f1PI_I[:]->cb_SO4_A2)/)/4.12 + (/(f1PI_I[:]->cb_SO4_AC)/)/3.06  + (/(f1PI_I[:]->cb_SO4_NA)/)/3.06 + (/(f1PI_I[:]->cb_SO4_PR)/)/3.06 + (/(f1PI_I[:]->cb_SO4_A1_OCW)/)/3.06 + (/(f1PI_I[:]->cb_SO4_A2_OCW)/)/4.12 + (/(f1PI_I[:]->cb_SO4_AC_OCW)/)/3.06 + (/(f1PI_I[:]->cb_SO4_NA_OCW)/)/3.06 + (/(f1PI_I[:]->cb_SO4_PR_OCW)/)/3.06)
+   forc_I=(/(f1PD_I[:]->cb_SO4_A1)/)/3.06 + (/(f1PD_I[:]->cb_SO4_A2)/)/3.59 + (/(f1PD_I[:]->cb_SO4_AC)/)/3.06 + (/(f1PD_I[:]->cb_SO4_NA)/)/3.06 + (/(f1PD_I[:]->cb_SO4_PR)/)/3.06 + (/(f1PD_I[:]->cb_SO4_A1_OCW)/)/3.06 + (/(f1PD_I[:]->cb_SO4_A2_OCW)/)/3.59 + (/(f1PD_I[:]->cb_SO4_AC_OCW)/)/3.06 + (/(f1PD_I[:]->cb_SO4_NA_OCW)/)/3.06 + (/(f1PD_I[:]->cb_SO4_PR_OCW)/)/3.06
+   forc_I=forc_I-((/(f1PI_I[:]->cb_SO4_A1)/)/3.06 + (/(f1PI_I[:]->cb_SO4_A2)/)/3.59 + (/(f1PI_I[:]->cb_SO4_AC)/)/3.06  + (/(f1PI_I[:]->cb_SO4_NA)/)/3.06 + (/(f1PI_I[:]->cb_SO4_PR)/)/3.06 + (/(f1PI_I[:]->cb_SO4_A1_OCW)/)/3.06 + (/(f1PI_I[:]->cb_SO4_A2_OCW)/)/3.59 + (/(f1PI_I[:]->cb_SO4_AC_OCW)/)/3.06 + (/(f1PI_I[:]->cb_SO4_NA_OCW)/)/3.06 + (/(f1PI_I[:]->cb_SO4_PR_OCW)/)/3.06)
    forc_I=forc_I*1.e6
  end if
- forc_II=(/(f1PD_II[:]->cb_SO4_A1)/)/3.06 + (/(f1PD_II[:]->cb_SO4_A2)/)/4.12 + (/(f1PD_II[:]->cb_SO4_AC)/)/3.06 + (/(f1PD_II[:]->cb_SO4_NA)/)/3.06 + (/(f1PD_II[:]->cb_SO4_PR)/)/3.06 + (/(f1PD_II[:]->cb_SO4_A1_OCW)/)/3.06 + (/(f1PD_II[:]->cb_SO4_A2_OCW)/)/4.12 + (/(f1PD_II[:]->cb_SO4_AC_OCW)/)/3.06 + (/(f1PD_II[:]->cb_SO4_NA_OCW)/)/3.06 + (/(f1PD_II[:]->cb_SO4_PR_OCW)/)/3.06
- forc_II=forc_II-((/(f1PI_II[:]->cb_SO4_A1)/)/3.06 + (/(f1PI_II[:]->cb_SO4_A2)/)/4.12 + (/(f1PI_II[:]->cb_SO4_AC)/)/3.06 + (/(f1PI_II[:]->cb_SO4_NA)/)/3.06 + (/(f1PI_II[:]->cb_SO4_PR)/)/3.06 + (/(f1PI_II[:]->cb_SO4_A1_OCW)/)/3.06 + (/(f1PI_II[:]->cb_SO4_A2_OCW)/)/4.12 + (/(f1PI_II[:]->cb_SO4_AC_OCW)/)/3.06 + (/(f1PI_II[:]->cb_SO4_NA_OCW)/)/3.06 + (/(f1PI_II[:]->cb_SO4_PR_OCW)/)/3.06)
+ forc_II=(/(f1PD_II[:]->cb_SO4_A1)/)/3.06 + (/(f1PD_II[:]->cb_SO4_A2)/)/3.59 + (/(f1PD_II[:]->cb_SO4_AC)/)/3.06 + (/(f1PD_II[:]->cb_SO4_NA)/)/3.06 + (/(f1PD_II[:]->cb_SO4_PR)/)/3.06 + (/(f1PD_II[:]->cb_SO4_A1_OCW)/)/3.06 + (/(f1PD_II[:]->cb_SO4_A2_OCW)/)/3.59 + (/(f1PD_II[:]->cb_SO4_AC_OCW)/)/3.06 + (/(f1PD_II[:]->cb_SO4_NA_OCW)/)/3.06 + (/(f1PD_II[:]->cb_SO4_PR_OCW)/)/3.06
+ forc_II=forc_II-((/(f1PI_II[:]->cb_SO4_A1)/)/3.06 + (/(f1PI_II[:]->cb_SO4_A2)/)/3.59 + (/(f1PI_II[:]->cb_SO4_AC)/)/3.06 + (/(f1PI_II[:]->cb_SO4_NA)/)/3.06 + (/(f1PI_II[:]->cb_SO4_PR)/)/3.06 + (/(f1PI_II[:]->cb_SO4_A1_OCW)/)/3.06 + (/(f1PI_II[:]->cb_SO4_A2_OCW)/)/3.59 + (/(f1PI_II[:]->cb_SO4_AC_OCW)/)/3.06 + (/(f1PI_II[:]->cb_SO4_NA_OCW)/)/3.06 + (/(f1PI_II[:]->cb_SO4_PR_OCW)/)/3.06)
  forc_II=forc_II*1.e6
  else if (plot_type.eq.4) then
  var="dC_POM"

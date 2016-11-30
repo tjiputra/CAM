@@ -76,11 +76,11 @@ begin
    load_I=(/f1_I[:]->C_SO4/)*1.e3                              ; variable to be plotted from I
    ext_I=(/f1_I[:]->D550_SO4/)/(/(f1_I[:]->C_SO4)/)*1.e-3      ; variable to be plotted from I
  else
-   load_I=(/(f1_I[:]->cb_SO4_A1)/)/3.06 + (/(f1_I[:]->cb_SO4_A2)/)/4.12 + (/(f1_I[:]->cb_SO4_AC)/)/3.06 + (/(f1_I[:]->cb_SO4_NA)/)/3.06 + (/(f1_I[:]->cb_SO4_PR)/)/3.06
+   load_I=(/(f1_I[:]->cb_SO4_A1)/)/3.06 + (/(f1_I[:]->cb_SO4_A2)/)/3.59 + (/(f1_I[:]->cb_SO4_AC)/)/3.06 + (/(f1_I[:]->cb_SO4_NA)/)/3.06 + (/(f1_I[:]->cb_SO4_PR)/)/3.06
    load_I=load_I*1.e3 
    ext_I=aod_I/load_I
  end if
- load_II=(/(f1_II[:]->cb_SO4_A1)/)/3.06 + (/(f1_II[:]->cb_SO4_A2)/)/4.12 + (/(f1_II[:]->cb_SO4_AC)/)/3.06 + (/(f1_II[:]->cb_SO4_NA)/)/3.06 + (/(f1_II[:]->cb_SO4_PR)/)/3.06
+ load_II=(/(f1_II[:]->cb_SO4_A1)/)/3.06 + (/(f1_II[:]->cb_SO4_A2)/)/3.59 + (/(f1_II[:]->cb_SO4_AC)/)/3.06 + (/(f1_II[:]->cb_SO4_NA)/)/3.06 + (/(f1_II[:]->cb_SO4_PR)/)/3.06
  load_II=load_II*1.e3 
  ext_II=aod_II/load_II
  else if (plot_type.eq.2) then
