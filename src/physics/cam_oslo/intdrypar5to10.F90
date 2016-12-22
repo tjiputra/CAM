@@ -1,4 +1,5 @@
-subroutine intdrypar5to10 (lchnk, ncol, Nnatk, Camk, xfac, xfbc, xfaq, & 
+subroutine intdrypar5to10 (lchnk, ncol, Nnatk, xct, ict1,              &
+           xfac, ifac1, xfbc, ifbc1, xfaq, ifaq1,                      & 
            cintbg, cintbg05, cintbg125, cintbc, cintbc05, cintbc125,   & 
            cintoc, cintoc05, cintoc125, cintsc, cintsc05, cintsc125,   &
            cintsa, cintsa05, cintsa125, aaeros, aaerol, vaeros, vaerol,&
@@ -18,13 +19,17 @@ subroutine intdrypar5to10 (lchnk, ncol, Nnatk, Camk, xfac, xfbc, xfaq, &
    integer, intent(in) :: lchnk                     ! chunk identifier
    integer, intent(in) :: ncol                      ! number of atmospheric columns
    real(r8), intent(in) :: Nnatk(pcols,pver,0:nmodes) ! modal aerosol number concentration  
-   real(r8), intent(in) :: Camk(pcols,pver,nbmodes) ! modal internally mixed SO4+BC+OC conc.
+   real(r8), intent(in) :: xct(pcols,pver,nmodes)      ! modal internally mixed SO4+BC+OC conc.
+   integer,  intent(in) :: ict1(pcols,pver,nmodes)        
+   real(r8), intent(in) :: xfac(pcols,pver,nbmodes)    ! modal (OC+BC)/(SO4+BC+OC)
+   integer,  intent(in) :: ifac1(pcols,pver,nbmodes)
+   real(r8), intent(in) :: xfbc(pcols,pver,nbmodes)    ! modal BC/(OC+BC)
+   integer,  intent(in) :: ifbc1(pcols,pver,nbmodes)
+   real(r8), intent(in) :: xfaq(pcols,pver,nbmodes)    ! modal SO4(aq)/SO4
+   integer,  intent(in) :: ifaq1(pcols,pver,nbmodes)
 !
 ! Input-Output arguments
 !
-   real(r8), intent(inout) :: xfac(pcols,pver,nbmodes) ! modal (OC+BC)/(SO4+BC+OC)
-   real(r8), intent(inout) :: xfbc(pcols,pver,nbmodes) ! modal BC/(OC+BC)
-   real(r8), intent(inout) :: xfaq(pcols,pver,nbmodes) ! modal SO4(aq)/SO4
    real(r8), intent(inout) :: &
      cknorm(pcols,pver,0:nmodes), cknlt05(pcols,pver,0:nmodes), ckngt125(pcols,pver,0:nmodes)
 !
@@ -44,13 +49,10 @@ subroutine intdrypar5to10 (lchnk, ncol, Nnatk, Camk, xfac, xfbc, xfaq, &
 !
 !---------------------------Local variables-----------------------------
 !
-      real(r8) a, b, e, eps, catot, fabc, fraq, xct(pcols,pver)
+      real(r8) a, b, e, eps
 
-      integer iv, ictot, ifac, ifbc, ifaq, kcomp, k, icol
-      integer ict1(pcols,pver), &
-        ict2(pcols,pver), ifac1(pcols,pver), ifac2(pcols,pver),     &
-        ifbc1(pcols,pver), ifbc2(pcols,pver), ifaq1(pcols,pver),    &
-        ifaq2(pcols,pver)
+      integer iv, kcomp, k, icol
+
 !      Temporary storage of often used array elements
       integer t_ict1, t_ict2, t_ifa1, t_ifa2
       integer t_ifb1, t_ifb2, t_ifc1, t_ifc2
@@ -96,58 +98,6 @@ subroutine intdrypar5to10 (lchnk, ncol, Nnatk, Camk, xfac, xfbc, xfaq, &
          end do
        end do
 
-!      write(*,*) 'Before x-loop'
-      do k=1,pver
-         do icol=1,ncol
-
-          if(Nnatk(icol,k,kcomp)>0.0_r8) then
-!ccccccccc1ccccccccc2ccccccccc3ccccccccc4ccccccccc5ccccccccc6ccccccccc7cc
-          xct(icol,k)  = min(max(Camk(icol,k,kcomp) &
-                 /(Nnatk(icol,k,kcomp)+eps),cat(kcomp,1)),cat(kcomp,6))
-          xfac(icol,k,kcomp) = min(max(xfac(icol,k,kcomp),fac(1)),fac(6))
-          xfbc(icol,k,kcomp) = min(max(xfbc(icol,k,kcomp),fbc(1)),fbc(6))
-          xfaq(icol,k,kcomp) = min(max(xfaq(icol,k,kcomp),faq(1)),faq(6))
-
-!      write(*,*) 'Before cat-loop', kcomp
-      do ictot=1,5
-            if(xct(icol,k)>=cat(kcomp,ictot).and. &
-            xct(icol,k)<=cat(kcomp,ictot+1)) then
-             ict1(icol,k)=ictot
-             ict2(icol,k)=ictot+1
-            endif
-      end do ! ictot
-
-!      write(*,*) 'Before fac-loop', kcomp
-      do ifac=1,5
-            if(xfac(icol,k,kcomp)>=fac(ifac).and. &
-             xfac(icol,k,kcomp)<=fac(ifac+1)) then
-             ifac1(icol,k)=ifac
-             ifac2(icol,k)=ifac+1
-            endif
-      end do ! ifac
-
-!      write(*,*) 'Before fbc-loop', kcomp
-      do ifbc=1,5
-            if(xfbc(icol,k,kcomp)>=fbc(ifbc).and. &
-             xfbc(icol,k,kcomp)<=fbc(ifbc+1)) then
-             ifbc1(icol,k)=ifbc
-             ifbc2(icol,k)=ifbc+1
-            endif
-      end do ! ifbc
-
-!      write(*,*) 'Before faq-loop', kcomp
-      do ifaq=1,5
-            if(xfaq(icol,k,kcomp)>=faq(ifaq).and. &
-            xfaq(icol,k,kcomp)<=faq(ifaq+1)) then
-             ifaq1(icol,k)=ifaq
-             ifaq2(icol,k)=ifaq+1
-            endif
-      end do ! ifaq
-           endif
-
-          end do ! icol
-        end do ! k
-
 
         do k=1,pver 
           do icol=1,ncol
@@ -156,14 +106,14 @@ subroutine intdrypar5to10 (lchnk, ncol, Nnatk, Camk, xfac, xfbc, xfaq, &
 
 !      Collect all the vector elements into temporary storage
 !      to avoid cache conflicts and excessive cross-referencing
-      t_ict1 = ict1(icol,k)
-      t_ict2 = ict2(icol,k)
-      t_ifc1 = ifac1(icol,k)
-      t_ifc2 = ifac2(icol,k)
-      t_ifb1 = ifbc1(icol,k)
-      t_ifb2 = ifbc2(icol,k)
-      t_ifa1 = ifaq1(icol,k)
-      t_ifa2 = ifaq2(icol,k)
+      t_ict1 = ict1(icol,k,kcomp)
+      t_ict2 = t_ict1+1
+      t_ifc1 = ifac1(icol,k,kcomp)
+      t_ifc2 = t_ifc1+1
+      t_ifb1 = ifbc1(icol,k,kcomp)
+      t_ifb2 = t_ifb1+1
+      t_ifa1 = ifaq1(icol,k,kcomp)
+      t_ifa2 = t_ifa1+1
       t_cat1 = cat(kcomp,t_ict1)
       t_cat2 = cat(kcomp,t_ict2)
       t_fac1 = fac(t_ifc1)
@@ -172,7 +122,7 @@ subroutine intdrypar5to10 (lchnk, ncol, Nnatk, Camk, xfac, xfbc, xfaq, &
       t_fbc2 = fbc(t_ifb2)
       t_faq1 = faq(t_ifa1)
       t_faq2 = faq(t_ifa2)
-      t_xct  = xct(icol,k)
+      t_xct  = xct(icol,k,kcomp)
       t_xfac = xfac(icol,k,kcomp)
       t_xfbc = xfbc(icol,k,kcomp)
       t_xfaq = xfaq(icol,k,kcomp)

@@ -1,12 +1,13 @@
-subroutine intaeropt2to3 (lchnk, ncol, xrh, irh1, irh2, mplus10, Nnatk, Camk, xfacsoain, &
-           bext440, bext500, bext550, bext670, bext870,                &
-           bebg440, bebg500, bebg550, bebg670, bebg870,                &
-           bebc440, bebc500, bebc550, bebc670, bebc870,                &
-           beoc440, beoc500, beoc550, beoc670, beoc870,                &
-           besu440, besu500, besu550, besu670, besu870,                &
-           babs440, babs500, babs550, babs670, babs870,                &
-           bebg550lt1, bebg550gt1, bebc550lt1, bebc550gt1,             &
-           beoc550lt1, beoc550gt1, besu550lt1, besu550gt1,             &
+subroutine intaeropt2to3 (lchnk, ncol, xrh, irh1, mplus10, &
+           Nnatk, xct, ict1, xfac, ifac1,                  &
+           bext440, bext500, bext550, bext670, bext870,    &
+           bebg440, bebg500, bebg550, bebg670, bebg870,    &
+           bebc440, bebc500, bebc550, bebc670, bebc870,    &
+           beoc440, beoc500, beoc550, beoc670, beoc870,    &
+           besu440, besu500, besu550, besu670, besu870,    &
+           babs440, babs500, babs550, babs670, babs870,    &
+           bebg550lt1, bebg550gt1, bebc550lt1, bebc550gt1, &
+           beoc550lt1, beoc550gt1, besu550lt1, besu550gt1, &
            backsc550, babg550, babc550, baoc550, basu550) 
 
 !   Extended by Alf Kirkevaag to include SOA in September 2015
@@ -22,15 +23,16 @@ subroutine intaeropt2to3 (lchnk, ncol, xrh, irh1, irh2, mplus10, Nnatk, Camk, xf
 !
 ! Input arguments
 !
-   integer, intent(in) :: lchnk                     ! chunk identifier
-   integer, intent(in) :: ncol                      ! number of atmospheric columns
-   integer, intent(in) :: mplus10                   ! mode number (0) or number + 10 (1)
-   real(r8), intent(in) :: xrh(pcols,pver)          ! level relative humidity (fraction)
+   integer, intent(in) :: lchnk                       ! chunk identifier
+   integer, intent(in) :: ncol                        ! number of atmospheric columns
+   integer, intent(in) :: mplus10                     ! mode number (0) or number + 10 (1)
+   real(r8), intent(in) :: xrh(pcols,pver)            ! level relative humidity (fraction)
    integer,  intent(in) :: irh1(pcols,pver)
-   integer,  intent(in) :: irh2(pcols,pver)
-   real(r8), intent(in) :: xfacsoain(pcols,pver,4)  ! mass fraction SOA/(H2SO4+SOA) for condensate
    real(r8), intent(in) :: Nnatk(pcols,pver,0:nmodes) ! modal aerosol number concentration  
-   real(r8), intent(in) :: Camk(pcols,pver,nbmodes) ! modal internally mixed SO4+BC+OC conc.
+   real(r8), intent(in) :: xct(pcols,pver,nmodes)     ! modal internally mixed SO4+BC+OC conc.
+   integer,  intent(in) :: ict1(pcols,pver,nmodes)        
+   real(r8), intent(in) :: xfac(pcols,pver,nbmodes)   ! condensed SOA/(SOA+H2SO4) (1-4) or added carbonaceous fraction (5-10)
+   integer,  intent(in) :: ifac1(pcols,pver,nbmodes)        
 !
 ! Output arguments: Modal total and absorption extiction coefficients (for AeroCom)
 !old: for 550nm (1) and 865nm (2), and for r<1um (lt1) and r>1um (gt1).
@@ -75,11 +77,8 @@ subroutine intaeropt2to3 (lchnk, ncol, xrh, irh1, irh2, mplus10, Nnatk, Camk, xf
 !
 
       real(r8) a, b, e, eps
-      real(r8) xct(pcols,pver), xfac(pcols,pver)
 
-      integer i, iv, ierr, irelh, ictot, ifac, kcomp, k, icol, kc10
-      integer ict1(pcols,pver), ict2(pcols,pver), &
-        ifac1(pcols,pver), ifac2(pcols,pver)
+      integer i, iv, kcomp, k, icol, kc10
 
 !     Temporary storage of often used array elements
       integer t_irh1, t_irh2, t_ict1, t_ict2, t_ifc1, t_ifc2
@@ -168,47 +167,13 @@ subroutine intaeropt2to3 (lchnk, ncol, xrh, irh1, irh2, mplus10, Nnatk, Camk, xf
 
         end do ! kcomp
 
-        do kcomp=2,2     ! kcomp=3 is not used        
+        do kcomp=2,2     ! kcomp=3 is no longer used        
 
            if(mplus10==0) then
              kc10=kcomp
            else
              kc10=kcomp+10
            endif 
-
-!      write(*,*) 'Before x-loop'
-      do k=1,pver
-         do icol=1,ncol
-
-          if(Nnatk(icol,k,kc10).gt.0) then
-!ccccccccc1ccccccccc2ccccccccc3ccccccccc4ccccccccc5ccccccccc6ccccccccc7cc
-
-          xct(icol,k)  = min(max(Camk(icol,k,kcomp) &
-                 /(Nnatk(icol,k,kc10)+eps),cate(kcomp,1)),cate(kcomp,16))
-          xfac(icol,k) = min(max(xfacsoain(icol,k,kcomp),fac(1)),fac(6))
-
-!      write(*,*) 'Before cate-loop', kc10
-      do ictot=1,15
-            if(xct(icol,k).ge.cate(kcomp,ictot).and. &
-            xct(icol,k).le.cate(kcomp,ictot+1)) then
-             ict1(icol,k)=ictot
-             ict2(icol,k)=ictot+1
-            endif
-      end do ! ictot
-
-!      write(*,*) 'Before fac-loop', kcomp
-      do ifac=1,5
-            if(xfac(icol,k)>=fac(ifac).and. &
-             xfac(icol,k) <= fac(ifac+1)) then
-             ifac1(icol,k)=ifac
-             ifac2(icol,k)=ifac+1
-            endif
-      end do ! ifac
-
-           endif  ! Nnatk > 0
-
-          end do ! icol
-        end do ! k
 
 
         do k=1,pver 
@@ -220,11 +185,11 @@ subroutine intaeropt2to3 (lchnk, ncol, xrh, irh1, irh2, mplus10, Nnatk, Camk, xf
 !      to avoid cache conflicts and excessive cross-referencing
 
       t_irh1 = irh1(icol,k)
-      t_irh2 = irh2(icol,k)
-      t_ict1 = ict1(icol,k)
-      t_ict2 = ict2(icol,k)
-      t_ifc1 = ifac1(icol,k)
-      t_ifc2 = ifac2(icol,k)
+      t_irh2 = t_irh1+1
+      t_ict1 = ict1(icol,k,kc10)
+      t_ict2 = t_ict1+1
+      t_ifc1 = ifac1(icol,k,kcomp)
+      t_ifc2 = t_ifc1+1
       t_rh1  = rh(t_irh1)
       t_rh2  = rh(t_irh2)
       t_cat1 = cate(kcomp,t_ict1)
@@ -232,8 +197,8 @@ subroutine intaeropt2to3 (lchnk, ncol, xrh, irh1, irh2, mplus10, Nnatk, Camk, xf
       t_fac1 = fac(t_ifc1)
       t_fac2 = fac(t_ifc2)
       t_xrh  = xrh(icol,k)
-      t_xct  = xct(icol,k)
-      t_xfac = xfac(icol,k)
+      t_xct  = xct(icol,k,kc10)
+      t_xfac = xfac(icol,k,kcomp)
 
 !     partial lengths along each dimension (1-4) for interpolation 
       d2mx(1) = (t_rh2-t_xrh)
@@ -245,6 +210,7 @@ subroutine intaeropt2to3 (lchnk, ncol, xrh, irh1, irh2, mplus10, Nnatk, Camk, xf
       d2mx(3) = (t_fac2-t_xfac)
       dxm1(3) = (t_xfac-t_fac1)
       invd(3) = 1.0_r8/(t_fac2-t_fac1)
+
 
 !ccccccccc1ccccccccc2ccccccccc3ccccccccc4ccccccccc5ccccccccc6ccccccccc7cc
 
@@ -267,11 +233,6 @@ subroutine intaeropt2to3 (lchnk, ncol, xrh, irh1, irh2, mplus10, Nnatk, Camk, xf
 !     finally, interpolation in the rh dimension
       opt(iv)=((t_rh2-t_xrh)*opt1+(t_xrh-t_rh1)*opt2) &
                           /(t_rh2-t_rh1)    
-
-!      if(mplus10==1) then
-!        write(*,*) 'kcomp, iv, opt =', kcomp, iv, opt
-!        write(*,*) 'kc10, Nnatk =', kc10, Nnatk(icol,k,kc10)
-!      endif
 
 
          end do ! iv=1,38 
@@ -323,12 +284,10 @@ subroutine intaeropt2to3 (lchnk, ncol, xrh, irh1, irh2, mplus10, Nnatk, Camk, xf
 
            endif   ! Nnatk > 0
          
-!     if(beocgt1(icol,k,kcomp)>beoc1(icol,k,kcomp)) then
-!       write(*,*) '2to3,kcomp,beocgt1,beoc1=', kcomp, beocgt1(icol,k,kcomp), beoc1(icol,k,kcomp)  
-!     endif
 
        end do ! icol
       end do ! k
+
 
         end do  ! kcomp
 

@@ -56,7 +56,7 @@ subroutine interpol0 (lchnk, ncol, daylight, Nnatk, omega, gass, bex, ske, lw_on
 !
 !---------------------------Local variables-----------------------------
 !
-      integer i, ierr, kcomp, k, icol
+      integer i, kcomp, k, icol
 
 
       kcomp=0
@@ -119,10 +119,8 @@ end subroutine interpol0
 
 !********************************************************************************************
 
-subroutine interpol1 (lchnk, ncol, daylight, xrh, irh1, irh2, &
-                      mplus10, Nnatk, xfombgin, &
-                      Camk, xfacin, omega, gass, bex, ske, lw_on, kabs, cxstot)
-
+subroutine interpol1 (lchnk, ncol, daylight, xrh, irh1, mplus10, Nnatk, xfombg, ifombg1, & 
+                      xct, ict1, xfac, ifac1, omega, gass, bex, ske, lw_on, kabs)
 
    use ppgrid
    use shr_kind_mod, only: r8 => shr_kind_r8
@@ -132,23 +130,23 @@ subroutine interpol1 (lchnk, ncol, daylight, xrh, irh1, irh2, &
 !
 ! Input arguments
 !
-   integer, intent(in) :: lchnk                     ! chunk identifier
-   integer, intent(in) :: ncol                      ! number of atmospheric columns
-   integer, intent(in) :: mplus10                   ! mode number (0) or number + 10 (1)
-   logical, intent(in) :: daylight(pcols)           ! only daylight calculations if .true.
+   integer, intent(in) :: lchnk                       ! chunk identifier
+   integer, intent(in) :: ncol                        ! number of atmospheric columns
+   integer, intent(in) :: mplus10                     ! mode number (0) or number + 10 (1)
+   logical, intent(in) :: daylight(pcols)             ! only daylight calculations if .true.
    logical, intent(in) :: lw_on                       ! LW calculations are performed if true
    real(r8), intent(in) :: Nnatk(pcols,pver,0:nmodes) ! modal aerosol number concentration  
-   real(r8), intent(in) :: Camk(pcols,pver,nbmodes)   ! modal internally mixed (cond+aq) SO4 conc.
    real(r8), intent(in) :: xrh(pcols,pver)            ! level relative humidity (fraction)
    integer,  intent(in) :: irh1(pcols,pver)
-   integer,  intent(in) :: irh2(pcols,pver)
-   real(r8), intent(in) :: xfombgin(pcols,pver)     ! SOA/(SOA+H2SO4) for the background mode 
-   real(r8), intent(in) :: xfacin(pcols,pver,4)     ! SOA/(SOA+H2SO4) for condensated mass 
+   real(r8), intent(in) :: xfombg(pcols,pver)         ! SOA/(SOA+H2SO4) for the background mode 
+   integer,  intent(in) :: ifombg1(pcols,pver)
+   real(r8), intent(in) :: xct(pcols,pver,nmodes)     ! modal internally mixed SO4+BC+OC conc.
+   integer,  intent(in) :: ict1(pcols,pver,nmodes)        
+   real(r8), intent(in) :: xfac(pcols,pver,nbmodes)   ! condensed SOA/(SOA+H2SO4) (1-4) or added carbonaceous fraction (5-10)
+   integer,  intent(in) :: ifac1(pcols,pver,nbmodes)        
 !
 !
 ! Input-Output arguments
-!
-   real(r8), intent(inout) :: cxstot(pcols,pver)    ! excess internally mixed mass ("table overshoot") 
 !
 !
 ! Output arguments
@@ -161,15 +159,8 @@ subroutine interpol1 (lchnk, ncol, daylight, xrh, irh1, irh2, &
 !
 !---------------------------Local variables-----------------------------
 !
-      integer i, ierr, irelh, ictot, ifac, ifombg, kcomp, k, icol, kc10
-!      integer irh1(pcols,pver), irh2(pcols,pver), ict1(pcols,pver), &
-      integer ict1(pcols,pver), &
-        ict2(pcols,pver), ifac1(pcols,pver), ifac2(pcols,pver), &
-        ifombg1(pcols,pver), ifombg2(pcols,pver)
-      real(r8) a, b, camdiff
-!      real(r8) xrh(pcols,pver), xct(pcols,pver), xfac(pcols,pver), &
-      real(r8) xct(pcols,pver), xfac(pcols,pver), &
-        xfombg(pcols,pver), cxs(pcols,pver)
+      integer i, kcomp, k, icol, kc10
+      real(r8) a, b
  
 !     Temporary storage of often used array elements
       integer t_irh1, t_irh2, t_ict1, t_ict2, t_ifc1, t_ifc2, t_ifo1, t_ifo2
@@ -181,14 +172,6 @@ subroutine interpol1 (lchnk, ncol, daylight, xrh, irh1, irh2, &
       real(r8) kabs1, kabs2
 
  
-      do k=1,pver
-        do icol=1,ncol
-          xct(icol,k)    = 0.0_r8
-          xfac(icol,k)   = 0.0_r8
-          xfombg(icol,k) = 0.0_r8
-        end do
-      end do
-
 !      write(*,*) 'Before kcomp-loop'
         do kcomp=1,1
 
@@ -197,51 +180,6 @@ subroutine interpol1 (lchnk, ncol, daylight, xrh, irh1, irh2, &
            else
              kc10=kcomp+10
            endif 
-
-      do k=1,pver
-        do icol=1,ncol
-
-          xct(icol,k)  = min(max(Camk(icol,k,kcomp) &
-                 /(Nnatk(icol,k,kc10)+eps),cate(kcomp,1)),cate(kcomp,16))
-          xfac(icol,k) = min(max(xfacin(icol,k,kcomp),fac(1)),fac(6))
-          xfombg(icol,k) = min(max(xfombgin(icol,k),fombg(1)),fombg(6))
-          camdiff=Camk(icol,k,kcomp)-xct(icol,k) &
-                         *(Nnatk(icol,k,kc10)+eps)
-          cxs(icol,k)=max(0.0_r8,camdiff)
-          cxstot(icol,k)=cxstot(icol,k)+cxs(icol,k)
-
-!        if(icol.eq.1) then
-!          write(*,*) 'dir: k, kc10, cxs =', k, kc10, cxs(icol,k)
-
-!         write(*,*) 'Before cate-loop', kc10
-          do ictot=1,15
-            if(xct(icol,k)>=cate(kcomp,ictot).and. &
-            xct(icol,k) <= cate(kcomp,ictot+1)) then
-             ict1(icol,k)=ictot
-             ict2(icol,k)=ictot+1
-            endif
-          end do ! ictot
-
-!         write(*,*) 'Before fac-loop', kcomp
-          do ifac=1,5
-            if(xfac(icol,k)>=fac(ifac).and. &
-             xfac(icol,k) <= fac(ifac+1)) then
-             ifac1(icol,k)=ifac
-             ifac2(icol,k)=ifac+1
-            endif
-          end do ! ifac
-
-!         write(*,*) 'Before fombg-loop', kcomp
-          do ifombg=1,5
-            if(xfombg(icol,k) >= fombg(ifombg).and. &
-            xfombg(icol,k) <= fombg(ifombg+1)) then
-             ifombg1(icol,k)=ifombg
-             ifombg2(icol,k)=ifombg+1
-            endif
-          end do ! ifombg
-
-        end do ! icol
-      end do ! k
 
 
 !      write(*,*) 'Before init-loop', kc10
@@ -270,20 +208,16 @@ subroutine interpol1 (lchnk, ncol, daylight, xrh, irh1, irh2, &
 !      to avoid cache conflicts and excessive cross-referencing
 
       t_irh1 = irh1(icol,k)
-      t_irh2 = irh2(icol,k)
-      t_ict1 = ict1(icol,k)
-      t_ict2 = ict2(icol,k)
-      t_ifc1 = ifac1(icol,k)
-      t_ifc2 = ifac2(icol,k)
+      t_irh2 = t_irh1+1
+      t_ict1 = ict1(icol,k,kcomp)
+      t_ict2 = t_ict1+1
+      t_ifc1 = ifac1(icol,k,kcomp)
+      t_ifc2 = t_ifc1+1
       t_ifo1 = ifombg1(icol,k)
-      t_ifo2 = ifombg2(icol,k)
-
-!      write(*,*) 't_irh1,t_irh2=',t_irh1,t_irh2
-!      write(*,*) 't_ict1,t_ict2=',t_ict1,t_ict2
-!      write(*,*) 't_ifc1,t_ifc2=',t_ifc1,t_ifc2
-!      write(*,*) 't_ifo1,t_ifo2=',t_ifo1,t_ifo2
+      t_ifo2 = t_ifo1+1
 
       t_rh1  = rh(t_irh1)
+!x      t_rh2  = t_rh1+1
       t_rh2  = rh(t_irh2)
       t_cat1 = cate(kcomp,t_ict1)
       t_cat2 = cate(kcomp,t_ict2)
@@ -292,12 +226,9 @@ subroutine interpol1 (lchnk, ncol, daylight, xrh, irh1, irh2, &
       t_fombg1 = fombg(t_ifo1)
       t_fombg2 = fombg(t_ifo2)
 
-!      write(*,*) 't_rh1,t_rh2,t_cat1,t_cat2=',t_rh1,t_rh2,t_cat1,t_cat2
-!      write(*,*) 't_fac1,t_fac2=',t_fac1,t_fac2
-
       t_xrh  = xrh(icol,k)
-      t_xct  = xct(icol,k)
-      t_xfac = xfac(icol,k)
+      t_xct  = xct(icol,k,kcomp)
+      t_xfac = xfac(icol,k,kcomp)
       t_xfombg = xfombg(icol,k)
 
 !     partial lengths along each dimension (1-4) for interpolation 
@@ -539,9 +470,8 @@ end subroutine interpol1
 
 !********************************************************************************************
 
-subroutine interpol2to3 (lchnk, ncol, daylight, xrh, irh1, irh2, &
-                         mplus10, Nnatk, Camk, xfacsoain, &
-                         omega, gass, bex, ske, lw_on, kabs, cxstot)
+subroutine interpol2to3 (lchnk, ncol, daylight, xrh, irh1, mplus10, Nnatk, &
+                         xct, ict1, xfac, ifac1, omega, gass, bex, ske, lw_on, kabs)
 
 
    use ppgrid
@@ -551,22 +481,21 @@ subroutine interpol2to3 (lchnk, ncol, daylight, xrh, irh1, irh2, &
 !
 ! Input arguments
 !
-   integer, intent(in) :: lchnk                     ! chunk identifier
-   integer, intent(in) :: ncol                      ! number of atmospheric columns
-   integer, intent(in) :: mplus10                   ! mode number (0) or number + 10 (1)
-   logical, intent(in) :: daylight(pcols)           ! only daylight calculations if .true.
+   integer, intent(in) :: lchnk                       ! chunk identifier
+   integer, intent(in) :: ncol                        ! number of atmospheric columns
+   integer, intent(in) :: mplus10                     ! mode number (0) or number + 10 (1)
+   logical, intent(in) :: daylight(pcols)             ! only daylight calculations if .true.
    logical, intent(in) :: lw_on                       ! LW calculations are performed if true
    real(r8), intent(in) :: Nnatk(pcols,pver,0:nmodes) ! modal aerosol number concentration  
-   real(r8), intent(in) :: Camk(pcols,pver,nbmodes) ! modal internally mixed SO4+BC+OC conc.
-   real(r8), intent(in) :: xrh(pcols,pver)          ! level relative humidity (fraction)
+   real(r8), intent(in) :: xrh(pcols,pver)            ! level relative humidity (fraction)
    integer,  intent(in) :: irh1(pcols,pver)
-   integer,  intent(in) :: irh2(pcols,pver)
-   real(r8), intent(in) :: xfacsoain(pcols,pver,4)  ! mass fraction SOA/(H2SO4+SOA) for condensate
+   real(r8), intent(in) :: xct(pcols,pver,nmodes)     ! modal internally mixed SO4+BC+OC conc.
+   integer,  intent(in) :: ict1(pcols,pver,nmodes)        
+   real(r8), intent(in) :: xfac(pcols,pver,nbmodes)   ! condensed SOA/(SOA+H2SO4) (1-4) or added carbonaceous fraction (5-10)
+   integer,  intent(in) :: ifac1(pcols,pver,nbmodes)        
 !
 !
 ! Input-Output arguments
-!
-   real(r8), intent(inout) :: cxstot(pcols,pver)            ! excess internally mixed mass ("table overshoot") 
 !
 !
 ! Output arguments
@@ -579,12 +508,8 @@ subroutine interpol2to3 (lchnk, ncol, daylight, xrh, irh1, irh2, &
 !
 !---------------------------Local variables-----------------------------
 !
-      integer i, ierr, irelh, ictot, ifac, kcomp, k, icol, kc10
-      integer ict1(pcols,pver), &
-        ict2(pcols,pver), ifac1(pcols,pver), ifac2(pcols,pver)
-      real(r8) a, b, camdiff
-      real(r8) xct(pcols,pver), xfac(pcols,pver), &
-        cxs(pcols,pver)
+      integer i, kcomp, k, icol, kc10
+      real(r8) a, b
  
 !     Temporary storage of often used array elements
       integer t_irh1, t_irh2, t_ict1, t_ict2, t_ifc1, t_ifc2
@@ -596,13 +521,6 @@ subroutine interpol2to3 (lchnk, ncol, daylight, xrh, irh1, irh2, &
       real(r8) kabs1, kabs2
 
 
-      do k=1,pver
-        do icol=1,ncol
-          xct(icol,k)    = 0.0_r8
-          xfac(icol,k)   = 0.0_r8
-        end do
-      end do
-
 !      write(*,*) 'Before kcomp-loop'
 !      do kcomp=2,3
       do kcomp=2,2
@@ -612,43 +530,6 @@ subroutine interpol2to3 (lchnk, ncol, daylight, xrh, irh1, irh2, &
            else
              kc10=kcomp+10
            endif 
-
-        do k=1,pver
-         do icol=1,ncol
-
-          xct(icol,k)  = min(max(Camk(icol,k,kcomp) &
-                 /(Nnatk(icol,k,kc10)+eps),cate(kcomp,1)),cate(kcomp,16))
-          xfac(icol,k) = min(max(xfacsoain(icol,k,kcomp),fac(1)),fac(6))
-          camdiff=Camk(icol,k,kcomp)-xct(icol,k) &
-                         *(Nnatk(icol,k,kc10)+eps)
-          cxs(icol,k)=max(0.0_r8,camdiff)
-          cxstot(icol,k)=cxstot(icol,k)+cxs(icol,k)
-
-!        if(icol.eq.1) then
-!          write(*,*) 'dir: k, kcomp, cxs =', k, kc10, cxs(icol,k)
-!          write(*,*) 'k, kcomp, xct =', k, kc10, xct(icol,k)
-!        endif
-
-!         write(*,*) 'Before cate-loop', kc10
-          do ictot=1,15
-            if(xct(icol,k)>=cate(kcomp,ictot).and. &
-            xct(icol,k) <= cate(kcomp,ictot+1)) then
-             ict1(icol,k)=ictot
-             ict2(icol,k)=ictot+1
-            endif
-          end do ! ictot
-
-!         write(*,*) 'Before fac-loop', kcomp
-          do ifac=1,5
-            if(xfac(icol,k)>=fac(ifac).and. &
-             xfac(icol,k) <= fac(ifac+1)) then
-             ifac1(icol,k)=ifac
-             ifac2(icol,k)=ifac+1
-            endif
-          end do ! ifac
-
-         end do ! icol
-        end do ! k
 
 !      write(*,*) 'Before init-loop', kc10
         do i=1,nbands
@@ -676,11 +557,11 @@ subroutine interpol2to3 (lchnk, ncol, daylight, xrh, irh1, irh2, &
 !      to avoid cache conflicts and excessive cross-referencing
 
       t_irh1 = irh1(icol,k)
-      t_irh2 = irh2(icol,k)
-      t_ict1 = ict1(icol,k)
-      t_ict2 = ict2(icol,k)
-      t_ifc1 = ifac1(icol,k)
-      t_ifc2 = ifac2(icol,k)
+      t_irh2 = t_irh1+1
+      t_ict1 = ict1(icol,k,kc10)
+      t_ict2 = t_ict1+1
+      t_ifc1 = ifac1(icol,k,kcomp)
+      t_ifc2 = t_ifc1+1
 
 !      write(*,*) 't_irh1,t_irh2=',t_irh1,t_irh2
 !      write(*,*) 't_ict1,t_ict2=',t_ict1,t_ict2
@@ -698,8 +579,8 @@ subroutine interpol2to3 (lchnk, ncol, daylight, xrh, irh1, irh2, &
 !      write(*,*) 't_fac1,t_fac2=',t_fac1,t_fac2
 
       t_xrh  = xrh(icol,k)
-      t_xct  = xct(icol,k)
-      t_xfac = xfac(icol,k)
+      t_xct  = xct(icol,k,kc10)
+      t_xfac = xfac(icol,k,kcomp)
 
 !     partial lengths along each dimension (1-4) for interpolation 
       d2mx(1) = (t_rh2-t_xrh)
@@ -884,9 +765,9 @@ end subroutine interpol2to3
 
 !********************************************************************************************
 
-subroutine interpol4 (lchnk, ncol, daylight, xrh, irh1, irh2, &
-                      mplus10, Nnatk, xfbcbgin, &
-                      Camk, xfacin, xfaqin, omega, gass, bex, ske, lw_on, kabs, cxstot)
+subroutine interpol4 (lchnk, ncol, daylight, xrh, irh1, mplus10, Nnatk, xfbcbg, ifbcbg1, &
+                      xct, ict1, xfac, ifac1, xfaq, ifaq1, &
+                      omega, gass, bex, ske, lw_on, kabs)
 
 
    use ppgrid
@@ -904,18 +785,18 @@ subroutine interpol4 (lchnk, ncol, daylight, xrh, irh1, irh2, &
    logical, intent(in) :: daylight(pcols)             ! only daylight calculations if .true.
    logical, intent(in) :: lw_on                       ! LW calculations are performed if true
    real(r8), intent(in) :: Nnatk(pcols,pver,0:nmodes) ! modal aerosol number concentration  
-   real(r8), intent(in) :: Camk(pcols,pver,nbmodes)   ! modal internally mixed SO4+BC+OC conc.
    real(r8), intent(in) :: xrh(pcols,pver)            ! level relative humidity (fraction)
    integer,  intent(in) :: irh1(pcols,pver)
-   integer,  intent(in) :: irh2(pcols,pver)
-   real(r8), intent(in) :: xfacin(pcols,pver,4)       ! modal (OC+BC)/(SO4+BC+OC)=SOA/(Sulfate+SOA)
-   real(r8), intent(in) :: xfaqin(pcols,pver)         ! modal SO4(aq)/SO4
-   real(r8), intent(in) :: xfbcbgin(pcols,pver)       ! mass fraction BC/(BC+OC) for the background mode 
-!
+   real(r8), intent(in) :: xfbcbg(pcols,pver)         ! mass fraction BC/(BC+OC) for the background mode 
+   integer,  intent(in) :: ifbcbg1(pcols,pver)
+   real(r8), intent(in) :: xct(pcols,pver,nmodes)     ! modal internally mixed SO4+BC+OC conc.
+   integer,  intent(in) :: ict1(pcols,pver,nmodes)        
+   real(r8), intent(in) :: xfac(pcols,pver,nbmodes)   ! condensed SOA/(SOA+H2SO4) (1-4) or added carbonaceous fraction (5-10)
+   integer,  intent(in) :: ifac1(pcols,pver,nbmodes)        
+   real(r8), intent(in) :: xfaq(pcols,pver,nbmodes)   ! modal SO4(aq)/SO4
+   integer,  intent(in) :: ifaq1(pcols,pver,nbmodes)
 !
 ! Input-Output arguments
-!
-   real(r8), intent(inout) :: cxstot(pcols,pver)    ! excess internally mixed mass ("table overshoot") 
 !
 !
 ! Output arguments
@@ -928,14 +809,8 @@ subroutine interpol4 (lchnk, ncol, daylight, xrh, irh1, irh2, &
 !
 !---------------------------Local variables-----------------------------
 !
-      integer i, ierr, irelh, ictot, ifac, ifbcbg, ifaq, kcomp, k, kc10, icol
-      integer ict1(pcols,pver), &
-        ict2(pcols,pver), ifac1(pcols,pver), ifac2(pcols,pver),     &
-        ifbcbg1(pcols,pver), ifbcbg2(pcols,pver), ifaq1(pcols,pver),    &
-        ifaq2(pcols,pver)
-      real(r8) a, b, camdiff
-      real(r8) xct(pcols,pver), xfac(pcols,pver), &
-        xfbcbg(pcols,pver), xfaq(pcols,pver), cxs(pcols,pver)
+      integer i, kcomp, k, kc10, icol
+      real(r8) a, b
 
 !     Temporary storage of often used array elements
       integer t_irh1, t_irh2, t_ict1, t_ict2, t_ifa1, t_ifa2,         &
@@ -948,11 +823,6 @@ subroutine interpol4 (lchnk, ncol, daylight, xrh, irh1, irh2, &
       real(r8) ome1, ome2, ge1, ge2, bex1, bex2, ske1, ske2  
       real(r8) kabs1, kabs2
 
-      do k=1,pver
-        do icol=1,ncol
-          xct(icol,k)  = 0.0_r8
-        end do
-      end do
 
 !      write(*,*) 'Before kcomp-loop'
         do kcomp=4,4
@@ -962,68 +832,6 @@ subroutine interpol4 (lchnk, ncol, daylight, xrh, irh1, irh2, &
            else
              kc10=kcomp+10
            endif 
-
-      do k=1,pver
-        do icol=1,ncol
-
-            xfac(icol,k) = 0.0_r8
-            xfbcbg(icol,k) = 0.0_r8
-            xfaq(icol,k) = 0.0_r8
-
-!            if(Nnatk(icol,k,kcomp)>0.0_r8) then
-
-          xct(icol,k)  = min(max(Camk(icol,k,kcomp) &
-                 /(Nnatk(icol,k,kc10)+eps),cate(kcomp,1)),cate(kcomp,16))
-          xfac(icol,k) = min(max(xfacin(icol,k,kcomp),fac(1)),fac(6))
-          xfbcbg(icol,k) = min(max(xfbcbgin(icol,k),fbcbg(1)),fbcbg(6))
-          xfaq(icol,k) = min(max(xfaqin(icol,k),faq(1)),faq(6))
-          camdiff=Camk(icol,k,kcomp)-xct(icol,k) &
-                         *(Nnatk(icol,k,kcomp)+eps)
-          cxs(icol,k)=max(0.0_r8,camdiff)
-          cxstot(icol,k)=cxstot(icol,k)+cxs(icol,k)
-
-!        if(icol.eq.1) then
-!          write(*,*) 'dir: k, kcomp, cxs =', k, kcomp, cxs(icol,k)
-!        endif
-
-!        write(*,*) 'Before cate-loop', kc10
-         do ictot=1,15
-            if(xct(icol,k)>=cate(kcomp,ictot).and. &
-            xct(icol,k) <= cate(kcomp,ictot+1)) then
-             ict1(icol,k)=ictot
-             ict2(icol,k)=ictot+1
-            endif
-         end do ! ictot
-
-!        write(*,*) 'Before fac-loop', kc10
-         do ifac=1,5
-            if(xfac(icol,k)>=fac(ifac).and. &
-             xfac(icol,k) <= fac(ifac+1)) then
-             ifac1(icol,k)=ifac
-             ifac2(icol,k)=ifac+1
-            endif
-         end do ! ifac
-
-!        write(*,*) 'Before fbcbg-loop', kc10
-         do ifbcbg=1,5
-            if(xfbcbg(icol,k) >= fbcbg(ifbcbg).and. &
-             xfbcbg(icol,k) <= fbcbg(ifbcbg+1)) then
-             ifbcbg1(icol,k)=ifbcbg
-             ifbcbg2(icol,k)=ifbcbg+1
-            endif
-         end do ! ifbcbg
-
-!        write(*,*) 'Before faq-loop', kc10
-         do ifaq=1,5
-            if(xfaq(icol,k) >= faq(ifaq).and. &
-            xfaq(icol,k) <= faq(ifaq+1)) then
-             ifaq1(icol,k)=ifaq
-             ifaq2(icol,k)=ifaq+1
-            endif
-         end do ! ifaq
-
-        end do ! icol
-      end do ! k
 
 !      write(*,*) 'Before init-loop', kc10
         do i=1,nbands
@@ -1051,21 +859,15 @@ subroutine interpol4 (lchnk, ncol, daylight, xrh, irh1, irh2, &
 !      to avoid cache conflicts and excessive cross-referencing
 
       t_irh1 = irh1(icol,k)
-      t_irh2 = irh2(icol,k)
-      t_ict1 = ict1(icol,k)
-      t_ict2 = ict2(icol,k)
-      t_ifc1 = ifac1(icol,k)
-      t_ifc2 = ifac2(icol,k)
+      t_irh2 = t_irh1+1
+      t_ict1 = ict1(icol,k,kc10)
+      t_ict2 = t_ict1+1
+      t_ifc1 = ifac1(icol,k,kcomp)
+      t_ifc2 = t_ifc1+1
       t_ifb1 = ifbcbg1(icol,k)
-      t_ifb2 = ifbcbg2(icol,k)
-      t_ifa1 = ifaq1(icol,k)
-      t_ifa2 = ifaq2(icol,k)
-
-!      write(*,*) 't_irh1,t_irh2=',t_irh1,t_irh2
-!      write(*,*) 't_ict1,t_ict2=',t_ict1,t_ict2
-!      write(*,*) 't_ifc1,t_ifc2=',t_ifc1,t_ifc2
-!      write(*,*) 't_ifb1,t_ifb2=',t_ifb1,t_ifb2
-!      write(*,*) 't_ifa1,t_ifa2=',t_ifa1,t_ifa2
+      t_ifb2 = t_ifb1+1
+      t_ifa1 = ifaq1(icol,k,kcomp)
+      t_ifa2 = t_ifa1+1
 
       t_rh1  = rh(t_irh1)
       t_rh2  = rh(t_irh2)
@@ -1078,15 +880,11 @@ subroutine interpol4 (lchnk, ncol, daylight, xrh, irh1, irh2, &
       t_faq1 = faq(t_ifa1)
       t_faq2 = faq(t_ifa2)
 
-!      write(*,*) 't_rh1,t_rh2,t_cat1,t_cat2=',t_rh1,t_rh2,t_cat1,t_cat2
-!      write(*,*) 't_fac1,t_fac2,t_fbcbg1,t_fbcbg2=',t_fac1,t_fac2,t_fbcbg1,t_fbcbg2
-!      write(*,*) 't_faq1,t_faq2=',t_faq1,t_faq2
-
       t_xrh  = xrh(icol,k)
-      t_xct  = xct(icol,k)
-      t_xfac = xfac(icol,k)
+      t_xct  = xct(icol,k,kc10)
+      t_xfac = xfac(icol,k,kcomp)
       t_xfbcbg = xfbcbg(icol,k)
-      t_xfaq = xfaq(icol,k)
+      t_xfaq = xfaq(icol,k,kcomp)
 
 !     partial lengths along each dimension (1-5) for interpolation 
       d2mx(1) = (t_rh2-t_xrh)
@@ -1392,9 +1190,9 @@ end subroutine interpol4
 
 !********************************************************************************************
 
-subroutine interpol5to10 (lchnk, ncol, daylight, xrh, irh1, irh2, &
-                          Nnatk, Camk, &
-                          xfacin, xfbcin, xfaqin, omega, gass, bex, ske, lw_on, kabs, cxstot)
+subroutine interpol5to10 (lchnk, ncol, daylight, xrh, irh1, Nnatk, xct, ict1, &
+              xfac, ifac1, xfbc, ifbc1, xfaq, ifaq1, &
+              omega, gass, bex, ske, lw_on, kabs)
 
 
    use ppgrid
@@ -1411,18 +1209,19 @@ subroutine interpol5to10 (lchnk, ncol, daylight, xrh, irh1, irh2, &
    logical, intent(in) :: daylight(pcols)             ! only daylight calculations if .true.
    logical, intent(in) :: lw_on                       ! LW calculations are performed if true
    real(r8), intent(in) :: Nnatk(pcols,pver,0:nmodes) ! modal aerosol number concentration  
-   real(r8), intent(in) :: Camk(pcols,pver,nbmodes)   ! modal internally mixed SO4+BC+OC conc.
    real(r8), intent(in) :: xrh(pcols,pver)            ! level relative humidity (fraction)
    integer,  intent(in) :: irh1(pcols,pver)
-   integer,  intent(in) :: irh2(pcols,pver)
-   real(r8), intent(in) :: xfacin(pcols,pver,nbmodes) ! modal (OC+BC)/(SO4+BC+OC)
-   real(r8), intent(in) :: xfbcin(pcols,pver,nbmodes) ! modal BC/(OC+BC)
-   real(r8), intent(in) :: xfaqin(pcols,pver,nbmodes) ! modal SO4(aq)/SO4
+   real(r8), intent(in) :: xct(pcols,pver,nmodes)     ! modal internally mixed SO4+BC+OC conc.
+   integer,  intent(in) :: ict1(pcols,pver,nmodes)        
+   real(r8), intent(in) :: xfac(pcols,pver,nbmodes)   ! modal (OC+BC)/(SO4+BC+OC)
+   integer,  intent(in) :: ifac1(pcols,pver,nbmodes)
+   real(r8), intent(in) :: xfbc(pcols,pver,nbmodes)   ! modal BC/(OC+BC)
+   integer,  intent(in) :: ifbc1(pcols,pver,nbmodes)
+   real(r8), intent(in) :: xfaq(pcols,pver,nbmodes)   ! modal SO4(aq)/SO4
+   integer,  intent(in) :: ifaq1(pcols,pver,nbmodes)
 !
 !
 ! Input-Output arguments
-!
-   real(r8), intent(inout) :: cxstot(pcols,pver)    ! excess internally mixed mass ("table overshoot") 
 !
 !
 ! Output arguments
@@ -1435,14 +1234,8 @@ subroutine interpol5to10 (lchnk, ncol, daylight, xrh, irh1, irh2, &
 !
 !---------------------------Local variables-----------------------------
 !
-      integer i, ierr, irelh, ictot, ifac, ifbc, ifaq, kcomp, k, icol
-      integer ict1(pcols,pver), &
-        ict2(pcols,pver), ifac1(pcols,pver), ifac2(pcols,pver),     &
-        ifbc1(pcols,pver), ifbc2(pcols,pver), ifaq1(pcols,pver),    &
-        ifaq2(pcols,pver)
-      real(r8) a, b, camdiff
-      real(r8) xct(pcols,pver), xfac(pcols,pver,nbmodes), &
-        xfbc(pcols,pver,nbmodes), xfaq(pcols,pver,nbmodes), cxs(pcols,pver)
+      integer i, kcomp, k, icol
+      real(r8) a, b
 
 !     Temporary storage of often used array elements
       integer t_irh1, t_irh2, t_ict1, t_ict2, t_ifa1, t_ifa2,         &
@@ -1455,75 +1248,8 @@ subroutine interpol5to10 (lchnk, ncol, daylight, xrh, irh1, irh2, &
       real(r8) kabs1, kabs2
 
 
-      do k=1,pver
-        do icol=1,ncol
-          xct(icol,k)  = 0.0_r8
-        end do
-      end do
-
 !      write(*,*) 'Before kcomp-loop'
         do kcomp=5,10
-
-      do k=1,pver
-        do icol=1,ncol
-
-            xfac(icol,k,kcomp) = 0.0_r8
-            xfbc(icol,k,kcomp) = 0.0_r8
-            xfaq(icol,k,kcomp) = 0.0_r8
-
-          xct(icol,k)  = min(max(Camk(icol,k,kcomp) &
-                 /(Nnatk(icol,k,kcomp)+eps),cat(kcomp,1)),cat(kcomp,6))
-          xfac(icol,k,kcomp) = min(max(xfacin(icol,k,kcomp),fac(1)),fac(6))
-          xfbc(icol,k,kcomp) = min(max(xfbcin(icol,k,kcomp),fbc(1)),fbc(6))
-          xfaq(icol,k,kcomp) = min(max(xfaqin(icol,k,kcomp),faq(1)),faq(6))
-          camdiff=Camk(icol,k,kcomp)-xct(icol,k) &
-                         *(Nnatk(icol,k,kcomp)+eps)
-          cxs(icol,k)=max(0.0_r8,camdiff)
-          cxstot(icol,k)=cxstot(icol,k)+cxs(icol,k)
-
-!        if(icol.eq.1) then
-!          write(*,*) 'dir: k, kcomp, cxs =', k, kcomp, cxs(icol,k)
-!        endif
-
-!        write(*,*) 'Before cat-loop', kcomp
-         do ictot=1,5
-            if(xct(icol,k)>=cat(kcomp,ictot).and. &
-            xct(icol,k) <= cat(kcomp,ictot+1)) then
-             ict1(icol,k)=ictot
-             ict2(icol,k)=ictot+1
-            endif
-         end do ! ictot
-
-!        write(*,*) 'Before fac-loop', kcomp
-         do ifac=1,5
-            if(xfac(icol,k,kcomp)>=fac(ifac).and. &
-             xfac(icol,k,kcomp) <= fac(ifac+1)) then
-             ifac1(icol,k)=ifac
-             ifac2(icol,k)=ifac+1
-            endif
-         end do ! ifac
-
-!        write(*,*) 'Before fbc-loop', kcomp
-         do ifbc=1,5
-            if(xfbc(icol,k,kcomp) >= fbc(ifbc).and. &
-             xfbc(icol,k,kcomp) <= fbc(ifbc+1)) then
-             ifbc1(icol,k)=ifbc
-             ifbc2(icol,k)=ifbc+1
-            endif
-         end do ! ifbc
-
-!        write(*,*) 'Before faq-loop', kcomp
-         do ifaq=1,5
-            if(xfaq(icol,k,kcomp) >= faq(ifaq).and. &
-            xfaq(icol,k,kcomp) <= faq(ifaq+1)) then
-             ifaq1(icol,k)=ifaq
-             ifaq2(icol,k)=ifaq+1
-            endif
-         end do ! ifaq
-
-        end do ! icol
-      end do ! k
-
 
 !      write(*,*) 'Before init-loop', kcomp
         do i=1,nbands
@@ -1551,21 +1277,16 @@ subroutine interpol5to10 (lchnk, ncol, daylight, xrh, irh1, irh2, &
 !      to avoid cache conflicts and excessive cross-referencing
 
       t_irh1 = irh1(icol,k)
-      t_irh2 = irh2(icol,k)
-      t_ict1 = ict1(icol,k)
-      t_ict2 = ict2(icol,k)
-      t_ifc1 = ifac1(icol,k)
-      t_ifc2 = ifac2(icol,k)
-      t_ifb1 = ifbc1(icol,k)
-      t_ifb2 = ifbc2(icol,k)
-      t_ifa1 = ifaq1(icol,k)
-      t_ifa2 = ifaq2(icol,k)
+      t_irh2 = t_irh1+1
+      t_ict1 = ict1(icol,k,kcomp)
+      t_ict2 = t_ict1+1
+      t_ifc1 = ifac1(icol,k,kcomp)
+      t_ifc2 = t_ifc1+1
 
-!      write(*,*) 't_irh1,t_irh2=',t_irh1,t_irh2
-!      write(*,*) 't_ict1,t_ict2=',t_ict1,t_ict2
-!      write(*,*) 't_ifc1,t_ifc2=',t_ifc1,t_ifc2
-!      write(*,*) 't_ifb1,t_ifb2=',t_ifb1,t_ifb2
-!      write(*,*) 't_ifa1,t_ifa2=',t_ifa1,t_ifa2
+      t_ifb1 = ifbc1(icol,k,kcomp)
+      t_ifb2 = t_ifb1+1
+      t_ifa1 = ifaq1(icol,k,kcomp)
+      t_ifa2 = t_ifa1+1
 
       t_rh1  = rh(t_irh1)
       t_rh2  = rh(t_irh2)
@@ -1578,12 +1299,8 @@ subroutine interpol5to10 (lchnk, ncol, daylight, xrh, irh1, irh2, &
       t_faq1 = faq(t_ifa1)
       t_faq2 = faq(t_ifa2)
 
-!      write(*,*) 't_rh1,t_rh2,t_cat1,t_cat2=',t_rh1,t_rh2,t_cat1,t_cat2
-!      write(*,*) 't_fac1,t_fac2,t_fbc1,t_fbc2=',t_fac1,t_fac2,t_fbc1,t_fbc2
-!      write(*,*) 't_faq1,t_faq2=',t_faq1,t_faq2
-
       t_xrh  = xrh(icol,k)
-      t_xct  = xct(icol,k)
+      t_xct  = xct(icol,k,kcomp)
       t_xfac = xfac(icol,k,kcomp)
       t_xfbc = xfbc(icol,k,kcomp)
       t_xfaq = xfaq(icol,k,kcomp)
@@ -1880,10 +1597,6 @@ subroutine interpol5to10 (lchnk, ncol, daylight, xrh, irh1, irh2, &
           end do ! icol
         end do ! k
 
-!       write(*,*) 'kcomp, omega(1,26,kcomp,4)=', kcomp, omega(1,26,kcomp,4)
-!       write(*,*) 'kcomp, gass(1,26,kcomp,4)=', kcomp, gass(1,26,kcomp,4)
-!       write(*,*) 'kcomp, bex(1,26,kcomp,4)=', kcomp, bex(1,26,kcomp,4)
-!       write(*,*) 'kcomp, ske(1,26,kcomp,4)=', kcomp, ske(1,26,kcomp,4)
 
       end do  ! kcomp
 

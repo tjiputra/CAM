@@ -27,6 +27,10 @@ use time_manager,  only: is_first_step
 use scamMod,       only: single_column, wfld
 use cam_abortutils, only: endrun
 
+#ifdef OSLO_AERO
+use opttab,        only: RF
+#endif
+
 implicit none
 private
 save
@@ -190,7 +194,7 @@ contains
 #ifdef AEROCOM
       character(len=10) :: modeString
       character(len=20) :: varname
-      integer :: i
+      integer :: i, irh
 #endif  
 !-
 
@@ -306,7 +310,6 @@ contains
    call addfld ('SSAVIS  ',(/'lev'/),'A','unitless','Aerosol single scattering albedo in visible wavelength band')    
    call addfld ('ASYMMVIS',(/'lev'/),'A','unitless','Aerosol assymetry factor in visible wavelength band')    
    call addfld ('EXTVIS  ',(/'lev'/),'A','1/km    ','Aerosol extinction')     
-   call addfld ('AKCXS   ',horiz_only,'A','mg/m2   ','Scheme excess aerosol mass burden')     
    call addfld ('RELH    ',(/'lev'/),'A', 'unitless','Fictive relative humidity')
 #ifdef COLTST4INTCONS 
 ! optical depth for each mode/mixture:
@@ -370,6 +373,7 @@ contains
 #endif  ! aerocom
 #endif  ! aeroffl
 #ifdef AEROCOM 
+      call addfld ('AKCXS   ',horiz_only, 'A','mg/m2   ','Scheme excess aerosol mass burden')     
       call addfld ('PMTOT   ',horiz_only, 'A','ug/m3   ','Aerosol PM, all sizes')
       call addfld ('PM25    ',horiz_only, 'A','ug/m3   ','Aerosol PM2.5')
       call addfld ('GRIDAREA',horiz_only, 'A','m2      ','Grid area for 1.9x2.5 horizontal resolution')
@@ -457,13 +461,6 @@ contains
       call addfld ('A550_SO4' ,horiz_only, 'A','unitless','SO4 aerosol abs. optical depth 550nm')     
       call addfld ('A550_POM' ,horiz_only, 'A','unitless', 'OC abs. aerosol optical depth 550nm')     
       call addfld ('A550_BC ' ,horiz_only, 'A','unitless', 'BC abs. aerosol optical depth 550nm')
-      call addfld ('ABS5503D',(/'lev'/),'A','unitless','aerosol 3d abs. optical depth 550nm')
-      call addfld ('DOD5503D',(/'lev'/),'A','unitless','aerosol 3d optical depth 550nm')
-      call addfld ('D553_DU ',(/'lev'/),'A','unitless','mineral aerosol 3d optical depth 550nm')     
-      call addfld ('D553_SS ',(/'lev'/),'A','unitless','sea-salt aerosol 3d optical depth 550nm')     
-      call addfld ('D553_SO4',(/'lev'/),'A', 'unitless','SO4 aerosol 3d optical depth 550nm')     
-      call addfld ('D553_POM',(/'lev'/),'A', 'unitless','OC aerosol 3d optical depth 550nm')     
-      call addfld ('D553_BC ',(/'lev'/),'A','unitless','BC aerosol 3d optical depth 550nm')
       call addfld ('D440_DU ',horiz_only, 'A','unitless','mineral aerosol optical depth 440nm')     
       call addfld ('D440_SS ',horiz_only, 'A','unitless','sea-salt aerosol optical depth 440nm')     
       call addfld ('D440_SO4',horiz_only, 'A','unitless','SO4 aerosol optical depth 440nm')     
@@ -513,7 +510,6 @@ contains
          varName = "Camrel"//trim(modeString)
          if(i.ne.3) call addfld(varName, (/'lev'/),'A','unitless', 'relative added mass for mode'//modeString)
       enddo  
-!++
       do i=1,nbmodes
          modeString="  "
          write(modeString,"(I2)"),i
@@ -521,8 +517,34 @@ contains
          varName = "Cxsrel"//trim(modeString)
          if(i.ne.3) call addfld(varName, horiz_only, 'A', 'unitless', 'relative exessive added mass column for mode'//modeString)
       enddo  
-!--
-!-
+
+#ifdef AEROCOM_INSITU
+
+      do i=2,6  
+
+          irh=RF(i)
+          modeString="  "
+          write(modeString,"(I2)"),irh
+          if(RF(i).eq.0) modeString="00"
+
+!-          varName = "EC44RH"//trim(modeString)
+!-          call addfld(varName, 'unitless', pver, 'A', '3D EC440 at RH ='//modeString//'%', phys_decomp)
+          varName = "EC55RH"//trim(modeString)
+          call addfld(varName, 'unitless', pver, 'A', '3D EC550 at RH ='//modeString//'%', phys_decomp)
+!-          varName = "EC87RH"//trim(modeString)
+!-          call addfld(varName, 'unitless', pver, 'A', '3D EC870 at RH ='//modeString//'%', phys_decomp)
+
+!-          varName = "AB44RH"//trim(modeString)
+!-          call addfld(varName, 'unitless', pver, 'A', '3D ABS440 at RH ='//modeString//'%', phys_decomp)
+          varName = "AB55RH"//trim(modeString)
+          call addfld(varName, 'unitless', pver, 'A', '3D ABS550 at RH ='//modeString//'%', phys_decomp)
+!-          varName = "AB87RH"//trim(modeString)
+!-          call addfld(varName, 'unitless', pver, 'A', '3D ABS870 at RH ='//modeString//'%', phys_decomp)
+
+      enddo  
+
+#endif  ! AEROCOM_INSITU
+
 #endif  ! aerocom
 #endif  ! dirind
 
@@ -654,7 +676,6 @@ contains
    call add_default ('SSAVIS  ', 1, ' ')
    call add_default ('ASYMMVIS', 1, ' ')
    call add_default ('EXTVIS  ', 1, ' ')
-   call add_default ('AKCXS   ', 1, ' ')
    call add_default ('RELH    ', 1, ' ')
 #ifdef AEROFFL
      call add_default ('FSNT_DRF', 1, ' ')
@@ -675,6 +696,7 @@ contains
 #endif  ! aerocom
 #endif  ! aeroffl
 #ifdef AEROCOM 
+      call add_default ('AKCXS   ', 1, ' ')
       call add_default ('PMTOT   ', 1, ' ')
       call add_default ('PM25    ', 1, ' ')
       call add_default ('GRIDAREA', 1, ' ')
@@ -758,13 +780,6 @@ contains
       call add_default ('A550_SO4', 1, ' ')
       call add_default ('A550_POM', 1, ' ')
       call add_default ('A550_BC ', 1, ' ')
-      call add_default ('ABS5503D', 1, ' ')
-      call add_default ('DOD5503D', 1, ' ')
-      call add_default ('D553_DU ', 1, ' ')
-      call add_default ('D553_SS ', 1, ' ')
-      call add_default ('D553_SO4', 1, ' ')
-      call add_default ('D553_POM', 1, ' ')
-      call add_default ('D553_BC ', 1, ' ')
       call add_default ('D440_DU ', 1, ' ')
       call add_default ('D440_SS ', 1, ' ')
       call add_default ('D440_SO4', 1, ' ')
@@ -814,7 +829,6 @@ contains
          varName = "Camrel"//trim(modeString)
          if(i.ne.3) call add_default(varName, 1, ' ')
       enddo  
-!++
       do i=1,nbmodes
          modeString="  "
          write(modeString,"(I2)"),i
@@ -822,6 +836,34 @@ contains
          varName = "Cxsrel"//trim(modeString)
          if(i.ne.3) call add_default(varName, 1, ' ')
       enddo  
+!++
+#ifdef AEROCOM_INSITU
+
+      do i=2,6  
+
+          irh=RF(i)
+          modeString="  "
+          write(modeString,"(I2)"),irh
+          if(RF(i).eq.0) modeString="00"
+
+!-          varName = "EC44RH"//trim(modeString)
+!-          call add_default(varName, 1, ' ')
+          varName = "EC55RH"//trim(modeString)
+          call add_default(varName, 1, ' ')
+!-          varName = "EC87RH"//trim(modeString)
+!-          call add_default(varName, 1, ' ')
+
+!-          varName = "AB44RH"//trim(modeString)
+!-          call add_default(varName, 1, ' ')
+          varName = "AB55RH"//trim(modeString)
+          call add_default(varName, 1, ' ')
+!-          varName = "AB87RH"//trim(modeString)
+!-          call add_default(varName, 1, ' ')
+
+      enddo 
+ 
+#endif  ! AEROCOM_INSITU
+
 !--
 !-
 #endif  ! aerocom

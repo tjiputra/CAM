@@ -62,6 +62,13 @@ module opttab
   real(r8), public :: be5to10(nbands,10,6,6,6,6,5:10)
   real(r8), public :: ke5to10(nbands,10,6,6,6,6,5:10)
 
+! relative humidity (RH, as integer for output variable names) for use in AeroCom code 
+  integer, public, dimension(6) :: RF = (/0, 40, 55, 65, 75, 85 /)
+
+! AeroCom specific RH input variables for use in opticsAtConstRh.F90     
+  integer, public :: irhrf1(6)
+  real(r8), public :: xrhrf(6)
+
   real(r8), public :: e, eps
   parameter (e=2.718281828_r8, eps=1.0e-30_r8)
   
@@ -85,8 +92,8 @@ subroutine initopt
 
       implicit none
 
-      integer kcomp, iwl, irelh, ictot, ifac, ifbc, ifaq, i
-      integer ifombg, ifbcbg                                  ! soa
+      integer kcomp, iwl, irelh, ictot, ifac, ifbc, ifaq, i, irf
+      integer ifombg, ifbcbg
       integer ik, ic, ifil, lin, linmax
       real(r8) catot, relh, frac, fabc, fraq, frombg, frbcbg
       real(r8) ssa, ass, ext, spext
@@ -94,17 +101,30 @@ subroutine initopt
       real(r8) :: eps3 = 1.e-3_r8
       real(r8) :: eps4 = 1.e-4_r8
       real(r8) :: eps6 = 1.e-6_r8
-      real(r8) :: eps7 = 1.e-7_r8
       character(len=dir_string_length) :: aerotab_table_dir
 
 !     Defining array bounds for tabulated optical parameters (and r and sigma) 
 !     relative humidity (only 0 value used for r and sigma tables):
       rh = (/ 0.0_r8, 0.37_r8, 0.47_r8, 0.65_r8, 0.75_r8, 0.8_r8, 0.85_r8, 0.9_r8, 0.95_r8, 0.995_r8 /)
+
+!     AeroCom specific RH input variables for use in opticsAtConstRh.F90     
+      do irf=1,6
+         xrhrf(irf)  = real(RF(irf))*0.01_r8
+      enddo  
+      do irelh=1,9
+        do irf=1,6
+           if(xrhrf(irf)>=rh(irelh).and.xrhrf(irf)<=rh(irelh+1)) then
+             irhrf1(irf)=irelh  
+           endif
+         end do
+      end do
+
 !     mass fractions internal mixtures in background (fombg and fbcbg) and mass added to the 
 !     background modes (fac, faq, faq)
       fombg = (/ 0.0_r8, 0.2_r8,  0.4_r8, 0.6_r8, 0.8_r8, 1.0_r8  /)
       fac =   (/ 0.0_r8, 0.2_r8,  0.4_r8, 0.6_r8, 0.8_r8, 1.0_r8  /)
       faq =   (/ 0.0_r8, 0.2_r8,  0.4_r8, 0.6_r8, 0.8_r8, 1.0_r8  /)
+
 !     with more weight on low fractions (thus a logaritmic f axis) for BC, 
 !     which is less ambundant than sulfate and OC, and the first value 
 !     corresponding to a clean background mode:
@@ -118,11 +138,8 @@ subroutine initopt
       do kcomp=1,4
         cate(kcomp,1)=1.e-10_r8
         do i=2,16
-!o          if(kcomp.eq.1) then
           if(kcomp.eq.1.or.kcomp.eq.2) then
             cate(kcomp,i)=10.0_r8**((i-1)/3.0_r8-6.222_r8)
-!o          elseif(kcomp.eq.2) then
-!o            cate(kcomp,i)=10.0_r8**((i-1)/3.0_r8-6.523_r8)
           elseif(kcomp.eq.3) then
             cate(kcomp,i)=1.0e-10_r8  ! not used
           else
@@ -138,14 +155,12 @@ subroutine initopt
           elseif(kcomp.eq.6) then
             cat(kcomp,i)=10.0_r8**((i-1)-3.523_r8)
           elseif(kcomp.eq.7) then
-!x            cat(kcomp,i)=10.0_r8**((i-1)-2.921_r8)
             cat(kcomp,i)=10.0_r8**((i-1)-3.699_r8)
           elseif(kcomp.eq.8) then
             cat(kcomp,i)=10.0_r8**((i-1)-4.921_r8)
           elseif(kcomp.eq.9) then
             cat(kcomp,i)=10.0_r8**((i-1)-3.301_r8)
           else
-!x            cat(kcomp,i)=10.0_r8**((i-1)-3.000_r8)
             cat(kcomp,i)=10.0_r8**((i-1)-3.699_r8)
           endif
         end do
