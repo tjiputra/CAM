@@ -138,7 +138,7 @@ begin
    sink_I=-(/f1_I[:]->WD_A_SO2/)/1.998 \   ;kg/m2/sec (positive in output file)
           -(/f1_I[:]->DF_SO2/)/1.998 \     ;kg/m2/sec (positive in output file)  
           +(/f1_I[:]->AQ_SO2/)/1.998 \     ;kg/m2/ses (negative in output file)
-          +(/f1_I[:]->GS_SO2/)/1.998 - (/f1_I[:]->SO2_CLXF/)/1.998 - so2_formed_from_dms_as_s_I + (/f1_I[:]->WD_A_SO2/)/1.998  ; net chemical loss (gas phase)
+          +(/f1_I[:]->GS_SO2/)/1.998 - (/f1_I[:]->SO2_CLXF/)/1.998 - so2_formed_from_dms_as_s_I  ; net chemical loss (gas phase)
 
    chlossg_I = (/f1_I[:]->GS_SO2/)/1.998 - (/f1_I[:]->SO2_CLXF/)/1.998 \ 
             - so2_formed_from_dms_as_s_I + (/f1_I[:]->WD_A_SO2/)/1.998  ; net chemical loss (gas phase)
@@ -217,7 +217,7 @@ begin
  
  dry_II=(/f1_II[:]->SO4_A1DDF/)/3.06 + (/f1_II[:]->SO4_A2DDF/)/3.59 + (/f1_II[:]->SO4_ACDDF/)/3.06  \
       + (/f1_II[:]->SO4_NADDF/)/3.06 + (/f1_II[:]->SO4_PRDDF/)/3.06   \
-      + (/f1_II[:]->SO4_A1_OCWDDF/)/3.06 + (/f1_II[:]->SO4_A2_OCWDDF/)/3.59 + (/f1_II[:]->SO4_AC_OCWDDF/) /3.06 \
+      + (/f1_II[:]->SO4_A1_OCWDDF/)/3.06 + (/f1_II[:]->SO4_A2_OCWDDF/)/3.59 + (/f1_II[:]->SO4_AC_OCWDDF/)/3.06 \
       + (/f1_II[:]->SO4_NA_OCWDDF/)/3.06 + (/f1_II[:]->SO4_PR_OCWDDF/)/3.06
 
  sink_II=wet_II-dry_II
@@ -232,16 +232,24 @@ begin
    wet_I=(/f1_I[:]->WET_BC/)
    sink_I=(/f1_I[:]->WET_BC/)+(/f1_I[:]->DRY_BC/)
  else
-   emis_I=(/(f1_I[:]->SFBC_A)/) + (/(f1_I[:]->SFBC_AC)/) + (/(f1_I[:]->SFBC_AX)/) + (/(f1_I[:]->SFBC_AI)/) + (/(f1_I[:]->SFBC_NI)/) + (/(f1_I[:]->SFBC_N)/) + (/(f1_I[:]->BC_AX_CLXF)/) + (/(f1_I[:]->BC_NI_CLXF)/) + (/(f1_I[:]->BC_N_CLXF)/)
+   emis_I=(/(f1_I[:]->SFBC_A)/) + (/(f1_I[:]->SFBC_AC)/) + (/(f1_I[:]->SFBC_AX)/) \
+       + (/(f1_I[:]->SFBC_AI)/) + (/(f1_I[:]->SFBC_NI)/) + (/(f1_I[:]->SFBC_N)/)  \
+       + (/(f1_I[:]->BC_AX_CLXF)/) + (/(f1_I[:]->BC_NI_CLXF)/) + (/(f1_I[:]->BC_N_CLXF)/)
+
    sour_I=emis_I
 
-   load_I=(/(f1_I[:]->cb_BC)/) + (/(f1_I[:]->cb_BC_A_OCW)/) + (/(f1_I[:]->cb_BC_AC_OCW)/) + (/(f1_I[:]->cb_BC_AI_OCW)/) + (/(f1_I[:]->cb_BC_NI_OCW)/) + (/(f1_I[:]->cb_BC_N_OCW)/)
+   load_I=(/(f1_I[:]->cb_BC)/) + (/(f1_I[:]->cb_BC_A_OCW)/) + (/(f1_I[:]->cb_BC_AC_OCW)/) \
+   + (/(f1_I[:]->cb_BC_AI_OCW)/) + (/(f1_I[:]->cb_BC_NI_OCW)/) + (/(f1_I[:]->cb_BC_N_OCW)/)
 
-   wet_I=(/f1_I[:]->BC_ASFWET/) + (/f1_I[:]->BC_ACSFWET/) + (/f1_I[:]->BC_AXSFWET/) + (/f1_I[:]->BC_AISFWET/) + (/f1_I[:]->BC_NISFWET/) + (/f1_I[:]->BC_NSFWET/) \
-   + (/f1_I[:]->BC_A_OCWSFWET/) + (/f1_I[:]->BC_AC_OCWSFWET/) + (/f1_I[:]->BC_AI_OCWSFWET/) + (/f1_I[:]->BC_NI_OCWSFWET/) + (/f1_I[:]->BC_N_OCWSFWET/)
+   wet_I=(/f1_I[:]->BC_ASFWET/) + (/f1_I[:]->BC_ACSFWET/) + (/f1_I[:]->BC_AXSFWET/) \
+       + (/f1_I[:]->BC_AISFWET/) + (/f1_I[:]->BC_NISFWET/) + (/f1_I[:]->BC_NSFWET/) \
+       + (/f1_I[:]->BC_A_OCWSFWET/) + (/f1_I[:]->BC_AC_OCWSFWET/) + (/f1_I[:]->BC_AI_OCWSFWET/)\
+       + (/f1_I[:]->BC_NI_OCWSFWET/) + (/f1_I[:]->BC_N_OCWSFWET/)
 
-   dry_I=(/f1_I[:]->BC_ADDF/) + (/f1_I[:]->BC_ACDDF/) + (/f1_I[:]->BC_AXDDF/) + (/f1_I[:]->BC_AIDDF/) + (/f1_I[:]->BC_NIDDF/) + (/f1_I[:]->BC_NDDF/) \
-       + (/f1_I[:]->BC_A_OCWDDF/) + (/f1_I[:]->BC_AC_OCWDDF/) + (/f1_I[:]->BC_AI_OCWDDF/) + (/f1_I[:]->BC_NI_OCWDDF/) + (/f1_I[:]->BC_N_OCWDDF/)
+   dry_I=(/f1_I[:]->BC_ADDF/) + (/f1_I[:]->BC_ACDDF/) + (/f1_I[:]->BC_AXDDF/) \
+       + (/f1_I[:]->BC_AIDDF/) + (/f1_I[:]->BC_NIDDF/) + (/f1_I[:]->BC_NDDF/) \
+       + (/f1_I[:]->BC_A_OCWDDF/) + (/f1_I[:]->BC_AC_OCWDDF/) + (/f1_I[:]->BC_AI_OCWDDF/) \
+       + (/f1_I[:]->BC_NI_OCWDDF/) + (/f1_I[:]->BC_N_OCWDDF/)
 
    sink_I=wet_I-dry_I
  end if
@@ -529,7 +537,7 @@ print(var+" total sources     (Tg/yr)             = "+sprintf("%4.3f",sourave_I)
 print(var+" total sink        (Tg/yr)             = "+sprintf("%4.3f",sinkave_I)+", "+sprintf("%4.3f",sinkave_II))
 print(var+" burden            (Tg)                = "+sprintf("%4.3f",loadave_I)+", "+sprintf("%4.3f",loadave_II))
 if (plot_type.ne.-1) then
-print(var+" wet depostion     (% of sinks)        = "+sprintf("%4.3f",wetdeppave_I)+", "+sprintf("%4.3f",wetdeppave_II))
+print(var+" wet deposition     (% of sinks)        = "+sprintf("%4.3f",wetdeppave_I)+", "+sprintf("%4.3f",wetdeppave_II))
 end if
 print(var+" lifetime          (d)                 = "+sprintf("%4.3f",lifetimeave_I)+", "+sprintf("%4.3f",lifetimeave_II))
 if (plot_type.eq.-1.or.plot_type.eq.0) then
