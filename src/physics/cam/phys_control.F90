@@ -22,6 +22,7 @@ save
 public :: &
    phys_ctl_readnl,   &! read namelist from file
    phys_getopts,      &! generic query method
+   phys_setopts,      &! generic set method
    phys_deepconv_pbl, &! return true if deep convection is allowed in the PBL
    phys_do_flux_avg,  &! return true to average surface fluxes
    cam_physpkg_is,    &! query for the name of the physics package
@@ -83,16 +84,14 @@ logical :: prog_modal_aero ! determines whether prognostic modal aerosols are pr
 logical, public, protected :: use_hetfrz_classnuc = .false.
 
 ! Which gravity wave sources are used?
-! Orography.
-logical, public, protected :: use_gw_oro = .true.
-! Frontogenesis.
-logical, public, protected :: use_gw_front = .false.
-! Frontogenesis to inertial spectrum.
-logical, public, protected :: use_gw_front_igw = .false.
-! Deep convection.
-logical, public, protected :: use_gw_convect_dp = .false.
-! Shallow convection.
-logical, public, protected :: use_gw_convect_sh = .false.
+logical, public, protected :: use_gw_oro = .true.         ! Orography.
+logical, public, protected :: use_gw_front = .false.      ! Frontogenesis.
+logical, public, protected :: use_gw_front_igw = .false.  ! Frontogenesis to inertial spectrum.
+logical, public, protected :: use_gw_convect_dp = .false. ! Deep convection.
+logical, public, protected :: use_gw_convect_sh = .false. ! Shallow convection.
+
+! FV dycore angular momentum correction
+logical, public, protected :: fv_am_correction = .false.
 
 !======================================================================= 
 contains
@@ -337,6 +336,16 @@ subroutine phys_getopts(deep_scheme_out, shallow_scheme_out, eddy_scheme_out, mi
    if ( present(convproc_do_aer_out     ) ) convproc_do_aer_out      = convproc_do_aer
 
 end subroutine phys_getopts
+
+!===============================================================================
+
+subroutine phys_setopts(fv_am_correction_in)
+
+   logical, intent(in), optional :: fv_am_correction_in
+
+   if ( present(fv_am_correction_in) ) fv_am_correction = fv_am_correction_in
+
+end subroutine phys_setopts
 
 !===============================================================================
 

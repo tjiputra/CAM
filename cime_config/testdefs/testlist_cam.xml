@@ -9,6 +9,7 @@
     <machines>
       <machine name="yellowstone" compiler="intel" category="prealpha"/>
       <machine name="yellowstone" compiler="intel" category="aux_cam"/>
+      <machine name="yellowstone" compiler="intel" category="aux_cam_short"/>
       <options>
          <option name="walltime">00:30:00</option>
       </options>
@@ -30,16 +31,6 @@
       <options>
          <option name="walltime">03:00:00</option>
       </options>
-    </machines>
-  </test>
-  <test compset="F55W5SC" grid="f19_f19" name="ERP_Ld3" testmods="cam/outfrq3d">
-    <machines>
-      <machine name="yellowstone" compiler="intel" category="aux_wcm"/>
-    </machines>
-  </test>
-  <test compset="F55W5SC" grid="f19_f19" name="SMS_D_Ln9" testmods="cam/outfrq9s">
-    <machines>
-      <machine name="yellowstone" compiler="intel" category="aux_wcm"/>
     </machines>
   </test>
   <test compset="FC4AQUAP" grid="f19_f19" name="ERP_Ln9" testmods="cam/outfrq9s">
@@ -113,66 +104,18 @@
       <machine name="hobart" compiler="nag" category="prealpha"/>
     </machines>
   </test>
-  <test compset="FMOZ" grid="f19_f19" name="SMS_Ld1" testmods="cam/chemproc">
-    <machines>
-      <machine name="yellowstone" compiler="intel" category="aux_chem"/>
-      <machine name="yellowstone" compiler="pgi" category="aux_chem"/>
-      <machine name="yellowstone" compiler="gnu" category="aux_chem"/>
-    </machines>
-  </test>
-  <test compset="FMOZ" grid="f45_f45" name="SMS_Ld1" testmods="cam/chemproc">
-    <machines>
-      <machine name="hobart" compiler="pgi" category="aux_chem"/>
-      <machine name="hobart" compiler="nag" category="aux_chem"/>
-    </machines>
-  </test>
-  <test compset="FMOZMAM" grid="f19_f19" name="ERP_Ln9" testmods="cam/outfrq9s">
-    <machines>
-      <machine name="yellowstone" compiler="intel" category="prealpha"/>
-    </machines>
-  </test>
   <test compset="FSCM5A97" grid="T42_T42" name="SMS_D_Mmpi-serial_Ld1" testmods="cam/outfrq1d">
     <machines>
       <machine name="hobart" compiler="nag" category="prealpha"/>
     </machines>
   </test>
-  <test compset="FSDSMAM" grid="f19_f19" name="ERP_Ld3" testmods="cam/outfrq3d">
-    <machines>
-      <machine name="yellowstone" compiler="intel" category="aux_chem"/>
-    </machines>
-  </test>
-  <test compset="FSDSSOA" grid="f19_f19" name="ERP_D_Ln9" testmods="cam/outfrq9s">
-    <machines>
-      <machine name="yellowstone" compiler="intel" category="aux_chem"/>
-    </machines>
-  </test>
-  <test compset="FSDW" grid="f19_f19" name="ERP_Ln9" testmods="cam/outfrq9s">
+  <test compset="FSDW" grid="f09_f09" name="ERP_Ld3" testmods="cam/outfrq9s">
     <machines>
       <machine name="yellowstone" compiler="intel" category="prebeta"/>
-    </machines>
-  </test>
-  <test compset="FSDW5" grid="f19_f19" name="ERP_Ln9" testmods="cam/outfrq9s">
-    <machines>
       <machine name="yellowstone" compiler="intel" category="aux_wcm"/>
     </machines>
   </test>
-  <test compset="FSDW5" grid="f19_f19" name="SMS_D_Ln3" testmods="cam/outfrq9s">
-    <machines>
-      <machine name="yellowstone" compiler="intel" category="prealpha"/>
-      <machine name="yellowstone" compiler="intel" category="aux_wcm"/>
-    </machines>
-  </test>
-  <test compset="FSDW5" grid="f19_f19" name="SMS_Ln12" testmods="cam/sd_leapday">
-    <machines>
-      <machine name="yellowstone" compiler="intel" category="aux_wcm"/>
-    </machines>
-  </test>
-  <test compset="FSDWD" grid="f19_f19" name="ERP_Ln9" testmods="cam/outfrq9s">
-    <machines>
-      <machine name="yellowstone" compiler="intel" category="aux_wcm"/>
-    </machines>
-  </test>
-  <test compset="FSDWD" grid="f19_f19" name="SMS_D_Ln3" testmods="cam/reduced_hist3s">
+  <test compset="FSDW" grid="f09_f09" name="SMS_D_Ln9" testmods="cam/outfrq9s">
     <machines>
       <machine name="yellowstone" compiler="intel" category="aux_wcm"/>
     </machines>
@@ -188,72 +131,20 @@
       <machine name="yellowstone" compiler="intel" category="aux_spcam"/>
     </machines>
   </test>
-  <test compset="FSTRATMAM3L45" grid="f45_f45" name="ERP_D_Ln9" testmods="cam/outfrq9s">
-    <machines>
-      <machine name="hobart" compiler="nag" category="prealpha"/>
-    </machines>
-  </test>
-  <test compset="FSTRATMAM7" grid="f19_f19" name="ERP_Ln9" testmods="cam/outfrq9s">
-    <machines>
-      <machine name="yellowstone" compiler="intel" category="prealpha"/>
-    </machines>
-  </test>
-  <test compset="FSTRATSOAL45BGC" grid="f19_f19" name="ERP_Ld5" testmods="cam/tssoa_fire_emis">
-    <machines>
-      <machine name="yellowstone" compiler="intel" category="aux_fire"/>
-    </machines>
-  </test>
-  <test compset="FSTRATSOAL45BGC" grid="f19_f19" name="SMS_D_Ld1" testmods="cam/tssoa_fire_emis">
-    <machines>
-      <machine name="yellowstone" compiler="intel" category="aux_fire"/>
-    </machines>
-  </test>
-  <test compset="FSTRATVBSL45" grid="f19_f19" name="ERP_Ln9" testmods="cam/outfrq9s">
-    <machines>
-      <machine name="yellowstone" compiler="intel" category="prealpha"/>
-      <machine name="yellowstone" compiler="intel" category="aux_chem"/>
-    </machines>
-  </test>
-  <test compset="FSV2000" grid="f09_f09" name="SMS_D_Ln9" testmods="cam/outfrq9s">
+  <test compset="FMOZ" grid="f19_f19" name="SMS_D_Ln9" testmods="cam/outfrq9s">
     <machines>
       <machine name="yellowstone" compiler="intel" category="aux_chem"/>
     </machines>
   </test>
-  <test compset="FW" grid="f45_f45" name="SMS_D_Ld1" testmods="cam/outfrq1d">
+  <test compset="FSV2000" grid="f19_f19" name="SMS_D_Ln9" testmods="cam/outfrq9s">
     <machines>
-      <machine name="hobart" compiler="nag" category="prealpha"/>
+      <machine name="yellowstone" compiler="intel" category="aux_chem"/>
     </machines>
   </test>
   <test compset="FW2000" grid="f09_f09" name="SMS_Ld1" testmods="cam/outfrq1d">
     <machines>
       <machine name="yellowstone" compiler="intel" category="aux_wcm"/>
       <machine name="yellowstone" compiler="intel" category="prealpha"/>
-    </machines>
-  </test>
-  <test compset="FW5SC" grid="f19_f19" name="ERP_Ld3" testmods="cam/outfrq3d">
-    <machines>
-      <machine name="yellowstone" compiler="intel" category="prealpha"/>
-      <machine name="yellowstone" compiler="intel" category="aux_wcm"/>
-    </machines>
-  </test>
-  <test compset="FW5SC" grid="f19_f19" name="SMS_D_Ln9" testmods="cam/outfrq9s">
-    <machines>
-      <machine name="yellowstone" compiler="intel" category="aux_wcm"/>
-    </machines>
-  </test>
-  <test compset="FW6" grid="f19_f19" name="ERP_Ln9" testmods="cam/outfrq9s">
-    <machines>
-      <machine name="yellowstone" compiler="intel" category="prealpha"/>
-    </machines>
-  </test>
-  <test compset="FW6" grid="ne30_ne30" name="ERP_Ln9" testmods="cam/outfrq9s_wse">
-    <machines>
-      <machine name="yellowstone" compiler="intel" category="aux_wcm"/>
-    </machines>
-  </test>
-  <test compset="FW6" grid="ne30_ne30" name="SMS_D_Ln9" testmods="cam/outfrq9s_wse">
-    <machines>
-      <machine name="yellowstone" compiler="intel" category="aux_wcm"/>
     </machines>
   </test>
   <test compset="FWAMIP" grid="f09_f09" name="ERP_Ln9" testmods="cam/outfrq9s">
@@ -267,19 +158,16 @@
       <machine name="yellowstone" compiler="intel" category="prealpha"/>
     </machines>
   </test>
-  <test compset="FWSC" grid="f45_f45" name="ERP_Ld3" testmods="cam/outfrq3d">
-    <machines>
-      <machine name="yellowstone" compiler="intel" category="aux_wcm"/>
-    </machines>
-  </test>
   <test compset="FWX" grid="f19_f19" name="ERP_Ln9" testmods="cam/outfrq9s">
     <machines>
       <machine name="yellowstone" compiler="intel" category="prealpha"/>
+      <machine name="yellowstone" compiler="intel" category="aux_wcm"/>
     </machines>
   </test>
   <test compset="FWXI" grid="f19_f19" name="ERP_Ln9" testmods="cam/outfrq9s">
     <machines>
       <machine name="yellowstone" compiler="intel" category="prealpha"/>
+      <machine name="yellowstone" compiler="intel" category="aux_wcm"/>
     </machines>
   </test>
   <test compset="FWmaAMIP" grid="f09_f09" name="SMS_D_Ln9" testmods="cam/outfrq9s">

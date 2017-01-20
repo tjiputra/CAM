@@ -42,7 +42,7 @@
 <ncdata dyn="fv"  hgrid="0.23x0.31" nlev="30"  ic_ymd="101"     >atm/cam/inic/fv/cami-mam3_0000-01-01_0.23x0.31_L30_c110527.nc</ncdata>
 <ncdata dyn="fv"  hgrid="0.47x0.63" nlev="30"  ic_ymd="101"     >atm/cam/inic/fv/cami-mam3_0000-01-01_0.47x0.63_L30_c100929.nc</ncdata>
 <ncdata dyn="fv"  hgrid="0.9x1.25"  nlev="30"  ic_ymd="101"     >atm/cam/inic/fv/cami-mam3_0000-01-01_0.9x1.25_L30_c100618.nc</ncdata>
-<ncdata dyn="fv"  hgrid="1.9x2.5"   nlev="30"  ic_ymd="101"     >atm/cam/inic/fv/cami_0000-01-01_1.9x2.5_L30_c070703.nc</ncdata>
+<ncdata dyn="fv"  hgrid="1.9x2.5"   nlev="30"  ic_ymd="101"     >atm/cam/inic/fv/cami-mam3_0000-01-01_1.9x2.5_L30_c090306.nc</ncdata>
 <ncdata dyn="fv"  hgrid="1.9x2.5"   nlev="30"  ic_ymd="901"     >atm/cam/inic/fv/cami_0000-09-01_1.9x2.5_L30_c070109.nc</ncdata>
 <ncdata dyn="fv"  hgrid="2.5x3.33"  nlev="30"  ic_ymd="101"     >atm/cam/inic/fv/cami_0000-01-01_2.5x3.33_L30_c110309.nc </ncdata>
 <ncdata dyn="fv"  hgrid="2.5x3.33"  nlev="30"  ic_ymd="901"     >atm/cam/inic/fv/cami_0000-09-01_2.5x3.33_L30_c100831.nc</ncdata>
@@ -56,8 +56,6 @@
 <ncdata dyn="fv"  hgrid="1.9x2.5"   nlev="64"  ic_ymd="101"     >atm/cam/inic/fv/cami_0000-01-01_1.9x2.5_L64_c070703.nc</ncdata>
 <ncdata dyn="fv"  hgrid="4x5"       nlev="64"  ic_ymd="101"     >atm/cam/inic/fv/cami_0000-01-01_4x5_L64_c090108.nc</ncdata>
 <ncdata dyn="fv"  hgrid="10x15"     nlev="64"  ic_ymd="101"     >atm/cam/inic/fv/cami_0000-01-01_10x15_L64_c081013.nc</ncdata>
-
-<ncdata dyn="fv"  hgrid="1.9x2.5"   nlev="30"  chem="trop_mam3" ic_ymd="101">atm/cam/inic/fv/cami-mam3_0000-01-01_1.9x2.5_L30_c090306.nc</ncdata>
 
 <ncdata dyn="fv"  hgrid="1.9x2.5"   nlev="26"  aquaplanet="1"  ic_ymd="101" >atm/cam/inic/fv/aqua_0006-01-01_1.9x2.5_L26_c161020.nc</ncdata>
 <ncdata dyn="fv"  hgrid="0.9x1.25"  nlev="26"  aquaplanet="1"  ic_ymd="101" >atm/cam/inic/fv/aqua_0006-01-01_0.9x1.25_L26_c161020.nc</ncdata>
@@ -80,28 +78,9 @@
 <ncdata dyn="fv" hgrid="1.9x2.5" nlev="26" chem="trop_mozart" ic_ymd="101" >atm/cam/inic/fv/camchemi_0012-01-01_1.9x2.5_L26_c081104.nc</ncdata>
 <ncdata dyn="fv" hgrid="1.9x2.5" nlev="30" chem="trop_mozart" ic_ymd="101" >atm/cam/inic/fv/camchemi_0012-01-01_1.9x2.5_L30_c081104.nc</ncdata>
 
-<ncdata dyn="fv" hgrid="10x15"   nlev="26" chem="trop_mozart_soa" ic_ymd="101" >atm/cam/inic/fv/camchemi_0012-01-01_10x15_L26_c081104.nc</ncdata>
-<ncdata dyn="fv" hgrid="10x15"   nlev="30" chem="trop_mozart_soa" ic_ymd="101" >atm/cam/inic/fv/camchemi_0012-01-01_10x15_L30_c081104.nc</ncdata>
-<ncdata dyn="fv" hgrid="4x5"     nlev="26" chem="trop_mozart_soa" ic_ymd="101" >atm/cam/inic/fv/camchemi_0012-01-01_4x5_L26_c081104.nc</ncdata>
-<ncdata dyn="fv" hgrid="4x5"     nlev="30" chem="trop_mozart_soa" ic_ymd="101" >atm/cam/inic/fv/camchemi_0012-01-01_4x5_L30_c081104.nc</ncdata>
-<ncdata dyn="fv" hgrid="1.9x2.5" nlev="26" chem="trop_mozart_soa" ic_ymd="101" >atm/cam/inic/fv/camchemi_0012-01-01_1.9x2.5_L26_c081104.nc</ncdata>
-<ncdata dyn="fv" hgrid="1.9x2.5" nlev="30" chem="trop_mozart_soa" ic_ymd="101" >atm/cam/inic/fv/camchemi_0012-01-01_1.9x2.5_L30_c081104.nc</ncdata>
-
-<ncdata dyn="fv" hgrid="10x15"   nlev="30" chem="trop_mozart_mam3" ic_ymd="101" >atm/cam/inic/fv/trop_strat_mam3_chem_2000-01-01_10x15_L30_c120222.nc</ncdata>
-<ncdata dyn="fv" hgrid="4x5"     nlev="30" chem="trop_mozart_mam3" ic_ymd="101" >atm/cam/inic/fv/trop_strat_mam3_chem_2000-01-01_4x5_L30_c120222.nc</ncdata>
-<ncdata dyn="fv" hgrid="1.9x2.5" nlev="30" chem="trop_mozart_mam3" ic_ymd="101" >atm/cam/inic/fv/trop_strat_mam3_chem_2000-01-01_1.9x2.5_L30_c120222.nc</ncdata>
-
-<ncdata dyn="fv" hgrid="10x15"   nlev="30" chem="trop_strat_mam3" ic_ymd="101" >atm/cam/inic/fv/trop_strat_mam3_chem_2000-01-01_10x15_L30_c121015.nc</ncdata>
-<ncdata dyn="fv" hgrid="4x5"     nlev="30" chem="trop_strat_mam3" ic_ymd="101" >atm/cam/inic/fv/trop_strat_mam3_chem_2000-01-01_4x5_L30_c121015.nc</ncdata>
-<ncdata dyn="fv" hgrid="1.9x2.5" nlev="30" chem="trop_strat_mam3" ic_ymd="101" >atm/cam/inic/fv/trop_strat_mam3_chem_2000-01-01_1.9x2.5_L30_c121015.nc</ncdata>
-
 <ncdata dyn="fv" hgrid="10x15"   nlev="30" chem="trop_strat_mam4_vbs" ic_ymd="101" >atm/cam/inic/fv/trop_strat_mam3_chem_2000-01-01_10x15_L30_c121015.nc</ncdata>
 <ncdata dyn="fv" hgrid="4x5"     nlev="30" chem="trop_strat_mam4_vbs" ic_ymd="101" >atm/cam/inic/fv/trop_strat_mam3_chem_2000-01-01_4x5_L30_c121015.nc</ncdata>
 <ncdata dyn="fv" hgrid="1.9x2.5" nlev="30" chem="trop_strat_mam4_vbs" ic_ymd="101" >atm/cam/inic/fv/trop_strat_mam3_chem_2000-01-01_1.9x2.5_L30_c121015.nc</ncdata>
-
-<ncdata dyn="fv" hgrid="10x15"   nlev="30" chem="trop_strat_mam7" ic_ymd="101" >atm/cam/inic/fv/trop_strat_mam7_chem_2000-01-01_10x15_L30_c121011.nc</ncdata>
-<ncdata dyn="fv" hgrid="4x5"     nlev="30" chem="trop_strat_mam7" ic_ymd="101" >atm/cam/inic/fv/trop_strat_mam7_chem_2000-01-01_4x5_L30_c121011.nc</ncdata>
-<ncdata dyn="fv" hgrid="1.9x2.5" nlev="30" chem="trop_strat_mam7" ic_ymd="101" >atm/cam/inic/fv/trop_strat_mam7_chem_2000-01-01_1.9x2.5_L30_c121011.nc</ncdata>
 
 <ncdata dyn="fv" hgrid="10x15"   nlev="26" chem="super_fast_llnl" ic_ymd="101" >atm/cam/inic/fv/camchemi_0012-01-01_10x15_L26_c081104.nc</ncdata>
 <ncdata dyn="fv" hgrid="10x15"   nlev="30" chem="super_fast_llnl" ic_ymd="101" >atm/cam/inic/fv/camchemi_0012-01-01_10x15_L30_c081104.nc</ncdata>
@@ -214,6 +193,11 @@
 <!-- Ridge parameterization (gamma) --->
 <bnd_rdggm hgrid="0.9x1.25" >atm/cam/topo/fv_0.9x1.25_nc3000_Nsw006_Nrs002_Co008_Fi001_ZR_c160505.nc</bnd_rdggm>
 
+<!-- Sometimes, the default should be no topography file -->
+<use_topo_file                  >   .true.  </use_topo_file>
+<use_topo_file ocn="aquaplanet" >   .false. </use_topo_file>
+<use_topo_file phys="held_suarez" > .false. </use_topo_file>
+<use_topo_file analytic_ic="1"  >   .false. </use_topo_file>
 
 <!-- Bulk aerosol physical properties (includes optics) -->
 
@@ -531,7 +515,7 @@
 <waccmx_opt waccmx="1">neutral</waccmx_opt>
 
 <!-- For MEGAN VOCs -->
-<megan_factors_file>atm/cam/chem/trop_mozart/emis/megan21_emis_factors_79pft_c20150518.nc</megan_factors_file>
+<megan_factors_file>atm/cam/chem/trop_mozart/emis/megan21_emis_factors_78pft_c20161108.nc</megan_factors_file>
 
 <!-- Airplane emissions -->
 <airpl_emis_file>atm/cam/chem/trop_mozart/emis/emissions.aircraft.T42LR.nc</airpl_emis_file>
@@ -1284,7 +1268,7 @@
 <fv_nspltrac hgrid="0.9x1.25" waccm_phys="1">4</fv_nspltrac>
 
 <fv_nsplit                  waccm_phys="1"> 8</fv_nsplit>
-<fv_nsplit hgrid="0.9x1.25" waccm_phys="1">12</fv_nsplit>
+<fv_nsplit hgrid="0.9x1.25" waccm_phys="1">16</fv_nsplit>
 
 <fv_del2coef                >3.e+5</fv_del2coef>
 
@@ -1456,6 +1440,10 @@
 <se_tstep_type > 5 </se_tstep_type>
 
 <se_vert_remap_q_alg> 1 </se_vert_remap_q_alg>
+
+<!-- Dycore testing  -->
+
+<analytic_ic_type> none </analytic_ic_type>
 
 <!-- ================================================================== -->
 <!-- Defaults for driver namelist seq_infodata_inparm                   -->

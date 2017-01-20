@@ -2,6 +2,8 @@
 
 <namelist_defaults>
 
+<co2vmr>367.0e-6</co2vmr>
+
 <micro_do_sb_physics>   .true.   </micro_do_sb_physics>
 <do_tms>                .false.  </do_tms>
 <do_beljaars>           .true.   </do_beljaars>  

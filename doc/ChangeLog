@@ -1,5 +1,858 @@
 ===============================================================
 
+Tag name: cam5_4_99
+Originator(s): mvertens, goldy
+Date: 2017-01-01
+One-line Summary: Update CAM'S configure to be called from the new script, cime_config/buildcpp
+
+Purpose of changes: CAM'S configure is now called from a new file,
+   cime_config/buildcpp. buildcpp is primarily now called from
+   cime_config/buildlib - but can also be called from cime_config/buildnml
+   for cases where namelist generation needs to occur but a
+   config_cache.xml file is either not available or is outdated.
+ - Removed references to CCSM_CO2_PPMV in user_nl_clm testmods files
+ - Also, fixed FV restart bug which affects PIO2 runs (2395).
+
+Bugs fixed (include bugzilla ID): 2395
+
+Describe any changes made to build system: configure infrastructure updated
+
+Describe any changes made to the namelist: NA
+
+List any changes to the defaults for the boundary datasets: NA
+
+Describe any substantial timing or memory changes: NA
+
+Code reviewed by: mvertens, goldy
+
+List all subroutines eliminated: NA
+
+List all subroutines added and what they do: NA
+
+List all existing files that have been modified, and describe the changes:
+A  +    components/cam/cime_config/buildcpp
+ - New CIME script to handle production of CPP variables from case configuration
+M       components/cam/cime_config/buildlib
+M       components/cam/cime_config/buildnml
+ - Added and modified code to be forwards compatible with upcoming CIME
+   namelist building changes
+M       components/cam/cime_config/config_component.xml
+ - Added entry for CAM_CPPDEFS needed by new configure utility script (buildcpp)
+M       components/cam/cime_config/testdefs/testmods_dirs/cam/fire_emis/user_nl_clm
+M       components/cam/cime_config/testdefs/testmods_dirs/cam/mam4_fire_emis/user_nl_clm
+M       components/cam/cime_config/testdefs/testmods_dirs/cam/outfrq1d/user_nl_clm
+M       components/cam/cime_config/testdefs/testmods_dirs/cam/outfrq1m_clm5/user_nl_clm
+M       components/cam/cime_config/testdefs/testmods_dirs/cam/outfrq3d/user_nl_clm
+M       components/cam/cime_config/testdefs/testmods_dirs/cam/outfrq9s/user_nl_clm
+M       components/cam/cime_config/testdefs/testmods_dirs/cam/outfrq9s_clm5/user_nl_clm
+M       components/cam/cime_config/testdefs/testmods_dirs/cam/outfrq9s_sat_hist/user_nl_clm
+M       components/cam/cime_config/testdefs/testmods_dirs/cam/outfrq9s_wse/user_nl_clm
+ - Removed references to deprecated variable, CCSM_CO2_PPMV
+M       components/cam/doc/ChangeLog_template
+ - Removed jaguar as a test machine
+M       components/cam/src/dynamics/fv/restart_dynamics.F90
+ - Fixed location of pio_setframe calls which did not work with PIO2 (bugzilla
+   2395)
+M       components/cam/src/dynamics/se/dyn_comp.F90
+ - Slight code documentation
+
+If there were any failures reported from running test_driver.sh on any test
+platform, and checkin with these failures has been OK'd by the gatekeeper,
+then copy the lines from the td.*.status files for the failed tests to the
+appropriate machine below.  All failed tests must be justified.
+
+yellowstone/intel: ALL PASS
+
+yellowstone/intel/aux_cam: All PASS (note that namelist comparison still
+  broken)
+
+hobart/nag: ALL PASS
+
+hobart/pgi: ALL PASS
+
+CAM tag used for the baseline comparison tests if different than previous
+tag: NA
+
+Summarize any changes to answers: NA
+
+If bitwise differences were observed, how did you show they were no worse
+than roundoff? NA
+
+If this tag changes climate describe the run(s) done to evaluate the new
+climate in enough detail that it(they) could be reproduced, i.e.,
+- source tag (all code used must be in the repository): NA
+
+MSS location of control simulations used to validate new climate: NA
+
+URL for AMWG diagnostics output used to validate new climate: NA
+
+===============================================================
+===============================================================
+
+Tag name: cam5_4_98
+Originator(s): eaton
+Date: Tue Dec 27 11:35:16 MST 2016
+One-line Summary: Remove dependence on CCSM_CO2_PPMV var in CESM scripts;
+  fix in hist_cam6 use case.
+
+Purpose of changes:
+
+. Remove the setting of CAM's co2vmr variable by cam/cime_config/buildnml.
+  This eliminates CAM's dependence on the CCSM_CO2_PPMV var in CESM scripts.
+
+  CAM's co2vmr namelist variable is only used when flbc_file is not
+  specified, or scenario_ghg is not set to RAMPED.  flbc_file is used by
+  all CAM-Chem and WACCM configurations, and scenario_ghg is set to RAMPED
+  in all historical runs that are not CAM-Chem or WACCM.  So basically the
+  only use of co2vmr is for climatology runs of that standard cam physics
+  packages, or for scam runs with which are short duration and use fixed
+  co2.
+
+  It turns out this dependency was redunant since the few cases where
+  co2vmr is used already had values that were consistent with the
+  CCSM_CO2_PPMV values set in use case files for in the namelist defaults
+  file.
+
+. bug fix in hist_cam6 use case file
+
+Bugs fixed (include bugzilla ID):
+
+. use case file hist_cam6.xml needed updated srf_emis_specifier files to
+  allow starting on 1850-01-01
+
+Describe any changes made to build system: none
+
+Describe any changes made to the namelist: none
+
+List any changes to the defaults for the boundary datasets: none
+
+Describe any substantial timing or memory changes: none
+
+Code reviewed by: eaton
+
+List all subroutines eliminated: none
+
+List all subroutines added and what they do: none
+
+List all existing files that have been modified, and describe the changes:
+
+components/cam/bld/namelist_files/use_cases/2000_cam6.xml
+components/cam/bld/namelist_files/use_cases/2000_cam4_trop_chem.xml
+. add <co2vmr>367.0e-6</co2vmr>
+
+components/cam/bld/namelist_files/use_cases/1850_trop_strat_vbs_cam6.xml
+components/cam/bld/namelist_files/use_cases/2000_trop_strat_vbs_cam6.xml
+. add <flbc_type>CYCLICAL</flbc_type>
+
+components/cam/bld/namelist_files/use_cases/scam_arm95.xml
+. add <co2vmr>368.9e-6</co2vmr>
+
+components/cam/cime_config/buildnml
+. remove setting co2vmr
+
+components/cam/bld/namelist_files/use_cases/hist_cam6.xml
+. updated srf_emis_specifier files for DMS and SO2 to
+  allow starting on 1850-01-01
+
+If there were any failures reported from running test_driver.sh on any test
+platform, and checkin with these failures has been OK'd by the gatekeeper,
+then copy the lines from the td.*.status files for the failed tests to the
+appropriate machine below.  All failed tests must be justified.
+
+yellowstone/intel: All PASS
+
+yellowstone/intel/aux_cam: All PASS (note that namelist comparison still
+  broken)
+
+hobart/nag: All PASS
+
+hobart/pgi: All PASS
+
+CAM tag used for the baseline comparison tests if different than previous
+tag:
+
+Summarize any changes to answers: BFB
+
+===============================================================
+===============================================================
+
+Tag name: cam5_4_97
+Originator(s): fvitt, mmills, tilmes
+Date: 8 Dec 2016
+One-line Summary: Update WACCM6 chemistry and remove obsolete compsets
+
+Purpose of changes:
+
+ - use the latest TSMLT chemistry in WACCM6
+ - add specified dynamics compset for WACCM6 FSDW
+ - remove unsupported obsolete compsets and associated build namelist
+   use case files and regression tests
+ - add default fields to h0 history when history_chemistry is TRUE
+ - correction in how emissions scaling factor is applied
+
+Bugs fixed (include bugzilla ID):
+
+  correction in emissions scaling factor
+
+Describe any changes made to build system:
+
+Describe any changes made to the namelist:
+
+List any changes to the defaults for the boundary datasets:
+
+Describe any substantial timing or memory changes:
+
+Code reviewed by:
+
+List all subroutines eliminated:
+D   components/cam/src/chemistry/pp_trop_mozart_mam3
+D   components/cam/src/chemistry/pp_trop_strat_soa
+D   components/cam/src/chemistry/pp_trop_strat_mam3
+D   components/cam/src/chemistry/pp_trop_mozart_soa
+D   components/cam/src/chemistry/pp_trop_strat_mam7
+ - remove obsolete chem packages
+
+D   components/cam/test/system/tests_ccmi_mpi
+D   components/cam/test/system/tests_ccmi_hybrid
+ - these no longer apply
+
+D   components/cam/test/system/config_files/f1.9c5tsmam7h
+D   components/cam/test/system/config_files/f4c5tsmam3dm
+D   components/cam/test/system/config_files/f4c5tsmam7dm
+D   components/cam/test/system/config_files/f4c5mzmam3dm
+D   components/cam/test/system/config_files/fsd1.9c4wtssoadh
+D   components/cam/test/system/config_files/f1.9c4tssoadh
+D   components/cam/test/system/config_files/f1.9c4wtssoadh
+D   components/cam/test/system/config_files/f4c4soadm
+D   components/cam/test/system/config_files/f1.9c4soadh
+D   components/cam/test/system/config_files/f1.9c5tsmam3dh
+D   components/cam/test/system/config_files/f4c4wtssoadh
+D   components/cam/test/system/config_files/f4c4wtssoadm
+D   components/cam/test/system/config_files/fsd1.9c4wtssoah
+D   components/cam/test/system/config_files/f1.9c5mzmam3dh
+ - remove these obsolete configure files
+
+D   components/cam/bld/namelist_files/use_cases/cam4_bam_radpsv_geos5.xml
+D   components/cam/bld/namelist_files/use_cases/waccm_sc_2005-2100_cam4_rcp26.xml
+D   components/cam/bld/namelist_files/use_cases/waccm_sc_1955-2005_cam4.xml
+D   components/cam/bld/namelist_files/use_cases/sd_2007-2011_htap_trop_strat_soa.xml
+D   components/cam/bld/namelist_files/use_cases/waccm_sc_1850_cam4.xml
+D   components/cam/bld/namelist_files/use_cases/waccm_2005-2100_cam4_rcp45.xml
+D   components/cam/bld/namelist_files/use_cases/1850-2005_cam4_super_fast_llnl.xml
+D   components/cam/bld/namelist_files/use_cases/cam4_chem_radpsv_geos5.xml
+D   components/cam/bld/namelist_files/use_cases/cam4_trop_strat_chem.xml
+D   components/cam/bld/namelist_files/use_cases/cam5_trop_strat_chem.xml
+D   components/cam/bld/namelist_files/use_cases/waccm_2005-2100_cam4_rcp85.xml
+D   components/cam/bld/namelist_files/use_cases/waccm_1955-2005_cam4.xml
+D   components/cam/bld/namelist_files/use_cases/waccm_1974-2005_cam4.xml
+D   components/cam/bld/namelist_files/use_cases/2005-2100_cam4_strataero_rcp45.xml
+D   components/cam/bld/namelist_files/use_cases/2000_cam4_trop_moz_soa.xml
+D   components/cam/bld/namelist_files/use_cases/1950-2100_ccmi_refc2_waccm_ma.xml
+D   components/cam/bld/namelist_files/use_cases/sd_waccm_geos5.xml
+D   components/cam/bld/namelist_files/use_cases/sd_1975-2010_ccmi_refc1_waccm_tsmlt.xml
+D   components/cam/bld/namelist_files/use_cases/1850_waccm_tsmlt_cam5.xml
+D   components/cam/bld/namelist_files/use_cases/mozart_megan_emis.xml
+D   components/cam/bld/namelist_files/use_cases/2007-2011_htap_trop_strat_soa.xml
+D   components/cam/bld/namelist_files/use_cases/sd_1975-2010_ccmi_refc1_trop_strat_soa.xml
+D   components/cam/bld/namelist_files/use_cases/waccm_1850_cam4.xml
+D   components/cam/bld/namelist_files/use_cases/volc_waccm_tsmlt_megan_cam5.xml
+D   components/cam/bld/namelist_files/use_cases/1850_cam4_super_fast_llnl.xml
+D   components/cam/bld/namelist_files/use_cases/2004-2100_ccmi_refc2_rcp45_trop_strat_soa.xml
+D   components/cam/bld/namelist_files/use_cases/waccm_sc_2005-2100_cam4_rcp45.xml
+D   components/cam/bld/namelist_files/use_cases/1950-2010_ccmi_refc1_waccm_tsmlt.xml
+D   components/cam/bld/namelist_files/use_cases/2000_ccmi_refc1_waccm_tsmlt.xml
+D   components/cam/bld/namelist_files/use_cases/waccm_sc_2005-2100_cam4_rcp85.xml
+D   components/cam/bld/namelist_files/use_cases/2000_cam5_trop_moz_mam3.xml
+D   components/cam/bld/namelist_files/use_cases/waccm_1850-2005_cam4.xml
+D   components/cam/bld/namelist_files/use_cases/waccm_2005-2100_cam4_rcp26.xml
+D   components/cam/bld/namelist_files/use_cases/1979-2010_sd_trop_strat_soa.xml
+D   components/cam/bld/namelist_files/use_cases/1950-2100_ccmi_refc2_rcp85_waccm_ma.xml
+D   components/cam/bld/namelist_files/use_cases/waccm_refb1.xml
+D   components/cam/bld/namelist_files/use_cases/volc_waccm_tsmlt_nomegan_cam5.xml
+D   components/cam/bld/namelist_files/use_cases/sd_1975-2010_ccmi_refc1_waccm_ma.xml
+D   components/cam/bld/namelist_files/use_cases/rcp6.0_waccm_tsmlt_nomegan_cam5.xml
+D   components/cam/bld/namelist_files/use_cases/1950-2010_ccmi_refc1_waccm_ma.xml
+D   components/cam/bld/namelist_files/use_cases/2000_cam5_trop_strat_mam3.xml
+D   components/cam/bld/namelist_files/use_cases/1850_cam4_trop_bam.xml
+D   components/cam/bld/namelist_files/use_cases/1950-2100_ccmi_refc2_waccm_tsmlt.xml
+D   components/cam/bld/namelist_files/use_cases/2000_cam5_trop_strat_mam7.xml
+D   components/cam/bld/namelist_files/use_cases/sd_cam4_trop_strat_soa.xml
+D   components/cam/bld/namelist_files/use_cases/volc_waccm_ma_cam5.xml
+D   components/cam/bld/namelist_files/use_cases/waccm_2000_cam4.xml
+D   components/cam/bld/namelist_files/use_cases/2000_cam4_super_fast_llnl.xml
+D   components/cam/bld/namelist_files/use_cases/2000_cam4_trop_strat_soa.xml
+D   components/cam/bld/namelist_files/use_cases/sd_cam5_trop_strat_mam3.xml
+D   components/cam/bld/namelist_files/use_cases/1950-2010_ccmi_refc1_trop_strat_soa.xml
+D   components/cam/bld/namelist_files/use_cases/1950-2100_ccmi_refc2_trop_strat_soa.xml
+ - remove obsolete use cases
+
+D   components/cam/bld/namelist_files/use_cases/2000_trop_strat_vbs_cam55.xml
+D   components/cam/bld/namelist_files/use_cases/1850_trop_strat_vbs_cam55.xml
+
+D   components/cam/bld/namelist_files/use_cases/waccm_tsmlt_2000_cam55.xml
+D   components/cam/bld/namelist_files/use_cases/waccm_tsmlt_amip_cam55.xml
+D   components/cam/bld/namelist_files/use_cases/waccm_tsmlt_1850_cam55.xml
+
+D   components/cam/bld/namelist_files/use_cases/waccm_sc_amip_cam55.xml
+D   components/cam/bld/namelist_files/use_cases/waccm_sc_2000_cam55.xml
+
+D   components/cam/bld/namelist_files/use_cases/waccm_ma_amip_cam55.xml
+D   components/cam/bld/namelist_files/use_cases/waccm_ma_1850_cam55.xml
+D   components/cam/bld/namelist_files/use_cases/waccm_ma_2000_cam55.xml
+ - most of these *cam55.xml use cases were renamed as *cam6.xml
+
+List all subroutines added and what they do:
+
+A   components/cam/test/system/config_files/fsd0.9c5.5wtsmlth
+ - new test configure for 1-degree SD WACCM
+
+A   components/cam/bld/namelist_files/use_cases/sd_waccm_tsmlt_cam6.xml
+A   components/cam/bld/namelist_files/use_cases/2000_trop_strat_vbs_cam6.xml
+A   components/cam/bld/namelist_files/use_cases/1850_trop_strat_vbs_cam6.xml
+A   components/cam/bld/namelist_files/use_cases/waccm_tsmlt_amip_cam6.xml
+A   components/cam/bld/namelist_files/use_cases/waccm_tsmlt_1850_cam6.xml
+A   components/cam/bld/namelist_files/use_cases/waccm_tsmlt_2000_cam6.xml
+A   components/cam/bld/namelist_files/use_cases/waccm_sc_amip_cam6.xml
+A   components/cam/bld/namelist_files/use_cases/waccm_ma_amip_cam6.xml
+A   components/cam/bld/namelist_files/use_cases/waccm_ma_1850_cam6.xml
+A   components/cam/bld/namelist_files/use_cases/waccm_ma_2000_cam6.xml
+ - new use cases for cam6 physics
+
+List all existing files that have been modified, and describe the changes:
+
+M   components/cam/src/chemistry/pp_waccm_tsmlt_mam4/mo_lin_matrix.F90
+M   components/cam/src/chemistry/pp_waccm_tsmlt_mam4/mo_phtadj.F90
+M   components/cam/src/chemistry/pp_waccm_tsmlt_mam4/m_rxt_id.F90
+M   components/cam/src/chemistry/pp_waccm_tsmlt_mam4/mo_nln_matrix.F90
+M   components/cam/src/chemistry/pp_waccm_tsmlt_mam4/mo_lu_factor.F90
+M   components/cam/src/chemistry/pp_waccm_tsmlt_mam4/mo_indprd.F90
+M   components/cam/src/chemistry/pp_waccm_tsmlt_mam4/mo_sim_dat.F90
+M   components/cam/src/chemistry/pp_waccm_tsmlt_mam4/m_spc_id.F90
+M   components/cam/src/chemistry/pp_waccm_tsmlt_mam4/chem_mech.doc
+M   components/cam/src/chemistry/pp_waccm_tsmlt_mam4/chem_mech.in
+M   components/cam/src/chemistry/pp_waccm_tsmlt_mam4/mo_lu_solve.F90
+M   components/cam/src/chemistry/pp_waccm_tsmlt_mam4/mo_setrxt.F90
+M   components/cam/src/chemistry/pp_waccm_tsmlt_mam4/mo_adjrxt.F90
+M   components/cam/src/chemistry/pp_waccm_tsmlt_mam4/mo_rxt_rates_conv.F90
+M   components/cam/src/chemistry/pp_waccm_tsmlt_mam4/chem_mods.F90
+M   components/cam/src/chemistry/pp_waccm_tsmlt_mam4/mo_prod_loss.F90
+ - use the latest TSMLT chemistry in WACCM
+
+M   components/cam/src/chemistry/mozart/mo_srf_emissions.F90
+ - correction in the scaling factor
+
+M   components/cam/src/chemistry/mozart/mo_extfrc.F90
+ - correction in the scaling factor
+ - added default history to h0 when history_chemistry is TRUE
+
+M   components/cam/src/chemistry/modal_aero/aero_model.F90
+M   components/cam/src/chemistry/mozart/mo_chm_diags.F90
+M   components/cam/src/chemistry/mozart/chemistry.F90
+ - added default history to h0 when history_chemistry is TRUE
+
+M   components/cam/src/chemistry/mozart/mo_gas_phase_chemdr.F90
+ - remove unused history_aerosol variable
+
+M   components/cam/test/system/tests_posttag_yellowstone
+M   components/cam/test/system/tests_waccm_hybrid
+M   components/cam/test/system/tests_waccm_mpi
+ - obsolete test were removed
+
+M   components/cam/test/system/config_files/f4c5portdm
+M   components/cam/test/system/config_files/f4c5portdh
+ - use trop_mam3 chem -- trop_strat_mam3 no longer exists
+
+M   components/cam/test/system/tests_titan
+M   components/cam/test/system/tests_pretag_yellowstone
+M   components/cam/test/system/input_tests_master
+M   components/cam/test/system/tests_chem_hybrid
+M   components/cam/test/system/tests_chem_mpi
+ - obsolete test were removed
+ - waccm6 tests were adjusted
+
+M   components/cam/test/system/nl_files/outfrq3s_sd
+ - use megan emis factors file compatible with clm4
+
+M   components/cam/bld/config_files/definition.xml
+ - adjust list of allowed chem configure options
+
+M   components/cam/bld/namelist_files/namelist_defaults_cam.xml
+ - new megan factors file
+ - remove defaults for obsolete chemistry packages
+ - increase default fv_nsplit from 12 to 16 for 1-degree waccm
+
+M   components/cam/bld/namelist_files/namelist_definition.xml
+ - adjust the list of possible chemistry packages
+
+M   components/cam/bld/namelist_files/use_cases/sd_waccm5_geos5.xml
+ - correction in rate_sums specifier
+
+M   components/cam/bld/build-namelist
+ - adjustment to the flbc_list for TSMLT chemistry
+ - removed references to obsolete chem packages
+
+M   components/cam/bld/configure
+ - adjust the list of possible chemistry packages
+
+M   components/cam/cime_config/config_compsets.xml
+M   components/cam/cime_config/config_component.xml
+ - clean out obsolete compsets
+ - add FSDW compset for waccm6
+
+M   components/cam/cime_config/testdefs/testlist_cam.xml
+ - test the supported waccm6 compsets
+
+If there were any failures reported from running test_driver.sh on any test
+platform, and checkin with these failures has been OK'd by the gatekeeper,
+then copy the lines from the td.*.status files for the failed tests to the
+appropriate machine below.  All failed tests must be justified.
+
+yellowstone/intel:
+027 bl456 TBL.sh f1.9c5.5wtmam4h outfrq3s_megan+waccm_tsmlt_2000_cam6 9s ......................FAIL! rc= 7 at Wed Dec  7 23:47:31 MST 2016
+044 bl470 TBL.sh fsd1.9c5.4wtclbh outfrq3s_sd+sd_waccm5_geos5 9s ..............................FAIL! rc= 7 at Thu Dec  8 00:59:34 MST 2016
+ - expected failures due to changes in waccm_tsmlt_mam4 chemistry mechanism
+
+041 bl492 TBL.sh f0.9c5.5mam4vbsh outfrq3s+1850_trop_strat_vbs_cam6 9s ........................FAIL! rc= 7 at Thu Dec  8 00:32:58 MST 2016
+ - new test for yellowstone
+
+047 bl482 TBL.sh f1.9c5.5wscmam4dh outfrq3s+waccm_sc_amip_cam6 9s .............................FAIL! rc= 7 at Thu Dec  8 01:34:46 MST 2016
+ - expected failure due to changes in waccm_sc_amip_cam6 usecase
+
+yellowstone/intel/aux_cam: All PASS (note NLCOMP tests failed due to lack archived of namelist files from baseline runs)
+
+hobart/nag:
+
+082 bl011 TBL.sh f4c5portdm outfrq24h_port 2d .................................................FAIL! rc= 7 at Wed Dec  7 18:42:33 MST 2016
+ - expected failure due to the chemistry mechanism used in f4c5portdm changed from "trop_strat_mam3" to "trop_mam3"
+   -- trop_strat_mam3 chemistry package is removed in this commit
+
+hobart/pgi:
+
+068 bl011 TBL.sh f4c5portdm outfrq24h_port 2d .................................................FAIL! rc= 7 at Wed Dec  7 18:30:19 MST 2016
+ - expected failure due to the chemistry mechanism used in f4c5portdm changed from "trop_strat_mam3" to "trop_mam3"
+   -- trop_strat_mam3 chemistry package is removed in this commit
+
+CAM tag used for the baseline comparison tests if different than previous
+tag:
+
+Summarize any changes to answers, i.e.,
+- what code configurations: waccm_tsmlt_mam4 chemistry, waccm use cases
+- nature of change: CAM is bit-for-bit unchanged while WACCM (waccm_tsmlt_mam4 chemistry) has changed
+
+===============================================================
+===============================================================
+
+Tag name: cam5_4_96
+Originator(s): goldy
+Date: 2016-12-04
+One-line Summary: Add analytic initial conditions options
+
+Purpose of changes: Enable setting initial conditions to analytic
+	functions for testing purposes (e.g., dycore validation).
+
+Bugs fixed (include bugzilla ID): NA
+
+Describe any changes made to build system: NA
+
+Describe any changes made to the namelist:
+ - New namelist item, analytic_ic_type (see below)
+
+List any changes to the defaults for the boundary datasets: NA
+
+Describe any substantial timing or memory changes: NA
+
+Code reviewed by: eaton, cacraig, fvitt, goldy
+
+List all subroutines eliminated: NA
+
+List all subroutines added and what they do:
+ - analytic_ic_readnl ! Read dyn_test_nl namelist
+ - analytic_ic_active ! .true. if analytic IC should be set
+ - analytic_ic_set_ic ! Set analytic initial conditions
+
+List all existing files that have been modified, and describe the changes:
+M       components/cam/bld/build-namelist
+ - Added new namelist item, analytic_ic_type, to determine which type of
+   analytic initial condition to use (or none).
+ - Make sure that use_topo_file is always expressed in namelist
+M       components/cam/bld/config_files/definition.xml
+ - Added new config switch, analytic_ic, to enable conditional compilation
+   of initial condition code.
+M       components/cam/bld/configure
+ - Added new config switch, analytic_ic, to enable conditional compilation
+   of initial condition code.
+M       components/cam/bld/namelist_files/namelist_defaults_cam.xml
+ - Set default for analytic_ic_type (none)
+ - Set defaults for use_topo_file
+M       components/cam/bld/namelist_files/namelist_definition.xml
+ - Added new namelist item, analytic_ic_type, to determine which type of
+   analytic initial condition to use (or none).
+M       components/cam/bld/namelist_files/use_cases/dctest_baro_moist.xml
+ - Added an analytic_ic_type setting (baroclinic_wave)
+M       components/cam/cime_config/config_component.xml
+ - Added analytic_ic to the CAM%DCTBM compset.
+M       components/cam/doc/ChangeLog
+ - Made this file great again.
+M       components/cam/src/control/runtime_opts.F90
+ - Read the analytic IC namelist (analytic_ic_readnl)
+M       components/cam/src/dynamics/eul/dyn_comp.F90
+ - Add analytic initial condition reading to Eulerian dycore
+M       components/cam/src/dynamics/fv/dyn_comp.F90
+ - Add analytic initial condition reading to finite volume dycore
+M       components/cam/src/dynamics/se/dyn_comp.F90
+ - Add analytic initial condition reading to spectral element dycore
+M       components/cam/src/dynamics/sld/dyn_comp.F90
+ - Add analytic initial condition reading to SLD dycore
+A  +    components/cam/src/dynamics/tests/dyn_tests_utils.F90
+ - Added parameters for vertical coordinate type
+A  +    components/cam/src/dynamics/tests/inic_analytic.F90
+ - Main interface for analytic initial conditions.
+A  +    components/cam/src/dynamics/tests/initial_conditions/ic_baroclinic.F90
+ - Implementation of analytic initial conditions for baroclinic wave tests.
+A  +    components/cam/src/dynamics/tests/initial_conditions/ic_held_suarez.F90
+ - Implementation of analytic initial conditions for Held-Suarez tests.
+M       components/cam/src/physics/cam/const_init.F90
+ - Clarify when a variable is not found on initial dataset.
+
+If there were any failures reported from running test_driver.sh on any test
+platform, and checkin with these failures has been OK'd by the gatekeeper,
+then copy the lines from the td.*.status files for the failed tests to the
+appropriate machine below.  All failed tests must be justified.
+
+yellowstone/intel: All PASS
+
+yellowstone/intel/aux_cam: All PASS - note that the comparison of namelist
+  file is broken.
+
+hobart/nag: All PASS
+
+hobart/pgi: All PASS
+
+CAM tag used for the baseline comparison tests if different than previous
+tag: NA
+
+Summarize any changes to answers: BFB
+
+===============================================================
+===============================================================
+
+Tag name: cam5_4_95
+Originator(s): toniazzo, eaton
+Date: Fri Dec  2 09:09:05 MST 2016
+One-line Summary: add option for angular momentum correction in FV dycore
+
+Purpose of changes:
+
+. Add angular momentum correction/fixer/diagnostic for the FV dycore from
+  Thomas Toniazzo <thomas.toniazzo@uni.no>.  The new code is optional, off
+  by default, and controlled by the new namelist variables described below.
+
+Bugs fixed (include bugzilla ID): none
+
+Describe any changes made to build system: none
+
+Describe any changes made to the namelist:
+
+. Add namelist vars to control AM corrections:
+   logical :: fv_am_correction ! apply correction for angular momentum (AM)
+                               ! conservation in SW eqns (default: .false.)
+   logical :: fv_am_fixer      ! apply global fixer to conserve AM (default: .false.)
+   logical :: fv_am_fix_lbl    ! apply AM fixer level by level (default: .false.)
+   logical :: fv_am_diag       ! turn on an AM diagnostic calculation
+                               ! written to log file (default: .false.)
+
+List any changes to the defaults for the boundary datasets:
+
+. The default FV, 2deg, 30 level ncdata file is changed
+  From: cami_0000-01-01_1.9x2.5_L30_c070703.nc
+  To:   cami-mam3_0000-01-01_1.9x2.5_L30_c090306.nc
+  - this was done to simplify the attributes for the standard cam5
+    configuration, which in turn allowed simplifying the attributes for the
+    cam5/aquaplanet ncdata file.
+
+Describe any substantial timing or memory changes: none
+
+Code reviewed by: eaton
+
+List all subroutines eliminated: none
+
+List all subroutines added and what they do:
+
+components/cam/src/dynamics/fv/angular_momentum.F90
+. new subroutine for calculating the AM diagnostics which are output to the
+  log file.
+
+List all existing files that have been modified, and describe the changes:
+
+components/cam/bld/namelist_files/namelist_defaults_cam.xml
+. Update attributes for the default FV 2deg L30 ncdata file.  This was done
+  to fix a problem getting the correct default for the corresponding ncdata
+  file for aquaplanet.
+
+components/cam/bld/namelist_files/namelist_definition.xml
+. Add namelist vars to control AM corrections:
+   logical :: fv_am_correction ! apply correction for angular momentum (AM)
+                               ! conservation in SW eqns
+   logical :: fv_am_fixer      ! apply global fixer to conserve AM
+   logical :: fv_am_fix_lbl    ! apply AM fixer level by level
+   logical :: fv_am_diag       ! turn on an AM diagnostic calculation written to log file
+
+components/cam/src/dynamics/fv/cd_core.F90
+. add control logicals for correction and fixer
+. and output args for fixer
+. remove obsolete !CSD$ directives
+. pass am_correction to d2a2c_winds
+. pass am_correction to d_sw, get ddpa and ddu back
+
+components/cam/src/dynamics/fv/d2a3dikj.F90
+. pass am_correction to d2a3dikj
+. new code inside am_correction conditionals
+
+components/cam/src/dynamics/fv/dp_coupling.F90
+. access am_correction via dyn_state object, and pass to routines d2a3dikj
+  and uv3s_update
+
+components/cam/src/dynamics/fv/dyn_comp.F90
+. dyn_readnl
+  - add new namelist vars to namelist reader
+  - add check that fv_am_fixer must be true when fv_am_fix_lbl is true
+  - call phys_setopts to set fv_am_correction in the phys_control module
+. dyn_run
+  - add AM conservation diagnostic
+  - add AM fixer
+  - pass am_correction to te_map
+
+components/cam/src/dynamics/fv/dyn_grid.F90
+. dyn_grid_init
+  - pass am_correction to grid_vars_init
+
+components/cam/src/dynamics/fv/dynamics_vars.F90
+. add AM control variables to the t_fvdycore_state derived type
+. grid_vars_init
+  - add dummy arg for am_correction
+  - modified calc of cose, sinp, and fc inside conditionals
+. remove unused routines
+
+components/cam/src/dynamics/fv/sw_core.F90
+. c_sw
+  - new calc of va
+. d_sw
+  - add am_correction, ddp, duc to dummy args
+. d2a2c_winds
+  - add am_correction to dummy args
+  - mods inside am_correction conditional
+
+components/cam/src/dynamics/fv/te_map.F90
+. add am_correction to dummy args
+. mods inside am_correction conditional
+
+components/cam/src/dynamics/fv/uv3s_update.F90
+. add am_correction to uv3s_update dummy args
+. mods inside am_correction conditional
+
+components/cam/src/physics/cam/diffusion_solver.F90
+. set module variable am_correction via init_vdiff method
+. mod inside am_correction conditional
+
+components/cam/src/physics/cam/phys_control.F90
+. add fv_am_correction module data
+. add phys_setopts method to allow setting fv_am_correction from the
+  dyn_readnl method
+
+components/cam/src/physics/cam/vertical_diffusion.F90
+. pass fv_am_correction to init_vdiff
+
+
+If there were any failures reported from running test_driver.sh on any test
+platform, and checkin with these failures has been OK'd by the gatekeeper,
+then copy the lines from the td.*.status files for the failed tests to the
+appropriate machine below.  All failed tests must be justified.
+
+yellowstone/intel: All PASS except:
+036 bl421 TBL.sh f1.9c5mam4dh outfrq3s 9s .....................................................FAIL! rc= 7 at Thu Dec  1 20:02:11 MST 2016
+
+This failure is due to a change in the default IC files.
+
+yellowstone/intel/aux_cam: All PASS - note that the comparison of namelist
+  file is broken.
+
+hobart/nag: All PASS
+
+hobart/pgi: All PASS
+
+CAM tag used for the baseline comparison tests if different than previous
+tag:
+
+Summarize any changes to answers: BFB
+
+===============================================================
+===============================================================
+
+Tag name: cam5_4_94
+Originator(s): cacraig
+Date: Nov 28, 2016
+One-line Summary: Update to cesm2_beta04 externals and bug fix cice5 tag
+
+Purpose of changes:
+ - Update CAM externals to match those used in cesm2_beta04
+ - Using a more recent CICE tag which corrects an issue in F compsets when using the
+   tag in cesm2_beta04
+
+Bugs fixed (include bugzilla ID):
+
+Describe any changes made to build system:
+ - All compsets are now using CISM2
+
+Describe any changes made to the namelist:
+
+List any changes to the defaults for the boundary datasets:
+
+Describe any substantial timing or memory changes:
+
+Code reviewed by:
+
+List all subroutines eliminated:
+
+List all subroutines added and what they do:
+
+List all existing files that have been modified, and describe the changes:
+ M      .
+M       SVN_EXTERNAL_DIRECTORIES
+         - update to cesm2_beta04 externals
+         - update to bug fix cice external to fix issue with F compsets
+
+M       components/cam/cime_config/config_compsets.xml
+         - have compsets now use CISM2
+         - add grid file for CISM2 as specified by Cecile
+
+M       components/cam/cime_config/testdefs/testlist_cam.xml
+         - add aux_short test for F1850_DONOTUSE
+
+M       components/cam/test/system/archive_baseline.sh
+         - added CESM_TESTDIR environment variable to archive_baseline.sh for yellowstone
+           to enable the archiving of the CESM tests
+           NOTE -- The CESM_TESTDIR can be found by looking in the file in test/system
+           and by default is called something like aux_cam_test_20161123172411.log
+
+M       components/cam/test/system/test_driver.sh
+         - removed generate capability from CESM tests - will generate the baselines in
+           the archive_baseline script
+         - removed the required test-id which was used for generating baselines
+         - added CESM_TESTDIR environment variable for yellowstone runs.  User can specify
+           or by default it will create a dir called something like aux_cam_test_20161123172411
+           in /glade/scratch/$USER on yellowstone
+
+If there were any failures reported from running test_driver.sh on any test
+platform, and checkin with these failures has been OK'd by the gatekeeper,
+then copy the lines from the td.*.status files for the failed tests to the
+appropriate machine below.  All failed tests must be justified.
+
+yellowstone/intel:
+004 bl132 TBL.sh e48c4dh ghgrmp_e8+1850_cam4 9s ...............................................FAIL! rc= 7 at Thu Nov 24 04:12:02 MST 2016
+008 bl331 TBL.sh f4c4dh co2rmp+1850_cam4 9s ...................................................FAIL! rc= 7 at Thu Nov 24 04:15:05 MST 2016
+011 bl353 TBL.sh f1.9c5.4dh outfrq3s 9s .......................................................FAIL! rc= 7 at Thu Nov 24 04:26:42 MST 2016
+015 bl357 TBL.sh f1.9c5.5h outfrq3s+1850_cam55 9s .............................................FAIL! rc= 7 at Thu Nov 24 04:32:22 MST 2016
+018 bl366 TBL.sh f1.9c5clbdh outfrq3s_clubb 9s ................................................FAIL! rc= 7 at Thu Nov 24 04:44:23 MST 2016
+022 bl373 TBL.sh f1.9c4mozdh outfrq3s+2000_cam4_trop_chem 9s ..................................FAIL! rc= 7 at Thu Nov 24 05:00:11 MST 2016
+024 bl375 TBL.sh f1.9c5m volc+1850-2005_cam5 2d ...............................................FAIL! rc= 7 at Thu Nov 24 05:02:39 MST 2016
+027 bl485 TBL.sh f1.9c5.5wtmam4h outfrq3s_megan+waccm_tsmlt_2000_cam55 9s .....................FAIL! rc= 7 at Thu Nov 24 05:27:13 MST 2016
+030 bl390 TBL.sh f1.9c4wmxh outfrq3s+waccmx_2000_cam4 9s ......................................FAIL! rc= 7 at Thu Nov 24 05:37:24 MST 2016
+033 bl397 TBL.sh f1.9c4cm outfrq3s+1850-2005_cam4 9s ..........................................FAIL! rc= 7 at Thu Nov 24 05:40:18 MST 2016
+036 bl421 TBL.sh f1.9c5mam4dh outfrq3s 9s .....................................................FAIL! rc= 7 at Thu Nov 24 05:51:30 MST 2016
+039 bl429 TBL.sh f1.9c4wmxh outfrq3s+waccmxi_2000_cam4 9s .....................................FAIL! rc= 7 at Thu Nov 24 05:59:37 MST 2016
+041 bl430 TBL.sh f1.9c5mzmam3dh outfrq3s_NEUwetdep 9s .........................................FAIL! rc= 7 at Thu Nov 24 06:08:55 MST 2016
+044 bl440 TBL.sh f1.9c4soadh outfrq3s+soa_chem_megan_emis 9s ..................................FAIL! rc= 7 at Thu Nov 24 06:27:15 MST 2016
+047 bl470 TBL.sh fsd1.9c5.4wtclbh outfrq3s_sd+sd_waccm5_geos5 9s ..............................FAIL! rc= 7 at Thu Nov 24 06:52:20 MST 2016
+050 bl482 TBL.sh f1.9c5.5wscmam4dh outfrq3s+waccm_sc_amip_cam55 9s ............................FAIL! rc= 7 at Thu Nov 24 07:32:34 MST 2016
+054 bl387 TBL.sh f1.9c4dm outfrq3s+1850-2005_cam4 9s ..........................................FAIL! rc= 7 at Thu Nov 24 07:39:05 MST 2016
+057 bl388 TBL.sh f1.9c4m outfrq24h+1850_cam4 2d ...............................................FAIL! rc= 7 at Thu Nov 24 07:40:35 MST 2016
+068 bl740 TBL.sh h30c5h outfrq3s_lb0 9s .......................................................FAIL! rc= 7 at Thu Nov 24 08:00:14 MST 2016
+
+
+yellowstone/intel/aux_cam:
+ERP_Ln9.f09_f09.F1850_DONOTUSE.yellowstone_intel.cam-outfrq9s_clm5 (Overall: DIFF), details:
+  FAIL ERP_Ln9.f09_f09.F1850_DONOTUSE.yellowstone_intel.cam-outfrq9s_clm5 NLCOMP
+  FAIL ERP_Ln9.f09_f09.F1850_DONOTUSE.yellowstone_intel.cam-outfrq9s_clm5 BASELINE
+  FAIL ERP_Ln9.f09_f09.F1850_DONOTUSE.yellowstone_intel.cam-outfrq9s_clm5 TPUTCOMP Error: Computation time increase > 25% from baseline
+ERP_Ln9.f09_f09.F2000_DEV.yellowstone_intel.cam-outfrq9s_clm5 (Overall: DIFF), details:
+  FAIL ERP_Ln9.f09_f09.F2000_DEV.yellowstone_intel.cam-outfrq9s_clm5 NLCOMP
+  FAIL ERP_Ln9.f09_f09.F2000_DEV.yellowstone_intel.cam-outfrq9s_clm5 BASELINE
+SMS_Lm13.f09_f09.F2000_DEV.yellowstone_intel.cam-outfrq1m_clm5 (Overall: DIFF), details:
+  FAIL SMS_Lm13.f09_f09.F2000_DEV.yellowstone_intel.cam-outfrq1m_clm5 NLCOMP
+  FAIL SMS_Lm13.f09_f09.F2000_DEV.yellowstone_intel.cam-outfrq1m_clm5 BASELINE
+
+
+hobart/nag:
+
+005 bl111 TBL.sh e8c5t5mdm ttrac 9s ...........................................................FAIL! rc= 7 at Tue Nov 22 09:52:45 MST 2016
+010 bl112 TBL.sh e8c5dm ghgrmp_e8 9s ..........................................................FAIL! rc= 7 at Tue Nov 22 09:56:48 MST 2016
+014 bl114 TBL.sh e8c5dm co2rmp 9s .............................................................FAIL! rc= 7 at Tue Nov 22 10:00:03 MST 2016
+017 bl221 TBL.sh f10c5spcamsm outfrq3s 9s .....................................................FAIL! rc= 7 at Tue Nov 22 10:07:16 MST 2016
+021 bl311 TBL.sh f10c5t5mdm ttrac 9s ..........................................................FAIL! rc= 7 at Tue Nov 22 10:12:26 MST 2016
+031 bl314 TBL.sh f10c4wscdm outfrq3s 9s .......................................................FAIL! rc= 7 at Tue Nov 22 10:21:54 MST 2016
+037 bl318 TBL.sh f10c4cdm sat_hist 9s .........................................................FAIL! rc= 7 at Tue Nov 22 10:30:28 MST 2016
+040 bl324 TBL.sh f4c4rrtmgdm outfrq3s 9s ......................................................FAIL! rc= 7 at Tue Nov 22 10:33:31 MST 2016
+043 bl325 TBL.sh f10c5t5mdmsc outfrq3s_subcol 9s ..............................................FAIL! rc= 7 at Tue Nov 22 10:37:42 MST 2016
+049 bl338 TBL.sh f10c5dm rad_diag_mam 9s ......................................................FAIL! rc= 7 at Tue Nov 22 10:41:09 MST 2016
+055 bl354 TBL.sh f1.9c5.4dm outfrq3s_npryz 9s .................................................FAIL! rc= 7 at Tue Nov 22 10:55:59 MST 2016
+058 bl356 TBL.sh fsd1.9c5clbdm off1.9x2.5 9s ..................................................FAIL! rc= 7 at Tue Nov 22 11:18:54 MST 2016
+061 bl368 TBL.sh f1.9c5mg2dm outfrq3s_macmic2_classnuc 9s .....................................FAIL! rc= 7 at Tue Nov 22 11:31:21 MST 2016
+064 bl369 TBL.sh f1.9c5clbdm outfrq3s_clubb 9s ................................................FAIL! rc= 7 at Tue Nov 22 11:46:55 MST 2016
+070 bl422 TBL.sh f4c5mam4dm outfrq3s 9s .......................................................FAIL! rc= 7 at Tue Nov 22 11:59:49 MST 2016
+073 bl426 TBL.sh f10c4wmxdm outfrq3s_ionos 9s .................................................FAIL! rc= 7 at Tue Nov 22 12:07:11 MST 2016
+076 bl471 TBL.sh f10c5.5wmam4dm outfrq3s_modalstrat 9s ........................................FAIL! rc= 7 at Tue Nov 22 12:16:28 MST 2016
+079 bl805 TBL.sh f4c5carmtt1dm outfrq3s_carma 9s ..............................................FAIL! rc= 7 at Tue Nov 22 12:35:55 MST 2016
+
+hobart/pgi or jaguar/pgi:
+005 bl111 TBL.sh e8c5t5mdm ttrac 9s ...........................................................FAIL! rc= 7 at Tue Nov 22 09:56:51 MST 2016
+010 bl112 TBL.sh e8c5dm ghgrmp_e8 9s ..........................................................FAIL! rc= 7 at Tue Nov 22 10:05:00 MST 2016
+016 bl114 TBL.sh e8c5dm co2rmp 9s .............................................................FAIL! rc= 7 at Tue Nov 22 10:14:05 MST 2016
+023 bl311 TBL.sh f10c5t5mdm ttrac 9s ..........................................................FAIL! rc= 7 at Tue Nov 22 10:27:31 MST 2016
+033 bl314 TBL.sh f10c4wscdm outfrq3s 9s .......................................................FAIL! rc= 7 at Tue Nov 22 10:49:15 MST 2016
+036 bl315 TBL.sh f10c3dm outfrq3s+cam3 9s .....................................................FAIL! rc= 7 at Tue Nov 22 10:55:24 MST 2016
+041 bl317 TBL.sh f10c5cdm outfrq3s 9s .........................................................FAIL! rc= 7 at Tue Nov 22 11:11:18 MST 2016
+045 bl319 TBL.sh f10c5nonedm outfrq3s_bam 9s ..................................................FAIL! rc= 7 at Tue Nov 22 11:18:33 MST 2016
+048 bl320 TBL.sh f10c5nonedm rad_diag 9s ......................................................FAIL! rc= 7 at Tue Nov 22 11:20:13 MST 2016
+051 bl321 TBL.sh f10c5cdm atrain 9s ...........................................................FAIL! rc= 7 at Tue Nov 22 11:22:55 MST 2016
+054 bl334 TBL.sh f10c5udm outfrq3s 9s .........................................................FAIL! rc= 7 at Tue Nov 22 11:31:17 MST 2016
+057 bl354 TBL.sh f1.9c5.4dm outfrq3s_npryz 9s .................................................FAIL! rc= 7 at Tue Nov 22 11:51:04 MST 2016
+060 bl420 TBL.sh f4c5mam7dm outfrq3s 9s .......................................................FAIL! rc= 7 at Tue Nov 22 12:02:08 MST 2016
+063 bl422 TBL.sh f4c5mam4dm outfrq3s 9s .......................................................FAIL! rc= 7 at Tue Nov 22 12:12:11 MST 2016
+
+
+** All failing baselines are due to changes in the external components
+
+CAM tag used for the baseline comparison tests if different than previous
+tag:
+
+Summarize any changes to answers, i.e.,
+- what code configurations: all
+- what platforms/compilers: all
+- nature of change (roundoff; larger than roundoff but same climate; new
+  climate): new climate
+
+If this tag changes climate describe the run(s) done to evaluate the new
+climate in enough detail that it(they) could be reproduced, i.e.,
+- source tag (all code used must be in the repository): https://svn-ccsm-models.cgd.ucar.edu/cam1/test_tags/cam5_4_94_n01
+- platform/compilers: yellowstone/intel
+- configure commandline: Using the F2000_DEV compset
+- build-namelist command (or complete namelist):
+ - To get the CLM namelist changes which mimic Cecile's runs, users need to add to their create_newcase the option:
+            --user-mods-dir ../../../components/cam/cime_config/testdefs/testmods_dirs/cam/outfrq1m_clm5
+            ** NOTE ** This directory name will be changing in a future tag
+- MSS location of output:
+Currently: /glade/p/cesm0005/archive/f.e20.F2000_DEV.f09_f09.cam5_4_94_n01
+Plan to put at: /CCSM/csm/f.e20.F2000_DEV.f09_f09.cam5_4_94_n01 (yellowstone is
+  currently down and have not been able to send these files to long-term archive)
+
+MSS location of control simulations used to validate new climate:
+
+URL for AMWG diagnostics output used to validate new climate:
+http://webext.cgd.ucar.edu/FCLIMO/f.e20.F2000_DEV.f09_f09.cam5_4_94_n01/atm/f.e20.F2000_DEV.f09_f09.cam5_4_94_n01-f.e15.F2000_DEV.f09_f09.cam5_4_89.119/
+
+===============================================================
+===============================================================
+
 Tag name: cam5_4_93
 Originator(s): jjb278, brianpm, olson, eaton
 Date: Wed Nov  2 08:55:33 MDT 2016

@@ -21,8 +21,7 @@ help () {
   echo "${hprefix} [ --cesm <test_name> ] (default aux_cam)"
   echo "${hprefix} [ --no-cesm ] (do not run any CESM test or test suite)"
   echo "${hprefix} [ --no-cam ] (do not run CAM regression tests"
-  echo "${hprefix} [ --rerun-cesm ] (rerun the cesm tests with the --use-existing flag)"
-  echo "${hprefix} [ --test-id ] (test ID; required when using --use-existing flag)"
+  echo "${hprefix} [ --rerun-cesm ] (rerun the cesm tests with the --use-existing-flag)"
   echo ""
   echo "${hprefix} **pass environment variables by preceding above commands with:"
   echo "${hprefix}   'env var1=setting var2=setting '"
@@ -41,6 +40,7 @@ help () {
   echo "CAM_TAG:           Default = none (used to set CESM baseline dir)"
   echo "CAM_TASKS:         Default = 32"
   echo "CAM_TESTDIR:       Default = <user_scratch_dir>/test-driver.<jobid>"
+  echo "CESM_TESTDIR:      Default = <user_scratch_dir>/test-cesm.<jobid>"
   echo ""
   echo "Less common ENVIRONMENT variables"
   echo "CALDERA_BATCHQ:    Default = caldera"
@@ -77,8 +77,6 @@ gmake_j=8
 interactive=false
 run_cam_regression=true
 use_existing=false
-idstr="`date '+%Y%m%d%H%M%S'`"
-test_id=aux_cam_${idstr}
 
 while [ "${1:0:1}" == "-" ]; do
     case $1 in
@@ -131,21 +129,6 @@ while [ "${1:0:1}" == "-" ]; do
 
         --rerun-cesm )
             use_existing=true
-            ;;
-
-        --test-id )
-            if [ $# -lt 2 ]; then
-                perr "${1} requires a CESM test ID (e.g., aux_cam_XXXXXXXXX)"
-            fi
-            if [ "${2:0:1}" == "-" ]; then
-                perr "Invalid test id, '${2}'"
-            fi
-            test_id="${2}"
-            shift
-            ;;
-
-	* ) echo "test_driver.sh: FATAL ERROR: unrecognized arg: $1"
-            exit 1
             ;;
 
     esac
@@ -289,6 +272,7 @@ input_file="tests_pretag_yellowstone"
 
 EOF
 
+mach_workspace="/glade/scratch"
 #-------------------------------------------
 
 cat > ${submit_script} << EOF
@@ -375,6 +359,7 @@ input_file="tests_pretag_yellowstone"
 EOF
 
 ##^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ writing to batch script ^^^^^^^^^^^^^^^^^^^
+mach_workspace="/glade/scratch"
     ;;
 
     ##hobart
@@ -486,6 +471,7 @@ echo_arg="-e"
 
 EOF
 ##^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ writing to batch script ^^^^^^^^^^^^^^^^^^^
+mach_workspace="/scratch/cluster"
     ;;
 
     ##leehill - always run with CAM_FC=PGI and -i
@@ -558,6 +544,7 @@ echo_arg="-e"
 
 EOF
 ##^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ writing to batch script ^^^^^^^^^^^^^^^^^^^
+mach_workspace="/scratch/cluster"
     ;;
 
     ##edison
@@ -633,6 +620,7 @@ input_file="tests_pretag_edison_intel"
 
 EOF
 ##^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ writing to batch script ^^^^^^^^^^^^^^^^^^^
+mach_workspace="/scratch1/scratchdirs"
     ;;
 
 
@@ -693,7 +681,7 @@ fi
 
 ##setup test work directory
 if [ -z "\$CAM_TESTDIR" ]; then
-    export CAM_TESTDIR=\${MACH_WORKSPACE}/\$LOGNAME/test-driver.\${JOBID}
+    export CAM_TESTDIR=$mach_workspace/\$LOGNAME/test-driver.\${JOBID}
     if [ -d \$CAM_TESTDIR ]; then
         rm -rf \$CAM_TESTDIR
     fi
@@ -927,6 +915,72 @@ if ! $force ; then
     esac
 fi
 
+##vvvvvvvvvvvvvvvvvvvvvv start CAM aux test suite vvvvvvvvvvvvvvvvvvvvvvvvvvvv
+cesm_test_mach="false"
+if [ "${hostname:0:2}" == "ye" -o "${hostname:0:2}" == "ys" -o "${hostname:0:2}" == "ca" ]; then
+  cesm_test_mach="true"
+fi
+if [ "${cesm_test_suite}" != "none" -a "${cesm_test_mach}" == "true" ]; then
+  module load python
+
+  idstr="`date '+%Y%m%d%H%M%S'`"
+  test_id=${cesm_test_suite}"_"${idstr}
+  currdir="`pwd -P`"
+  logfile="${currdir}/aux_cam_test_${idstr}.log"
+  tdir="$( cd $( dirname $0 ); pwd -P )"
+  root_dir="$( dirname $( dirname $( dirname $( dirname ${tdir} ) ) ) )"
+  script_dir="${root_dir}/cime/scripts"
+  if [ ! -d "${script_dir}" ]; then
+    echo "ERROR: CIME scripts dir not found at ${script_dir}"
+    exit 1
+  fi
+  if [ ! -x "${script_dir}/create_test" ]; then
+    echo "ERROR: create_test script dir not found in ${script_dir}"
+    exit 1
+  fi
+
+  ##setup CESM work directory
+  if [ -z "$CESM_TESTDIR" ]; then
+    cesm_testdir=$mach_workspace/$LOGNAME/$test_id
+    echo " --- CESM tests will be written to $cesm_testdir"
+  else
+    cesm_testdir=${CESM_TESTDIR}
+  fi
+
+  if [ -e ${cesm_testdir} ]; then
+     if $use_existing ; then
+        echo " Using existing tests in ${cesm_testdir}"
+     else
+        echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! "
+        echo "!! ERROR: ${cesm_testdir} already exists and << --rerun-cesm >> was not specified " 
+        echo "!!        Either remove ${cesm_testdir} or specify << --rerun-cesm >> "
+        echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! "
+        exit 1
+     fi
+  else
+    mkdir $cesm_testdir
+  fi
+
+  cd ${script_dir}
+  testargs="--xml-machine yellowstone --xml-compiler intel --xml-category ${cesm_test_suite}"
+  testargs="${testargs} --queue ${CAM_BATCHQ} --test-root ${cesm_testdir}  --project ${CAM_ACCOUNT}"
+  testargs="${testargs} --test-id ${test_id} --walltime 3:00"
+  if [ -n "${BL_TESTDIR}" ]; then
+    testargs="${testargs} --compare $( basename ${BL_TESTDIR} )"
+  fi
+  if $use_existing; then
+    testargs="${testargs} --use-existing"
+  fi
+  echo ""
+  echo "CESM test results will be in: ${cesm_testdir}/${test_id}" | tee {logfile}
+  echo "Running ./create_test ${testargs}" | tee ${logfile}
+  echo ""
+  bsub -q caldera -n1 -P$CAM_ACCOUNT -W06:00 ./create_test ${testargs} >> ${logfile} 2>&1
+  cd ${currdir}
+
+fi
+##^^^^^^^^^^^^^^^^^^^^^^ start CAM aux test suite ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
 if $run_cam_regression; then
   echo "submitting..."
   case $hostname in
@@ -948,62 +1002,5 @@ if $run_cam_regression; then
   esac
 fi
 
-##vvvvvvvvvvvvvvvvvvvvvv start CAM aux test suite vvvvvvvvvvvvvvvvvvvvvvvvvvvv
-cesm_test_mach="false"
-if [ "${hostname:0:2}" == "ye" -o "${hostname:0:2}" == "ys" -o "${hostname:0:2}" == "ca" ]; then
-  cesm_test_mach="true"
-fi
-if [ "${cesm_test_suite}" != "none" -a "${cesm_test_mach}" == "true" ]; then
-  module load python
-
-  currdir="`pwd -P`"
-  logfile="${currdir}/aux_cam_test_${idstr}.log"
-  tdir="$( cd $( dirname $0 ); pwd -P )"
-  root_dir="$( dirname $( dirname $( dirname $( dirname ${tdir} ) ) ) )"
-  script_dir="${root_dir}/cime/scripts"
-  if [ ! -d "${script_dir}" ]; then
-    echo "ERROR: CIME scripts dir not found at ${script_dir}"
-    exit 1
-  fi
-  if [ ! -x "${script_dir}/create_test" ]; then
-    echo "ERROR: create_test script dir not found in ${script_dir}"
-    exit 1
-  fi
-
-  if [ "${test_id}" == "aux_cam_${idstr}" ]; then
-    if $use_existing; then
-      echo "ERROR: Must supply a test-id when using rerun-cesm - typically something like aux_cam_XXXXXXXX"
-      exit 1
-    fi 
-  fi 
-
-  cd ${script_dir}
-  testroot=/glade/scratch/$USER/$CAM_TAG
-  testargs="--xml-machine yellowstone --xml-compiler intel --xml-category ${cesm_test_suite}"
-  testargs="${testargs} --queue ${CAM_BATCHQ} --test-root ${testroot}  --project ${CAM_ACCOUNT}"
-  testargs="${testargs} --test-id ${test_id} --walltime 3:00"
-  if [ -n "${CAM_TAG}" ]; then
-    testargs="${testargs} --generate ${CAM_TAG}"
-  else
-    echo "!!!!!!!!!!!!!!! "
-    echo "!!! WARNING !!! CAM_TAG has not been set for generating baselines and for test-root directory"
-    echo "!!!!!!!!!!!!!!! "
-  fi
-  if [ -n "${testroot}" ]; then
-    mkdir ${testroot}
-  fi
-  echo "Case directories will be at: ${testroot}"
-  if [ -n "${BL_TESTDIR}" ]; then
-    testargs="${testargs} --compare $( basename ${BL_TESTDIR} )"
-  fi
-  if $use_existing; then
-    testargs="${testargs} --use-existing  --allow-baseline-overwrite"
-  fi
-  echo "Running ./create_test ${testargs}" | tee ${logfile}
-  bsub -q caldera -n1 -P$CAM_ACCOUNT -W06:00 ./create_test ${testargs} >> ${logfile} 2>&1
-  cd ${currdir}
-
-fi
-##^^^^^^^^^^^^^^^^^^^^^^ start CAM aux test suite ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 exit 0

@@ -554,9 +554,15 @@ if ($dyn =~ /se/) {add_default($nl, 'vect_map', 'val'=>'cart3d');}
 # Adiabatic or Ideal physics
 my $phys = $cfg->get('phys');
 if ($phys eq 'adiabatic') { add_default($nl, 'atm_adiabatic',  'val'=>'.true.'); }
-if ($phys eq 'ideal')     { add_default($nl, 'atm_ideal_phys', 'val'=>'.true.'); }
+if ($phys eq 'ideal') {
+  add_default($nl, 'atm_ideal_phys', 'val'=>'.true.');
+  my $analytic_ic = $cfg->get('analytic_ic');
+  if ($analytic_ic) {
+    add_default($nl, 'analytic_ic_type', 'val'=>'held_suarez_1994');
+  }
+}
 
-# Aqua planet 
+# Aqua planet
 
 my $aqua_mode = $cfg->get('aquaplanet');
 my $nl_aqua_flag = $nl->get_value('aqua_planet');
@@ -681,7 +687,7 @@ my $prog_species = $cfg->get('prog_species');
 my $prog_ghg1    = ($chem =~ "trop_mozart" or $chem =~ "trop_strat" or $chem =~ "ghg" or $chem =~ "_sc" or $prog_species =~ "GHG");
 my $prog_ghg2    = ($chem =~ "ghg" or $chem =~ "_sc" or $prog_species =~ "GHG");
 my $ghg_chem     = ($chem =~ "ghg" or $chem =~ "_sc");
-my $aero_chem    = ($chem =~ "aero" or $chem eq 'trop_mozart' or $chem eq 'trop_mozart_soa' or $chem =~ 'trop_strat' or $chem =~ 'tsmlt' or $chem eq 'trop_bam');
+my $aero_chem    = ($chem =~ "aero" or $chem eq 'trop_mozart' or $chem =~ 'trop_strat' or $chem =~ 'tsmlt' or $chem eq 'trop_bam');
 
 my $chem_rad_passive = ($nl->get_value('chem_rad_passive') =~ /$TRUE/io);
 my $ipcc_aircraft_emis = ($nl->get_value('ipcc_aircraft_emis') =~ /$TRUE/io);
@@ -810,6 +816,7 @@ if ($sim_year =~ /(\d+)-(\d+)/) {
 }
 
 # Topography
+add_default($nl, 'use_topo_file', 'nofail'=>1);
 my $use_topo_file = $nl->get_value('use_topo_file');
 if (!defined $use_topo_file or ($use_topo_file =~ m/$TRUE/io)) {
     # Add the topo file unless the "do not use" override has been set.
@@ -1881,6 +1888,7 @@ if ($chem =~ /trop_mozart/ or $chem =~ /trop_strat/ or $chem =~ /waccm_tsmlt/) {
                    'C2H2     -> ' => 'c2h2_emis_file',
                    'CH3COOH  -> ' => 'ch3cooh_emis_file',
                    'ISOP     -> ' => 'isop_emis_file',
+                   'TOLUENE  -> ' => 'toluene_emis_file',
                    );
     if (!($chem =~ /_vbs/) and !($chem =~ /_tsmlt/)) {
         %species = (%species,
@@ -1961,17 +1969,6 @@ if ($chem =~ /trop_mozart/ or $chem =~ /trop_strat/ or $chem =~ /waccm_tsmlt/) {
                    'OC2      -> ' => 'oc2_emis_file',
                    );
     }
-    if ($chem =~ /_soa/) {
-        %species = (%species,
-                   'BENZENE  -> ' => 'soa_benzene_emis_file',
-                   'XYLENE   -> ' => 'soa_xylene_emis_file',
-                   'TOLUENE  -> ' => 'soa_toluene_emis_file',
-                   );
-    } else {
-        %species = (%species,
-                   'TOLUENE  -> ' => 'toluene_emis_file',
-                   );
-    }
 
     my $first = 1; my $pre = "";
     foreach my $id (sort keys %species) {
@@ -1992,10 +1989,7 @@ if ($chem =~ /trop_mozart/ or $chem =~ /trop_strat/ or $chem =~ /waccm_tsmlt/) {
     # aircraft emission datasets:
     %species = ();
     my $cyc_yr = '1999';
-    if ($chem eq 'trop_strat_soa') {
-      %species = ( 'NO2    -> ' => 'no2_aircraft_emis_file',
-                   'CB1    -> ' => 'bc_aircraft_emis_file' );
-    } elsif ($chem =~ /mam3/) {
+    if ($chem =~ /mam3/) {
       %species = ( 'NO2    -> ' => 'no2_aircraft_emis_file',
                    'SO2    -> ' => 'so2_ext_file',
                    'so4_a1 -> ' => 'so4_a1_ext_file', 
@@ -2082,7 +2076,10 @@ if ($chem =~ /trop_mozart/ or $chem =~ /trop_strat/ or $chem =~ /waccm_tsmlt/) {
     }
 
     # Species with fixed lower boundary
-    if ($chem =~ /trop_strat/ or $chem =~ /_tsmlt/) {
+    if ($chem =~ /_tsmlt_mam/) {
+      $val = "'CCL4','CF2CLBR','CF3BR','CFC11','CFC113','CFC12','CH3BR','CH3CCL3','CH3CL','CH4','CO2'"
+            .",'H2','HCFC22','N2O','CFC114','CFC115','HCFC141B','HCFC142B','CH2BR2','CHBR3','H2402'";
+    } elsif ($chem =~ /trop_strat/ or $chem =~ /_tsmlt/) {
       $val = "'CCL4','CF2CLBR','CF3BR','CFC11','CFC113','CFC12','CH3BR','CH3CCL3','CH3CL','CH4','CO2'"
             .",'H2','HCFC22','N2O','CFC114','CFC115','HCFC141B','HCFC142B','CH2BR2','CHBR3','H1202','H2402'";
     } else {
@@ -2817,7 +2814,10 @@ if ($chem =~ /waccm_ma/ or $chem =~ /waccm_tsmlt/) {
 
     # Species with fixed lower boundary
     my $val = "'CCL4','CF2CLBR','CF3BR','CFC11','CFC113','CFC12','CH3BR','CH3CCL3','CH3CL','CH4','CO2'"
-             .",'H2','HCFC22','N2O','CFC114','CFC115','HCFC141B','HCFC142B','CH2BR2','CHBR3','H1202','H2402'";
+             .",'H2','HCFC22','N2O','CFC114','CFC115','HCFC141B','HCFC142B','CH2BR2','CHBR3','H2402'";
+    if ($chem =~ /waccm_ma/) {
+      $val .= ",'H1202'";
+    }
 
     if ($chem_has_ocs) {
         $val .= ",'OCS'";

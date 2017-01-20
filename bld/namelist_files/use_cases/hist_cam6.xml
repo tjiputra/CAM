@@ -25,8 +25,8 @@
   <zmconv_num_cin           >   1   </zmconv_num_cin>
 
   <srf_emis_type            >    INTERP_MISSING_MONTHS  </srf_emis_type>
-  <srf_emis_specifier       >   'DMS       -> $INPUTDATA_ROOT/atm/cam/chem/emis/ccmi_1950_2100_rcp6/IPCC_emissions_DMS_surface_1850-2100_1.9x2.5_c130814.nc', 
-                                'SO2       -> $INPUTDATA_ROOT/atm/cam/chem/emis/ccmi_1950_2100_rcp6/IPCC_emissions_SO2_surface_1850-2100_1.9x2.5_c130814.nc', 
+  <srf_emis_specifier       >   'DMS       -> $INPUTDATA_ROOT/atm/cam/chem/emis/ccmi_1950_2100_rcp6/IPCC_emissions_DMS_surface_1850-2100_1.9x2.5_c141106.nc', 
+                                'SO2       -> $INPUTDATA_ROOT/atm/cam/chem/emis/ccmi_1950_2100_rcp6/IPCC_emissions_SO2_surface_1850-2100_1.9x2.5_c141106.nc', 
                                 'SOAG      -> $INPUTDATA_ROOT/atm/cam/chem/trop_mozart_aero/emis/ar5_mam3_soag_1.5_surf_1850-2005_c130424.nc', 
                                 'bc_a4     -> $INPUTDATA_ROOT/atm/cam/chem/trop_mozart_aero/emis/ar5_mam3_bc_surf_1850-2005_c090804.nc', 
                                 'num_a1    -> $INPUTDATA_ROOT/atm/cam/chem/trop_mozart_aero/emis/ar5_mam4_num_a1_surf_1850-2005_c150205.nc', 

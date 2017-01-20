@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 
 """
-build namelist input for cam
+CAM namelist creator
 """
-import sys, os, time
+import sys, os, time, shutil, re, filecmp, imp
 
 _CIMEROOT = os.environ.get("CIMEROOT")
 if _CIMEROOT is None:
@@ -14,159 +14,61 @@ sys.path.append(_LIBDIR)
 
 from standard_script_setup          import *
 from CIME.XML.standard_module_setup import *
-from CIME.buildnml                  import create_namelist_infile
+from CIME.buildnml                  import create_namelist_infile, parse_input
 from CIME.case                      import Case
 from CIME.utils                     import expect, run_cmd
-import shutil, re
 
 logger = logging.getLogger(__name__)
 
 ###############################################################################
-def parse_command_line(args):
+def buildnml(case, caseroot, compname):
 ###############################################################################
+    """Build the cam namelist """
 
-    parser = argparse.ArgumentParser()
+    # Build the component namelist 
+    if compname != "cam":
+        raise AttributeError
 
-    CIME.utils.setup_standard_logging_options(parser)
-
-    parser.add_argument("caseroot", default=os.getcwd(),
-                        help="Case directory")
-
-    args = parser.parse_args()
-
-    CIME.utils.handle_standard_logging_options(args)
-
-    return args.caseroot
-
-###############################################################################
-def _main_func():
-###############################################################################
-
-    caseroot = parse_command_line(sys.argv)
-
-    case = Case(caseroot)
-
-    CIMEROOT            = case.get_value("CIMEROOT")
-    SRCROOT             = case.get_value("SRCROOT")
-    DIN_LOC_ROOT        = case.get_value("DIN_LOC_ROOT")
-    EXEROOT             = case.get_value("EXEROOT")
-    ATM_GRID            = case.get_value("ATM_GRID")
-    ATM_NCPL            = case.get_value("ATM_NCPL")
-    BUILD_COMPLETE      = case.get_value("BUILD_COMPLETE")
-    CAM_CONFIG_OPTS     = case.get_value("CAM_CONFIG_OPTS")
+    srcroot             = case.get_value("SRCROOT")
+    rundir              = case.get_value("RUNDIR")
+    din_loc_root        = case.get_value("DIN_LOC_ROOT")
+    atm_ncpl            = case.get_value("ATM_NCPL")
     CAM_NAMELIST_OPTS   = case.get_value("CAM_NAMELIST_OPTS")
     CAM_NML_USE_CASE    = case.get_value("CAM_NML_USE_CASE")
-    CAM_DYCORE          = case.get_value("CAM_DYCORE")
-    CCSM_CO2_PPMV       = case.get_value("CCSM_CO2_PPMV")
-    COMP_INTERFACE      = case.get_value("COMP_INTERFACE")
-    COMP_OCN            = case.get_value("COMP_OCN")
     DEBUG               = case.get_value("DEBUG")
-    MPILIB              = case.get_value("MPILIB")
-    NTHRDS_ATM          = case.get_value("NTHRDS_ATM")
     NTASKS_ATM          = case.get_value("NTASKS_ATM")
     NINST_ATM           = case.get_value("NINST_ATM")
-    PTS_MODE            = case.get_value("PTS_MODE")
-    PTS_LON             = case.get_value("PTS_LON")
-    PTS_LAT             = case.get_value("PTS_LAT")
-    RUNDIR              = case.get_value("RUNDIR")
     RUN_TYPE            = case.get_value("RUN_TYPE")
     RUN_STARTDATE       = case.get_value("RUN_STARTDATE")
     RUN_REFCASE         = case.get_value("RUN_REFCASE")
     RUN_REFDATE         = case.get_value("RUN_REFDATE")
     RUN_REFTOD          = case.get_value("RUN_REFTOD")
-    DOCN_MODE           = case.get_value("DOCN_MODE")
-    COMPILER            = case.get_value("COMPILER") # for chem preprocessor
 
     #--------------------------------------------------------------------
-    # Invoke cam configure - output will go in $CASEROOT/Buildconf/camconf
+    # call buildcpp to set both cppdefs and config_cache.xml file for generating namelist
     #--------------------------------------------------------------------
-
-    camconf = os.path.join(caseroot, "Buildconf", "camconf")
-
-    # level information for CAM is part of the atm grid name - and must be stripped out
-    nlev = ''
-    match = re.match('(.+)z(\d+)',ATM_GRID)
-    if match:
-        ATM_GRID = match.groups()[0]
-        nlev = match.groups()[1]
-
-    # The following translation is hard-wired for backwards compatibility
-    # to support the differences between how the scripts specify the land grid
-    # and how it is specified internally
-
-    if ATM_GRID == 'T31':
-        ATM_GRID = '48x96'
-    if ATM_GRID == 'T42':
-        ATM_GRID = '64x128'
-    if ATM_GRID == 'T85':
-        ATM_GRID = '128x256'
-    if ATM_GRID == 'T341':
-        ATM_GRID = '512x1024'
-
-    if not BUILD_COMPLETE:
-
-        # if need to build - then construct configure command
-        config_opts = ["-s", "-fc_type", COMPILER, "-ccsm_seq",
-                       "-dyn", CAM_DYCORE, "-res", ATM_GRID,
-                       "-usr_src", os.path.join(caseroot, "SourceMods", "src.cam")]
-
-        if nlev:
-            config_opts += ["-nlev", nlev]
-
-        # Some settings for single column mode.
-        if PTS_MODE:
-            config_opts.append("-scam")
-
-        if MPILIB == 'mpi-serial':
-            config_opts.append("-nospmd")
-        else:
-            config_opts.append("-spmd")
-
-        if int(NTHRDS_ATM) == 1 or PTS_MODE:
-            config_opts.append("-nosmp")
-        else:
-            config_opts.append("-smp")
-
-        # The ocean component setting is only used by CAM to do attribute matching for
-        # setting default tuning parameter values.  In SOM mode we want to use the same
-        # tunings as the fully coupled B compset, so set the ocean component to pop in
-        # that case.
-
-        ocn = COMP_OCN
-        if DOCN_MODE == 'som':
-            config_opts += ["-ocn", "pop"]
-        else:
-            config_opts += ["-ocn", COMP_OCN]
-
-        if COMP_INTERFACE == 'ESMF':
-            config_opts += ["-comp_intf", "esmf"]
-        elif COMP_INTERFACE == 'MCT':
-            config_opts += ["-comp_intf", "mct"]
-        else:
-            expect(False, "COMP_INTERFACE not recognized; must be ESMF or MCT.")
-
-        # Add user options.
-        config_opts += CAM_CONFIG_OPTS.split(" ")
-
-        if "-cosp" in config_opts:
-            config_opts += ["-cosp_libdir",
-                            os.path.join(EXEROOT,"atm","obj","cosp")]
-
-        # Construct the command itself.
-        cmd = os.path.join(SRCROOT,"components","cam","bld","configure") + " " \
-              + " ".join(config_opts)
-
-        if not os.path.isdir(camconf):
-            os.makedirs(camconf)
-
-        run_cmd_no_fail(cmd, from_dir=camconf)
-
+    call_buildcpp = False
+    if not os.path.exists(os.path.join(caseroot,"LockedFiles","env_build.xml")):
+        call_buildcpp = True
     else:
+        file1 = os.path.join(caseroot,"env_build.xml")  
+        file2 = os.path.join(caseroot,"LockedFiles","env_build.xml")
+        if not filecmp.cmp(file1, file2):
+            call_buildcpp = True
+    if call_buildcpp:
+        cmd = os.path.join(os.path.join(srcroot,"components","cam","cime_config","buildcpp"))
+        logger.info("     ...calling cam buildcpp to set build time options")
+        try:
+            mod = imp.load_source("buildcpp", cmd)
+            mod.buildcpp(case)
+        except:
+            raise
 
-        # Verify that we have a config_cache file.
-        filename = os.path.join(camconf, "config_cache.xml")
-        expect(os.path.isfile(filename),
-               " Cannot run build-namelist; try cleaning build and building again.")
+    # Verify that we have a config_cache file (generated by the call to buildcpp) 
+    camconf = os.path.join(caseroot, "Buildconf", "camconf")
+    filename = os.path.join(camconf, "config_cache.xml")
+    expect(os.path.isfile(filename),
+           " Missing config_cache.xml - cannot run build-namelist")
 
     #--------------------------------------------------------------------
     # Invoke cam build-namelist - output will go in $CASEROOT/Buildconf/camconf
@@ -181,9 +83,9 @@ def _main_func():
 
         inst_string = ""
         if ninst > 1:
-            single_case_rpointer = os.path.join(RUNDIR, "rpointer.atm")
+            single_case_rpointer = os.path.join(rundir, "rpointer.atm")
             inst_string = '_%04d' % inst_counter
-            instance_rpointer = os.path.join(RUNDIR,"rpointer.atm"+inst_string)
+            instance_rpointer = os.path.join(rundir,"rpointer.atm"+inst_string)
 
             # If multi-instance case does not have restart file, use
             # single-case restart for each instance
@@ -206,27 +108,25 @@ def _main_func():
         if RUN_TYPE == 'hybrid':
             ncdata = create_ic_filename(inst_string, 'i')
             # Fallback if no instance-specific file is found.
-            if not os.path.isfile(os.path.join(RUNDIR, ncdata)):
+            if not os.path.isfile(os.path.join(rundir, ncdata)):
                 ncdata = create_ic_filename('', 'i')
             infile_lines.append(" ncdata = '" + ncdata + "'")
             if ninst > 1:
-                logger.info("%s is being used for ncdata" % ncdata)
+                logger.debug("%s is being used for ncdata" % ncdata)
 
         if RUN_TYPE == 'branch':
             cam_branch_file = create_ic_filename(inst_string, 'r')
             # Fallback if no instance-specific file is found.
-            if not os.path.isfile(os.path.join(RUNDIR, cam_branch_file)):
+            if not os.path.isfile(os.path.join(rundir, cam_branch_file)):
                 cam_branch_file = create_ic_filename('', 'r')
             infile_lines.append(" cam_branch_file = '" + cam_branch_file + "'")
             if ninst > 1:
-                logger.info("%s is being used for cam_branch_file" % cam_branch_file)
+                logger.debug("%s is being used for cam_branch_file" % cam_branch_file)
 
-        dtime = ( 3600 * 24 ) / int(ATM_NCPL)
+        dtime = ( 3600 * 24 ) / int(atm_ncpl)
         infile_lines.append(" dtime = " + str(dtime))
         start_ymd = RUN_STARTDATE.replace('-','')
         infile_lines.append(" start_ymd = " + start_ymd)
-
-        infile_lines.append(" co2vmr = " + str(float(CCSM_CO2_PPMV) * 1.e-6))
 
         if DEBUG:
             infile_lines.append(" state_debug_checks = .true.")
@@ -234,8 +134,7 @@ def _main_func():
         user_nl_file = os.path.join(caseroot, "user_nl_cam" + inst_string)
         namelist_infile = os.path.join(camconf, "namelist")
 
-        create_namelist_infile(case, user_nl_file, namelist_infile,
-                               "\n".join(infile_lines))
+        create_namelist_infile(case, user_nl_file, namelist_infile, "\n".join(infile_lines))
 
         # -----------------------------------------------------
         # call build-namelist
@@ -243,7 +142,7 @@ def _main_func():
 
         ntasks = int(NTASKS_ATM) / ninst
 
-        buildnl_opts = ["-ntasks", str(ntasks), "-csmdata", DIN_LOC_ROOT,
+        buildnl_opts = ["-ntasks", str(ntasks), "-csmdata", din_loc_root,
                         "-infile", os.path.join(camconf, "namelist")]
 
         if ('-01-01' in RUN_STARTDATE) or ('-09-01' in RUN_STARTDATE):
@@ -262,43 +161,49 @@ def _main_func():
         buildnl_opts += ["-namelist",
                          '" &atmexp ' + CAM_NAMELIST_OPTS + '/" ']
 
-        cmd = os.path.join(SRCROOT, "components", "cam", "bld", "build-namelist")
+        cmd = os.path.join(srcroot, "components", "cam", "bld", "build-namelist")
         cmd += " " + " ".join(buildnl_opts)
 
         rc, out, err = run_cmd(cmd, from_dir=camconf)
         expect(rc==0,"Command %s failed rc=%d\nout=%s\nerr=%s"%(cmd,rc,out,err))
 
         # -----------------------------------------------------
-        # copy resolved namelist, atm_in, to RUNDIR
+        # copy resolved namelist, atm_in, to rundir
         # -----------------------------------------------------
 
-        if os.path.isdir(RUNDIR):
+        if os.path.isdir(rundir):
             file1 = os.path.join(camconf, "atm_in")
-            file2 = os.path.join(RUNDIR, "atm_in")
+            file2 = os.path.join(rundir, "atm_in")
             if ninst > 1:
                 file2 += inst_string
             logger.debug("CAM namelist copy: file1 %s file2 %s " %(file1, file2))
             shutil.copy(file1,file2)
 
         # -----------------------------------------------------
-        # copy drv_flds_in to RUNDIR if it does not exist
+        # copy drv_flds_in to rundir if it does not exist
         # -----------------------------------------------------
 
         file1 = os.path.join(camconf, "drv_flds_in")
-        file2 = os.path.join(RUNDIR, "drv_flds_in")
+        file2 = os.path.join(rundir, "drv_flds_in")
         if (os.path.isfile(file1)) and (not os.path.isfile(file2)):
             shutil.copy(file1,file2)
 
         # -----------------------------------------------------
-        # copy aquap_in to RUNDIR if it exists
+        # copy aquap_in to rundir if it exists
         # -----------------------------------------------------
 
         file1 = os.path.join(camconf, "aquap_in")
-        file2 = os.path.join(RUNDIR, "aquap_in")
+        file2 = os.path.join(rundir, "aquap_in")
         if (os.path.isfile(file1)):
             shutil.copy(file1,file2)
 
 ###############################################################################
+def _main_func():
+
+    caseroot = parse_input(sys.argv)
+    with Case(caseroot) as case:
+        buildnml(case, caseroot, "cam")
 
 if __name__ == "__main__":
     _main_func()
+

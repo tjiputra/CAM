@@ -640,274 +640,373 @@ end subroutine dyn_init
 
 !=============================================================================================
 
-subroutine read_inidat(dyn_in)
+  subroutine read_inidat(dyn_in)
 
-   use shr_vmath_mod,       only: shr_vmath_log
-   use physconst,           only: pi
-   use hycoef,              only: ps0
-   use dyn_grid,            only: get_horiz_grid_dim_d, dyn_decomp
-   use dyn_grid,            only: pelat_deg, pelon_deg
-   use constituents,        only: cnst_name, cnst_read_iv, qmin
-   use const_init,          only: cnst_init_default
-   use cam_control_mod,     only: ideal_phys, aqua_planet
-   use cam_initfiles,       only: initial_file_get_id, topo_file_get_id, pertlim
-   use ncdio_atm,           only: infld
-   use cam_history_support, only: max_fieldname_len
-   use cam_grid_support,    only: cam_grid_get_local_size, cam_grid_get_gcid
-   use cam_map_utils,       only: iMap
+    use shr_vmath_mod,       only: shr_vmath_log
+    use physconst,           only: pi
+    use hycoef,              only: ps0
+    use dyn_grid,            only: get_horiz_grid_dim_d, dyn_decomp
+    use dyn_grid,            only: pelat_deg, pelon_deg
+    use constituents,        only: cnst_name, cnst_read_iv, qmin
+    use const_init,          only: cnst_init_default
+    use cam_control_mod,     only: ideal_phys, aqua_planet
+    use cam_initfiles,       only: initial_file_get_id, topo_file_get_id, pertlim
+    use ncdio_atm,           only: infld
+    use cam_history_support, only: max_fieldname_len
+    use cam_grid_support,    only: cam_grid_get_local_size, cam_grid_get_gcid
+    use cam_map_utils,       only: iMap
 
-   use phys_control,        only: phys_getopts
+    use phys_control,        only: phys_getopts
 
-   use parallel_mod,        only: par
-   use bndry_mod,           only: bndry_exchangev
-   use dimensions_mod,      only: nelemd, nlev, np, npsq
-   use dof_mod,             only: putUniquePoints
-   use edge_mod,            only: edgevpack, edgevunpack, InitEdgeBuffer, FreeEdgeBuffer
-   use edge_mod,            only: EdgeBuffer_t
-   use nctopo_util_mod,     only: nctopo_util_inidat
+    use parallel_mod,        only: par
+    use bndry_mod,           only: bndry_exchangev
+    use dimensions_mod,      only: nelemd, nlev, np, npsq
+    use dof_mod,             only: putUniquePoints
+    use edge_mod,            only: edgevpack, edgevunpack, InitEdgeBuffer, FreeEdgeBuffer
+    use edge_mod,            only: EdgeBuffer_t
+    use nctopo_util_mod,     only: nctopo_util_inidat
+    use inic_analytic,       only: analytic_ic_active, analytic_ic_set_ic
+    use cam_grid_support,    only: cam_grid_id, cam_grid_get_latvals, cam_grid_get_lonvals
+    use dyn_tests_utils,     only: vc_moist_pressure, vc_dry_pressure
 
-   use pio,                 only: file_desc_t, io_desc_t, pio_double, &
-                                  pio_get_local_array_size, pio_freedecomp
+    use pio,                 only: file_desc_t, io_desc_t, pio_double, &
+         pio_get_local_array_size, pio_freedecomp
 
-   type (dyn_import_t), target, intent(inout) :: dyn_in   ! dynamics import
+    type (dyn_import_t), target, intent(inout) :: dyn_in   ! dynamics import
 
-   type(file_desc_t), pointer :: fh_ini, fh_topo
+    type(file_desc_t), pointer :: fh_ini, fh_topo
 
-   type(element_t), pointer :: elem(:)
-   real(r8), allocatable :: tmp(:,:,:)    ! (npsp,nlev,nelemd)
-   integer :: ie, k, t
-   character(len=max_fieldname_len) :: fieldname
-   logical :: found
-   integer :: kptr, m_cnst
-   type(EdgeBuffer_t) :: edge
-   integer :: lsize
+    type(element_t), pointer :: elem(:)
+    real(r8), allocatable :: tmp(:,:,:)    ! (npsp,nlev,nelemd)
+    real(r8), allocatable :: phis_tmp(:,:) ! (npsp,nelemd)
+    integer :: ie, k, t
+    character(len=max_fieldname_len) :: fieldname
+    logical :: found
+    integer :: kptr, m_cnst
+    type(EdgeBuffer_t) :: edge
+    integer :: lsize
 
-   integer,parameter :: pcnst = PCNST
-   integer(iMap), pointer :: ldof(:) => NULL() ! Basic (2D) grid dof
-   logical,       pointer :: mask(:) => NULL() ! mask based on ldof
-   real(r8),  allocatable :: lat(:)
-   real(r8),  allocatable :: lon(:)
+    integer,parameter :: pcnst = PCNST
+    integer(iMap), pointer :: ldof(:) => NULL() ! Basic (2D) grid dof
+    logical,       pointer :: mask(:) => NULL() ! mask based on ldof
+    real(r8),  allocatable :: lat(:)
+    real(r8),  allocatable :: lon(:)
 
-   integer :: rndm_seed_sz
-   integer, allocatable :: rndm_seed(:)
-   real(r8) :: pertval
-   integer :: i, j, indx
-   real(r8), parameter :: D0_0 = 0.0_r8
-   real(r8), parameter :: D0_5 = 0.5_r8
-   real(r8), parameter :: D1_0 = 1.0_r8
-   real(r8), parameter :: D2_0 = 2.0_r8
-   real(r8), parameter :: deg2rad = pi / 180.0_r8
-   character(len=*), parameter :: subname='READ_INIDAT'
+    integer :: rndm_seed_sz
+    integer, allocatable :: rndm_seed(:)
+    real(r8) :: pertval
+    integer :: i, j, indx
+    real(r8), parameter :: D0_0 = 0.0_r8
+    real(r8), parameter :: D0_5 = 0.5_r8
+    real(r8), parameter :: D1_0 = 1.0_r8
+    real(r8), parameter :: D2_0 = 2.0_r8
+    real(r8), parameter :: deg2rad = pi / 180.0_r8
+    ! Variables for analytic initial conditions
+    integer,  allocatable            :: glob_ind(:)
+    integer,  allocatable            :: m_ind(:)
+    real(r8), allocatable            :: dbuf4(:,:,:,:)
+    integer                          :: grid_id
+    real(r8), pointer                :: latdegp(:) ! Latitudes in degrees
+    real(r8), pointer                :: londegp(:) ! Longitudes in degrees
+    real(r8), allocatable            :: latvals(:) ! Latitudes in radians
+    real(r8), allocatable            :: lonvals(:) ! Longitudes in radians
+    integer                          :: vcoord
+!!!!!!!!!!!!!!! Temporary until physgrid branch is integrated !!!!!!!!!!!!
+    logical, parameter :: ldry_mass_vertical_coordinates = .false.
+!!!!!!!!!!!!!!! Temporary until physgrid branch is integrated !!!!!!!!!!!!
 
-   fh_ini  => initial_file_get_id()
-   fh_topo => topo_file_get_id()
 
-   if(iam < par%nprocs) then
+    character(len=*), parameter :: subname='READ_INIDAT'
+
+    fh_ini  => initial_file_get_id()
+    fh_topo => topo_file_get_id()
+
+    if(iam < par%nprocs) then
       elem=> dyn_in%elem
-   else
+    else
       nullify(elem)
-   end if
+    end if
 
-   lsize = cam_grid_get_local_size(dyn_decomp)	
+    lsize = cam_grid_get_local_size(dyn_decomp)	
 
-   if (lsize /= (np*np*nelemd)) then
-     call endrun(trim(subname)//': mismatch in local input array size')
-   end if
-   allocate(tmp(npsq,nlev,nelemd))
-   tmp = 0.0_r8
+    if (lsize /= (np*np*nelemd)) then
+      call endrun(trim(subname)//': mismatch in local input array size')
+    end if
 
-   if (iam < par%nprocs) then
-     if(elem(1)%idxP%NumUniquePts <=0 .or. elem(1)%idxP%NumUniquePts > np*np) then
+    if (iam < par%nprocs) then
+      if(elem(1)%idxP%NumUniquePts <=0 .or. elem(1)%idxP%NumUniquePts > np*np) then
         write(iulog,*)  elem(1)%idxP%NumUniquePts
         call endrun(trim(subname)//': invalid idxP%NumUniquePts')
-     end if
-   end if
-
-   fieldname = 'U'
-   tmp = 0.0_r8
-   call infld(fieldname, fh_ini, 'ncol', 'lev', 1, npsq,          &
-        1, nlev, 1, nelemd, tmp, found, gridname='GLL')
-   if(.not. found) then
-      call endrun('Could not find U field on input datafile')
-   end if
-   
-   do ie=1,nelemd
-      elem(ie)%state%v=0.0_r8
-      indx = 1
-      do j = 1, np
-         do i = 1, np
-            elem(ie)%state%v(i,j,1,:,1) = tmp(indx,:,ie)
-            indx = indx + 1
-         end do
-      end do
-   end do
-
-   fieldname = 'V'
-   tmp = 0.0_r8
-   call infld(fieldname, fh_ini, 'ncol', 'lev', 1, npsq,          &
-        1, nlev, 1, nelemd, tmp, found, gridname='GLL')
-   if(.not. found) then
-      call endrun('Could not find V field on input datafile')
-   end if
-
-   do ie=1,nelemd
-      indx = 1
-      do j = 1, np
-         do i = 1, np
-            elem(ie)%state%v(i,j,2,:,1) = tmp(indx,:,ie)
-            indx = indx + 1
-         end do
-      end do
-   end do
-
-   fieldname = 'T'
-   tmp = 0.0_r8
-   call infld(fieldname, fh_ini, 'ncol', 'lev', 1, npsq,          &
-        1, nlev, 1, nelemd, tmp, found, gridname='GLL')
-   if(.not. found) then
-      call endrun('Could not find T field on input datafile')
-   end if
-
-   do ie=1,nelemd
-      elem(ie)%state%T=0.0_r8
-      indx = 1
-      do j = 1, np
-         do i = 1, np
-            elem(ie)%state%T(i,j,:,1) = tmp(indx,:,ie)
-            indx = indx + 1
-         end do
-      end do
-   end do
-
-   if (pertlim .ne. D0_0) then
-     if(masterproc) then
-       write(iulog,*) trim(subname), ': Adding random perturbation bounded', &
-                      'by +/- ', pertlim, ' to initial temperature field'
-     end if
-
-     call random_seed(size=rndm_seed_sz)
-     allocate(rndm_seed(rndm_seed_sz))
-
-     do ie=1,nelemd
-       ! seed random number generator based on element ID
-       ! (possibly include a flag to allow clock-based random seeding)
-       rndm_seed = elem(ie)%GlobalId
-       call random_seed(put=rndm_seed)
-       do i=1,np
-         do j=1,np
-           do k=1,nlev
-             call random_number(pertval)
-             pertval = D2_0*pertlim*(D0_5 - pertval)
-             elem(ie)%state%T(i,j,k,1) = elem(ie)%state%T(i,j,k,1)*(D1_0 + pertval)
-           end do
-         end do
-       end do
-     end do
-
-     deallocate(rndm_seed)
-   end if
-
-   if (associated(ldof)) then
-      call endrun(trim(subname)//': ldof should not be associated')
-   end if
-   call cam_grid_get_gcid(dyn_decomp, ldof)
-   if (associated(mask)) then
-      call endrun(trim(subname)//': mask should not be associated')
-   end if
-   !! The mask is to indicate which tracer values should be initialized
-   allocate(mask(size(ldof)))
-   mask = ldof /= 0
-   deallocate(ldof)
-   nullify(ldof)
-   allocate(lat(size(pelat_deg)))
-   allocate(lon(size(pelon_deg)))
-   lat(:) = pelat_deg(:) * deg2rad
-   lon(:) = pelon_deg(:) * deg2rad
-
-   do m_cnst = 1, pcnst
-
-      found = .false.
-
-      if(cnst_read_iv(m_cnst)) then
-         tmp = 0.0_r8
-         call infld(cnst_name(m_cnst), fh_ini, 'ncol', 'lev',      &
-              1, npsq, 1, nlev, 1, nelemd, tmp, found, gridname='GLL')
       end if
+    end if
 
+    allocate(phis_tmp(npsq,nelemd))
+    if (associated(ldof)) then
+      call endrun(trim(subname)//': ldof should not be associated')
+    end if
+    call cam_grid_get_gcid(dyn_decomp, ldof)
+    if (associated(mask)) then
+      call endrun(trim(subname)//': mask should not be associated')
+    end if
+    !! The mask is to indicate which tracer values should be initialized
+    allocate(mask(size(ldof)))
+    mask = (ldof /= 0)
+    deallocate(ldof)
+    nullify(ldof)
+    ! We need coordinates for to initialize some variables
+    grid_id = cam_grid_id('GLL')
+    latdegp => cam_grid_get_latvals(grid_id)
+    allocate(latvals(size(latdegp)))
+    latvals(:) = latdegp(:) * deg2rad
+    londegp => cam_grid_get_lonvals(grid_id)
+    allocate(lonvals(size(londegp)))
+    lonvals(:) = londegp(:) * deg2rad
+
+    if (analytic_ic_active()) then
+      if (ldry_mass_vertical_coordinates) then
+        vcoord = vc_dry_pressure
+      else
+        vcoord = vc_moist_pressure
+      end if
+      allocate(glob_ind(npsq * nelemd))
+      j = 1
+      do ie = 1, nelemd
+        do i = 1, npsq
+          ! Create a global(ish) column index
+          glob_ind(j) = elem(ie)%GlobalId
+          j = j + 1
+        end do
+      end do
+
+      allocate(m_ind(pcnst))
+      do m_cnst = 1, pcnst
+        m_ind(m_cnst) = m_cnst
+      end do
+
+      ! First, initialize all the variables, then assign
+      allocate(dbuf4(npsq, nlev, nelemd, (pcnst + 4)))
+      dbuf4 = 0.0_r8
+      call analytic_ic_set_ic(vcoord, latvals, lonvals, glob_ind,              &
+           PS=dbuf4(:,1,:,(pcnst+1)), PHIS=phis_tmp, U=dbuf4(:,:,:,(pcnst+2)), &
+           V=dbuf4(:,:,:,(pcnst+3)), T=dbuf4(:,:,:,(pcnst+4)),                 &
+           Q=dbuf4(:,:,:,1:pcnst), m_cnst=m_ind, mask=mask(:))
+      do ie=1,nelemd
+        elem(ie)%state%ps_v = 0.0_r8
+        elem(ie)%state%v    = 0.0_r8
+        elem(ie)%state%T    = 0.0_r8
+        indx = 1
+        do j = 1, np
+          do i = 1, np
+            ! PS
+            elem(ie)%state%ps_v(i,j,1) = dbuf4(indx, 1, ie, (pcnst+1))
+            ! PHIS is done assigned later
+            ! U
+            elem(ie)%state%v(i,j,1,:,1) = dbuf4(indx, :, ie, (pcnst+2))
+            ! V
+            elem(ie)%state%v(i,j,2,:,1) = dbuf4(indx, :, ie, (pcnst+3))
+            ! T
+            elem(ie)%state%T(i,j,:,1) = dbuf4(indx, :, ie, (pcnst+4))
+            indx = indx + 1
+          end do
+        end do
+      end do
+      !
+      ! tracers
+      !
+      do m_cnst = 1, pcnst
+        do ie = 1, nelemd
+          elem(ie)%state%Q(:,:,:,m_cnst) = 0.0_r8
+          indx = 1
+          do j = 1, np
+            do i = 1, np
+              elem(ie)%state%Q(i, j, :, m_cnst) = dbuf4(indx, :, ie, m_cnst)
+              indx = indx + 1
+            end do
+          end do
+        end do
+      end do
+      deallocate(dbuf4)
+      deallocate(m_ind)
+    else
+      allocate(tmp(npsq,nlev,nelemd))
+
+      fieldname = 'U'
+      tmp = 0.0_r8
+      call infld(fieldname, fh_ini, 'ncol', 'lev', 1, npsq,          &
+           1, nlev, 1, nelemd, tmp, found, gridname='GLL')
       if(.not. found) then
-        call cnst_init_default(m_cnst, lat, lon, tmp, mask)
+        call endrun('Could not find U field on input datafile')
       end if
 
       do ie=1,nelemd
-         indx = 1
-         do j = 1, np
-            do i = 1, np
-               if (mask(indx+((ie-1)*npsq))) then
-                  elem(ie)%state%Q(i,j,:,m_cnst) = max(tmp(indx,:,ie), qmin(m_cnst))
-                else
-                  elem(ie)%state%Q(i,j,:,m_cnst) = 0.0_r8
-               end if
-               indx = indx + 1
-            end do
-         end do
+        elem(ie)%state%v=0.0_r8
+        indx = 1
+        do j = 1, np
+          do i = 1, np
+            elem(ie)%state%v(i,j,1,:,1) = tmp(indx,:,ie)
+            indx = indx + 1
+          end do
+        end do
       end do
-    end do
-    deallocate(lat)
-    deallocate(lon)
 
-   fieldname = 'PS'
-   tmp(:,1,:) = 0.0_r8
-   call infld(fieldname, fh_ini, 'ncol',      &
-        1, npsq, 1, nelemd, tmp(:,1,:), found, gridname='GLL')
-   if(.not. found) then
-      call endrun('Could not find PS field on input datafile')
-   end if
+      fieldname = 'V'
+      tmp = 0.0_r8
+      call infld(fieldname, fh_ini, 'ncol', 'lev', 1, npsq,          &
+           1, nlev, 1, nelemd, tmp, found, gridname='GLL')
+      if(.not. found) then
+        call endrun('Could not find V field on input datafile')
+      end if
 
-   ! Check read-in data to make sure it is in the appropriate units
-   if(minval(tmp(:,1,:), mask=reshape(mask, (/npsq,nelemd/))) < 10000._r8) then
-      call endrun('Problem reading ps field')
-   end if
+      do ie=1,nelemd
+        indx = 1
+        do j = 1, np
+          do i = 1, np
+            elem(ie)%state%v(i,j,2,:,1) = tmp(indx,:,ie)
+            indx = indx + 1
+          end do
+        end do
+      end do
 
-   do ie=1,nelemd
-      elem(ie)%state%ps_v=0.0_r8
-         indx = 1
-         do j = 1, np
-            do i = 1, np
-               elem(ie)%state%ps_v(i,j,1) = tmp(indx,1,ie)
-               indx = indx + 1
+      fieldname = 'T'
+      tmp = 0.0_r8
+      call infld(fieldname, fh_ini, 'ncol', 'lev', 1, npsq,          &
+           1, nlev, 1, nelemd, tmp, found, gridname='GLL')
+      if(.not. found) then
+        call endrun('Could not find T field on input datafile')
+      end if
+
+      do ie=1,nelemd
+        elem(ie)%state%T=0.0_r8
+        indx = 1
+        do j = 1, np
+          do i = 1, np
+            elem(ie)%state%T(i,j,:,1) = tmp(indx,:,ie)
+            indx = indx + 1
+          end do
+        end do
+      end do
+
+      if (pertlim /= 0.0_r8) then
+        if(masterproc) then
+          write(iulog,*) trim(subname), ': Adding random perturbation bounded',&
+               'by +/- ', pertlim, ' to initial temperature field'
+        end if
+
+        call random_seed(size=rndm_seed_sz)
+        allocate(rndm_seed(rndm_seed_sz))
+
+        do ie=1,nelemd
+          ! seed random number generator based on element ID
+          ! (possibly include a flag to allow clock-based random seeding)
+          rndm_seed = elem(ie)%GlobalId
+          call random_seed(put=rndm_seed)
+          do i=1,np
+            do j=1,np
+              do k=1,nlev
+                call random_number(pertval)
+                pertval = D2_0*pertlim*(D0_5 - pertval)
+                elem(ie)%state%T(i,j,k,1) = elem(ie)%state%T(i,j,k,1)*(D1_0 + pertval)
+              end do
             end do
-         end do
-   end do
+          end do
+        end do
 
-   if (ideal_phys .or. aqua_planet .or. .not. associated(fh_topo)) then
-      tmp(:,:,:) = 0._r8
-   else    
-      fieldname = 'PHIS'
+        deallocate(rndm_seed)
+      end if
+
+      do m_cnst = 1, pcnst
+
+        found = .false.
+
+        if(cnst_read_iv(m_cnst)) then
+          tmp = 0.0_r8
+          call infld(cnst_name(m_cnst), fh_ini, 'ncol', 'lev',      &
+               1, npsq, 1, nlev, 1, nelemd, tmp, found, gridname='GLL')
+        end if
+
+        if(.not. found) then
+          call cnst_init_default(m_cnst, latvals, lonvals, tmp, mask)
+        end if
+
+        do ie=1,nelemd
+          indx = 1
+          do j = 1, np
+            do i = 1, np
+              if (mask(indx+((ie-1)*npsq))) then
+                if (analytic_ic_active()) then
+                  ! Don't reset analytic IC tracer values
+                  elem(ie)%state%Q(i,j,:,m_cnst) = tmp(indx,:,ie)
+                else
+                  elem(ie)%state%Q(i,j,:,m_cnst) = max(tmp(indx,:,ie), qmin(m_cnst))
+                end if
+              else
+                elem(ie)%state%Q(i,j,:,m_cnst) = 0.0_r8
+              end if
+              indx = indx + 1
+            end do
+          end do
+        end do
+      end do
+
+      fieldname = 'PS'
       tmp(:,1,:) = 0.0_r8
-      call infld(fieldname, fh_topo, 'ncol',      &
+      call infld(fieldname, fh_ini, 'ncol',      &
            1, npsq, 1, nelemd, tmp(:,1,:), found, gridname='GLL')
       if(.not. found) then
-         call endrun('Could not find PHIS field on input datafile')
+        call endrun('Could not find PS field on input datafile')
       end if
-   end if
 
-   do ie=1,nelemd
-      elem(ie)%state%phis=0.0_r8
+      ! Check read-in data to make sure it is in the appropriate units
+      if(minval(tmp(:,1,:), mask=reshape(mask, (/npsq,nelemd/))) < 10000._r8) then
+        call endrun('Problem reading ps field')
+      end if
+
+      do ie=1,nelemd
+        elem(ie)%state%ps_v=0.0_r8
+        indx = 1
+        do j = 1, np
+          do i = 1, np
+            elem(ie)%state%ps_v(i,j,1) = tmp(indx,1,ie)
+            indx = indx + 1
+          end do
+        end do
+      end do
+
+      if (associated(fh_topo)) then
+        fieldname = 'PHIS'
+        phis_tmp(:,:) = 0.0_r8
+        call infld(fieldname, fh_topo, 'ncol',      &
+             1, npsq, 1, nelemd, phis_tmp(:,:), found, gridname='GLL')
+        if(.not. found) then
+          call endrun('Could not find PHIS field on input datafile')
+        end if
+      else if (.not. analytic_ic_active()) then
+        phis_tmp(:,:) = 0._r8
+      end if
+
+      deallocate(tmp)
+    end if ! analytic_ic_active
+    deallocate(latvals)
+    deallocate(lonvals)
+
+    do ie = 1, nelemd
+      elem(ie)%state%phis = 0.0_r8
       indx = 1
       do j = 1, np
-         do i = 1, np
-            elem(ie)%state%phis(i,j) = tmp(indx,1,ie)
-            indx = indx + 1
-         end do
+        do i = 1, np
+          elem(ie)%state%phis(i,j) = phis_tmp(indx,ie)
+          indx = indx + 1
+        end do
       end do
-   end do
-   
-   ! once we've read all the fields we do a boundary exchange to 
-   ! update the redundent columns in the dynamics
-   if(iam < par%nprocs) then
+    end do
+    deallocate(phis_tmp)
+
+    ! once we've read all the fields we do a boundary exchange to 
+    ! update the redundent columns in the dynamics
+    if(iam < par%nprocs) then
       call initEdgeBuffer(par, edge, (3+pcnst)*nlev+2)
-   end if
-   do ie=1,nelemd
+    end if
+    do ie=1,nelemd
       kptr=0
       call edgeVpack(edge, elem(ie)%state%ps_v(:,:,1),1,kptr,elem(ie)%desc)
       kptr=kptr+1
@@ -918,11 +1017,11 @@ subroutine read_inidat(dyn_in)
       call edgeVpack(edge, elem(ie)%state%T(:,:,:,1),nlev,kptr,elem(ie)%desc)
       kptr=kptr+nlev
       call edgeVpack(edge, elem(ie)%state%Q(:,:,:,:),nlev*pcnst,kptr,elem(ie)%desc)
-   end do
-   if(iam < par%nprocs) then
+    end do
+    if(iam < par%nprocs) then
       call bndry_exchangeV(par,edge)
-   end if
-   do ie=1,nelemd
+    end if
+    do ie=1,nelemd
       kptr=0
       call edgeVunpack(edge, elem(ie)%state%ps_v(:,:,1),1,kptr,elem(ie)%desc)
       kptr=kptr+1
@@ -933,40 +1032,41 @@ subroutine read_inidat(dyn_in)
       call edgeVunpack(edge, elem(ie)%state%T(:,:,:,1),nlev,kptr,elem(ie)%desc)
       kptr=kptr+nlev
       call edgeVunpack(edge, elem(ie)%state%Q(:,:,:,:),nlev*pcnst,kptr,elem(ie)%desc)
-   end do
+    end do
 
-!$omp parallel do private(ie, t, m_cnst)
-   do ie=1,nelemd
+    !$omp parallel do private(ie, t, m_cnst)
+    do ie=1,nelemd
       do t=2,3
-         elem(ie)%state%ps_v(:,:,t)=elem(ie)%state%ps_v(:,:,1)
-         elem(ie)%state%v(:,:,:,:,t)=elem(ie)%state%v(:,:,:,:,1)
-         elem(ie)%state%T(:,:,:,t)=elem(ie)%state%T(:,:,:,1)
+        elem(ie)%state%ps_v(:,:,t)=elem(ie)%state%ps_v(:,:,1)
+        elem(ie)%state%v(:,:,:,:,t)=elem(ie)%state%v(:,:,:,:,1)
+        elem(ie)%state%T(:,:,:,t)=elem(ie)%state%T(:,:,:,1)
       end do
       call shr_vmath_log(elem(ie)%state%ps_v,elem(ie)%state%lnps,size(elem(ie)%state%lnps))
-   end do
+    end do
 
-   if(iam < par%nprocs) then
+    if(iam < par%nprocs) then
       call FreeEdgeBuffer(edge)
-   end if
+    end if
 
-   !
-   ! This subroutine is used to create nc_topo files, if requested
-   ! 
+    !
+    ! This subroutine is used to create nc_topo files, if requested
+    ! 
 
-   call nctopo_util_inidat(fh_topo, elem)
+    if (associated(fh_topo)) then
+      call nctopo_util_inidat(fh_topo, elem)
+    end if
 
-   ! Cleanup
-   deallocate(tmp)
-   if (associated(ldof)) then
-     deallocate(ldof)
-     nullify(ldof)
-   end if
-   if (associated(mask)) then
-     deallocate(mask)
-     nullify(mask)
-   end if
+    ! Cleanup
+    if (associated(ldof)) then
+      deallocate(ldof)
+      nullify(ldof)
+    end if
+    if (associated(mask)) then
+      deallocate(mask)
+      nullify(mask)
+    end if
 
-end subroutine read_inidat
+  end subroutine read_inidat
 
 !=============================================================================================
 

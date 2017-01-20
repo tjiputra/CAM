@@ -9,7 +9,7 @@
                      nx,      u,       v,      pt,      tracer,          &
                      hs,      cp,      akap,   kord,    peln,            &
                      te0,     te,      dz,     mfx,     mfy,             &
-                     te_method )
+                     te_method, am_correction)
 !
 ! !USES:
 
@@ -41,9 +41,10 @@
    real(r8) hs(grid%ifirstxy:grid%ilastxy,grid%jfirstxy:grid%jlastxy) ! surface geopotential
    real(r8) cp
    real(r8) te0
-   integer, intent(in)          ::  te_method   ! Method for vertical total energy remapping
-                                                !     0          :  piecewise-parabolic
-                                                !     1          :  cubic interpolation
+   integer, intent(in)  ::  te_method     ! Method for vertical total energy remapping
+                                          !     0          :  piecewise-parabolic
+                                          !     1          :  cubic interpolation
+   logical, intent(in)  ::  am_correction ! logical switch for AM correction
  
 ! !INPUT/OUTPUT PARAMETERS:
    real(r8) pk(grid%ifirstxy:grid%ilastxy,grid%jfirstxy:grid%jlastxy,grid%km+1) ! pe to the kappa
@@ -170,6 +171,10 @@
 ! z
       real(r8) pe1w(grid%km+1)
       real(r8) pe2w(grid%km+1)
+
+      ! AM correction
+      ! variable for zonal momentum
+      real(r8) :: dum(grid%ifirstxy:grid%ilastxy,grid%jfirstxy:grid%jlastxy)
 
       integer i1w, nxu
       integer i, j, k, js2g0, jn2g0, jn1g1
@@ -595,45 +600,113 @@
 
         if(j /= 1) then
 
-! WS 99.07.29 : protect j==jfirst case
-          if (j > jfirst) then
-            do k=2,km+1
-              do i=i1,i2
-                pe0(i,k) = D0_5*(pe1(i,k)+pe(i,k,j-1))
-              enddo
-            enddo
+           if (am_correction) then
 
-            do k=grid%ks+2,km+1
-              bkh = D0_5*grid%bk(k)
-              do i=i1,i2
-                pe3(i,k) = grid%ak(k) + bkh*(pe1(i,km+1)+pe(i,km+1,j-1))
-              enddo
-            enddo
+              ! WS 99.07.29 : protect j==jfirst case
+              if (j > jfirst) then
+                 do k=2,km+1
+                    do i=i1,i2
+                       ! extensive integral weight -> use cosines
+                       pe0(i,k) = (pe1(i,k)*grid%cosp(j) + pe(i,k,j-1)*grid%cosp(j-1)) &
+                            / (grid%cosp(j) + grid%cosp(j-1))
+                    enddo
+                 enddo
+                 do k=grid%ks+2,km+1
+                    bkh = D0_5*grid%bk(k)
+                    do i=i1,i2
+                       pe3(i,k) = grid%ak(k) + grid%bk(k)*(pe1(i,km+1)*grid%cosp(j) + &
+                            pe(i,km+1,j-1)*grid%cosp(j-1)) / &
+                            (grid%cosp(j) + grid%cosp(j-1))
+                    enddo
+                 enddo
 
 #if defined( SPMD )
-          else
-!  WS 99.10.01 : Read in pe(:,:,jfirst-1) from the pesouth buffer
-            do k=2,km+1
-              do i=i1,i2
-                pe0(i,k) = D0_5*(pe1(i,k)+pesouth(i,k))
-              enddo
-            enddo
-
-            do k=grid%ks+2,km+1
-              bkh = D0_5*grid%bk(k)
-              do i=i1,i2
-                pe3(i,k) = grid%ak(k) + bkh*(pe1(i,km+1)+pesouth(i,km+1))
-              enddo
-            enddo
+              else
+                 !  WS 99.10.01 : Read in pe(:,:,jfirst-1) from the pesouth buffer
+                 do k=2,km+1
+                    do i=i1,i2
+                       pe0(i,k) = (pe1(i,k)*grid%cosp(j) + pesouth(i,k)*grid%cosp(j-1)) &
+                            / (grid%cosp(j) + grid%cosp(j-1))
+                    enddo
+                 enddo
+                 do k=grid%ks+2,km+1
+                    bkh = D0_5*grid%bk(k)
+                    do i=i1,i2
+                       pe3(i,k) = grid%ak(k) + grid%bk(k)*(pe1(i,km+1)*grid%cosp(j) + &
+                            pesouth(i,km+1)*grid%cosp(j-1)) / &
+                            (grid%cosp(j) + grid%cosp(j-1))
+                    enddo
+                 enddo
 #endif
-          endif
+              endif  ! (j > jfirst)
 
+              ! total zonal momentum
+              do i=i1,i2
+                 dum(i,j)=0._r8
+              enddo
+              do k=1,km
+                 do i=i1,i2
+                    dum(i,j)=dum(i,j)-u(i,j,k)*(pe0(i,k+1)-pe0(i,k))
+                 enddo
+              enddo
+
+           else  ! not am_correction
+
+              ! WS 99.07.29 : protect j==jfirst case
+              if (j > jfirst) then
+                 do k=2,km+1
+                    do i=i1,i2
+                       pe0(i,k) = D0_5*(pe1(i,k)+pe(i,k,j-1))
+                    enddo
+                 enddo
+                 do k=grid%ks+2,km+1
+                    bkh = D0_5*grid%bk(k)
+                    do i=i1,i2
+                       pe3(i,k) = grid%ak(k) + bkh*(pe1(i,km+1)+pe(i,km+1,j-1))
+                    enddo
+                 enddo
+#if defined( SPMD )
+              else
+                 !  WS 99.10.01 : Read in pe(:,:,jfirst-1) from the pesouth buffer
+                 do k=2,km+1
+                    do i=i1,i2
+                       pe0(i,k) = D0_5*(pe1(i,k)+pesouth(i,k))
+                    enddo
+                 enddo
+                 do k=grid%ks+2,km+1
+                    bkh = D0_5*grid%bk(k)
+                    do i=i1,i2
+                       pe3(i,k) = grid%ak(k) + bkh*(pe1(i,km+1)+pesouth(i,km+1))
+                    enddo
+                 enddo
+#endif
+              endif  ! (j > jfirst)
+
+           endif ! (am_correction)
+
+!-------------------------------
 
 ! ReMap U-Wind (D-Grid Location)
 ! ------------------------------
           call map1_ppm ( km,   pe0,    u,    km,   pe3,    u,            &
                           0,    0,   itot, i1-ifirst+1, i2-ifirst+1,      &
                           j,    jfirst, jlast,  -1,    kord)
+
+          ! compute zonal momentum difference due to remapping
+          if (am_correction) then
+             do k=1,km
+                do i=i1,i2
+                   dum(i,j)=dum(i,j)+u(i,j,k)*(pe3(i,k+1)-pe3(i,k))
+                enddo
+             enddo
+
+             ! correct zonal wind to preserve momentum
+             do k=1,km
+                do i=i1,i2
+                   u(i,j,k)=u(i,j,k)-dum(i,j)/(pe3(i,km+1)-pe3(i,1))
+                enddo
+             enddo
+          endif
 
 
 ! ReMap Y-Mass Flux (C-Grid Location)

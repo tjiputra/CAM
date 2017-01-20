@@ -77,6 +77,8 @@
   real(r8), parameter :: horomin = 10._r8                ! Min value of subgrid orographic height for mountain stress
   real(r8), parameter :: dv2min  = 0.01_r8               ! Minimum shear squared
 
+  logical :: am_correction ! logical switch for AM correction 
+
   contains
 
   ! =============================================================================== !
@@ -84,7 +86,7 @@
   ! =============================================================================== !
 
   subroutine init_vdiff( kind, iulog_in, rair_in, cpair_in, gravit_in, do_iss_in, &
-                         errstring )
+                         am_correction_in, errstring )
 
     integer,              intent(in)  :: kind            ! Kind used for reals
     integer,              intent(in)  :: iulog_in        ! Unit number for log output.
@@ -92,6 +94,7 @@
     real(r8),             intent(in)  :: cpair_in        ! Input heat capacity for dry air
     real(r8),             intent(in)  :: gravit_in       ! Input gravitational acceleration
     logical,              intent(in)  :: do_iss_in       ! Input ISS flag
+    logical,              intent(in)  :: am_correction_in! for angular momentum conservation
     character(128),       intent(out) :: errstring       ! Output status
     
     errstring = ''
@@ -106,6 +109,7 @@
     cpair  = cpair_in
     gravit = gravit_in
     do_iss = do_iss_in
+    am_correction = am_correction_in
 
   end subroutine init_vdiff
 
@@ -497,7 +501,13 @@
          ! Add residual stress of previous time step explicitly into the lowest
          ! model layer with a relaxation time scale of 'timeres'.
 
-           ramda         = ztodt / timeres
+           if (am_correction) then
+              ! preserve time-mean torque 
+              ramda         = 1._r8
+           else
+              ramda         = ztodt / timeres
+           endif
+
            u(:ncol,pver) = u(:ncol,pver) + tmp1(:ncol)*tauresx(:ncol)*ramda
            v(:ncol,pver) = v(:ncol,pver) + tmp1(:ncol)*tauresy(:ncol)*ramda
 

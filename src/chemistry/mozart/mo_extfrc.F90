@@ -89,7 +89,8 @@ contains
     character(len=1), parameter :: filelist = ''
     character(len=1), parameter :: datapath = ''
     logical         , parameter :: rmv_file = .false.
-    logical  :: history_aerosol      ! Output the MAM aerosol tendencies
+    logical  :: history_aerosol
+    logical  :: history_chemistry
 
     character(len=32) :: extfrc_type = ' '
     character(len=80) :: file_interp_type = ' '
@@ -99,7 +100,7 @@ contains
 
     !-----------------------------------------------------------------------
  
-    call phys_getopts( history_aerosol_out = history_aerosol   )
+    call phys_getopts( history_aerosol_out = history_aerosol, history_chemistry_out = history_chemistry )
 
     !-----------------------------------------------------------------------
     ! 	... species has insitu forcing ?
@@ -182,8 +183,7 @@ contains
                'external forcing for '//trim(spc_name) )
           call addfld( trim(spc_name)//'_CLXF', horiz_only,  'A',  'molec/cm2/s', &
                'vertically intergrated external forcing for '//trim(spc_name) )
-          if ( history_aerosol ) then 
-             call add_default( trim(spc_name)//'_XFRC', 1, ' ' )
+          if ( history_aerosol .or. history_chemistry ) then 
              call add_default( trim(spc_name)//'_CLXF', 1, ' ' )
           endif
        endif
@@ -354,10 +354,8 @@ contains
        n = forcings(m)%frc_ndx
 
        do isec = 1,forcings(m)%nsectors
-          frcing(:ncol,:,n) = frcing(:ncol,:,n) + forcings(m)%fields(isec)%data(:ncol,:,lchnk)
+          frcing(:ncol,:,n) = frcing(:ncol,:,n) + forcings(m)%scalefactor*forcings(m)%fields(isec)%data(:ncol,:,lchnk)
        enddo
-
-       frcing(:ncol,:,n) = forcings(m)%scalefactor*frcing(:ncol,:,n)
 
     enddo file_loop
 

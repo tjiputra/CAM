@@ -23,7 +23,8 @@ SYNOPSIS
 
 ENVIROMENT VARIABLES
 
-	CAM_TESTDIR - Directory that contains the finished results you wish to archive.
+	CESM_TESTDIR - Directory that contains the CESM finished results you wish to archive.
+	CAM_TESTDIR - Directory that contains the CAM finished results you wish to archive.
 	CAM_FC      - Compiler used, only used on hobart (PGI,NAG), where the compiler
                       name is appended to the archive directory.
 
@@ -93,10 +94,23 @@ case $hostname in
     if [ -z "$CAM_FC" ]; then
       CAM_FC="INTEL"
     fi
+    if [ -z "$CESM_TESTDIR" ]; then
+      echo "ERROR: please set CESM_TESTDIR (test-root in the create_test)"
+      echo
+      exit 1
+    fi
     test_file_list="tests_pretag_yellowstone"
     baselinedir="/glade/p/cesm/cseg/models/atm/cam/pretag_bl/$1"
   ;;
   * ) echo "ERROR: machine $hostname not currently supported"; exit 1 ;;
+esac
+
+echo " "
+echo "CESM Archiving to /glade/p/cesmdata/cseg/ccsm_baselines/$1"
+echo " "
+case $hostname in
+  ys*)
+    ../../../../cime/scripts/Tools/bless_test_results  -t '' -c '' --hist-only  -r $CESM_TESTDIR -b $1 -f -s
 esac
 
 echo
@@ -146,4 +160,5 @@ while read input_line; do
        fi
 
   done
+
 done < ${test_file_list}

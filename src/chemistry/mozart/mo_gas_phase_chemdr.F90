@@ -66,12 +66,10 @@ contains
 
     character(len=3) :: string
     integer          :: n, m, err
-    logical          :: history_aerosol      ! Output the MAM aerosol tendencies
 
     !-----------------------------------------------------------------------
 
-    call phys_getopts( history_aerosol_out = history_aerosol, &
-                       convproc_do_aer_out = convproc_do_aer )
+    call phys_getopts( convproc_do_aer_out = convproc_do_aer )
    
     ndx_h2so4 = get_spc_ndx('H2SO4')
 !

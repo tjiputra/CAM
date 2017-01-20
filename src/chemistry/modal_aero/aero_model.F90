@@ -202,6 +202,7 @@ contains
     character(len=20) :: dummy
 
     logical  :: history_aerosol ! Output MAM or SECT aerosol tendencies
+    logical  :: history_chemistry
 
     integer :: l
     character(len=6) :: test_name
@@ -227,6 +228,7 @@ contains
     sulfeq_idx      = pbuf_get_index('MAMH2SO4EQ',errcode)
     
     call phys_getopts(history_aerosol_out = history_aerosol, &
+                      history_chemistry_out=history_chemistry, &
                       convproc_do_aer_out = convproc_do_aer)
     
     call rad_cnst_get_info(0, nmodes=nmodes)
@@ -322,7 +324,7 @@ contains
        do m = 1, dust_nbin+dust_nnum
           dummy = trim(dust_names(m)) // 'SF'
           call addfld (dummy,horiz_only, 'A','kg/m2/s',trim(dust_names(m))//' dust surface emission')
-          if (history_aerosol) then
+          if (history_aerosol.or.history_chemistry) then
              call add_default (dummy, 1, ' ')
           endif
        enddo
@@ -352,7 +354,7 @@ contains
        do m = 1, seasalt_nbin
           dummy = trim(seasalt_names(m)) // 'SF'
           call addfld (dummy,horiz_only, 'A','kg/m2/s',trim(seasalt_names(m))//' seasalt surface emission')
-          if (history_aerosol) then
+          if (history_aerosol.or.history_chemistry) then
              call add_default (dummy, 1, ' ')
           endif
        enddo
@@ -401,8 +403,10 @@ contains
        call addfld (trim(drydep_list(m))//'DDV', (/ 'lev' /), 'A','m/s',                   &
             trim(drydep_list(m))//' deposition velocity')
 
-       if ( history_aerosol ) then 
+       if ( history_aerosol.or.history_chemistry ) then 
           call add_default (trim(drydep_list(m))//'DDF', 1, ' ')
+       endif
+       if ( history_aerosol ) then 
           call add_default (trim(drydep_list(m))//'TBF', 1, ' ')
           call add_default (trim(drydep_list(m))//'GVF', 1, ' ')
        endif
@@ -446,8 +450,10 @@ contains
        call addfld (trim(wetdep_list(m))//'SBS',(/ 'lev' /), 'A',unit_basename//'/kg/s ', &
             trim(wetdep_list(m))//' bs wet deposition')
        
-       if ( history_aerosol ) then          
+       if ( history_aerosol .or. history_chemistry ) then          
           call add_default (trim(wetdep_list(m))//'SFWET', 1, ' ')
+       endif
+       if ( history_aerosol ) then          
           call add_default (trim(wetdep_list(m))//'SFSIC', 1, ' ')
           call add_default (trim(wetdep_list(m))//'SFSIS', 1, ' ')
           call add_default (trim(wetdep_list(m))//'SFSBC', 1, ' ')
@@ -516,10 +522,12 @@ contains
           end if
 
 
-          if ( history_aerosol ) then 
+          if ( history_aerosol.or. history_chemistry ) then 
              call add_default( cnst_name_cw(n), 1, ' ' )
+             call add_default (trim(cnst_name_cw(n))//'SFWET', 1, ' ')
+          endif
+          if ( history_aerosol ) then
              call add_default (trim(cnst_name_cw(n))//'GVF', 1, ' ')
-             call add_default (trim(cnst_name_cw(n))//'SFWET', 1, ' ') 
              call add_default (trim(cnst_name_cw(n))//'TBF', 1, ' ')
              call add_default (trim(cnst_name_cw(n))//'DDF', 1, ' ')
              call add_default (trim(cnst_name_cw(n))//'SFSBS', 1, ' ')      

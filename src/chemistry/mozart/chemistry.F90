@@ -779,7 +779,8 @@ end function chem_is_active
     integer :: m                                ! tracer indicies
     character(len=fieldname_len) :: spc_name
     integer :: n, ii
-    logical :: history_aerosol 
+    logical :: history_aerosol
+    logical :: history_chemistry
     character(len=2)  :: unit_basename  ! Units 'kg' or '1' 
     logical :: history_budget                 ! output tendencies and state variables for CAM
                                               ! temperature, water vapor, cloud ice and cloud
@@ -788,6 +789,7 @@ end function chem_is_active
 
     call phys_getopts( cam_chempkg_out=chem_name, &
                        history_aerosol_out=history_aerosol , &
+                       history_chemistry_out=history_chemistry , &
                        history_budget_out = history_budget , &
                        history_budget_histfile_num_out = history_budget_histfile_num)
 
@@ -836,7 +838,7 @@ end function chem_is_active
           endif
 
           call addfld (sflxnam(n),horiz_only,    'A',  unit_basename//'/m2/s',trim(solsym(m))//' surface flux')
-          if ( history_aerosol ) then 
+          if ( history_aerosol .or. history_chemistry ) then 
              call add_default( sflxnam(n), 1, ' ' )
           endif
        
@@ -940,6 +942,10 @@ end function chem_is_active
            ! MEGAN  history fields
            call addfld( 'MEG_'//trim(shr_megan_mechcomps(n)%name),horiz_only,'A','kg/m2/sec',&
                 trim(shr_megan_mechcomps(n)%name)//' MEGAN emissions flux')
+           if (history_chemistry) then
+              call add_default('MEG_'//trim(shr_megan_mechcomps(n)%name), 1, ' ')
+           endif
+
         enddo
      endif
      
