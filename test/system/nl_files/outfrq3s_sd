@@ -6,4 +6,5 @@
  nhtfrq=3,3,3,3,3,3
  inithist='ENDOFRUN'
  pbuf_global_allocate=.false.
+ megan_factors_file = '$CSMDATA/atm/cam/chem/trop_mozart/emis/megan21_emis_factors_c20130304.nc'
  /

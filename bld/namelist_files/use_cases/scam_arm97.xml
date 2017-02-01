@@ -3,6 +3,8 @@
 
 <namelist_defaults>
 
+<co2vmr>368.9e-6</co2vmr>
+
 <ncdata             hgrid="64x128"    nlev="30"   scam="1"  >atm/cam/inic/gaus/cami_0000-09-01_64x128_L30_c031210.nc</ncdata>
 <iopfile dyn="eul"                                scam="1"  >atm/cam/scam/iop/ARM97_4scam.nc</iopfile>
 <scmlat                                           scam="1"  >   36.6     </scmlat>

@@ -155,13 +155,13 @@ contains
     !
     ! Arguments:
     !
-    real(r8),            intent(in)    :: dt              ! time step
-    type(physics_state), intent(in)    :: state           ! Physics state variables
-    type(physics_ptend), intent(out)   :: ptend           ! indivdual parameterization tendencies
+    real(r8),            intent(in)    :: dt          ! time step
+    type(physics_state), intent(in)    :: state       ! Physics state variables
+    type(physics_ptend), intent(out)   :: ptend       ! indivdual parameterization tendencies
     type(cam_in_t),      intent(inout) :: cam_in
     type(cam_out_t),     intent(in)    :: cam_out
-    real(r8),            intent(out)   :: fh2o(pcols)     ! h2o flux to balance source from chemistry
     type(physics_buffer_desc), pointer :: pbuf(:)
+    real(r8), optional,  intent(out)   :: fh2o(pcols) ! h2o flux to balance source from chemistry
     
     return
   end subroutine chem_timestep_tend

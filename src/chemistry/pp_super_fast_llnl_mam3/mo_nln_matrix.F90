@@ -1,46 +1,28 @@
-
-
-
-
-
       module mo_nln_matrix
-
       use shr_kind_mod, only : r8 => shr_kind_r8
-
       private
       public :: nlnmat
-
       contains
-
       subroutine nlnmat01( mat, y, rxt )
-
       use chem_mods, only : gas_pcnst, rxntot, nzcnt
-
       implicit none
-
 !----------------------------------------------
 ! ... dummy arguments
 !----------------------------------------------
       real(r8), intent(in) :: y(gas_pcnst)
       real(r8), intent(in) :: rxt(rxntot)
       real(r8), intent(inout) :: mat(nzcnt)
-
-
 !----------------------------------------------
 ! ... local variables
 !----------------------------------------------
-
 !----------------------------------------------
 ! ... complete matrix entries implicit species
 !----------------------------------------------
-
-
          mat(92) = -(rxt(7)*y(2) + rxt(8)*y(3) + rxt(12)*y(5) + rxt(28)*y(14))
          mat(61) = -rxt(7)*y(1)
          mat(69) = -rxt(8)*y(1)
          mat(84) = -rxt(12)*y(1)
          mat(34) = -rxt(28)*y(1)
-
          mat(57) = -(rxt(7)*y(1) + rxt(9)*y(3) + rxt(11)*y(4) + rxt(14)*y(6) + rxt(17) &
                       *y(9) + rxt(19)*y(11) + (rxt(24) + rxt(25)) * y(12) + rxt(26) &
                       *y(13) + rxt(27)*y(14))
@@ -53,18 +35,15 @@
          mat(24) = -(rxt(24) + rxt(25)) * y(2)
          mat(21) = -rxt(26)*y(2)
          mat(31) = -rxt(27)*y(2)
-
          mat(88) = mat(88) + rxt(8)*y(3)
          mat(65) = mat(65) + rxt(8)*y(1) + rxt(13)*y(5)
          mat(80) = rxt(13)*y(3)
-
          mat(66) = -(rxt(8)*y(1) + rxt(9)*y(2) + 4._r8*rxt(10)*y(3) + rxt(13)*y(5) &
                       + rxt(18)*y(10))
          mat(89) = -rxt(8)*y(3)
          mat(58) = -rxt(9)*y(3)
          mat(81) = -rxt(13)*y(3)
          mat(74) = -rxt(18)*y(3)
-
          mat(89) = mat(89) + rxt(7)*y(2) + .060_r8*rxt(28)*y(14)
          mat(58) = mat(58) + rxt(7)*y(1) + rxt(11)*y(4) + rxt(17)*y(9) &
                       + .500_r8*rxt(25)*y(12)
@@ -74,68 +53,49 @@
          mat(74) = mat(74) + rxt(21)*y(5) + 1.600_r8*rxt(22)*y(10)
          mat(25) = .500_r8*rxt(25)*y(2)
          mat(32) = .060_r8*rxt(28)*y(1)
-
          mat(26) = -(rxt(11)*y(2))
          mat(52) = -rxt(11)*y(4)
-
          mat(62) = 2.000_r8*rxt(10)*y(3)
-
          mat(83) = -(rxt(12)*y(1) + rxt(13)*y(3) + rxt(21)*y(10))
          mat(91) = -rxt(12)*y(5)
          mat(68) = -rxt(13)*y(5)
          mat(76) = -rxt(21)*y(5)
-
          mat(44) = -(rxt(14)*y(2))
          mat(56) = -rxt(14)*y(6)
-
          mat(87) = rxt(12)*y(5)
          mat(64) = rxt(13)*y(5)
          mat(79) = rxt(12)*y(1) + rxt(13)*y(3) + rxt(21)*y(10)
          mat(72) = rxt(21)*y(5)
-
-
          mat(48) = rxt(14)*y(6)
          mat(43) = rxt(14)*y(2)
-
          mat(35) = -(rxt(17)*y(2))
          mat(54) = -rxt(17)*y(9)
-
          mat(86) = .870_r8*rxt(28)*y(14)
          mat(54) = mat(54) + rxt(20)*y(11)
          mat(78) = rxt(21)*y(10)
          mat(70) = rxt(21)*y(5) + 4.000_r8*rxt(22)*y(10)
          mat(38) = rxt(20)*y(2)
          mat(30) = .870_r8*rxt(28)*y(1)
-
          mat(75) = -(rxt(18)*y(3) + rxt(21)*y(5) + 4._r8*rxt(22)*y(10))
          mat(67) = -rxt(18)*y(10)
          mat(82) = -rxt(21)*y(10)
-
          mat(90) = 1.860_r8*rxt(28)*y(14)
          mat(59) = rxt(19)*y(11)
          mat(42) = rxt(19)*y(2)
          mat(33) = 1.860_r8*rxt(28)*y(1)
-
          mat(39) = -((rxt(19) + rxt(20)) * y(2))
          mat(55) = -(rxt(19) + rxt(20)) * y(11)
-
          mat(63) = rxt(18)*y(10)
          mat(71) = rxt(18)*y(3)
-
          mat(23) = -((rxt(24) + rxt(25)) * y(2))
          mat(51) = -(rxt(24) + rxt(25)) * y(12)
-
          mat(20) = -(rxt(26)*y(2))
          mat(50) = -rxt(26)*y(13)
-
          mat(50) = mat(50) + (rxt(24)+.500_r8*rxt(25))*y(12)
          mat(22) = (rxt(24)+.500_r8*rxt(25))*y(2)
-
          mat(29) = -(rxt(27)*y(2) + rxt(28)*y(1))
          mat(53) = -rxt(27)*y(14)
          mat(85) = -rxt(28)*y(14)
-
-
          mat(49) = rxt(26)*y(13)
          mat(19) = rxt(26)*y(2)
       end subroutine nlnmat01

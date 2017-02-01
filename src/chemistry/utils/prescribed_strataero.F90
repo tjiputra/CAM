@@ -50,6 +50,7 @@ module prescribed_strataero
   integer            :: sad_ndx = -1
   integer            :: mmr_ndx = -1
 
+  logical            :: prescribed_strataero_use_chemtrop = .false.
 
 contains
 
@@ -86,7 +87,8 @@ subroutine prescribed_strataero_readnl(nlfile)
       prescribed_strataero_rmfile,    &
       prescribed_strataero_cycle_yr,  &
       prescribed_strataero_fixed_ymd, &
-      prescribed_strataero_fixed_tod      
+      prescribed_strataero_fixed_tod, &
+      prescribed_strataero_use_chemtrop
    !-----------------------------------------------------------------------------
 
    ! Initialize namelist variables from local module variables.
@@ -126,6 +128,7 @@ subroutine prescribed_strataero_readnl(nlfile)
    call mpibcast(prescribed_strataero_cycle_yr, 1, mpiint,  0, mpicom)
    call mpibcast(prescribed_strataero_fixed_ymd,1, mpiint,  0, mpicom)
    call mpibcast(prescribed_strataero_fixed_tod,1, mpiint,  0, mpicom)
+   call mpibcast(prescribed_strataero_use_chemtrop, 1, mpilog,  0, mpicom)
 #endif
 
    ! Update module variables with user settings.
@@ -213,8 +216,8 @@ end subroutine prescribed_strataero_readnl
     use cam_history,  only : outfld
     use physconst,    only : mwdry                ! molecular weight dry air ~ kg/kmole
     use physconst,    only : boltz, gravit        ! J/K/molecule
-    use tropopause,   only : tropopause_find, TROP_ALG_TWMO, TROP_ALG_CLIMATE
-    
+    use tropopause,   only : tropopause_findChemTrop
+
     use physics_buffer, only : physics_buffer_desc, pbuf_get_field, pbuf_get_chunk
     use physconst,      only : pi
 
@@ -235,7 +238,7 @@ end subroutine prescribed_strataero_readnl
     real(r8) :: columnmass(pcols)
     real(r8) :: mmrvolc
     integer  :: tropLev(pcols)
-    real(r8) :: area_fact
+    real(r8) :: area_fact, radius_fact
 
     real(r8) :: outdata(pcols,pver)
     real(r8), pointer :: mass(:,:)
@@ -273,29 +276,43 @@ end subroutine prescribed_strataero_readnl
 
        call pbuf_get_field(pbuf_chnk, mmr_ndx, mass)
 
-       call outfld( dens_name,         mass(:,:),     pcols, state(c)%lchnk)
+       call outfld( dens_name, mass(:,:), pcols, state(c)%lchnk)
 
        mass(:ncol,:) = to_mmr(:ncol,:) * mass(:ncol,:) ! mmr
 
        call pbuf_get_field(pbuf_chnk, rad_ndx, radius)
+
+       select case ( to_lower(trim(fields(2)%units(:GLC(fields(2)%units)))) )
+       case ("m","meters")
+          radius_fact = 1._r8
+       case ("cm","centimeters")
+          radius_fact = 1.e-2_r8
+       case default
+          write(iulog,*) 'prescribed_strataero_adv: radius units = ',trim(fields(2)%units) ,' are not recognized'
+          call endrun('prescribed_strataero_adv: radius units are not recognized')
+       end select
+       radius(:ncol,:) = radius_fact*radius(:ncol,:)
+
        call pbuf_get_field(pbuf_chnk, sad_ndx, area)
 
        select case ( to_lower(trim(fields(3)%units(:7))) )
        case ("um2/cm3")
           area_fact = 1.e-8_r8
+       case ("cm2/cm3")
+          area_fact = 1._r8
        case default
           write(iulog,*) 'prescribed_strataero_adv: surface area density units = ',trim(fields(3)%units) ,' are not recognized'
-          call endrun('prescribed_strataero_adv: surface area density are not recognized')
+          call endrun('prescribed_strataero_adv: surface area density units are not recognized')
        end select
        area(:ncol,:) = area_fact*area(:ncol,:)
 
        ! this definition of tropopause is consistent with what is used in chemistry
-       call tropopause_find(state(c), tropLev, primary=TROP_ALG_TWMO, backup=TROP_ALG_CLIMATE)
+       call tropopause_findChemTrop(state(c), tropLev)
 
        do i = 1,ncol
           do k = 1,pver
              zero_aerosols = k >= tropLev(i)
-             if ( abs( state(c)%lat(i)*rad2deg ) > 50._r8 ) then
+             if ( .not.prescribed_strataero_use_chemtrop .and. abs( state(c)%lat(i)*rad2deg ) > 50._r8 ) then
                 zero_aerosols = state(c)%pmid(i,k) >= 30000._r8
              endif
              ! set to zero at and below tropopause

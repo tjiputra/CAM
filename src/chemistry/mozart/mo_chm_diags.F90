@@ -58,7 +58,8 @@ contains
 
     use cam_history,  only : addfld, add_default, horiz_only
     use constituents, only : cnst_get_ind, cnst_longname
-    use phys_control, only: phys_getopts
+    use phys_control, only : phys_getopts
+    use mo_drydep,    only : has_drydep
 
     integer :: j, k, m, n
     character(len=16) :: jname, spc_name, attr
@@ -74,13 +75,15 @@ contains
     integer :: id_bry, id_cly 
 
     logical :: history_aerosol      ! Output the MAM aerosol tendencies
+    logical :: history_chemistry
     logical :: history_amwg         ! output the variables used by the AMWG diag package
     integer :: bulkaero_species(20)
 
     !-----------------------------------------------------------------------
 
     call phys_getopts( history_aerosol_out = history_aerosol, &
-                       history_amwg_out    = history_amwg )
+                       history_chemistry_out = history_chemistry, &
+                       history_amwg_out = history_amwg )
 
     id_bry     = get_spc_ndx( 'BRY' )
     id_cly     = get_spc_ndx( 'CLY' )
@@ -306,6 +309,10 @@ contains
        call addfld( depflx_name(m), horiz_only,  'A', 'kg/m2/s', 'dry deposition flux ' )
        call addfld( dtchem_name(m), (/ 'lev' /), 'A', 'kg/s',    'net tendency from chem' )
 
+       if (has_drydep(spc_name).and.history_chemistry) then
+          call add_default( depflx_name(m), 1, ' ' )
+       endif
+
        if (gas_wetdep_method=='MOZ') then
           wetdep_name(m) = 'WD_'//trim(spc_name)
           wtrate_name(m) = 'WDR_'//trim(spc_name)
@@ -329,7 +336,7 @@ contains
        endif
 
        if ((m /= id_cly) .and. (m /= id_bry)) then
-          if (history_aerosol) then
+          if (history_aerosol.or.history_chemistry) then
              call add_default( spc_name, 1, ' ' )
              call add_default( trim(spc_name)//'_SRF', 1, ' ' )
           endif 

@@ -425,7 +425,7 @@ contains
 
   subroutine usrrxt( rxt, temp, tempi, tempe, invariants, h2ovmr,  ps, &
                      pmid, m, sulfate, mmr, relhum, strato_sad, &
-                     tropchemlev, dlat, ncol, sad_total, cwat, mbar, pbuf )
+                     tropchemlev, dlat, ncol, sad_trop, reff_trop, cwat, mbar, pbuf )
 
 !-----------------------------------------------------------------
 !        ... set the user specified reaction rates
@@ -463,9 +463,10 @@ contains
     real(r8), intent(in)    :: cwat(ncol,pver) !PJC Condensed Water (liquid+ice) (kg/kg)
     real(r8), intent(in)    :: mbar(ncol,pver) !PJC Molar mass of air (g/mol)
     real(r8), intent(inout) :: rxt(ncol,pver,rxntot)      ! gas phase rates
-    real(r8), intent(out)   :: sad_total(pcols,pver)      ! total surface area density (cm2/cm3)
+    real(r8), intent(out)   :: sad_trop(pcols,pver)       ! tropospheric surface area density (cm2/cm3)
+    real(r8), intent(out)   :: reff_trop(pcols,pver)      ! tropospheric effective radius (cm)
     type(physics_buffer_desc), pointer :: pbuf(:)
-      
+
 !-----------------------------------------------------------------
 !        ... local variables
 !-----------------------------------------------------------------
@@ -563,19 +564,19 @@ contains
 
     sfc_array(:,:,:) = 0._r8
     dm_array(:,:,:) = 0._r8
-    sad_total(:,:) = 0._r8
+    sad_trop(:,:) = 0._r8
+    reff_trop(:,:) = 0._r8
+        
+    if( usr_NO2_aer_ndx > 0 .or. usr_NO3_aer_ndx > 0 .or. usr_N2O5_aer_ndx > 0 .or. usr_HO2_aer_ndx > 0 ) then
 
-    if( usr_NO2_aer_ndx > 0 .or. usr_NO3_aer_ndx > 0 .or. usr_N2O5_aer_ndx > 0 .or. usr_HO2_aer_ndx > 0 &
-      .or. usr_GLYOXAL_aer_ndx > 0) then
-
-! sad_total should be set outside of usrrxt ?? 
+! sad_trop should be set outside of usrrxt ?? 
        if( carma_hetchem_feedback ) then
-          sad_total(:ncol,:pver)=strato_sad(:ncol,:pver)
+          sad_trop(:ncol,:pver)=strato_sad(:ncol,:pver)
        else
 
           call aero_model_surfarea( &
-               mmr, rm1, relhum, pmid, temp, strato_sad, &
-               sulfate, m, tropchemlev, dlat, het1_ndx, pbuf, ncol, sfc_array, dm_array, sad_total )
+               mmr, rm1, relhum, pmid, temp, strato_sad, sulfate, m, tropchemlev, dlat, &
+               het1_ndx, pbuf, ncol, sfc_array, dm_array, sad_trop, reff_trop )
 
        endif
     endif
@@ -587,7 +588,7 @@ contains
        sqrt_t_58(:)      = sqrt( temp(:ncol,k) / 58.0_r8 )
 
 !-----------------------------------------------------------------
-!	... o + o2 + m --> o3 + m
+!	... o + o2 + m --> o3 + m (JPL15-10)
 !-----------------------------------------------------------------
        if( usr_O_O2_ndx > 0 ) then
           rxt(:,k,usr_O_O2_ndx) = 6.e-34_r8 * tp(:)**2.4_r8
@@ -604,11 +605,11 @@ contains
        end if
          
 !-----------------------------------------------------------------
-! 	... cl2o2 + m -> 2*clo + m
+! 	... cl2o2 + m -> 2*clo + m  (JPL15-10)
 !-----------------------------------------------------------------
        if ( usr_CL2O2_M_ndx > 0 ) then
           if ( tag_CLO_CLO_M_ndx > 0 ) then
-             ko(:)            = 1.72e-27_r8 * exp( 8649.0_r8* tinv(:) )
+             ko(:)            = 2.16e-27_r8 * exp( 8537.0_r8* tinv(:) )
              rxt(:,k,usr_CL2O2_M_ndx) = rxt(:,k,tag_CLO_CLO_M_ndx)/ko(:)         
           else
              rxt(:,k,usr_CL2O2_M_ndx) = 0._r8
@@ -636,28 +637,28 @@ contains
        end if
          
 !-----------------------------------------------------------------
-!	... n2o5 + m --> no2 + no3 + m
+!	... n2o5 + m --> no2 + no3 + m (JPL15-10)
 !-----------------------------------------------------------------
        if( usr_N2O5_M_ndx > 0 ) then
           if( tag_NO2_NO3_ndx > 0 ) then
-             call comp_exp( exp_fac, -11000.0_r8*tinv, ncol )
-             rxt(:,k,usr_N2O5_M_ndx) = rxt(:,k,tag_NO2_NO3_ndx) * 3.703704e26_r8 * exp_fac(:)
+             call comp_exp( exp_fac, -10840.0_r8*tinv, ncol )
+             rxt(:,k,usr_N2O5_M_ndx) = rxt(:,k,tag_NO2_NO3_ndx) * 1.724138e26_r8 * exp_fac(:)
           else
              rxt(:,k,usr_N2O5_M_ndx) = 0._r8
           end if
        end if
        if( usr_XNO2NO3_M_ndx > 0 ) then
           if( tag_NO2_NO3_ndx > 0 ) then
-             call comp_exp( exp_fac, -11000._r8*tinv, ncol )
-             rxt(:,k,usr_XNO2NO3_M_ndx) = rxt(:,k,tag_NO2_NO3_ndx) * 3.703704e26_r8 * exp_fac(:)
+             call comp_exp( exp_fac, -10840.0_r8*tinv, ncol )
+             rxt(:,k,usr_XNO2NO3_M_ndx) = rxt(:,k,tag_NO2_NO3_ndx) *1.724138e26_r8 * exp_fac(:)
           else
              rxt(:,k,usr_XNO2NO3_M_ndx) = 0._r8
           end if
        end if
        if( usr_NO2XNO3_M_ndx > 0 ) then
           if( tag_NO2_NO3_ndx > 0 ) then
-             call comp_exp( exp_fac, -11000._r8*tinv, ncol )
-             rxt(:,k,usr_NO2XNO3_M_ndx) = rxt(:,k,tag_NO2_NO3_ndx) * 3.703704e26_r8 * exp_fac(:)
+             call comp_exp( exp_fac, -10840.0_r8*tinv, ncol )
+             rxt(:,k,usr_NO2XNO3_M_ndx) = rxt(:,k,tag_NO2_NO3_ndx) * 1.734138e26_r8 * exp_fac(:)
           else
              rxt(:,k,usr_NO2XNO3_M_ndx) = 0._r8
           end if
@@ -708,11 +709,11 @@ contains
                (1._r8 + 6.e-7_r8*boltz_cgs*m(:,k)*temp(:ncol,k))
        end if
 !-----------------------------------------------------------------
-! 	... co + oh --> co2 + h (second branch JPL06; pg2.2; 2.10) WACCM
+! 	... co + oh --> co2 + h (second branch JPL15-10)
 !-----------------------------------------------------------------
        if( usr_CO_OH_b_ndx > 0 ) then
          kinf(:)  = 2.1e+09_r8 * (temp(:ncol,k)/ t0)**(6.1_r8)
-         ko  (:)  = 1.5e-13_r8 * (temp(:ncol,k)/ t0)**(0.6_r8)
+         ko  (:)  = 1.5e-13_r8
 
          term1(:) = ko(:) / ( (kinf(:) / m(:,k)) )
          term2(:) = ko(:) / (1._r8 + term1(:))
@@ -755,7 +756,7 @@ contains
        end if
 
 !-----------------------------------------------------------------
-!	... pan + m --> ch3co3 + no2 + m
+!	... pan + m --> ch3co3 + no2 + m (JPL15-10)
 !-----------------------------------------------------------------
        call comp_exp( exp_fac, -14000._r8*tinv, ncol )
        if( usr_PAN_M_ndx > 0 ) then
@@ -774,7 +775,7 @@ contains
        end if
 
 !-----------------------------------------------------------------
-!	... mpan + m --> mco3 + no2 + m
+!	... mpan + m --> mco3 + no2 + m (JPL15-10)
 !-----------------------------------------------------------------
        if( usr_MPAN_M_ndx > 0 ) then
           if( usr_MCO3_NO2_ndx > 0 ) then

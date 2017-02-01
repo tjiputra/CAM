@@ -42,7 +42,7 @@
 <ncdata dyn="fv"  hgrid="0.23x0.31" nlev="30"  ic_ymd="101"     >atm/cam/inic/fv/cami-mam3_0000-01-01_0.23x0.31_L30_c110527.nc</ncdata>
 <ncdata dyn="fv"  hgrid="0.47x0.63" nlev="30"  ic_ymd="101"     >atm/cam/inic/fv/cami-mam3_0000-01-01_0.47x0.63_L30_c100929.nc</ncdata>
 <ncdata dyn="fv"  hgrid="0.9x1.25"  nlev="30"  ic_ymd="101"     >atm/cam/inic/fv/cami-mam3_0000-01-01_0.9x1.25_L30_c100618.nc</ncdata>
-<ncdata dyn="fv"  hgrid="1.9x2.5"   nlev="30"  ic_ymd="101"     >atm/cam/inic/fv/cami_0000-01-01_1.9x2.5_L30_c070703.nc</ncdata>
+<ncdata dyn="fv"  hgrid="1.9x2.5"   nlev="30"  ic_ymd="101"     >atm/cam/inic/fv/cami-mam3_0000-01-01_1.9x2.5_L30_c090306.nc</ncdata>
 <ncdata dyn="fv"  hgrid="1.9x2.5"   nlev="30"  ic_ymd="901"     >atm/cam/inic/fv/cami_0000-09-01_1.9x2.5_L30_c070109.nc</ncdata>
 <ncdata dyn="fv"  hgrid="2.5x3.33"  nlev="30"  ic_ymd="101"     >atm/cam/inic/fv/cami_0000-01-01_2.5x3.33_L30_c110309.nc </ncdata>
 <ncdata dyn="fv"  hgrid="2.5x3.33"  nlev="30"  ic_ymd="901"     >atm/cam/inic/fv/cami_0000-09-01_2.5x3.33_L30_c100831.nc</ncdata>
@@ -57,10 +57,15 @@
 <ncdata dyn="fv"  hgrid="4x5"       nlev="64"  ic_ymd="101"     >atm/cam/inic/fv/cami_0000-01-01_4x5_L64_c090108.nc</ncdata>
 <ncdata dyn="fv"  hgrid="10x15"     nlev="64"  ic_ymd="101"     >atm/cam/inic/fv/cami_0000-01-01_10x15_L64_c081013.nc</ncdata>
 
-<ncdata dyn="fv"  hgrid="1.9x2.5"   nlev="30"  chem="trop_mam3" ic_ymd="101">atm/cam/inic/fv/cami-mam3_0000-01-01_1.9x2.5_L30_c090306.nc</ncdata>
+<ncdata dyn="fv"  hgrid="1.9x2.5"   nlev="26"  aquaplanet="1"  ic_ymd="101" >atm/cam/inic/fv/aqua_0006-01-01_1.9x2.5_L26_c161020.nc</ncdata>
+<ncdata dyn="fv"  hgrid="0.9x1.25"  nlev="26"  aquaplanet="1"  ic_ymd="101" >atm/cam/inic/fv/aqua_0006-01-01_0.9x1.25_L26_c161020.nc</ncdata>
+<ncdata dyn="fv"  hgrid="0.47x0.63" nlev="26"  aquaplanet="1"  ic_ymd="101" >atm/cam/inic/fv/cami_0000-01-01_0.47x0.63_L26_APE_c080227.nc</ncdata>
 
-<ncdata dyn="fv"  hgrid="0.47x0.63" nlev="26"  ocn="aquaplanet"  ic_ymd="101" >atm/cam/inic/fv/cami_0000-01-01_0.47x0.63_L26_APE_c080227.nc</ncdata>
-<ncdata dyn="fv"  hgrid="1.9x2.5"   nlev="26"  ocn="aquaplanet"  ic_ymd="101" >atm/cam/inic/fv/cami_0000-01-01_1.9x2.5_L26_APE_c080203.nc</ncdata>
+<ncdata dyn="fv"  hgrid="1.9x2.5"   nlev="30"  aquaplanet="1"  ic_ymd="101" >atm/cam/inic/fv/aqua_0006-01-01_1.9x2.5_L30_c161020.nc</ncdata>
+<ncdata dyn="fv"  hgrid="0.9x1.25"  nlev="30"  aquaplanet="1"  ic_ymd="101" >atm/cam/inic/fv/aqua_0006-01-01_0.9x1.25_L30_c161020.nc</ncdata>
+
+<ncdata dyn="fv"  hgrid="1.9x2.5"   nlev="32"  aquaplanet="1"  ic_ymd="101" >atm/cam/inic/fv/aqua_0006-01-01_1.9x2.5_L32_c161020.nc</ncdata>
+<ncdata dyn="fv"  hgrid="0.9x1.25"  nlev="32"  aquaplanet="1"  ic_ymd="101" >atm/cam/inic/fv/aqua_0006-01-01_0.9x1.25_L32_c161020.nc</ncdata>
 
 <ncdata dyn="fv"  hgrid="0.9x1.25"  nlev="30"  chem="trop_mozart" ic_ymd="19900101" >atm/cam/inic/fv/cami-chem_1990-01-01_0.9x1.25_L30_c080724.nc</ncdata>
 <ncdata dyn="fv"  hgrid="1.9x2.5"   nlev="26"  chem="trop_mozart" ic_ymd="19900101" >atm/cam/inic/fv/cami-chem_1990-01-01_1.9x2.5_L26_c080114.nc</ncdata>
@@ -73,28 +78,9 @@
 <ncdata dyn="fv" hgrid="1.9x2.5" nlev="26" chem="trop_mozart" ic_ymd="101" >atm/cam/inic/fv/camchemi_0012-01-01_1.9x2.5_L26_c081104.nc</ncdata>
 <ncdata dyn="fv" hgrid="1.9x2.5" nlev="30" chem="trop_mozart" ic_ymd="101" >atm/cam/inic/fv/camchemi_0012-01-01_1.9x2.5_L30_c081104.nc</ncdata>
 
-<ncdata dyn="fv" hgrid="10x15"   nlev="26" chem="trop_mozart_soa" ic_ymd="101" >atm/cam/inic/fv/camchemi_0012-01-01_10x15_L26_c081104.nc</ncdata>
-<ncdata dyn="fv" hgrid="10x15"   nlev="30" chem="trop_mozart_soa" ic_ymd="101" >atm/cam/inic/fv/camchemi_0012-01-01_10x15_L30_c081104.nc</ncdata>
-<ncdata dyn="fv" hgrid="4x5"     nlev="26" chem="trop_mozart_soa" ic_ymd="101" >atm/cam/inic/fv/camchemi_0012-01-01_4x5_L26_c081104.nc</ncdata>
-<ncdata dyn="fv" hgrid="4x5"     nlev="30" chem="trop_mozart_soa" ic_ymd="101" >atm/cam/inic/fv/camchemi_0012-01-01_4x5_L30_c081104.nc</ncdata>
-<ncdata dyn="fv" hgrid="1.9x2.5" nlev="26" chem="trop_mozart_soa" ic_ymd="101" >atm/cam/inic/fv/camchemi_0012-01-01_1.9x2.5_L26_c081104.nc</ncdata>
-<ncdata dyn="fv" hgrid="1.9x2.5" nlev="30" chem="trop_mozart_soa" ic_ymd="101" >atm/cam/inic/fv/camchemi_0012-01-01_1.9x2.5_L30_c081104.nc</ncdata>
-
-<ncdata dyn="fv" hgrid="10x15"   nlev="30" chem="trop_mozart_mam3" ic_ymd="101" >atm/cam/inic/fv/trop_strat_mam3_chem_2000-01-01_10x15_L30_c120222.nc</ncdata>
-<ncdata dyn="fv" hgrid="4x5"     nlev="30" chem="trop_mozart_mam3" ic_ymd="101" >atm/cam/inic/fv/trop_strat_mam3_chem_2000-01-01_4x5_L30_c120222.nc</ncdata>
-<ncdata dyn="fv" hgrid="1.9x2.5" nlev="30" chem="trop_mozart_mam3" ic_ymd="101" >atm/cam/inic/fv/trop_strat_mam3_chem_2000-01-01_1.9x2.5_L30_c120222.nc</ncdata>
-
-<ncdata dyn="fv" hgrid="10x15"   nlev="30" chem="trop_strat_mam3" ic_ymd="101" >atm/cam/inic/fv/trop_strat_mam3_chem_2000-01-01_10x15_L30_c121015.nc</ncdata>
-<ncdata dyn="fv" hgrid="4x5"     nlev="30" chem="trop_strat_mam3" ic_ymd="101" >atm/cam/inic/fv/trop_strat_mam3_chem_2000-01-01_4x5_L30_c121015.nc</ncdata>
-<ncdata dyn="fv" hgrid="1.9x2.5" nlev="30" chem="trop_strat_mam3" ic_ymd="101" >atm/cam/inic/fv/trop_strat_mam3_chem_2000-01-01_1.9x2.5_L30_c121015.nc</ncdata>
-
 <ncdata dyn="fv" hgrid="10x15"   nlev="30" chem="trop_strat_mam4_vbs" ic_ymd="101" >atm/cam/inic/fv/trop_strat_mam3_chem_2000-01-01_10x15_L30_c121015.nc</ncdata>
 <ncdata dyn="fv" hgrid="4x5"     nlev="30" chem="trop_strat_mam4_vbs" ic_ymd="101" >atm/cam/inic/fv/trop_strat_mam3_chem_2000-01-01_4x5_L30_c121015.nc</ncdata>
 <ncdata dyn="fv" hgrid="1.9x2.5" nlev="30" chem="trop_strat_mam4_vbs" ic_ymd="101" >atm/cam/inic/fv/trop_strat_mam3_chem_2000-01-01_1.9x2.5_L30_c121015.nc</ncdata>
-
-<ncdata dyn="fv" hgrid="10x15"   nlev="30" chem="trop_strat_mam7" ic_ymd="101" >atm/cam/inic/fv/trop_strat_mam7_chem_2000-01-01_10x15_L30_c121011.nc</ncdata>
-<ncdata dyn="fv" hgrid="4x5"     nlev="30" chem="trop_strat_mam7" ic_ymd="101" >atm/cam/inic/fv/trop_strat_mam7_chem_2000-01-01_4x5_L30_c121011.nc</ncdata>
-<ncdata dyn="fv" hgrid="1.9x2.5" nlev="30" chem="trop_strat_mam7" ic_ymd="101" >atm/cam/inic/fv/trop_strat_mam7_chem_2000-01-01_1.9x2.5_L30_c121011.nc</ncdata>
 
 <ncdata dyn="fv" hgrid="10x15"   nlev="26" chem="super_fast_llnl" ic_ymd="101" >atm/cam/inic/fv/camchemi_0012-01-01_10x15_L26_c081104.nc</ncdata>
 <ncdata dyn="fv" hgrid="10x15"   nlev="30" chem="super_fast_llnl" ic_ymd="101" >atm/cam/inic/fv/camchemi_0012-01-01_10x15_L30_c081104.nc</ncdata>
@@ -162,17 +148,20 @@
 
 <ncdata dyn="se" hgrid="ne240np4" nlev="30"             ic_ymd="101" >atm/cam/inic/homme/cami-mam3_0000-01-ne240np4_L30_c111004.nc</ncdata>
 
-<ncdata dyn="se" hgrid="ne5np8"   nlev="26"  ocn="aquaplanet" ic_ymd="101" >atm/cam/inic/homme/cami_0000-01-01_ne5np8_L26_ape_c061102.nc</ncdata>
-<ncdata dyn="se" hgrid="ne16np4"  nlev="26"  ocn="aquaplanet" ic_ymd="101" >atm/cam/inic/homme/cami_0000-01-01_ne16np4_L26_ape_c071213.nc</ncdata>
-<ncdata dyn="se" hgrid="ne16np8"  nlev="26"  ocn="aquaplanet" ic_ymd="101" >atm/cam/inic/homme/cami_0000-01-01_ne16np8_L26_ape_c110222.nc</ncdata>
-<ncdata dyn="se" hgrid="ne21np4"  nlev="26"  ocn="aquaplanet" ic_ymd="101" >atm/cam/inic/homme/cami_0000-01-01_ne21np4_L26_ape_c071210.nc</ncdata>
-<ncdata dyn="se" hgrid="ne30np4"  nlev="26"  ocn="aquaplanet" ic_ymd="101" >atm/cam/inic/homme/cami_0000-01-01_ne30np4_L26_ape_c071210.nc</ncdata>
-<ncdata dyn="se" hgrid="ne120np4" nlev="26"  ocn="aquaplanet" ic_ymd="101" >atm/cam/inic/homme/cami_0003-01-01_ne120np4_L26_ape_c140519.nc</ncdata>
+<ncdata dyn="se" hgrid="ne5np8"   nlev="26"  aquaplanet="1" ic_ymd="101" >atm/cam/inic/homme/cami_0000-01-01_ne5np8_L26_ape_c061102.nc</ncdata>
+<ncdata dyn="se" hgrid="ne16np4"  nlev="26"  aquaplanet="1" ic_ymd="101" >atm/cam/inic/homme/aqua_0006-01-01_ne16_np4_L26_c161027.nc</ncdata>
+<ncdata dyn="se" hgrid="ne16np8"  nlev="26"  aquaplanet="1" ic_ymd="101" >atm/cam/inic/homme/cami_0000-01-01_ne16np8_L26_ape_c110222.nc</ncdata>
+<ncdata dyn="se" hgrid="ne21np4"  nlev="26"  aquaplanet="1" ic_ymd="101" >atm/cam/inic/homme/cami_0000-01-01_ne21np4_L26_ape_c071210.nc</ncdata>
+<ncdata dyn="se" hgrid="ne30np4"  nlev="26"  aquaplanet="1" ic_ymd="101" >atm/cam/inic/homme/aqua_0006-01-01_ne30_np4_L26_c161027.nc</ncdata>
+<ncdata dyn="se" hgrid="ne120np4" nlev="26"  aquaplanet="1" ic_ymd="101" >atm/cam/inic/homme/cami_0003-01-01_ne120np4_L26_ape_c140519.nc</ncdata>
+                                                
+<ncdata dyn="se" hgrid="ne5np4"   nlev="30"  aquaplanet="1" ic_ymd="101" >atm/cam/inic/homme/cami_0000-01-01_ne5np4_L30_ape_c101201.nc</ncdata>
+<ncdata dyn="se" hgrid="ne16np4"  nlev="30"  aquaplanet="1" ic_ymd="101" >atm/cam/inic/homme/aqua_0006-01-01_ne16_np4_L30_c161027.nc</ncdata>
+<ncdata dyn="se" hgrid="ne30np4"  nlev="30"  aquaplanet="1" ic_ymd="101" >atm/cam/inic/homme/aqua_0006-01-01_ne30_np4_L30_c161027.nc</ncdata>
+<ncdata dyn="se" hgrid="ne120np4" nlev="30"  aquaplanet="1" ic_ymd="101" >atm/cam/inic/homme/cami_0003-01-01_ne120np4_L30_ape_c140519.nc</ncdata>
 
-<ncdata dyn="se" hgrid="ne5np4"   nlev="30"  ocn="aquaplanet" ic_ymd="101" >atm/cam/inic/homme/cami_0000-01-01_ne5np4_L30_ape_c101201.nc</ncdata>
-<ncdata dyn="se" hgrid="ne16np4"  nlev="30"  ocn="aquaplanet" ic_ymd="101" >atm/cam/inic/homme/cami_0000-01-01_ne16np4_L30_ape_c101201.nc</ncdata>
-<ncdata dyn="se" hgrid="ne30np4"  nlev="30"  ocn="aquaplanet" ic_ymd="101" >atm/cam/inic/homme/cami_0000-01-01_ne30np4_L30_ape_c111020.nc</ncdata>
-<ncdata dyn="se" hgrid="ne120np4" nlev="30"  ocn="aquaplanet" ic_ymd="101" >atm/cam/inic/homme/cami_0003-01-01_ne120np4_L30_ape_c140519.nc</ncdata>
+<ncdata dyn="se" hgrid="ne16np4"  nlev="32"  aquaplanet="1" ic_ymd="101" >atm/cam/inic/homme/aqua_0006-01-01_ne16_np4_L32_c161027.nc</ncdata>
+<ncdata dyn="se" hgrid="ne30np4"  nlev="32"  aquaplanet="1" ic_ymd="101" >atm/cam/inic/homme/aqua_0006-01-01_ne30_np4_L32_c161027.nc</ncdata>
 
 <ncdata dyn="se" hgrid="ne5np4"   nlev="66">atm/waccm/ic/wa3_ne5np4_1950_spinup.cam2.i.1960-01-01-00000_c150810.nc</ncdata>
 <ncdata dyn="se" hgrid="ne30np4"  nlev="70">atm/waccm/ic/waccm5_1850_ne30np4_L70_0001-01-11-00000_c151217.nc</ncdata>
@@ -206,6 +195,11 @@
 <bnd_topo  clubb_sgs="1" hgrid="1.9x2.5" >atm/cam/topo/fv_1.9x2.5_nc3000_Nsw084_Nrs016_Co120_Fi001_ZR_061116.nc</bnd_topo>
 
 
+<!-- Sometimes, the default should be no topography file -->
+<use_topo_file                  >   .true.  </use_topo_file>
+<use_topo_file ocn="aquaplanet" >   .false. </use_topo_file>
+<use_topo_file phys="held_suarez" > .false. </use_topo_file>
+<use_topo_file analytic_ic="1"  >   .false. </use_topo_file>
 
 <!-- Bulk aerosol physical properties (includes optics) -->
 
@@ -361,8 +355,8 @@
 
 <prescribed_ozone_file chem="waccm_sc">waccm_ozone_c121126.nc</prescribed_ozone_file>
 <prescribed_ozone_cycle_yr chem="waccm_sc">0</prescribed_ozone_cycle_yr>
-<prescribed_ozone_file chem="waccm_sc_mam3">waccm_ozone_c121126.nc</prescribed_ozone_file>
-<prescribed_ozone_cycle_yr chem="waccm_sc_mam3">0</prescribed_ozone_cycle_yr>
+<prescribed_ozone_file chem="waccm_sc_mam4">waccm_ozone_c121126.nc</prescribed_ozone_file>
+<prescribed_ozone_cycle_yr chem="waccm_sc_mam4">0</prescribed_ozone_cycle_yr>
 
 <!-- CAM-Chem aerosols (2000 climatology) -->
 <prescribed_aero_datapath  aer_model='bam'  >atm/cam/chem/trop_mozart_aero/aero</prescribed_aero_datapath>
@@ -406,10 +400,15 @@
 <tropopause_climo_file>atm/cam/chem/trop_mozart/ub/clim_p_trop.nc</tropopause_climo_file>
 
 
-<!-- Solar constant from Judith Lean via Caspar Ammann for 1990 or 2000 -->
+<!-- Solar constant -->
 <solar_const>1361.27</solar_const>
-<solar_data_file               >atm/cam/solar/solar_ave_sc19-sc23.c090810.nc</solar_data_file>
-<solar_data_file waccm_phys="1">atm/cam/solar/spectral_irradiance_Lean_1610-2009_ann_c100405.nc</solar_data_file>
+<solar_data_file phys="cam4"               >atm/cam/solar/solar_ave_sc19-sc23.c090810.nc</solar_data_file>
+<solar_data_file phys="cam5"               >atm/cam/solar/solar_ave_sc19-sc23.c090810.nc</solar_data_file>
+<solar_data_file phys="cam4" waccm_phys="1">atm/cam/solar/spectral_irradiance_Lean_1610-2009_ann_c100405.nc</solar_data_file>
+<solar_data_file phys="cam5" waccm_phys="1">atm/cam/solar/spectral_irradiance_Lean_1610-2009_ann_c100405.nc</solar_data_file>
+<solar_data_file                           >atm/cam/solar/SolarForcing1995-2005avg_c160929.nc</solar_data_file>
+<solar_data_file             waccm_phys="1">atm/cam/solar/SolarForcing1995-2005avg_c160929.nc</solar_data_file>
+
 
 <!-- GHG values for 2000 from ghg_hist_1850-2005_c090419.nc -->
 <co2vmr>367.0e-6</co2vmr>
@@ -448,13 +447,13 @@
 
 <!-- WACCM_GHG H2O production/loss rates -->
 <h2orates chem="waccm_sc"     >atm/waccm/phot/xh2o_c080826.nc</h2orates>
-<h2orates chem="waccm_sc_mam3">atm/waccm/phot/xh2o_c080826.nc</h2orates>
+<h2orates chem="waccm_sc_mam4">atm/waccm/phot/xh2o_c080826.nc</h2orates>
 
 <!-- Constituents for non-LTE calculations and heating rates below 200 nm -->
 <waccm_forcing_datapath chem="waccm_sc">atm/waccm/ub</waccm_forcing_datapath>
 <waccm_forcing_file     chem="waccm_sc">ghg_forcing_2000_c110321.nc</waccm_forcing_file>
-<waccm_forcing_datapath chem="waccm_sc_mam3">atm/waccm/ub</waccm_forcing_datapath>
-<waccm_forcing_file     chem="waccm_sc_mam3">ghg_forcing_2000_c110321.nc</waccm_forcing_file>
+<waccm_forcing_datapath chem="waccm_sc_mam4">atm/waccm/ub</waccm_forcing_datapath>
+<waccm_forcing_file     chem="waccm_sc_mam4">ghg_forcing_2000_c110321.nc</waccm_forcing_file>
 
 <!-- Waccm electric field parameters -->
 <efield_lflux_file >atm/waccm/efld/coeff_lflux.dat</efield_lflux_file>
@@ -471,7 +470,11 @@
 
 <!-- Waccm solar variability parameters -->
 <solar_parms_file               >atm/waccm/phot/wasolar_ave.nc</solar_parms_file>
-<solar_parms_file waccm_phys="1">atm/waccm/solar/wasolar_c140408.nc</solar_parms_file>
+
+<solar_parms_file phys="cam4" waccm_phys="1">atm/waccm/solar/wasolar_c140408.nc</solar_parms_file>
+<solar_parms_file phys="cam5" waccm_phys="1">atm/waccm/solar/wasolar_c140408.nc</solar_parms_file>
+<solar_parms_file             waccm_phys="1">atm/cam/solar/SolarForcing1995-2005avg_c160929.nc</solar_parms_file>
+
 
 <!-- nudged QBO  -->
 <qbo_forcing_file>atm/waccm/qbo/qbocyclic28months.nc</qbo_forcing_file>
@@ -525,7 +528,7 @@
 <waccmx_opt waccmx="1">neutral</waccmx_opt>
 
 <!-- For MEGAN VOCs -->
-<megan_factors_file>atm/cam/chem/trop_mozart/emis/megan21_emis_factors_79pft_c20150518.nc</megan_factors_file>
+<megan_factors_file>atm/cam/chem/trop_mozart/emis/megan21_emis_factors_78pft_c20161108.nc</megan_factors_file>
 
 <!-- Airplane emissions -->
 <airpl_emis_file>atm/cam/chem/trop_mozart/emis/emissions.aircraft.T42LR.nc</airpl_emis_file>
@@ -580,22 +583,10 @@
 <ch2o_emis_file chem="waccm_ma">atm/cam/chem/1850-2000_emis/IPCC_emissions_houw_CH2O_1850-2000_1.9x2.5.c090728.nc</ch2o_emis_file>
 <so2_emis_file  chem="waccm_ma">atm/cam/chem/1850-2000_emis/IPCC_emissions_houw_SO2_1850-2000_1.9x2.5.c090522.nc</so2_emis_file> 
 
-<nox_emis_file  chem="waccm_ma_mam3">atm/cam/chem/emis/1992-2010/emissions.NO.surface.1.9x2.5_c110426.nc</nox_emis_file>
-<co_emis_file   chem="waccm_ma_mam3">atm/cam/chem/emis/1992-2010/emissions.CO.surface.1.9x2.5_c110426.nc</co_emis_file>
-<ch2o_emis_file chem="waccm_ma_mam3">atm/cam/chem/emis/1992-2010/emissions.CH2O.surface.1.9x2.5_c110426.nc</ch2o_emis_file>
-<dms_emis_file	chem="waccm_ma_mam3">atm/cam/chem/trop_mozart_aero/emis/aerocom_mam3_dms_surf_2000_c120315.nc</dms_emis_file>
-<so2_emis_file	chem="waccm_ma_mam3">atm/cam/chem/trop_mozart_aero/emis/ar5_mam3_so2_surf_2000_c120315.nc</so2_emis_file>
-
 <nox_emis_file  chem="waccm_ma_sulfur">atm/cam/chem/1850-2000_emis/IPCC_emissions_houw_NOx_1850-2000_1.9x2.5.c090728.nc</nox_emis_file>
 <co_emis_file   chem="waccm_ma_sulfur">atm/cam/chem/1850-2000_emis/IPCC_emissions_houw_CO_1850-2000_1.9x2.5.c090728.nc</co_emis_file>
 <ch2o_emis_file chem="waccm_ma_sulfur">atm/cam/chem/1850-2000_emis/IPCC_emissions_houw_CH2O_1850-2000_1.9x2.5.c090728.nc</ch2o_emis_file>
 <so2_emis_file  chem="waccm_ma_sulfur">atm/cam/chem/1850-2000_emis/IPCC_emissions_houw_SO2_1850-2000_1.9x2.5.c090522.nc</so2_emis_file> 
-
-<!-- WACCM-X emissions (same as WACCM) -->
-<nox_emis_file  chem="waccmx_ma">atm/cam/chem/1850-2000_emis/IPCC_emissions_houw_NOx_1850-2000_1.9x2.5.c090728.nc</nox_emis_file>
-<co_emis_file   chem="waccmx_ma">atm/cam/chem/1850-2000_emis/IPCC_emissions_houw_CO_1850-2000_1.9x2.5.c090728.nc</co_emis_file>
-<ch2o_emis_file chem="waccmx_ma">atm/cam/chem/1850-2000_emis/IPCC_emissions_houw_CH2O_1850-2000_1.9x2.5.c090728.nc</ch2o_emis_file>
-<so2_emis_file  chem="waccmx_ma">atm/cam/chem/1850-2000_emis/IPCC_emissions_houw_SO2_1850-2000_1.9x2.5.c090522.nc</so2_emis_file> 
 
 <!-- super_fast Chemistry emissions -->
 <ch2o_emis_file	   chem="super_fast_llnl">atm/cam/chem/trop_mozart/emis/emissions.CH2O.surface.T42LR.nc</ch2o_emis_file>
@@ -693,6 +684,12 @@
 <tracer_cnst_type     ver="fixed_ox">CYCLICAL</tracer_cnst_type>
 <tracer_cnst_cycle_yr ver="fixed_ox">2000</tracer_cnst_cycle_yr>
 <tracer_cnst_filelist ver="fixed_ox">oxid_1.9x2.5_L26_clim_list.c090805.txt</tracer_cnst_filelist>
+
+<!-- prescribed oxidants for prognostic aerosol chemistry plus halons for radiative forcings -->
+<tracer_cnst_file     ver="fixed_ox_halons">halons_oxid_1.9x2.5zm_L66_1849-2099_c160714.nc</tracer_cnst_file>
+<tracer_cnst_datapath ver="fixed_ox_halons">atm/waccm/halons</tracer_cnst_datapath>
+<tracer_cnst_type     ver="fixed_ox_halons">CYCLICAL</tracer_cnst_type>
+<tracer_cnst_cycle_yr ver="fixed_ox_halons">2000</tracer_cnst_cycle_yr>
 
 <!-- prescribed methane  -->
 <tracer_cnst_file     ver="fixed_ch4">CH4_1990-1999_clim_c090605.nc</tracer_cnst_file>
@@ -844,7 +841,6 @@
 <!-- Microphysics scheme -->
 <microp_scheme microphys="rk"           >RK</microp_scheme>
 <microp_scheme microphys="mg1"          >MG</microp_scheme>
-<microp_scheme microphys="mg1.5"        >MG</microp_scheme>
 <microp_scheme microphys="spcam_m2005"  >SPCAM_m2005</microp_scheme>
 <microp_scheme microphys="spcam_sam1mom">SPCAM_sam1mom</microp_scheme>
 <microp_scheme microphys="mg2">MG</microp_scheme>
@@ -853,11 +849,6 @@
 <micro_mg_sub_version microphys="mg1">    0          </micro_mg_sub_version>
 <micro_mg_num_steps   microphys="mg1">    1          </micro_mg_num_steps>
 <micro_mg_dcs         microphys="mg1">    400.D-6    </micro_mg_dcs>
-
-<micro_mg_version     microphys="mg1.5">  1          </micro_mg_version>
-<micro_mg_sub_version microphys="mg1.5">  5          </micro_mg_sub_version>
-<micro_mg_num_steps   microphys="mg1.5">  2          </micro_mg_num_steps>
-<micro_mg_dcs         microphys="mg1.5">  250.D-6    </micro_mg_dcs>
 
 <micro_mg_version     microphys="mg2">                                 2          </micro_mg_version>
 <micro_mg_sub_version microphys="mg2">                                 0          </micro_mg_sub_version>
@@ -883,8 +874,11 @@
 <!-- Ice nucleation -->
 <nucleate_ice_subgrid                                  >1.0D0</nucleate_ice_subgrid>
 <nucleate_ice_subgrid microphys="mg1"                  >1.2D0</nucleate_ice_subgrid>
-<nucleate_ice_subgrid microphys="mg1.5"                >1.2D0</nucleate_ice_subgrid>
 <nucleate_ice_subgrid microphys="mg2"                  >1.2D0</nucleate_ice_subgrid>
+
+<nucleate_ice_subgrid_strat                            >1.0D0</nucleate_ice_subgrid_strat>
+<nucleate_ice_subgrid_strat microphys="mg1"            >1.2D0</nucleate_ice_subgrid_strat>
+<nucleate_ice_subgrid_strat microphys="mg2"            >1.2D0</nucleate_ice_subgrid_strat>
 
 <use_hetfrz_classnuc              >.false.</use_hetfrz_classnuc>
 <use_hetfrz_classnuc phys="cam5.4">.true.</use_hetfrz_classnuc>
@@ -896,6 +890,15 @@
 <nucleate_ice_incloud    phys="cam5.4" clubb_sgs="1">.false.</nucleate_ice_incloud>
 <nucleate_ice_strat                            >0.0D0</nucleate_ice_strat>
 <nucleate_ice_strat phys="cam5.4" clubb_sgs="1">0.3D0</nucleate_ice_strat>
+<nucleate_ice_use_troplev                           >.false.</nucleate_ice_use_troplev>
+
+<chem_use_chemtrop>.true.</chem_use_chemtrop>
+<chem_use_chemtrop chem='trop_mam3'>.false.</chem_use_chemtrop>
+<chem_use_chemtrop chem='trop_mam4'>.false.</chem_use_chemtrop>
+
+<prescribed_strataero_use_chemtrop>.true.</prescribed_strataero_use_chemtrop>
+<prescribed_strataero_use_chemtrop chem='trop_mam3'>.false.</prescribed_strataero_use_chemtrop>
+<prescribed_strataero_use_chemtrop chem='trop_mam4'>.false.</prescribed_strataero_use_chemtrop>
 
 <!-- Macrophysics scheme -->
 <macrop_scheme                           >none</macrop_scheme>
@@ -1143,9 +1146,17 @@
 <cldfrc2m_rhmini   unicon="1"  >  0.85D0  </cldfrc2m_rhmini>
 <cldfrc2m_rhmini clubb_sgs="1" >  0.80D0  </cldfrc2m_rhmini>
 
+<cldfrc2m_rhminis               >  0.80D0 </cldfrc2m_rhminis>
+<cldfrc2m_rhminis  unicon="1"   >  0.85D0 </cldfrc2m_rhminis>
+
 <cldfrc2m_rhmaxi                                     >  1.1D0  </cldfrc2m_rhmaxi>
 <cldfrc2m_rhmaxi    clubb_sgs="1"                    >  1.0D0  </cldfrc2m_rhmaxi>
 <cldfrc2m_rhmaxi    spcam_clubb_sgs="1"              >  1.0D0  </cldfrc2m_rhmaxi>
+<cldfrc2m_rhmaxis                                    >  1.1D0  </cldfrc2m_rhmaxis>
+<cldfrc2m_rhmaxis   clubb_sgs="1"                    >  1.0D0  </cldfrc2m_rhmaxis>
+<cldfrc2m_rhmaxis   spcam_clubb_sgs="1"              >  1.0D0  </cldfrc2m_rhmaxis>
+
+<micro_mg_adjust_cpt>.false.</micro_mg_adjust_cpt>
 
 <cldfrc2m_do_subgrid_growth>.false.</cldfrc2m_do_subgrid_growth>
 <cldfrc2m_do_subgrid_growth phys="cam5.4" clubb_sgs="1">.true.</cldfrc2m_do_subgrid_growth>
@@ -1295,7 +1306,7 @@
 <fv_nspltrac hgrid="0.9x1.25" waccm_phys="1">4</fv_nspltrac>
 
 <fv_nsplit                  waccm_phys="1"> 8</fv_nsplit>
-<fv_nsplit hgrid="0.9x1.25" waccm_phys="1">12</fv_nsplit>
+<fv_nsplit hgrid="0.9x1.25" waccm_phys="1">16</fv_nsplit>
 
 <fv_del2coef                >3.e+5</fv_del2coef>
 
@@ -1467,6 +1478,10 @@
 <se_tstep_type > 5 </se_tstep_type>
 
 <se_vert_remap_q_alg> 1 </se_vert_remap_q_alg>
+
+<!-- Dycore testing  -->
+
+<analytic_ic_type> none </analytic_ic_type>
 
 <!-- ================================================================== -->
 <!-- Defaults for driver namelist seq_infodata_inparm                   -->
@@ -1684,6 +1699,8 @@
 
 <bndtvs dyn="se"        sim_year="1850-2000">atm/cam/sst/sst_HadOIBl_bc_1x1_1850_2012_c130411.nc</bndtvs>
 
+<bndtvs hgrid="1.9x2.5" ocn="som" sim_year="2000">atm/cam/som/cam4.som.forcing.aquaplanet.QzaFix_h50Fix_TspunFix.fv19.nc</bndtvs>
+
 <!-- SST domain files -->
 <bndtvs_domain dyn="se"  >ocn/docn7/domain.ocn.1x1.111007.nc</bndtvs_domain>
 
@@ -1708,6 +1725,7 @@
 <focndomain hgrid="ne60np4"   >share/domains/domain.ocn.ne60np4_gx1v6.120406.nc</focndomain>
 <focndomain hgrid="ne120np4"  >share/domains/domain.ocn.ne120np4_gx1v6.111226.nc</focndomain>
 <focndomain hgrid="ne240np4"  >share/domains/domain.ocn.ne240np4_gx1v6.111226.nc</focndomain>
+<focndomain hgrid="1.9x2.5" ocn="som">atm/cam/ocnfrac/domain.aqua.fv1.9x2.5.nc</focndomain>
 
 <!-- CAM-Oslo variables -->
 <volc_fraction_coarse   >0.0</volc_fraction_coarse>

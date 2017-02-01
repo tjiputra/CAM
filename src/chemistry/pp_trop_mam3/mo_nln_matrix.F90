@@ -1,23 +1,11 @@
-
-
-
-
-
       module mo_nln_matrix
-
       use shr_kind_mod, only : r8 => shr_kind_r8
-
       private
       public :: nlnmat
-
       contains
-
       subroutine nlnmat( mat, y, rxt, lmat, dti )
-
       use chem_mods, only : gas_pcnst, rxntot, nzcnt
-
       implicit none
-
 !----------------------------------------------
 ! ... dummy arguments
 !----------------------------------------------

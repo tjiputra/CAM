@@ -1,12 +1,5 @@
-
-
-
-
-
       module m_spc_id
-
       implicit none
-
       integer, parameter :: id_O3 = 1
       integer, parameter :: id_O = 2
       integer, parameter :: id_O1D = 3
@@ -181,6 +174,4 @@
       integer, parameter :: id_DST02 = 172
       integer, parameter :: id_DST03 = 173
       integer, parameter :: id_DST04 = 174
-
-
       end module m_spc_id

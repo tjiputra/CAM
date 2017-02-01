@@ -142,29 +142,26 @@ public :: &
      micro_mg_get_cols, &
      micro_mg_tend
 
-! switch for specification rather than prediction of droplet and crystal number
+! Switches for specification rather than prediction of droplet and crystal number
 ! note: number will be adjusted as needed to keep mean size within bounds,
 ! even when specified droplet or ice number is used
-
+!
 ! If constant cloud ice number is set (nicons = .true.),
 ! then all microphysical processes except mass transfer due to ice nucleation
 ! (mnuccd) are based on the fixed cloud ice number. Calculation of
 ! mnuccd follows from the prognosed ice crystal number ni.
 
-! nccons = .true. to specify constant cloud droplet number
-! nicons = .true. to specify constant cloud ice number
+logical :: nccons  ! nccons = .true. to specify constant cloud droplet number
+logical :: nicons  ! nicons = .true. to specify constant cloud ice number
 
-logical, parameter, public :: nccons = .false.
-logical, parameter, public :: nicons = .false.
+! specified ice and droplet number concentrations
+! note: these are local in-cloud values, not grid-mean
+real(r8) :: ncnst  ! droplet num concentration when nccons=.true. (m-3)
+real(r8) :: ninst  ! ice num concentration when nicons=.true. (m-3)
 
 !=========================================================
 ! Private module parameters
 !=========================================================
-
-! parameters for specified ice and droplet number concentration
-! note: these are local in-cloud values, not grid-mean
-real(r8), parameter :: ncnst = 100.e6_r8    ! droplet num concentration when nccons=.true. (m-3)
-real(r8), parameter :: ninst = 0.1e6_r8     ! ice num concentration when nicons=.true. (m-3)
 
 !Range of cloudsat reflectivities (dBz) for analytic simulator
 real(r8), parameter :: csmin = -30._r8
@@ -237,7 +234,8 @@ subroutine micro_mg_init( &
      rhmini_in, micro_mg_dcs,            &
      microp_uniform_in, do_cldice_in, use_hetfrz_classnuc_in, &
      micro_mg_precip_frac_method_in, micro_mg_berg_eff_factor_in, &
-     allow_sed_supersat_in, do_sb_physics_in, errstring)
+     allow_sed_supersat_in, do_sb_physics_in, &
+     nccons_in, nicons_in, ncnst_in, ninst_in, errstring)
 
   use micro_mg_utils, only: micro_mg_utils_init
 
@@ -273,6 +271,10 @@ subroutine micro_mg_init( &
   logical,  intent(in)  ::  allow_sed_supersat_in ! allow supersaturated conditions after sedimentation loop
   logical,  intent(in)  ::  do_sb_physics_in ! do SB autoconversion and accretion physics
 
+  logical,  intent(in)  :: nccons_in
+  logical,  intent(in)  :: nicons_in
+  real(r8), intent(in)  :: ncnst_in
+  real(r8), intent(in)  :: ninst_in
 
   character(128), intent(out) :: errstring    ! Output status (non-blank for error return)
 
@@ -298,6 +300,11 @@ subroutine micro_mg_init( &
   micro_mg_berg_eff_factor    = micro_mg_berg_eff_factor_in
   allow_sed_supersat          = allow_sed_supersat_in
   do_sb_physics               = do_sb_physics_in
+
+  nccons = nccons_in
+  nicons = nicons_in
+  ncnst  = ncnst_in
+  ninst  = ninst_in
 
   ! latent heats
 
@@ -2118,10 +2125,10 @@ subroutine micro_mg_tend ( &
            fni(i,k) = g*rho(i,k)* &
                 min(ain(i,k)*gamma_bi_plus1/lami(i,k)**bi,1.2_r8*rhof(i,k))
 
-           ! adjust the ice fall velocity for smaller (r < 10 um) ice
-           ! particles (blend over 8-12 um)
+           ! adjust the ice fall velocity for smaller (r < 20 um) ice
+           ! particles (blend over 18-20 um)
            irad = 1.5_r8 / lami(i,k) * 1e6_r8
-           ifrac = min(1._r8, max(0._r8, (irad - 8._r8) / 4._r8))
+           ifrac = min(1._r8, max(0._r8, (irad - 18._r8) / 2._r8))
  
            if (ifrac .lt. 1._r8) then
               vtrmi(i,k) = ifrac * vtrmi(i,k) + & 
@@ -2129,7 +2136,7 @@ subroutine micro_mg_tend ( &
                  min(ajn(i,k)*gamma_bj_plus4/(6._r8*lami(i,k)**bj), &
                  1.2_r8*rhof(i,k))
 
-              fi(i,k) = g*rho(i,k)+vtrmi(i,k)
+              fi(i,k) = g*rho(i,k)*vtrmi(i,k)
               fni(i,k) = ifrac * fni(i,k) + & 
                  (1._r8 - ifrac) * &
                  g*rho(i,k)* &

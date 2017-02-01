@@ -308,19 +308,31 @@ subroutine co2_init_cnst(name, latvals, lonvals, mask, q)
    logical,          intent(in)  :: mask(:)    ! Only initialize where .true.
    real(r8),         intent(out) :: q(:,:)     ! kg tracer/kg dry air (gcol, plev
 !-----------------------------------------------------------------------
+   integer :: k, nlev
 
    if (.not. co2_flag) return
  
-   select case (name)
-   case ('CO2_OCN')
-      q = chem_surfvals_get('CO2MMR')
-   case ('CO2_FFF')
-      q = chem_surfvals_get('CO2MMR')
-   case ('CO2_LND')
-      q = chem_surfvals_get('CO2MMR')
-   case ('CO2')
-      q = chem_surfvals_get('CO2MMR')
-   end select
+   nlev = size(q, 2)
+   do k = 1, nlev
+     select case (name)
+     case ('CO2_OCN')
+       where(mask)
+         q(:, k) = chem_surfvals_get('CO2MMR')
+       end where
+     case ('CO2_FFF')
+       where(mask)
+         q(:, k) = chem_surfvals_get('CO2MMR')
+       end where
+     case ('CO2_LND')
+       where(mask)
+         q(:, k) = chem_surfvals_get('CO2MMR')
+       end where
+     case ('CO2')
+       where(mask)
+         q(:, k) = chem_surfvals_get('CO2MMR')
+       end where
+     end select
+   end do
 
 end subroutine co2_init_cnst
 !===============================================================================

@@ -12,7 +12,8 @@ module dp_coupling
    use physconst,     only: cpair, gravit, rair, zvir, cpairv, rairv
    use geopotential,  only: geopotential_t
    use check_energy,  only: check_energy_timestep_init
-   use dynamics_vars, only: T_FVDYCORE_GRID
+   use dynamics_vars,     only: T_FVDYCORE_GRID, t_fvdycore_state
+   use dyn_internal_state,only: get_dyn_state
    use dyn_comp,      only: dyn_import_t, dyn_export_t
    use cam_abortutils,    only: endrun
 #if defined ( SPMD )
@@ -92,7 +93,7 @@ CONTAINS
 !-----------------------------------------------------------------------
 ! !INPUT PARAMETERS:
 !
-    type(T_FVDYCORE_GRID), intent(in) :: grid ! FV Dynamics grid
+    type(t_fvdycore_grid), intent(in) :: grid
     type(physics_buffer_desc), pointer :: pbuf2d(:,:)
     type(dyn_export_t), intent(in)    :: dyn_out  ! dynamics export 
 
@@ -122,6 +123,8 @@ CONTAINS
 !-----------------------------------------------------------------------
 !BOC
 ! !LOCAL VARIABLES:
+
+    type(t_fvdycore_state), pointer :: dyn_state
 
 ! Variables from dynamics export container
     real(r8), pointer :: phisxy(:,:)              ! surface geopotential
@@ -203,6 +206,8 @@ CONTAINS
 
 !---------------------------End Local workspace-------------------------
 
+    dyn_state => get_dyn_state()
+
     if (use_gw_front .or. use_gw_front_igw) then
 
        allocate(frontgf(grid%ifirstxy:grid%ilastxy,plev,grid%jfirstxy:grid%jlastxy), stat=astat)
@@ -259,7 +264,7 @@ CONTAINS
     allocate (v3(ifirstxy:ilastxy, km, jfirstxy:jlastxy))
 
     if (iam .lt. grid%npes_xy) then
-       call d2a3dikj( grid, u3sxy,  v3sxy, u3, v3 )
+       call d2a3dikj(grid, dyn_state%am_correction, u3sxy,  v3sxy, u3, v3)
     end if  ! (iam .lt. grid%npes_xy)
 
     call t_stopf  ('d2a3dikj')
@@ -711,6 +716,8 @@ chnk_loop2 : &
 !BOC
 ! !LOCAL VARIABLES:
 
+    type(t_fvdycore_state), pointer :: dyn_state
+
 ! Variables from the dynamics import container
 
     real(r8), pointer :: psxy(:,:)
@@ -756,6 +763,8 @@ chnk_loop2 : &
     integer  :: im, jm, km, ng_d, ng_s, iam
     integer  :: ifirstxy, ilastxy, jfirstxy, jlastxy 
     integer  :: jfirst, jlast, kfirst, klast
+
+    dyn_state => get_dyn_state()
 
 ! Pull the variables out of the dynamics export container
 
@@ -930,7 +939,8 @@ chnk_loop2 : &
        call t_barrierf('sync_uv3s_update', grid%commxy)
        call t_startf('uv3s_update')
        if (iam .lt. grid%npes_xy) then
-          call uv3s_update( grid, dudtxy, u3sxy, dvdtxy, v3sxy, dt5 )
+          call uv3s_update(grid, dudtxy, u3sxy, dvdtxy, v3sxy, dt5, &
+                           dyn_state%am_correction)
        end if  ! (iam .lt. grid%npes_xy)
        call t_stopf('uv3s_update')
 

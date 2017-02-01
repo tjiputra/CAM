@@ -36,7 +36,7 @@ yellowstone/intel/aux_cam:
 
 hobart/nag:
 
-hobart/pgi or jaguar/pgi:
+hobart/pgi:
 
 CAM tag used for the baseline comparison tests if different than previous
 tag:

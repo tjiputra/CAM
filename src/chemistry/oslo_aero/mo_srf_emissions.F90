@@ -131,19 +131,21 @@ contains
 
        if (m > 0) then
           has_emis(m) = .true.
-          has_emis(m) = has_emis(m) .and. ( .not. any( flbc_list == spc_name ) )
        else 
           write(iulog,*) 'srf_emis_inti: spc_name ',spc_name,' is not included in the simulation'
           call endrun('srf_emis_inti: invalid surface emission specification')
        endif
 
-       if ( has_emis(m) ) then
-          nn = nn+1
-          emis_species(nn) = spc_name
-          emis_filenam(nn) = filename
-          emis_indexes(nn) = m
-          emis_scalefactor(nn) = xdbl
+       if (any( flbc_list == spc_name )) then
+          call endrun('srf_emis_inti: ERROR -- cannot specify both fixed LBC ' &
+                    //'and emissions for the same species: '//trim(spc_name))
        endif
+
+       nn = nn+1
+       emis_species(nn) = spc_name
+       emis_filenam(nn) = filename
+       emis_indexes(nn) = m
+       emis_scalefactor(nn) = xdbl
 
     enddo count_emis
 
@@ -342,13 +344,11 @@ contains
 
        flux(:) = 0._r8
        do isec = 1,emissions(m)%nsectors
-          flux(:ncol) = flux(:ncol) + emissions(m)%fields(isec)%data(:ncol,1,lchnk)
+          flux(:ncol) = flux(:ncol) + emissions(m)%scalefactor*emissions(m)%fields(isec)%data(:ncol,1,lchnk)
        enddo
 
-       flux(:ncol) = emissions(m)%scalefactor*flux(:ncol)
-
        units = to_lower(trim(emissions(m)%fields(1)%units(:GLC(emissions(m)%fields(1)%units))))
-       
+
        if ( any( mks_units(:) == units ) ) then
           sflx(:ncol,n) = sflx(:ncol,n) + flux(:ncol)
        else

@@ -89,6 +89,7 @@ subroutine read_namelist(nlfilename, single_column, scmlat, scmlon)
    use metdata,             only: metdata_readnl
 #endif
    use offline_driver,      only: offline_driver_readnl
+   use inic_analytic,       only: analytic_ic_readnl
    use rate_diags,          only: rate_diags_readnl
    use tracers,             only: tracers_readnl
 
@@ -183,6 +184,7 @@ subroutine read_namelist(nlfilename, single_column, scmlat, scmlon)
    call oslo_ctl_readnl(nlfilename)
 #endif
    call offline_driver_readnl(nlfilename)
+   call analytic_ic_readnl(nlfilename)
    call rate_diags_readnl(nlfilename)
    call scam_readnl(nlfilename, single_column, scmlat, scmlon)
 

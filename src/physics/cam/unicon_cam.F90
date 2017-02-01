@@ -818,25 +818,33 @@ subroutine unicon_init_cnst(name, latvals, lonvals, mask, q)
    logical,          intent(in)  :: mask(:)    ! Only initialize where .true.
    real(r8),         intent(out) :: q(:,:)     ! kg tracer/kg dry air (gcol, plev
    !-----------------------------------------------------------------------
+   integer :: k
 
 #ifdef USE_UNICON
 
-   if ( name == 'ORGawk' ) then
-      q = 0.0_r8
-      return
-   else if ( name == 'ORGthl' ) then
-      q = 100.0_r8
-      return
-   else if ( name == 'ORGqto' ) then
-      q = 100.0_r8
-      return
-   else if ( name == 'ORGuoo' ) then
-      q = 100.0_r8
-      return
-   else if ( name == 'ORGvoo' ) then
-      q = 100.0_r8
-      return
-   end if
+   do k = 1, size(q, 2)
+     if ( name == 'ORGawk' ) then
+       where(mask)
+         q(:,k) = 0.0_r8
+       end where
+     else if ( name == 'ORGthl' ) then
+       where(mask)
+         q(:,k) = 100.0_r8
+       end where
+     else if ( name == 'ORGqto' ) then
+       where(mask)
+         q(:,k) = 100.0_r8
+       end where
+     else if ( name == 'ORGuoo' ) then
+       where(mask)
+         q(:,k) = 100.0_r8
+       end where
+     else if ( name == 'ORGvoo' ) then
+       where(mask)
+         q(:,k) = 100.0_r8
+       end where
+     end if
+   end do
 
 #endif
 

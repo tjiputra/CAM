@@ -113,12 +113,15 @@ module clubb_intr
     l_implemented    = .true.,        &  ! Implemented in a host model (always true)
     l_host_applies_sfc_fluxes = .false.  ! Whether the host model applies the surface fluxes
     
+  logical, parameter, private :: &
+    apply_to_heat    = .false.           ! Apply WACCM energy fixer to heat or not (.true. = yes (duh))  
+    
   logical            :: lq(pcnst)
   logical            :: prog_modal_aero
   logical            :: do_rainturb
   logical            :: do_expldiff
   logical            :: clubb_do_adv
-  logical            :: clubb_do_liqsupersat
+  logical            :: clubb_do_liqsupersat = .false.
   logical            :: history_budget
 
   logical            :: clubb_l_lscale_plume_centered
@@ -304,7 +307,6 @@ end function clubb_implements_cnst
   ! =============================================================================== !
 
 subroutine clubb_init_cnst(name, latvals, lonvals, mask, q)
-
 #ifdef CLUBB_SGS
     use constants_clubb,        only: w_tol_sqd, rt_tol, thl_tol  
 #endif
@@ -320,19 +322,60 @@ subroutine clubb_init_cnst(name, latvals, lonvals, mask, q)
    real(r8),         intent(in)  :: lonvals(:) ! lon in degrees (ncol)
    logical,          intent(in)  :: mask(:)    ! Only initialize where .true.
    real(r8),         intent(out) :: q(:,:)     ! kg tracer/kg dry air (gcol, plev
+
    !-----------------------------------------------------------------------
+   integer :: k, nlev
 
 #ifdef CLUBB_SGS
    if (clubb_do_adv) then
-      if (trim(name) == trim(cnst_names(1))) q = thl_tol**2
-      if (trim(name) == trim(cnst_names(2))) q = rt_tol**2
-      if (trim(name) == trim(cnst_names(3))) q = 0.0_r8
-      if (trim(name) == trim(cnst_names(4))) q = 0.0_r8
-      if (trim(name) == trim(cnst_names(5))) q = 0.0_r8
-      if (trim(name) == trim(cnst_names(6))) q = w_tol_sqd
-      if (trim(name) == trim(cnst_names(7))) q = 0.0_r8
-      if (trim(name) == trim(cnst_names(8))) q = w_tol_sqd
-      if (trim(name) == trim(cnst_names(9))) q = w_tol_sqd
+      nlev = size(q, 2)
+      do k = 1, nlev
+         if (trim(name) == trim(cnst_names(1))) then
+            where(mask)
+               q(:,k) = thl_tol**2
+            end where
+         end if
+         if (trim(name) == trim(cnst_names(2))) then
+            where(mask)
+               q(:,k) = rt_tol**2
+            end where
+         end if
+         if (trim(name) == trim(cnst_names(3))) then
+            where(mask)
+               q(:,k) = 0.0_r8
+            end where
+         end if
+         if (trim(name) == trim(cnst_names(4))) then
+            where(mask)
+               q(:,k) = 0.0_r8
+            end where
+         end if
+         if (trim(name) == trim(cnst_names(5))) then
+            where(mask)
+               q(:,k) = 0.0_r8
+            end where
+         end if
+         if (trim(name) == trim(cnst_names(6))) then
+            where(mask)
+               q(:,k) = w_tol_sqd
+            end where
+         end if
+         if (trim(name) == trim(cnst_names(7))) then
+            where(mask)
+               q(:,k) = 0.0_r8
+            end where
+         end if
+         if (trim(name) == trim(cnst_names(8))) then
+            where(mask)
+               q(:,k) = w_tol_sqd
+            end where
+         end if
+         if (trim(name) == trim(cnst_names(9))) then
+            where(mask)
+               q(:,k) = w_tol_sqd
+            end where
+         end if
+      end do
    end if
 #endif
 
@@ -829,6 +872,7 @@ end subroutine clubb_init_cnst
     call addfld ('CMELIQ',           (/ 'lev' /),  'A', 'kg/kg/s',  'Rate of cond-evap of liq within the cloud')
 
     call addfld ('QSATFAC',          (/ 'lev' /),  'A', '-', 'Subgrid cloud water saturation scaling factor')
+    call addfld ('KVH_CLUBB',        (/ 'ilev' /), 'A', 'm2/s',      'Vertical Diffusivity')
  
     !  Initialize statistics, below are dummy variables
     dum1 = 300._r8
@@ -976,6 +1020,7 @@ end subroutine clubb_init_cnst
    use camsrfexch,     only: cam_in_t
    use time_manager,   only: is_first_step   
    use cam_abortutils, only: endrun
+   use tropopause,     only: tropopause_findChemTrop
       
 #ifdef CLUBB_SGS
    use hb_diff,                   only: pblintd
@@ -1005,7 +1050,7 @@ end subroutine clubb_init_cnst
         zt2zm_api, zm2zt_api
 
    ! These are not exposed by the api module, but we want them anyway!
-   use cldfrc2m,                  only: aist_vector
+   use cldfrc2m,                  only: aist_vector, rhmini_const, rhmaxi_const, rhminis_const, rhmaxis_const
    use cam_history,               only: outfld
 
    use macrop_driver,             only: liquid_macro_tend
@@ -1197,7 +1242,7 @@ end subroutine clubb_init_cnst
    real(r8) :: qrl_clubb(pverp+1-top_lev)
    real(r8) :: qrl_zm(pverp+1-top_lev)
    real(r8) :: thlp2_rad_out(pverp+1-top_lev)
-   real(r8) :: apply_const
+   real(r8) :: apply_const, rtm_test
 
    integer                               :: time_elapsed                ! time keep track of stats          [s]
    real(r8), dimension(nparams)          :: clubb_params                ! These adjustable CLUBB parameters (C1, C2 ...)
@@ -1255,7 +1300,11 @@ end subroutine clubb_init_cnst
    real(r8)                          :: qctend(pcols,pver)
    real(r8)                          :: inctend(pcols,pver)
    real(r8)                          :: fqtend(pcols,pver)
+   real(r8)                          :: rhmini(pcols)
+   real(r8)                          :: rhmaxi(pcols)
+   integer                           :: troplev(pcols)
    logical                           :: lqice(pcnst)
+   logical                           :: apply_to_surface
 
    real(r8) :: temp2d(pcols,pver), temp2dp(pcols,pverp)  ! temporary array for holding scaled outputs
 
@@ -1511,6 +1560,8 @@ end subroutine clubb_init_cnst
 
    !  Initialize physics tendencies
    call physics_ptend_init(ptend_loc,state%psetcols, 'clubb', ls=.true., lu=.true., lv=.true., lq=lq)
+
+   call tropopause_findChemTrop(state, troplev)
 
    !  Loop over all columns in lchnk to advance CLUBB core
    do i=1,ncol   ! loop over columns
@@ -1921,6 +1972,8 @@ end subroutine clubb_init_cnst
       khzt(i,:top_lev-1) = 0._r8
       qclvar(i,:top_lev-1) = 2._r8
 
+      call outfld('KVH_CLUBB', khzt, pcols, lchnk)
+
       ! enforce zero tracer tendencies above the top_lev level -- no change
       icnt=0
       do ixind=1,pcnst
@@ -1941,10 +1994,9 @@ end subroutine clubb_init_cnst
       !   The second is to provider a fixer because CLUBB and CAM's thermodynamic
       !   variables are different.  
 
-      ! Limit the energy fixer to find highest layer where CLUBB is active 
-      ! Find first level where rtp2 is past a certain threshold or where
-      ! CLUBB has generated a cloud water mixing ratio greater than zero 
-      clubbtop = 1
+      ! Initialize clubbtop with the chemistry topopause top, to prevent CLUBB from
+      !  firing up in the stratosphere 
+      clubbtop = troplev(i)
       do while ((rtp2(i,clubbtop) .le. 1.e-15_r8 .and. rcm(i,clubbtop) .eq. 0._r8) .and. clubbtop .lt. pver-1)
          clubbtop = clubbtop + 1
       enddo    
@@ -1975,19 +2027,38 @@ end subroutine clubb_init_cnst
       se_upper_diss = (se_upper_a - se_upper_b)/(state1%pint(i,pverp)-state1%pint(i,clubbtop+1))
       tw_upper_diss = (tw_upper_a - tw_upper_b)/(state1%pint(i,pverp)-state1%pint(i,clubbtop+1))
       
-      ! Apply the disbalances above to layers where CLUBB is active
-      do k=clubbtop+1,pver
-        clubb_s(k) = clubb_s(k) + se_upper_diss*gravit
-        rtm(i,k) = rtm(i,k) + tw_upper_diss*gravit
-      enddo
+      ! Perform a test to see if there will be any negative RTM errors
+      !  in the column.  If so, apply the disbalance to the surface
+      apply_to_surface = .false.
+      if (tw_upper_diss .lt. 0._r8) then
+        do k=clubbtop+1,pver
+	  rtm_test = (rtm(i,k) + tw_upper_diss*gravit) - rcm(i,k)
+          if (rtm_test .lt. 0._r8) then
+	    apply_to_surface = .true.
+	  endif
+        enddo
+      endif
+      
+      if (apply_to_surface) then
+        tw_upper_diss = (tw_upper_a - tw_upper_b)/(state1%pint(i,pverp)-state1%pint(i,pver))
+	se_upper_diss = (se_upper_a - se_upper_b)/(state1%pint(i,pverp)-state1%pint(i,pver))
+        rtm(i,pver) = rtm(i,pver) + tw_upper_diss*gravit
+	if (apply_to_heat) clubb_s(pver) = clubb_s(pver) + se_upper_diss*gravit
+      else
+        ! Apply the disbalances above to layers where CLUBB is active
+        do k=clubbtop+1,pver
+          rtm(i,k) = rtm(i,k) + tw_upper_diss*gravit
+	  if (apply_to_heat) clubb_s(k) = clubb_s(k) + se_upper_diss*gravit
+        enddo
+      endif      
       
       ! Essentially "zero" out tendencies in the layers above where CLUBB is active
       do k=1,clubbtop
-        clubb_s(k) = state1%s(i,k)
+        if (apply_to_heat) clubb_s(k) = state1%s(i,k)
         rcm(i,k) = state1%q(i,k,ixcldliq)
         rtm(i,k) = state1%q(i,k,ixq) + rcm(i,k)
       enddo           
-     
+
       ! Compute integrals for static energy, kinetic energy, water vapor, and liquid water
       ! after CLUBB is called.  
       se_a = 0._r8
@@ -2127,10 +2198,10 @@ end subroutine clubb_init_cnst
    call physics_ptend_sum(ptend_loc,ptend_all,ncol)
    call physics_update(state1,ptend_loc,hdtime)
  
-    ! CLUBB is introducing RHliq > 1. Use ice_macro_tend to enforce
-    ! RHliq <= 1 everywhere. Do the adjustment here so it is correct
-    ! coming out of CLUBB. Hopefull this can be removed and CLUUB core
-    ! itself will maintain the RHliq <= 1 constraint.
+    ! Due to the order of operation of CLUBB, which closes on liquid first, 
+    ! then advances it's predictive equations second, this can lead to 
+    ! RHliq > 1 directly before microphysics is called.  Therefore, we use 
+    ! ice_macro_tend to enforce RHliq <= 1 everywhere before microphysics is called. 
  
     if (clubb_do_liqsupersat) then
  
@@ -2380,10 +2451,26 @@ end subroutine clubb_init_cnst
    qsatfac(:, :top_lev-1) = 0._r8
 
    do k = top_lev, pver
+
+      ! For Type II PSC and for thin cirrus, the clouds can be thin, but
+      ! extensive and they should start forming when the gridbox mean saturation
+      ! reaches 1.0.
+      !
+      ! For now, use the tropopause diagnostic to determine where the Type II
+      ! PSC should be, but in the future wold like a better metric that can also
+      ! identify the level for thin cirrus. Include the tropopause level so that
+      ! the cold point tropopause will use the stratospheric values.
+      where (k <= troplev)
+         rhmini = rhminis_const
+         rhmaxi = rhmaxis_const
+      elsewhere
+         rhmini = rhmini_const
+         rhmaxi = rhmaxi_const
+      end where
+
       call aist_vector(state1%q(:,k,ixq),state1%t(:,k),state1%pmid(:,k),state1%q(:,k,ixcldice), &
            state1%q(:,k,ixnumice),cam_in%landfrac(:),cam_in%snowhland(:),aist(:,k),ncol,&
-           qsatfac_out=qsatfac(:,k))
-
+           qsatfac_out=qsatfac(:,k), rhmini_in=rhmini, rhmaxi_in=rhmaxi)
    enddo
   
    ! --------------------------------------------------------------------------------- !  
@@ -2467,7 +2554,9 @@ end subroutine clubb_init_cnst
    call outfld( 'WPRTP_CLUBB',      wprtp_output,            pcols, lchnk )
    call outfld( 'RTP2_CLUBB',       rtp2*1000._r8,           pcols, lchnk )
    call outfld( 'THLP2_CLUBB',      thlp2,                   pcols, lchnk )
-   call outfld( 'RTPTHLP_CLUBB',    rtpthlp_output*1000._r8, pcols, lchnk )
+
+   rtpthlp_output(:ncol,:) = rtpthlp_output(:ncol,:) * 1000._r8
+   call outfld( 'RTPTHLP_CLUBB',    rtpthlp_output,          pcols, lchnk )
 
    temp2dp(:ncol,:) = rcm(:ncol,:) * 1000._r8
    call outfld( 'RCM_CLUBB',        temp2dp,                 pcols, lchnk )

@@ -273,7 +273,7 @@ subroutine vertical_diffusion_init(pbuf2d)
   use trb_mtn_stress_cam,only : trb_mtn_stress_init
   use beljaars_drag_cam, only : beljaars_drag_init
   use upper_bc,          only : ubc_init
-  use phys_control,      only : waccmx_is
+  use phys_control,      only : waccmx_is, fv_am_correction
 
   type(physics_buffer_desc), pointer :: pbuf2d(:,:)
   character(128) :: errstring   ! Error status for init_vdiff
@@ -416,7 +416,7 @@ subroutine vertical_diffusion_init(pbuf2d)
   ! Initialize diffusion solver module !
   ! ---------------------------------- !
 
-  call init_vdiff( r8, iulog, rair, cpair, gravit, do_iss, errstring )
+  call init_vdiff(r8, iulog, rair, cpair, gravit, do_iss, fv_am_correction, errstring)
   call handle_errmsg(errstring, subname="init_vdiff")
 
   ! Use fieldlist_wet to select the fields which will be diffused using moist mixing ratios ( all by default )

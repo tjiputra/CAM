@@ -66,6 +66,7 @@ contains
 
     use cam_control_mod,    only: moist_physics
     use cam_diagnostics,    only: diag_register
+    use chemistry,          only: chem_register
     use tracers,            only: tracers_register
     use check_energy,       only: check_energy_register
 
@@ -101,6 +102,9 @@ contains
 
     ! Register diagnostics PBUF
     call diag_register()
+
+    ! register chemical constituents including aerosols ...
+    call chem_register()
 
     ! Register test tracers
     call tracers_register()
@@ -157,6 +161,7 @@ contains
 
     use cam_control_mod,    only: initial_run, ideal_phys
     use check_energy,       only: check_energy_init
+    use chemistry,          only: chem_init, chem_is_active
     use cam_diagnostics,    only: diag_init
     use held_suarez_cam,    only: held_suarez_init
     use tracers,            only: tracers_init
@@ -206,6 +211,11 @@ contains
 
     if (ideal_phys) then
       call held_suarez_init(pbuf2d)
+    end if
+
+    if (chem_is_active()) then
+      ! Prognostic chemistry.
+      call chem_init(phys_state,pbuf2d)
     end if
 
   end subroutine phys_init
@@ -531,6 +541,7 @@ contains
     use time_manager,      only: get_nstep
     use check_energy,      only: check_energy_chng, check_energy_fix, check_energy_timestep_init
     use check_energy,      only: check_tracers_data, check_tracers_init, check_tracers_chng
+    use chemistry,         only: chem_is_active, chem_timestep_tend
     use held_suarez_cam,   only: held_suarez_tend
     use dycore,            only: dycore_is
 
@@ -543,7 +554,7 @@ contains
     type(physics_buffer_desc), pointer       :: pbuf(:)
 
     type(cam_out_t),           intent(inout) :: cam_out
-    type(cam_in_t),            intent(in)    :: cam_in
+    type(cam_in_t),            intent(inout) :: cam_in
 
 
     !
@@ -655,6 +666,18 @@ contains
     ! check_energy_chng to account for how the ideal physics forcings are
     ! changing the total exnergy.
     call check_energy_chng(state, tend, "tphysidl", nstep, ztodt, zero, zero, zero, zero)
+       
+    if (chem_is_active()) then
+      call t_startf('simple_chem')
+
+      call check_tracers_init(state, tracerint)
+      call chem_timestep_tend(state, ptend, cam_in, cam_out, ztodt, pbuf)
+      call physics_update(state, ptend, ztodt, tend)
+      call check_tracers_chng(state, tracerint, "chem_timestep_tend", nstep, ztodt, cam_in%cflx)
+
+      call t_stopf('simple_chem')
+      call physics_ptend_dealloc(ptend)
+    end if
 
     ! Save total enery after physics for energy conservation checks
     teout = state%te_cur

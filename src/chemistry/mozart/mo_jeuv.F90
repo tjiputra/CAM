@@ -25,8 +25,12 @@
        integer, parameter :: nspecies = 5            ! number of neutral species(O,N,O2,N2,CO2)
        integer, parameter :: nstat = 6               ! maximum number of ionization/dissociation
                                                      ! /excitation states for each speies
-       integer, parameter :: lmax = 23               ! number of wavelength bins in EUV 
-       real(r8), parameter :: heat_eff_fac = .05_r8  ! heating efficiency factor
+       integer, parameter :: lmax = 23               ! number of wavelength bins in EUV
+
+       real(r8), parameter :: heat_eff_fac = .08_r8  ! heating efficiency factor
+       ! Solar EUV direct heating was increased from 5% to 8% to bring it closer to the 
+       ! TIE-GCM value (5% applied twice for a total of 10%) -- Hanli Liu & Stan Solomon
+
        real(r8), parameter :: hc = 6.62608e-34_r8 * 2.9979e8_r8 / 1.e-9_r8
 
        real(r8) :: sigabs(lmax,nspecies)               ! absorption cross sections of major species

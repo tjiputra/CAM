@@ -17,6 +17,7 @@
       use cam_abortutils,only : endrun
       use mo_tracname,   only : solsym
       use chem_mods,     only : frc_from_dataset
+      use chem_mods,     only : is_scalar, is_vector
       use shr_kind_mod,  only : r8 => shr_kind_r8
       use cam_logfile,   only : iulog
 
@@ -26,6 +27,9 @@
 !      ... local variables
 !--------------------------------------------------------------
       integer :: ios
+
+      is_scalar = .true.
+      is_vector = .false.
 
       clscnt(:) = (/      0,     0,     0,    29,     0 /)
 

@@ -3,6 +3,8 @@
 
 
 
+
+
       module chem_mods
 !--------------------------------------------------------------
 ! ... Basic chemistry parameters and arrays
@@ -61,6 +63,8 @@
       character(len=16) :: inv_lst(max(1,nfs))
       character(len=16) :: extfrc_lst(max(1,extcnt))
       logical :: frc_from_dataset(max(1,extcnt))
+      logical :: is_vector
+      logical :: is_scalar
       character(len=16) :: slvd_lst(max(1,nslvd))
 
       end module chem_mods

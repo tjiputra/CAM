@@ -3,14 +3,14 @@ module mo_extfrc
   ! 	... insitu forcing module
   !---------------------------------------------------------------
 
-  use shr_kind_mod, only : r8 => shr_kind_r8
+  use shr_kind_mod,  only : r8 => shr_kind_r8
   use ppgrid,        only : pver, pverp
   use chem_mods,     only : gas_pcnst, extcnt, extfrc_lst, frc_from_dataset
   use spmd_utils,    only : masterproc
   use cam_abortutils,only : endrun
   use cam_history,   only : addfld, outfld, add_default, horiz_only
-  use cam_logfile,  only : iulog
-  use tracer_data,  only : trfld,trfile
+  use cam_logfile,   only : iulog
+  use tracer_data,   only : trfld,trfile
 
   implicit none
 
@@ -90,6 +90,7 @@ contains
     character(len=1), parameter :: datapath = ''
     logical         , parameter :: rmv_file = .false.
     logical  :: history_aerosol      ! Output the MAM aerosol tendencies
+    logical  :: history_chemistry
 
     character(len=32) :: extfrc_type = ' '
     character(len=80) :: file_interp_type = ' '
@@ -99,7 +100,7 @@ contains
 
     !-----------------------------------------------------------------------
  
-    call phys_getopts( history_aerosol_out        = history_aerosol   )
+    call phys_getopts( history_aerosol_out = history_aerosol, history_chemistry_out = history_chemistry )
 
     !-----------------------------------------------------------------------
     ! 	... species has insitu forcing ?
@@ -187,8 +188,7 @@ contains
           call addfld( trim(spc_name)//'_CLXF', horiz_only, 'A', 'kg/m2/s', &
                        'vertically intergrated external forcing for '//trim(spc_name) )
 #endif
-           if ( history_aerosol ) then 
-             call add_default( trim(spc_name)//'_XFRC', 1, ' ' )
+          if ( history_aerosol .or. history_chemistry ) then 
              call add_default( trim(spc_name)//'_CLXF', 1, ' ' )
           endif
        endif
@@ -366,22 +366,22 @@ contains
        n = forcings(m)%frc_ndx
 
        do isec = 1,forcings(m)%nsectors
-             frcing(:ncol,:,n) = frcing(:ncol,:,n) + forcings(m)%fields(isec)%data(:ncol,:,lchnk)
+          frcing(:ncol,:,n) = frcing(:ncol,:,n) + forcings(m)%scalefactor*forcings(m)%fields(isec)%data(:ncol,:,lchnk)
        enddo
-
-       frcing(:ncol,:,n) = forcings(m)%scalefactor*frcing(:ncol,:,n)
 
     enddo file_loop
 
     frc_loop : do n = 1,extcnt
        if (frc_from_dataset(n)) then
 
-       frcing_col(:ncol) = 0._r8
-       do k = 1,pver
-          frcing_col(:ncol) = frcing_col(:ncol) + frcing(:ncol,k,n)*(zint(:ncol,k)-zint(:ncol,k+1))*km_to_cm
-       enddo
+          xfcname = trim(extfrc_lst(n))//'_XFRC'
+          call outfld( xfcname, frcing(:ncol,:,n), ncol, lchnk )
 
-          xfcname = trim(extfrc_lst(n))
+          frcing_col(:ncol) = 0._r8
+          do k = 1,pver
+             frcing_col(:ncol) = frcing_col(:ncol) + frcing(:ncol,k,n)*(zint(:ncol,k)-zint(:ncol,k+1))*km_to_cm
+          enddo
+
 
 #ifdef OSLO_AERO
        !redefine to kg/m2/s if oslo aerosols
@@ -394,8 +394,8 @@ contains
                            *1.e-3_r8                 !==>> kg/m2
 #endif
 
-          xfcname = trim(xfcname)//'_CLXF'
-       call outfld( xfcname, frcing_col(:ncol), ncol, lchnk )
+          xfcname = trim(extfrc_lst(n))//'_CLXF'
+          call outfld( xfcname, frcing_col(:ncol), ncol, lchnk )
        endif
     end do frc_loop
 

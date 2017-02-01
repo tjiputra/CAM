@@ -91,9 +91,9 @@ fi
 echo "TER_ccsm.sh: restarting CESM; output in ${CAM_TESTDIR}/${test_name}/test.log" 
 
 cd ${CAM_TESTDIR}/case.$1.$2
-./xmlchange -file env_run.xml -id STOP_N -val $restart_length
-./xmlchange -file env_run.xml -id CONTINUE_RUN -val TRUE
-./xmlchange -file env_run.xml -id RUN_WITH_SUBMIT -val TRUE
+./xmlchange  -id STOP_N -val $restart_length
+./xmlchange  -id CONTINUE_RUN -val TRUE
+./xmlchange  -id RUN_WITH_SUBMIT -val TRUE
 runscript=`ls *.run`
 ./$runscript > ${CAM_TESTDIR}/${test_name}/test.log 2>&1
 rc=$?

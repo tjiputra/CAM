@@ -113,6 +113,7 @@ integer :: micro_mg_sub_version = 0      ! Second part of version number.
 real(r8) :: micro_mg_dcs = -1._r8
 
 logical :: microp_uniform
+logical :: micro_mg_adjust_cpt  = .false.
 
 character(len=16) :: micro_mg_precip_frac_method = 'max_overlap' ! type of precipitation fraction method
 
@@ -124,6 +125,14 @@ logical, public :: do_cldice ! Prognose cldice flag
 integer :: num_steps ! Number of MG substeps
 
 integer :: ncnst = 4       ! Number of constituents
+
+! Namelist variables for option to specify constant cloud droplet/ice number
+logical :: micro_mg_nccons = .false. ! set .true. to specify constant cloud droplet number
+logical :: micro_mg_nicons = .false. ! set .true. to specify constant cloud ice number
+! parameters for specified ice and droplet number concentration
+! note: these are local in-cloud values, not grid-mean
+real(r8) :: micro_mg_ncnst = 100.e6_r8 ! constant droplet num concentration (m-3)
+real(r8) :: micro_mg_ninst = 0.1e6_r8  ! constant ice num concentration (m-3)
 
 character(len=8), parameter :: &      ! Constituent names
    cnst_names(8) = (/'CLDLIQ', 'CLDICE','NUMLIQ','NUMICE', &
@@ -246,7 +255,8 @@ subroutine micro_mg_cam_readnl(nlfile)
 
   use namelist_utils,  only: find_group_name
   use units,           only: getunit, freeunit
-  use mpishorthand
+  use spmd_utils,      only: mpicom, mstrid=>masterprocid, mpi_integer, mpi_real8, &
+                             mpi_logical, mpi_character
 
   character(len=*), intent(in) :: nlfile  ! filepath for file containing namelist input
 
@@ -258,13 +268,13 @@ subroutine micro_mg_cam_readnl(nlfile)
 
   ! Local variables
   integer :: unitn, ierr
-  character(len=*), parameter :: subname = 'micro_mg_cam_readnl'
+  character(len=*), parameter :: sub = 'micro_mg_cam_readnl'
 
   namelist /micro_mg_nl/ micro_mg_version, micro_mg_sub_version, &
        micro_mg_do_cldice, micro_mg_do_cldliq, micro_mg_num_steps, &
-       microp_uniform, micro_mg_dcs, micro_mg_precip_frac_method, micro_mg_berg_eff_factor, &
-       micro_do_sb_physics
-
+       microp_uniform, micro_mg_dcs, micro_mg_precip_frac_method,  &
+       micro_mg_berg_eff_factor, micro_do_sb_physics, micro_mg_adjust_cpt, &
+       micro_mg_nccons, micro_mg_nicons, micro_mg_ncnst, micro_mg_ninst
   !-----------------------------------------------------------------------------
 
   if (masterproc) then
@@ -274,7 +284,7 @@ subroutine micro_mg_cam_readnl(nlfile)
      if (ierr == 0) then
         read(unitn, micro_mg_nl, iostat=ierr)
         if (ierr /= 0) then
-           call endrun(subname // ':: ERROR reading namelist')
+           call endrun(sub // ':: ERROR reading namelist')
         end if
      end if
      close(unitn)
@@ -291,8 +301,6 @@ subroutine micro_mg_cam_readnl(nlfile)
         select case (micro_mg_sub_version)
         case(0)
            ! MG version 1.0
-        case(5)
-           ! MG version 1.5 - MG2 development
         case default
            call bad_version_endrun()
         end select
@@ -311,20 +319,71 @@ subroutine micro_mg_cam_readnl(nlfile)
               &micro_mg_dcs has not been set to a valid value.")
   end if
 
-#ifdef SPMD
   ! Broadcast namelist variables
-  call mpibcast(micro_mg_version,            1, mpiint, 0, mpicom)
-  call mpibcast(micro_mg_sub_version,        1, mpiint, 0, mpicom)
-  call mpibcast(do_cldice,                   1, mpilog, 0, mpicom)
-  call mpibcast(do_cldliq,                   1, mpilog, 0, mpicom)
-  call mpibcast(num_steps,                   1, mpiint, 0, mpicom)
-  call mpibcast(microp_uniform,              1, mpilog, 0, mpicom)
-  call mpibcast(micro_mg_dcs,                1, mpir8,  0, mpicom)
-  call mpibcast(micro_mg_berg_eff_factor,    1, mpir8,  0, mpicom)
-  call mpibcast(micro_mg_precip_frac_method, 16, mpichar,0, mpicom)
-  call mpibcast(micro_do_sb_physics,           1, mpilog, 0, mpicom)
+  call mpi_bcast(micro_mg_version, 1, mpi_integer, mstrid, mpicom, ierr)
+  if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: micro_mg_version")
 
-#endif
+  call mpi_bcast(micro_mg_sub_version, 1, mpi_integer, mstrid, mpicom, ierr)
+  if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: micro_mg_sub_version")
+
+  call mpi_bcast(do_cldice, 1, mpi_logical, mstrid, mpicom, ierr)
+  if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: do_cldice")
+
+  call mpi_bcast(do_cldliq, 1, mpi_logical, mstrid, mpicom, ierr)
+  if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: do_cldliq")
+
+  call mpi_bcast(num_steps, 1, mpi_integer, mstrid, mpicom, ierr)
+  if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: num_steps")
+
+  call mpi_bcast(microp_uniform, 1, mpi_logical, mstrid, mpicom, ierr)
+  if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: microp_uniform")
+
+  call mpi_bcast(micro_mg_dcs, 1, mpi_real8, mstrid, mpicom, ierr)
+  if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: micro_mg_dcs")
+
+  call mpi_bcast(micro_mg_berg_eff_factor, 1, mpi_real8, mstrid, mpicom, ierr)
+  if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: micro_mg_berg_eff_factor")
+
+  call mpi_bcast(micro_mg_precip_frac_method, 16, mpi_character, mstrid, mpicom, ierr)
+  if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: micro_mg_precip_frac_method")
+
+  call mpi_bcast(micro_do_sb_physics, 1, mpi_logical, mstrid, mpicom, ierr)
+  if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: micro_do_sb_physics")
+
+  call mpi_bcast(micro_mg_adjust_cpt, 1, mpi_logical, mstrid, mpicom, ierr)
+  if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: micro_mg_adjust_cpt")
+
+  call mpi_bcast(micro_mg_nccons, 1, mpi_logical, mstrid, mpicom, ierr)
+  if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: micro_mg_nccons")
+
+  call mpi_bcast(micro_mg_nicons, 1, mpi_logical, mstrid, mpicom, ierr)
+  if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: micro_mg_nicons")
+
+  call mpi_bcast(micro_mg_ncnst, 1, mpi_real8, mstrid, mpicom, ierr)
+  if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: micro_mg_ncnst")
+
+  call mpi_bcast(micro_mg_ninst, 1, mpi_real8, mstrid, mpicom, ierr)
+  if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: micro_mg_ninst")
+
+  if (masterproc) then
+
+     write(iulog,*) 'MG microphysics namelist:'
+     write(iulog,*) '  micro_mg_version            = ', micro_mg_version
+     write(iulog,*) '  micro_mg_sub_version        = ', micro_mg_sub_version
+     write(iulog,*) '  micro_mg_do_cldice          = ', do_cldice
+     write(iulog,*) '  micro_mg_do_cldliq          = ', do_cldliq
+     write(iulog,*) '  micro_mg_num_steps          = ', num_steps
+     write(iulog,*) '  microp_uniform              = ', microp_uniform
+     write(iulog,*) '  micro_mg_dcs                = ', micro_mg_dcs
+     write(iulog,*) '  micro_mg_berg_eff_factor    = ', micro_mg_berg_eff_factor
+     write(iulog,*) '  micro_mg_precip_frac_method = ', micro_mg_precip_frac_method
+     write(iulog,*) '  micro_do_sb_physics         = ', micro_do_sb_physics
+     write(iulog,*) '  micro_mg_adjust_cpt         = ', micro_mg_adjust_cpt
+     write(iulog,*) '  micro_mg_nccons             = ', micro_mg_nccons
+     write(iulog,*) '  micro_mg_nicons             = ', micro_mg_nicons
+     write(iulog,*) '  micro_mg_ncnst              = ', micro_mg_ncnst
+     write(iulog,*) '  micro_mg_ninst              = ', micro_mg_ninst
+  end if
 
 contains
 
@@ -561,8 +620,15 @@ subroutine micro_mg_cam_init_cnst(name, latvals, lonvals, mask, q)
    logical,          intent(in)  :: mask(:)    ! Only initialize where .true.
    real(r8),         intent(out) :: q(:,:)     ! kg tracer/kg dry air (gcol, plev
    !-----------------------------------------------------------------------
+   integer :: k
 
-   if (micro_mg_cam_implements_cnst(name)) q = 0.0_r8
+   if (micro_mg_cam_implements_cnst(name)) then
+     do k = 1, size(q, 2)
+       where(mask)
+         q(:, k) = 0.0_r8
+       end where
+     end do
+   end if
 
 end subroutine micro_mg_cam_init_cnst
 
@@ -572,7 +638,6 @@ subroutine micro_mg_cam_init(pbuf2d)
    use time_manager,   only: is_first_step
    use micro_mg_utils, only: micro_mg_utils_init
    use micro_mg1_0, only: micro_mg_init1_0 => micro_mg_init
-   use micro_mg1_5, only: micro_mg_init1_5 => micro_mg_init
    use micro_mg2_0, only: micro_mg_init2_0 => micro_mg_init
 
    !-----------------------------------------------------------------------
@@ -630,19 +695,9 @@ subroutine micro_mg_cam_init(pbuf2d)
               r8, gravit, rair, rh2o, cpair, &
               rhoh2o, tmelt, latvap, latice, &
               rhmini, micro_mg_dcs, use_hetfrz_classnuc, &
-              micro_mg_precip_frac_method, micro_mg_berg_eff_factor, errstring)
-      case (5)
-         ! MG 1 does not initialize micro_mg_utils, so have to do it here.
-         call micro_mg_utils_init(r8, rh2o, cpair, tmelt, latvap, latice, &
-              micro_mg_dcs, errstring)
-         call handle_errmsg(errstring, subname="micro_mg_utils_init")
-
-         call micro_mg_init1_5( &
-              r8, gravit, rair, rh2o, cpair, &
-              tmelt, latvap, latice, rhmini, &
-              micro_mg_dcs,                  &
-              microp_uniform, do_cldice, use_hetfrz_classnuc, &
-              micro_mg_precip_frac_method, micro_mg_berg_eff_factor, errstring)
+              micro_mg_precip_frac_method, micro_mg_berg_eff_factor, &
+              micro_mg_nccons, micro_mg_nicons, micro_mg_ncnst,   &
+              micro_mg_ninst, errstring)
       end select
    case (2)
       ! Set constituent number for later loops.
@@ -656,7 +711,9 @@ subroutine micro_mg_cam_init(pbuf2d)
               micro_mg_dcs,                  &
               microp_uniform, do_cldice, use_hetfrz_classnuc, &
               micro_mg_precip_frac_method, micro_mg_berg_eff_factor, &
-              allow_sed_supersat, micro_do_sb_physics, errstring)
+              allow_sed_supersat, micro_do_sb_physics,          &
+              micro_mg_nccons, micro_mg_nicons, micro_mg_ncnst, &
+              micro_mg_ninst, errstring)
       end select
    end select
 
@@ -799,6 +856,17 @@ subroutine micro_mg_cam_init(pbuf2d)
       call addfld('FICE_SCOL', (/'psubcols','lev     '/), 'I', 'fraction', &
            'Sub-column fractional ice content within cloud', flag_xyfill=.true., fill_value=1.e30_r8)
    end if
+
+   
+   ! This is only if the coldpoint temperatures are being adjusted.
+   ! NOTE: Some fields related to these and output later are added in tropopause.F90.
+   if (micro_mg_adjust_cpt) then
+     call addfld ('TROPF_TADJ', (/ 'lev' /), 'A', 'K',  'Temperatures after cold point adjustment'                    )
+     call addfld ('TROPF_RHADJ', (/ 'lev' /), 'A', 'K', 'Relative Hunidity after cold point adjustment'               )
+     call addfld ('TROPF_CDT',   horiz_only,  'A', 'K',  'Cold point temperature adjustment'                           )
+     call addfld ('TROPF_CDZ',   horiz_only,  'A', 'm',  'Distance of coldpoint from coldest model level'              )
+   end if
+
 
    ! Averaging for cloud particle number and size
    call addfld ('AWNC',        (/ 'lev' /),  'A', 'm-3',      'Average cloud water number conc'                                   )
@@ -999,19 +1067,13 @@ subroutine micro_mg_cam_init(pbuf2d)
       call add_default ('NITNSZMX ', budget_histfile,' ')
       select case (micro_mg_version)
       case (1)
-         select case (micro_mg_sub_version)
-         case (0)
-            call add_default ('NCTNCONS ', budget_histfile, ' ')
-            call add_default ('NCTNNBMN ', budget_histfile, ' ')
-         end select
+         call add_default ('NCTNCONS ', budget_histfile, ' ')
+         call add_default ('NCTNNBMN ', budget_histfile, ' ')
       case (2)
-         select case (micro_mg_sub_version)
-         case (0)
-            call add_default ('FRZR ', budget_histfile, ' ')
-            call add_default ('NFRZR ', budget_histfile, ' ')
-            call add_default ('MNUCCRI ', budget_histfile, ' ')
-            call add_default ('NNUCCRI ', budget_histfile, ' ')
-         end select
+         call add_default ('FRZR ', budget_histfile, ' ')
+         call add_default ('NFRZR ', budget_histfile, ' ')
+         call add_default ('MNUCCRI ', budget_histfile, ' ')
+         call add_default ('NNUCCRI ', budget_histfile, ' ')
       end select
       call add_default ('MPDNLIQ  ', budget_histfile, ' ')
       call add_default ('MPDNICE  ', budget_histfile, ' ')
@@ -1112,7 +1174,6 @@ end subroutine micro_mg_cam_init
 subroutine micro_mg_cam_tend(state, ptend, dtime, pbuf)
 
    use micro_mg1_0, only: micro_mg_get_cols1_0 => micro_mg_get_cols
-   use micro_mg1_5, only: micro_mg_get_cols1_5 => micro_mg_get_cols
    use micro_mg2_0, only: micro_mg_get_cols2_0 => micro_mg_get_cols
 
    type(physics_state),         intent(in)    :: state
@@ -1130,14 +1191,8 @@ subroutine micro_mg_cam_tend(state, ptend, dtime, pbuf)
    
    select case (micro_mg_version)
    case (1)
-      select case (micro_mg_sub_version)
-      case (0)
-         call micro_mg_get_cols1_0(ncol, nlev, top_lev, state%q(:,:,ixcldliq), &
-              state%q(:,:,ixcldice), mgncol, mgcols)
-      case (5)
-         call micro_mg_get_cols1_5(ncol, nlev, top_lev, state%q(:,:,ixcldliq), &
-              state%q(:,:,ixcldice), mgncol, mgcols)
-      end select
+      call micro_mg_get_cols1_0(ncol, nlev, top_lev, state%q(:,:,ixcldliq), &
+           state%q(:,:,ixcldice), mgncol, mgcols)
    case (2)
       call micro_mg_get_cols2_0(ncol, nlev, top_lev, state%q(:,:,ixcldliq), &
            state%q(:,:,ixcldice), state%q(:,:,ixrain), state%q(:,:,ixsnow), &
@@ -1157,11 +1212,12 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
    use micro_mg_data, only: MGPacker, MGPostProc, accum_null, accum_mean
 
    use micro_mg1_0, only: micro_mg_tend1_0 => micro_mg_tend
-   use micro_mg1_5, only: micro_mg_tend1_5 => micro_mg_tend
    use micro_mg2_0, only: micro_mg_tend2_0 => micro_mg_tend
 
    use physics_buffer,  only: pbuf_col_type_index
    use subcol,          only: subcol_field_avg
+   use tropopause,      only: tropopause_find, TROP_ALG_CPP, TROP_ALG_NONE, NOTFOUND
+   use wv_saturation,   only: qsat
 
    type(physics_state),         intent(in)    :: state
    type(physics_ptend),         intent(out)   :: ptend
@@ -1345,10 +1401,6 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
 
    real(r8) :: packed_p(mgncol,nlev)
    real(r8) :: packed_pdel(mgncol,nlev)
-
-   ! This is only needed for MG1.5, and can be removed when support for
-   ! that version is dropped.
-   real(r8) :: packed_pint(mgncol,nlev+1)
 
    real(r8) :: packed_cldn(mgncol,nlev)
    real(r8) :: packed_liqcldf(mgncol,nlev)
@@ -1685,6 +1737,15 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
    real(r8) :: nr_grid(pcols,pver)
    real(r8) :: qs_grid(pcols,pver)
    real(r8) :: ns_grid(pcols,pver)
+   
+   real(r8) :: cp_rh(pcols,pver)
+   real(r8) :: cp_t(pcols)
+   real(r8) :: cp_z(pcols)
+   real(r8) :: cp_dt(pcols)
+   real(r8) :: cp_dz(pcols)
+   integer  :: troplev(pcols)
+   real(r8) :: es
+   real(r8) :: qs
 
    real(r8), pointer :: cmeliq_grid(:,:)
 
@@ -1927,6 +1988,40 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
    ! Initialize local state from input.
    call physics_state_copy(state, state_loc)
 
+   ! Because of the of limited vertical resolution, there can be a signifcant
+   ! warm bias at the cold point tropopause, which can create a wet bias in the
+   ! stratosphere. For the microphysics only, update the cold point temperature, with
+   ! an estimate of the coldest point between the model layers.
+   if (micro_mg_adjust_cpt) then
+      cp_rh(:ncol, :pver)  = 0._r8
+      cp_dt(:ncol)         = 0._r8
+      cp_dz(:ncol)         = 0._r8
+
+      call tropopause_find(state_loc, troplev, primary=TROP_ALG_CPP, backup=TROP_ALG_NONE, &
+                           tropZ=cp_z, tropT=cp_t)
+
+      do i = 1, ncol
+
+         ! Update statistics and output results.
+         if (troplev(i) .ne. NOTFOUND) then
+            cp_dt(i) = cp_t(i) - state_loc%t(i,troplev(i))
+            cp_dz(i) = cp_z(i) - state_loc%zm(i,troplev(i))
+
+            ! NOTE: This change in temperature is just for the microphysics
+            ! and should not be added to any tendencies or used to update
+            ! any states
+            state_loc%t(i,troplev(i)) = state_loc%t(i,troplev(i)) + cp_dt(i)
+         end if
+      end do
+
+      ! Output all of the statistics related to the cold point
+      ! tropopause adjustment. Th cold point information itself is
+      ! output in tropopause.F90.
+      call outfld("TROPF_TADJ", state_loc%t, pcols, lchnk)
+      call outfld("TROPF_CDT",  cp_dt,       pcols, lchnk)
+      call outfld("TROPF_CDZ",  cp_dz,       pcols, lchnk)
+   end if
+
    ! Initialize ptend for output.
    lq = .false.
    lq(1) = .true.
@@ -1968,7 +2063,7 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
       call post_proc%add_field(p(iflx), p(packed_iflx))
    end if
 
-      call post_proc%add_field(p(am_evp_st), p(packed_am_evp_st))
+   call post_proc%add_field(p(am_evp_st), p(packed_am_evp_st))
 
    call post_proc%add_field(p(prect), p(packed_prect))
    call post_proc%add_field(p(preci), p(packed_preci))
@@ -2034,7 +2129,7 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
    call post_proc%add_field(p(freqs), p(packed_freqs))
    call post_proc%add_field(p(freqr), p(packed_freqr))
    call post_proc%add_field(p(nfice), p(packed_nfice))
-   if (micro_mg_version /= 1 .or. micro_mg_sub_version /= 0) then
+   if (micro_mg_version /= 1) then
       call post_proc%add_field(p(qcrat), p(packed_qcrat), fillvalue=1._r8)
    end if
 
@@ -2103,8 +2198,6 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
    packed_p = packer%pack(state_loc%pmid)
    packed_pdel = packer%pack(state_loc%pdel)
 
-   packed_pint = packer%pack_interface(state_loc%pint)
-
    packed_cldn = packer%pack(ast)
    packed_liqcldf = packer%pack(alst_mic)
    packed_icecldf = packer%pack(aist_mic)
@@ -2123,7 +2216,7 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
    allocate(packed_nacon(mgncol,nlev,size(nacon, 3)))
    packed_nacon = packer%pack(nacon)
 
-   if (.not. do_cldice) then
+  if (.not. do_cldice) then
       packed_tnd_qsnow = packer%pack(tnd_qsnow)
       packed_tnd_nsnow = packer%pack(tnd_nsnow)
       packed_re_ice = packer%pack(re_ice)
@@ -2188,46 +2281,6 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
          packed_nctncons, packed_nctnnbmn, packed_nctnszmn,                    &
          packed_nctnszmx, packed_nctnncld, packed_nitncons, packed_nitnszmn,          &
          packed_nitnszmx, packed_nitnncld)
-
-
-!AL
-
-         case (5)
-
-            call micro_mg_tend1_5( &
-                 mgncol,   nlev,     dtime/num_steps,    &
-                 packed_t,       packed_q,                     &
-                 packed_qc,      packed_qi,    &
-                 packed_nc,      packed_ni,    &
-                 packed_relvar,             packed_accre_enhan,                            &
-                 packed_p,     packed_pdel,     packed_pint,     &
-                 packed_cldn,                packed_liqcldf,           packed_icecldf,           &
-                 packed_rate1ord_cw2pr_st,           packed_naai,     packed_npccn,    packed_rndst,    packed_nacon,    &
-                 packed_tlat,     packed_qvlat,    packed_qctend,    packed_qitend,    packed_nctend,    packed_nitend,    &
-                 packed_rel,      rel_fn_dum,   packed_rei,                packed_prect,    packed_preci,    &
-                 packed_nevapr,   packed_evapsnow, packed_am_evp_st, packed_prain,    &
-                 packed_prodsnow, packed_cmeout,   packed_dei, &
-                 packed_mu,       packed_lambdac,  packed_qsout,    packed_des,      packed_rflx,     packed_sflx,     &
-                 packed_qrout,              reff_rain_dum,          reff_snow_dum,          &
-                 packed_qcsevap,  packed_qisevap,  packed_qvres,    packed_cmei,  packed_vtrmc,   packed_vtrmi,    &
-                 packed_qcsedten, packed_qisedten, packed_pra,     packed_prc,     packed_mnuccc,  packed_mnucct,  &
-                 packed_msacwi,  packed_psacws,  packed_bergs,   packed_berg,    packed_melt,    packed_homo,    &
-                 packed_qcres,             packed_prci,    packed_prai,    packed_qires,             &
-                 packed_mnuccr,  packed_pracs,   packed_meltsdt,  packed_frzrdt,   packed_mnuccd,            &
-                 packed_nrout,   packed_nsout,    packed_refl,     packed_arefl,    packed_areflz,   packed_frefl,    &
-                 packed_csrfl,    packed_acsrfl,   packed_fcsrfl,             packed_rercld,             &
-                 packed_ncai,     packed_ncal,     packed_qrout2,   packed_qsout2,   packed_nrout2,   packed_nsout2,   &
-                 drout_dum,   dsout2_dum,   packed_freqs,    packed_freqr,    packed_nfice,    packed_qcrat,    &
-                 errstring, &
-                 packed_tnd_qsnow,          packed_tnd_nsnow,          packed_re_ice, packed_prer_evap,             &
-                 packed_frzimm, packed_frzcnt, packed_frzdep, &
-!AL
-         packed_nnuccco, packed_nnuccto, packed_npsacwso, packed_nsubco, packed_nprao,       &
-         packed_nprc1o, packed_nqcsedten, packed_nqisedten, packed_nmelto, packed_nhomoo,    &
-         packed_nimelto, packed_nihomoo, packed_nsacwio, packed_nsubio, packed_nprcio,       &
-         packed_npraio, packed_nnudepo, packed_npccno, packed_nnuccdo, packed_mnudepo,       &
-         packed_nctnszmx,packed_nctnszmn, packed_nctnncld, packed_nitncons, packed_nitnszmx, &
-         packed_nitnszmn, packed_nitnncld)
 
 
 !AL
@@ -2306,7 +2359,7 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
                   packed_nitnszmx, packed_nitnszmn, packed_nitnncld, &
 !AL
                  packed_tnd_qsnow,packed_tnd_nsnow,packed_re_ice,&
-		 packed_prer_evap,                                     &
+                 packed_prer_evap,                                     &
                  packed_frzimm,  packed_frzcnt,  packed_frzdep   )
          end select
       end select
@@ -2481,7 +2534,7 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
             cldfsnow(i,k) = 0._r8
          end if
          ! If no cloud and snow, then set to 0.25
-         if( ( cldfsnow(i,k) .lt. 1.e-4_r8 ) .and. ( qsout(i,k) .gt. 1.e-6_r8 ) ) then
+         if( ( cldfsnow(i,k) .le. 1.e-4_r8 ) .and. ( qsout(i,k) .gt. 1.e-6_r8 ) ) then
             cldfsnow(i,k) = 0.25_r8
          end if
          ! Calculate in-cloud snow water path
@@ -3220,6 +3273,21 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
    call outfld('FCTM',        fctm_grid,        pcols, lchnk)
    call outfld('FCTSL',       fctsl_grid,       pcols, lchnk)
    call outfld('FCTSLM',      fctslm_grid,      pcols, lchnk)
+
+   if (micro_mg_adjust_cpt) then
+      cp_rh(:ncol, :pver)  = 0._r8
+
+      do i = 1, ncol
+      
+         ! Calculate the RH including any T change that we make.
+         do k = top_lev, pver 
+           call qsat(state_loc%t(i,k), state_loc%pmid(i,k), es, qs)
+           cp_rh(i,k) = state_loc%q(i, k, 1) / qs * 100._r8
+         end do
+      end do
+
+      call outfld("TROPF_RHADJ", cp_rh,       pcols, lchnk)
+   end if
 
    ! ptend_loc is deallocated in physics_update above
    call physics_state_dealloc(state_loc)
