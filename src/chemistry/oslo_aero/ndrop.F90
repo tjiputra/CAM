@@ -352,6 +352,13 @@ subroutine ndrop_init
    call addfld('CCN5',(/ 'lev' /), 'A','#/cm3','CCN concentration at S=0.5%')
    call addfld('CCN6',(/ 'lev' /), 'A','#/cm3','CCN concentration at S=1.0%')
 
+#ifdef OSLO_AERO
+   if(history_aerosol)then
+      do l = 1, psat 
+         call add_default(ccn_name(l), 1, ' ')
+      enddo
+   end if
+#endif
 
    call addfld('WTKE',     (/ 'lev' /), 'A', 'm/s', 'Standard deviation of updraft velocity')
    call addfld('NDROPMIX', (/ 'lev' /), 'A', '#/kg/s', 'Droplet number mixing')
@@ -2099,10 +2106,21 @@ subroutine dropmixnuc( &
 #ifndef OSLO_AERO
    !fxm: Make this work with the oslo aerosols also!
    call ccncalc(state, pbuf, cs, ccn)
+#else
+   call ccncalc_oslo(state &
+                    , pbuf &
+                    , cs     &
+                    , numberConcentration &
+                    , volumeConcentration &
+                    , hygroscopicity &
+                    , lnSigma        &
+                    , ccn           )
+#endif
    do l = 1, psat
       call outfld(ccn_name(l), ccn(1,1,l), pcols, lchnk)
    enddo
 
+#ifndef OSLO_AERO
    ! do column tendencies
    if (prog_modal_aero) then
       do m = 1, ntot_amode
@@ -2848,6 +2866,127 @@ subroutine ccncalc(state, pbuf, cs, ccn)
       argfactor   )
 
 end subroutine ccncalc
+
+#else
+
+subroutine ccncalc_oslo(state &
+                     , pbuf   &
+                     , cs     &
+                     , numberConcentration &
+                     , volumeConcentration &
+                     , hygroscopicity &
+                     , lnSigma        &
+                     , ccn           )
+
+   ! calculates number concentration of aerosols activated as CCN at
+   ! supersaturation supersat.
+   ! assumes an internal mixture of a multiple externally-mixed aerosol modes
+   ! cgs units
+
+   ! This was used in the BACCHUS-project where it was agreed that 
+   ! CCN would not include cloud-borne aerosols. It is possible to 
+   ! calculate cloud-borne aerosols, but it is complicated, and it was
+   ! not needed when this code was made.
+
+   ! arguments
+
+   type(physics_state), target, intent(in)    :: state
+   type(physics_buffer_desc),   pointer       :: pbuf(:)
+
+   real(r8), intent(in)  :: cs(pcols,pver)       ! air density (kg/m3)
+   real(r8), intent(out) :: ccn(pcols,pver,psat) ! number conc of aerosols activated at supersat (#/m3)
+   real(r8), intent(in) ::  numberConcentration(pcols,pver, nmodes) ! interstit+activated aerosol number conc (/m3)
+   real(r8), intent(in) ::  volumeConcentration(pcols,pver,nmodes)  ! interstit+activated aerosol volume conc (m3/m3)
+   real(r8), intent(in) ::  hygroscopicity(pcols,pver,nmodes)
+   real(r8), intent(in) ::  lnSigma(pcols,pver,nmodes)
+
+   ! local
+   integer :: lchnk ! chunk index
+   integer :: ncol  ! number of columns
+   real(r8), pointer :: tair(:,:)     ! air temperature (K)
+
+
+   real(r8) super(psat) ! supersaturation
+   real(r8) surften_coef !Coefficient in ARGI / ARGII
+   real(r8) amcube       !number median radius qubed
+   real(r8) a    ! surface tension parameter
+   real(r8) sm   ! critical supersaturation at mode radius
+   real(r8) arg  ! factor in eqn 15 ARGII
+   real(r8) argfactor !Coefficient in ARGI/ARGII 
+   !     mathematical constants
+   real(r8), parameter:: twothird=2.0_r8/3.0_r8
+   real(r8), parameter:: sq2=sqrt(2.0_r8)
+   real(r8), parameter :: surften=0.076_r8 !surface tension of water (J/m2)
+   real(r8) exp45logsig_var
+   integer lsat,m,i,k
+   real(r8) smcoefcoef,smcoef
+   !-------------------------------------------------------------------------------
+
+   lchnk = state%lchnk
+   ncol  = state%ncol
+   tair  => state%t
+
+   super(:)=supersat(:)*0.01_r8
+ 
+   !This is curvature effect (A) in ARGI
+   !eqn 5 in ARG1 (missing division by temperature, see below)
+   surften_coef=2._r8*mwh2o*surften/(r_universal*rhoh2o)
+
+   !This is part of eqn 9 in ARGII 
+   !where A smcoefcoef is 2/3^(3/2) 
+   smcoefcoef=2._r8/sqrt(27._r8)
+
+   ccn(:,:,:) = 0._r8
+
+   do m=1,nmodes
+      do k=top_lev,pver
+
+         do i=1,ncol
+
+            !Curvature-parameter "A" in ARGI (eqn 5)
+            a = surften_coef/tair(i,k)
+
+            !standard factor for transforming size distr
+            !volume ==> number (google psd.pdf by zender)
+            exp45logsig_var = & 
+               exp(4.5_r8*lnsigma(i,k,m)*lnsigma(i,k,m))
+
+            !Numbe rmedian radius (power of three)
+            !By definition of lognormal distribution
+            amcube =(3._r8*volumeConcentration(i,k,m) & 
+               /(4._r8*pi*exp45logsig_var*numberConcentration(i,k,m)))  ! only if variable size dist
+
+
+            !This is part of eqn 9 in ARGII 
+            !where A smcoefcoef is 2/3^(3/2) 
+            smcoef = smcoefcoef * a * sqrt(a)
+
+            !This is finally solving eqn 9 
+            !(solve for critical supersat of mode)
+            sm=smcoef   &
+               / sqrt(hygroscopicity(i,k,m)*amcube) ! critical supersaturation
+
+            !Solve eqn 13 in ARGII
+            do lsat = 1,psat
+   
+               !eqn 15 in ARGII
+               argfactor=twothird/(sq2*lnSigma(i,k,m))
+
+               !eqn 15 in ARGII
+               arg=argfactor*log(sm/super(lsat))
+
+               !eqn 13 i ARGII
+               ccn(i,k,lsat)=ccn(i,k,lsat) &
+                  +numberConcentration(i,k,m)&
+                  *0.5_r8*(1._r8-erf(arg))
+            end do
+         end do
+      end do
+   end do
+
+   ccn(:ncol,:,:)=ccn(:ncol,:,:)*1.e-6_r8 ! convert from #/m3 to #/cm3
+
+end subroutine ccncalc_oslo
 #endif
 
 !===============================================================================

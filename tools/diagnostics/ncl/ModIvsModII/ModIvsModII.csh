@@ -31,9 +31,18 @@ plotf=png  # chosen output format for figures (ps, eps, pdf, png)
 #pthI=/media/BackupAK/NorESM2output/PDndgMG15MegVadSOA/
 #fnmI=PDndgMG15MegVadSOA.cam.h0.1983-01.nc 
 #fnmpI=PDndgMG15MegVadSOA.cam.h0.19
-pthI=/media/BackupAK/NorESM2output/PD_MG15MegVadSOA/clim3-12corr/
-fnmI=PD_MG15MegVadSOA.cam.h0.climyr3-12_01.nc
-fnmpI=PD_MG15MegVadSOA.cam.h0.clim
+#pthI=/media/BackupAK/NorESM2output/PD_MG15MegVadSOA/clim3-12corr/
+#fnmI=PD_MG15MegVadSOA.cam.h0.climyr3-12_01.nc
+#fnmpI=PD_MG15MegVadSOA.cam.h0.clim
+#pthI=/media/BackupAK/NorESM2output/PDaug16UVPSndg/yr18-19/
+#fnmI=PDaug16UVPSndg.cam.h0.0018-01.nc
+#fnmpI=PDaug16UVPSndg.cam.h0.00
+#pthI=/media/BackupAK/NorESM2output/PD_ERA_2001-2015/
+#fnmI=ERA_2001-2015.cam.h0.2012-01.nc
+#fnmpI=ERA_2001-2015.cam.h0.20
+pthI=/media/BackupAK/NorESM2output/PDnewBCfixedSOA/
+fnmI=PDnewBCfixedSOA.cam.h0.2010-01.nc
+fnmpI=PDnewBCfixedSOA.cam.h0.20
 #
 #pthII=/lustre/mnt/alfg/condTimeStep/R566SoaNucl/atm/hist/
 #fnmII=R566SoaNucl.cam.h0.1981-01.nc                 # first file to be used
@@ -44,9 +53,9 @@ fnmpI=PD_MG15MegVadSOA.cam.h0.clim
 #pthII=/media/BackupAK/NorESM2output/PD_MG15MegVadSOA/clim3-12corr/
 #fnmII=PD_MG15MegVadSOA.cam.h0.climyr3-12_01.nc
 #fnmpII=PD_MG15MegVadSOA.cam.h0.clim
-pthII=/media/BackupAK/NorESM2output/PDaug16UVPSndg/yr18-19/
-fnmII=PDaug16UVPSndg.cam.h0.0018-01.nc
-fnmpII=PDaug16UVPSndg.cam.h0.00
+pthII=/media/BackupAK/NorESM2output/PD-opticsINSITU_Vilje/
+fnmII=PD-opticsINSITU.cam.h0.2010-01.nc
+fnmpII=PD-opticsINSITU.cam.h0.20
 #
 # Paths and names of input files necessary for forcing plots (PI case)):
 #pthI_PI=/vol/fou/atmos2/alfk/hexagon/aerocomA2noresm_r128/
@@ -58,10 +67,19 @@ fnmpII=PDaug16UVPSndg.cam.h0.00
 #pthI_PI=/media/BackupAK/NorESM2output/PIndgMG15MegVadSOA/
 #fnmI_PI=PIndgMG15MegVadSOA.cam.h0.1983-01.nc
 #fnmpI_PI=PIndgMG15MegVadSOA.cam.h0.19
-pthI_PI=/media/BackupAK/NorESM2output/PI_MG15MegVadSOA/clim3-12corr/
-fnmI_PI=PI_MG15MegVadSOA.cam.h0.climyr3-12_01.nc
-fnmpI_PI=PI_MG15MegVadSOA.cam.h0.clim
-#
+#pthI_PI=/media/BackupAK/NorESM2output/PI_MG15MegVadSOA/clim3-12corr/
+#fnmI_PI=PI_MG15MegVadSOA.cam.h0.climyr3-12_01.nc
+#fnmpI_PI=PI_MG15MegVadSOA.cam.h0.clim
+#pthI_PI=/media/BackupAK/NorESM2output/PIaug16UVPSndg/yr18-19/
+#fnmI_PI=PIaug16UVPSndg.cam.h0.0018-01.nc
+#fnmpI_PI=PIaug16UVPSndg.cam.h0.00
+#pthI_PI=/media/BackupAK/NorESM2output/PI_ERA_2001-2015/
+#fnmI_PI=PI_ERA_2001-2015.cam.h0.2012-01.nc
+#fnmpI_PI=PI_ERA_2001-2015.cam.h0.20
+pthI_PI=/media/BackupAK/NorESM2output/PInewBCfixedSOA/
+fnmI_PI=PInewBCfixedSOA.cam.h0.2010-01.nc
+fnmpI_PI=PInewBCfixedSOA.cam.h0.20
+
 #pthII_PI=/media/BackupAK/NorESM2output/PI1850R516/
 #fnmII_PI=PI1850R516.cam.h0.1984-12.nc                 # first file to be used
 #fnmpII_PI=PI1850R516.cam.h0.19                        # all files fnmpII* are used
@@ -71,14 +89,15 @@ fnmpI_PI=PI_MG15MegVadSOA.cam.h0.clim
 #pthII_PI=/media/BackupAK/NorESM2output/PI_MG15MegVadSOA/clim3-12corr/
 #fnmII_PI=PI_MG15MegVadSOA.cam.h0.climyr3-12_01.nc
 #fnmpII_PI=PI_MG15MegVadSOA.cam.h0.clim
-pthII_PI=/media/BackupAK/NorESM2output/PIaug16UVPSndg/yr18-19/
-fnmII_PI=PIaug16UVPSndg.cam.h0.0018-01.nc
-fnmpII_PI=PIaug16UVPSndg.cam.h0.00
+pthII_PI=/media/BackupAK/NorESM2output/PI-opticsINSITU_Vilje/
+fnmII_PI=PI-opticsINSITU.cam.h0.2010-01.nc
+fnmpII_PI=PI-opticsINSITU.cam.h0.20
 #
 #ModelI=CAM4-Oslo  # gives CAM4-Oslo vs. new CAM5-Oslo comparison plots
 ModelI=CAM5-Oslo  # gives CAM5-Oslo Revision N vs. CAM5-Oslo Revision M comparison plots
 #**********************************************************************************************
 #No changes by the user should be necessary below...
+
 
 echo ''
 echo 'Running Emis_ModIvsModII.ncl'
@@ -97,14 +116,14 @@ done
 echo ''
 echo 'Running Load_ModIvsModII.ncl'
 echo ''
-for I in {0..7};do
+for I in {0..19};do
  ncl plot_type=$I format=\"$plotf\" filepath_I=\"$pthI\" filename_I=\"$fnmI\" filepath_II=\"$pthII\" filename_II=\"$fnmII\" filenamep_I=\"$fnmpI\" filenamep_II=\"$fnmpII\" ModI=\"$ModelI\" Load_ModIvsModII.ncl
 done
 
 echo ''
 echo 'Running Ext_ModIvsModII.ncl'
 echo ''
-for I in {1..5};do
+for I in {1..20};do
  ncl plot_type=$I format=\"$plotf\" filepath_I=\"$pthI\" filename_I=\"$fnmI\" filepath_II=\"$pthII\" filename_II=\"$fnmII\" filenamep_I=\"$fnmpI\" filenamep_II=\"$fnmpII\" ModI=\"$ModelI\" Ext_ModIvsModII.ncl 
 done
 

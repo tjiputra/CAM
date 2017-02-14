@@ -885,6 +885,11 @@ subroutine micro_mg_cam_init(pbuf2d)
 
    call addfld ('FCTL',        horiz_only,   'A', 'fraction', 'Fractional occurrence of cloud top liquid'                         )
    call addfld ('FCTI',        horiz_only,   'A', 'fraction', 'Fractional occurrence of cloud top ice'                            )
+   !++IH
+   !For comparing to Bernartz CDNC concentrations
+   call addfld ('ACTNL_B    ', horiz_only, 'A', 'Micron  ', 'Average Cloud Top droplet number (Bennartz)'                         )
+   call addfld ('FCTL_B     ', horiz_only, 'A', 'fraction',  'Fractional occurrence of cloud top liquid (Bennartz)'                      )
+   !--IH
 
    ! New frequency arrays for mixed phase and supercooled liquid (only and mixed) for (a) Cloud Top and (b) everywhere..
    call addfld ('FREQM',       (/ 'lev' /),  'A', 'fraction', 'Fractional occurrence of mixed phase'                              )
@@ -981,12 +986,18 @@ subroutine micro_mg_cam_init(pbuf2d)
       call add_default ('FREQS    ', 1, ' ')
       call add_default ('FREQL    ', 1, ' ')
       call add_default ('FREQI    ', 1, ' ')
-      ! ADDED BY IH:
+      !++IH (Bennartz CDNC comparison) and extra clouds diags
+      ! made default for NorESM
       call add_default ('ACTNL     ', 1, ' ')
       call add_default ('ACTREL     ', 1, ' ')
       call add_default ('FCTL    ', 1, ' ')
-      ! Done extra vars by IH
-
+      call add_default ('ACTNI     ', 1, ' ')
+      call add_default ('ACTREI     ', 1, ' ')
+      call add_default ('FCTI    ', 1, ' ')
+      !These are for comparing to Bennartz
+      call add_default ('FCTL_B    ', 1, ' ')
+      call add_default ('ACTNL_B     ', 1, ' ')
+      !--IH
       do m = 1, ncnst
          call cnst_get_ind(cnst_names(m), mm)
          call add_default(cnst_name(mm), 1, ' ')
@@ -1141,7 +1152,7 @@ subroutine micro_mg_cam_init(pbuf2d)
       call pbuf_set_field(pbuf2d, acpr_idx,   0._r8)
       call pbuf_set_field(pbuf2d, acgcme_idx, 0._r8)
       call pbuf_set_field(pbuf2d, acnum_idx,  0)
-      call pbuf_set_field(pbuf2d, relvar_idx, 2._r8)
+      call pbuf_set_field(pbuf2d, relvar_idx, 2.0_r8)  
       call pbuf_set_field(pbuf2d, accre_enhan_idx, 1._r8)
       call pbuf_set_field(pbuf2d, am_evp_st_idx,  0._r8)
       call pbuf_set_field(pbuf2d, evprain_st_idx, 0._r8)
@@ -1660,6 +1671,10 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
    real(r8) :: fctl_grid(pcols)
 
    real(r8) :: ftem_grid(pcols,pver)
+   !++IH: 
+   real(r8) :: fctl_b(pcols) !frequency of occurrence for Bennartz 
+   real(r8) :: ctnl_b(pcols) !cdnc [/m3] for Bennartz
+   !--IH
 
    ! Variables for precip efficiency calculation
    real(r8) :: minlwp        ! LWP threshold
@@ -3030,6 +3045,9 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
    fctm_grid  = 0._r8
    fctsl_grid = 0._r8
    fctslm_grid= 0._r8
+   !++IH for comparign to Bennartz CDNC concentrations 
+   fctl_b  = 0._r8
+   ctnl_b  = 0._r8
 
    do i = 1, ngrdcol
       do k = top_lev, pver
@@ -3075,6 +3093,35 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
    if (qsnow_idx > 0)  qsout_grid_ptr = qsout_grid
    if (nrain_idx > 0)  nrout_grid_ptr = nrout_grid
    if (nsnow_idx > 0)  nsout_grid_ptr = nsout_grid
+
+   !Calculate values for comparing with Bennartz 2017
+   do i = 1, ncol
+      do k = top_lev, pver
+         !Criterions for Bennartz (2017) to use values from a column
+         !1) 268 < T < 300 [K]
+         !2) liquid cloud fraction > 10 %
+         if (   liqcldf(i,k) > 0.1_r8   & 
+               .and. state_loc%t(i,k) > 268.0_r8 & 
+               .and. state_loc%t(i,k) < 300.0_r8 ) then   
+            !Save cloud fraction and in-cloud number conc
+            ctnl_b(i)  = icwnc(i,k) * liqcldf(i,k)
+            fctl_b(i)  = liqcldf(i,k)
+            exit !==> Go out to i=1,ncol-loop
+         end if
+         !--IH
+      end do
+   end do
+
+   call outfld( 'ACTREL'     , ctrel_grid,     pcols, lchnk )
+   call outfld( 'ACTREI'     , ctrei_grid,     pcols, lchnk )
+   call outfld( 'ACTNL'      , ctnl_grid,      pcols, lchnk )
+   call outfld( 'ACTNI'      , ctni_grid,      pcols, lchnk )
+   call outfld( 'FCTL'       , fctl_grid,      pcols, lchnk )
+   call outfld( 'FCTI'       , fcti_grid,      pcols, lchnk )
+   !++IH 
+   call outfld( 'FCTL_B'       , fctl_b,      pcols, lchnk )
+   call outfld( 'ACTNL_B'      , ctnl_b,      pcols, lchnk )
+   !--IH
 
    ! --------------------------------------------- !
    ! General outfield calls for microphysics       !
