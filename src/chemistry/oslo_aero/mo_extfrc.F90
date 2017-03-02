@@ -384,6 +384,8 @@ contains
 
 
 #ifdef OSLO_AERO
+       xfcname = trim(extfrc_lst(n))  
+
        !redefine to kg/m2/s if oslo aerosols
        spc_ndx = get_spc_ndx(trim(xfcname))
        !It makes more sense to output in kg/m2/s to compare with other terms
