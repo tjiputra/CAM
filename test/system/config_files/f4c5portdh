@@ -1,5 +1,5 @@
 -spmd -smp
--chem trop_strat_mam3
+-chem trop_mam3
 -offline_drv rad
 -dyn fv
 -res 4x5

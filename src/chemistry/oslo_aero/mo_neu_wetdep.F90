@@ -101,7 +101,7 @@ subroutine neu_wetdep_init
          test_name = 'SO2'
       case ( 'CLONO2','BRONO2','HCL','HOCL','HOBR','HBR', 'Pb', 'MACROOH', 'ISOPOOH', 'XOOH', 'H2SO4', 'HF', 'COF2', 'COFCL')
          test_name = 'HNO3'
-      case ( 'NH_50W' ) 
+      case ( 'NH_50W', 'NDEP', 'NHDEP' ) 
          test_name = 'HNO3'
       case ( 'ALKOOH', 'MEKOOH', 'TOLOOH' )
          test_name = 'CH3OOH'        
@@ -242,7 +242,7 @@ subroutine neu_wetdep_tend(lchnk,ncol,mmr,pmid,pdel,zint,tfld,delt, &
   real(r8),       intent(in)    :: zint(pcols,pver+1)       ! interface geopotential height above the surface (m)
   real(r8),       intent(in)    :: tfld(pcols,pver)         ! midpoint temperature (K)
   real(r8),       intent(in)    :: delt                     ! timestep (s)
-!  
+! 
   real(r8),       intent(in)    :: prain(ncol, pver)
   real(r8),       intent(in)    :: nevapr(ncol, pver)
   real(r8),       intent(in)    :: cld(ncol, pver)

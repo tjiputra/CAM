@@ -548,11 +548,17 @@ contains
     real(r8),         intent(out) :: q(:,:)     !! mass mixing ratio (gcol, lev)
     integer,          intent(out) :: rc         !! return code, negative indicates failure
 
+    integer :: i
+
     ! Default return code.
     rc = RC_OK
 
     ! Add initial condition here (default is 0.)
-    q(:,:) = 0._f
+    do i = 1, size(q, 2)
+      where(mask)
+        q(:,i) = 0._r8
+      end where
+    end do
     
     return
   end subroutine CARMA_InitializeParticle

@@ -63,7 +63,7 @@ contains
  subroutine c_sw(grid,   u,       v,      pt,       delp,               &
                  u2,     v2,                                            &
                  uc,     vc,      ptc,    delpf,    ptk,                &
-                 tiny,   iord,    jord)
+                 tiny,   iord,    jord, am_correction)
 
 ! Routine for shallow water dynamics on the C-grid
 
@@ -78,6 +78,7 @@ contains
   type (T_FVDYCORE_GRID), intent(in) :: grid
   integer, intent(in):: iord
   integer, intent(in):: jord
+  logical, intent(in):: am_correction
 
   real(r8), intent(in):: u2(grid%im,grid%jfirst-grid%ng_d:grid%jlast+grid%ng_d)
   real(r8), intent(in):: v2(grid%im,grid%jfirst-grid%ng_s:grid%jlast+grid%ng_d)
@@ -272,14 +273,31 @@ contains
         enddo
 
 ! New va definition
+
+        if (am_correction) then
+
 #if defined(INNER_OMP)
 !$omp parallel do default(shared) private(j,i)
 #endif
-        do j=js2g1,jn2g0                     ! va needed on S (for YCC, iv==1)
-          do i=1,im
-            va(i,j) = D0_5*(cry(i,j)+cry(i,j+1))
-          enddo
-        enddo
+           do j=js2g1,jn2g0                     ! va needed on S (for YCC, iv==1)
+              do i=1,im
+                 ! weight by cos ? -> no need to modify advective winds
+                 va(i,j) = (cry(i,j)*cose(j)+cry(i,j+1)*cose(j+1))/(cose(j)+cose(j+1)) 
+              end do
+           end do
+
+        else
+
+#if defined(INNER_OMP)
+!$omp parallel do default(shared) private(j,i)
+#endif
+           do j=js2g1,jn2g0                     ! va needed on S (for YCC, iv==1)
+              do i=1,im
+                 va(i,j) = 0.5_r8*(cry(i,j)+cry(i,j+1))
+              end do
+           end do
+
+        end if
 
 ! SJL: Check if FFSL integer fluxes need to be computed
 
@@ -545,7 +563,8 @@ contains
                   cdxde, cdxdp,  cdyde,   cdydp,                     & !ldel2 variables
                   cdxdiv,  cdydiv, cdx4,  cdy4,  cdtau4,  &
                   ldiv2, ldiv4, ldel2, &
-                  iord,  jord,  tiny )  
+                  iord,  jord,  tiny, am_correction, &
+                  ddp, duc)
 !--------------------------------------------------------------------------
 ! Routine for shallow water dynamics on the D-grid
 
@@ -596,6 +615,11 @@ contains
   real(r8), intent(inout):: cy3(grid%im,grid%jfirst:grid%jlast+1)        ! Accumulated Courant number in Y
   real(r8), intent(inout):: mfx(grid%im,grid%jfirst:grid%jlast)          ! Mass flux in X  (unghosted)
   real(r8), intent(inout):: mfy(grid%im,grid%jfirst:grid%jlast+1)        ! Mass flux in Y
+
+  ! AM correction
+  logical,  intent(in)  :: am_correction      ! logical switch for correction (generate out args)
+  real(r8), intent(out) :: ddp(grid%im,grid%jfirst:grid%jlast)
+  real(r8), intent(out) :: duc(grid%im,grid%jfirst:grid%jlast)
 
 ! !DESCRIPTION:
 !
@@ -666,6 +690,7 @@ contains
   real(r8) ::  wk2div4(grid%im+1,grid%jfirst-grid%ng_s:grid%jlast+grid%ng_s) 
   
   real(r8)  wk1(grid%im,grid%jfirst-1:grid%jlast+1)
+
   real(r8)  cry(grid%im,grid%jfirst-1:grid%jlast+1)
   real(r8)   fy(grid%im,grid%jfirst-2:grid%jlast+2)!halo changed for div4
   
@@ -674,7 +699,12 @@ contains
   
   real(r8)   va(grid%im,grid%jfirst-1:grid%jlast)
   real(r8)   ub(grid%im,grid%jfirst:  grid%jlast+1)
-  
+
+  ! AM correction
+  real(r8) :: dfx(grid%im,grid%jfirst:grid%jlast)     
+  real(r8) :: dfy(grid%im,grid%jfirst-2:grid%jlast+2) 
+  real(r8) :: dvdx(grid%im,grid%jfirst-grid%ng_d:grid%jlast+grid%ng_d)
+
   real(r8)  crx(grid%im,grid%jfirst-grid%ng_d:grid%jlast+grid%ng_d)
 #if defined(FILTER_MASS_FLUXES)
   real(r8)   u2(grid%im,grid%jfirst-grid%ng_d:grid%jlast+grid%ng_d)
@@ -912,6 +942,24 @@ contains
    enddo
 #endif
 
+   ! AM correction
+   do j = jfirst, jlast 
+      do i = 1, im
+         ddp(i,j) = 0.0_r8
+      end do
+   end do
+
+   if (am_correction) then
+
+      do j = js2g0, jn2g0
+         do i = 1, im-1
+            ddp( i,j) = (xfx(i+1,j) - xfx(i ,j))
+         end do
+         ddp(im,j) = (xfx(  1,j) - xfx(im,j))
+      end do
+
+   end if ! am_correction
+
 ! <<< Save necessary data for large time step tracer transport >>>
       if( nq > 0 ) then
 #if defined(INNER_OMP)
@@ -980,6 +1028,8 @@ contains
 #if defined(INNER_OMP)
 !$omp parallel do default(shared) private(j,i)
 #endif
+      ! ub here is average over updated C-grid points (involving 
+      ! 6 D-grid points) instead of 2 non-updated D-grid points (tht)
       do j=js2g0,jn1g1                          ! ub needed on N
            ub(1,j) = dtdy5*(vc(1,j) + vc(im,j))  
          do i=2,im
@@ -997,7 +1047,7 @@ contains
    do j=js2g0,jn1g1                 ! ub needed on N
        do i=1,im                
           ub(i,j) = dtxe5(j)*(uc(i,j) + uc(i,j-1))
-!                        uc will be used as wrok array after this point
+!                        uc will be used as work array after this point
        enddo
    enddo
 
@@ -1394,14 +1444,61 @@ end if
                 fy(1,jfirst), ffsl, crx(1,jfirst),                     &
                 ymass, cosp, 0, jfirst, jlast)
 
+
+      ! AM correction
+      if (am_correction) then 
+
+         if (jlast+ng_d >= jm) then 
+            do i = 1, im
+               dvdx(i,jm) = 0.0_r8
+            end do
+         else
+            do i = 1, im
+               dvdx(i,jn2gd) = 0.0_r8
+            end do
+         end if
+
+         if (jfirst-ng_d <= 1) then 
+            do i = 1, im
+               dvdx(i,1) = 0.0_r8
+            end do
+         end if
+
+         do j = js2gd, min(jm-1, jlast+ng_d-1)
+            do i = 1, im-1
+               dvdx( i,j) = (v(i+1,j) - v(i ,j)) * rdx(j)
+            end do
+            dvdx(im,j) = (v(  1,j) - v(im,j)) * rdx(j)
+         end do
+
+         call tp2d(va(1,jfirst),dvdx(1,jfirst-ng_d), crx(1,jfirst-ng_d), &
+                   cry(1,jfirst), im, jm, iord, jord, ng_d,dfx,           &
+                   dfy(1,jfirst), ffsl, crx(1,jfirst),                    &
+                   ymass, cosp, 0, jfirst, jlast)
+
+         do j = js2g0, jlast
+            do i = 1, im
+               duc(i,j) = dyce(j)*dfy(i,j)
+            end do
+         end do
+
+         do j = js2g0, jlast
+            do i = 1, im-1
+               duc( i,j) = dtdxe(j)*(wk1(i+1,j)-wk1( i,j)) - duc( i,j) - wku( i,j)
+            end do
+            duc(im,j) = dtdxe(j)*(wk1(  1,j)-wk1(im,j)) - duc(im,j) - wku(im,j)
+         end do
+
+      end if ! am_correction
+
 #if defined(INNER_OMP)
 !$omp parallel do default(shared) private(j,i)
 #endif
       do j=js2g0,jlast
           do i=1,im-1
-            uc(i,j) = dtdxe(j)*(wk1(i,j)-wk1(i+1,j)) + dyce(j)*fy(i,j)+wku(i,j)
+           uc(i ,j) = dtdxe(j)*(wk1(i ,j)-wk1(i+1,j)) + dyce(j)*fy(i ,j)+wku(i ,j)
           enddo
-           uc(im,j) = dtdxe(j)*(wk1(im,j)-wk1(1,j))  + dyce(j)*fy(im,j)+wku(im,j)
+           uc(im,j) = dtdxe(j)*(wk1(im,j)-wk1(  1,j)) + dyce(j)*fy(im,j)+wku(im,j)
       enddo
 
 #if defined(INNER_OMP)
@@ -1421,7 +1518,8 @@ end if
 ! !IROUTINE: d2a2c_winds --- Interpolate winds
 !
 ! !INTERFACE:
- subroutine d2a2c_winds(grid, u, v, ua, va, uc, vc, u_cen, v_cen, reset_winds, met_rlx)
+ subroutine d2a2c_winds(grid, u, v, ua, va, uc, vc, u_cen, v_cen, &
+                        reset_winds, met_rlx, am_correction)
 
   implicit none
 
@@ -1440,6 +1538,7 @@ end if
   real(r8), intent(in):: u_cen(grid%im,grid%jfirst-grid%ng_d:grid%jlast+grid%ng_d)
   real(r8), intent(in):: v_cen(grid%im,grid%jfirst-grid%ng_s:grid%jlast+grid%ng_d)
   real(r8), intent(in):: met_rlx
+  logical,  intent(in):: am_correction
 
 ! !DESCRIPTION:
 !
@@ -1467,6 +1566,11 @@ end if
   real(r8), pointer:: coslon(:)
   real(r8), pointer:: sinl5(:)
   real(r8), pointer:: cosl5(:)
+
+  ! AM correction
+  real(r8), pointer:: cosp(:)
+  real(r8), pointer:: acosp(:)
+  real(r8), pointer:: cose(:)
 
   integer :: i, j, im2
   integer :: im, jm, jfirst, jlast, ng_s, ng_c, ng_d
@@ -1501,6 +1605,11 @@ end if
   coslon => grid%coslon
   sinl5  => grid%sinl5
   cosl5  => grid%cosl5
+
+  ! AM correction
+  cosp   => grid%cosp
+  acosp  => grid%acosp
+  cose   => grid%cose
 
 ! Get D-grid V-wind at the poles.
 
@@ -1587,12 +1696,19 @@ end if
           va(im,j) = v(im,j) + v(1,j)
     enddo
 
-    do j=js2gd,jn2gsm1  ! WS: should be safe since u defined to jn2gs
-       do i=1,im
-          ua(i,j) = u(i,j) + u(i,j+1)
-       enddo
-    enddo
-
+    if (am_correction) then
+       do j = js2gd, jn2gsm1
+          do i = 1, im
+             ua(i,j) =(u(i,j)*cose(j) + u(i,j+1)*cose(j+1))/cosp(j) ! curl free -> curl free
+          end do
+       end do
+    else
+       do j = js2gd, jn2gsm1  ! WS: should be safe since u defined to jn2gs
+          do i = 1, im
+             ua(i,j) = u(i,j) + u(i,j+1)                          ! solid body -> solid body
+          end do
+       end do
+    end if
 !
 ! reset cell center winds to the offline meteorlogy data
 !
@@ -1658,21 +1774,26 @@ end if
 
 ! A -> C
         do j=js1gc,jn1gc       ! uc needed N*ng_c S*ng_c, ua defined at poles
-! i=1
             uc(1,j) = D0_25*(ua(1,j)+ua(im,j))
-
-
           do i=2,im
-
             uc(i,j) = D0_25*(ua(i,j)+ua(i-1,j))
           enddo
         enddo
 
-        do j=js2g2,jn1g2       ! vc needed N*2, S*2 (for ycc), va defined at poles
-          do i=1,im
-            vc(i,j) = D0_25*(va(i,j)+va(i,j-1))  ! va needed N*2 S*3
-          enddo
-        enddo
+        if (am_correction) then
+           do j = js2g2, jn1g2       ! vc needed N*2, S*2 (for ycc), va defined at poles
+              do i = 1, im
+                 vc(i,j) = D0_25*(va(i,j)*cosp(j) + va(i,j-1)*cosp(j-1))/cose(j) ! div free -> div free
+              end do
+           end do
+        else
+           do j = js2g2, jn1g2
+              do i = 1, im
+                 vc(i,j) = D0_25*(va(i,j) + va(i,j-1))
+              end do
+           end do
+        end if
+
         if ( jfirst==1 ) then
            do i=1,im
               vc(i,1) = D0_0   ! Needed to avoid undefined values in VC

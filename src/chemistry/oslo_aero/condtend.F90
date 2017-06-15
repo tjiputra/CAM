@@ -123,7 +123,7 @@ contains
       real(r8) :: Mdual ![molec/amu] 1/M_1 + 1/M_2
       real(r8) :: rho   ![kg/m3] density of component in question
       real(r8) :: radmol ![m] radius molecule
-      real(r8) :: th     !thermal velocity
+      real(r8), dimension(N_COND_VAP) :: th     !thermal velocity
 
       !Couple the condenseable vapours to chemical species for properties and indexes
       cond_vap_map(COND_VAP_H2SO4) = chemistryIndex(l_h2so4)
@@ -137,7 +137,7 @@ contains
          molecularWeight=adv_mass(cond_vap_map(cond_vap_idx))    !pick up molecular weights from mozart
 
          !https://en.wikipedia.org/wiki/Thermal_velocity
-         th = sqrt(8.0_r8*boltz*t0/(pi*molecularweight*aunit))   ! thermal velocity for H2SO4 in air (m/s) 
+         th(cond_vap_idx) = sqrt(8.0_r8*boltz*t0/(pi*molecularweight*aunit))   ! thermal velocity for H2SO4 in air (m/s) 
 
          !Radius of molecul (straight forward assuming spherical)
          radmol=(3.0_r8*molecularWeight*aunit/(4.0_r8*pi*rho))**aThird    ! molecule radius 
@@ -176,7 +176,7 @@ contains
             DiffusionCoefficient(nsiz,imode,cond_vap_idx) = diff(cond_vap_idx)  &    !original diffusion coefficient 
                /(                                    &       
                   rBinMidPoint(nsiz)/(rBinMidPoint(nsiz)+mfv(cond_vap_idx))  &  !non-continuum correction factor
-                  +4.0_r8*diff(cond_vap_idx)/(stickingCoefficient(imode,cond_vap_idx)*th*rBinMidPoint(nsiz)) & 
+                  +4.0_r8*diff(cond_vap_idx)/(stickingCoefficient(imode,cond_vap_idx)*th(cond_vap_idx)*rBinMidPoint(nsiz)) & 
                  )
             enddo
          end do !receiver modes

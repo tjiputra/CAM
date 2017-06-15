@@ -5,12 +5,12 @@
 !
 ! !INTERFACE:
 
-      subroutine d2a3dikj( grid, u, v, ua, va )
+      subroutine d2a3dikj(grid, am_correction, u, v, ua, va)
 
 ! !USES:
 
       use shr_kind_mod, only: r8 => shr_kind_r8
-      use dynamics_vars, only : T_FVDYCORE_GRID
+      use dynamics_vars, only : t_fvdycore_grid
 
 #if defined( SPMD )
       use parutilitiesmodule, only : parcollective, sumop
@@ -26,7 +26,8 @@
 
       implicit none
 ! !INPUT PARAMETERS:
-      type (T_FVDYCORE_GRID), intent(in) :: grid
+      type (t_fvdycore_grid), intent(in) :: grid
+      logical,  intent(in) :: am_correction
       real(r8), intent(in) :: u(grid%ifirstxy:grid%ilastxy,                  &
                                 grid%jfirstxy:grid%jlastxy,grid%km) ! U-Wind
       real(r8), intent(in) :: v(grid%ifirstxy:grid%ilastxy,                  &
@@ -80,6 +81,9 @@
       integer dest, src, incount, outcount
 #endif
 
+      ! for AM correction
+      real(r8), pointer :: cosp(:), cose(:)
+
       myidxy_y = grid%myidxy_y
       myidxy_x = grid%myidxy_x
       nprxy_x  = grid%nprxy_x
@@ -94,12 +98,14 @@
       jfirstxy = grid%jfirstxy
       jlastxy  = grid%jlastxy
 
-      coslon   => grid%coslon
-      sinlon   => grid%sinlon
-
       itot = ilastxy-ifirstxy+1
       jtot = jlastxy-jfirstxy+1
       imh = im/2
+
+      coslon   => grid%coslon
+      sinlon   => grid%sinlon
+      cosp     => grid%cosp
+      cose     => grid%cose
 
 #if defined( SPMD )
 ! Set ua on A-grid
@@ -111,24 +117,49 @@
                       ifirstxy, ilastxy, jlastxy+1, jlastxy+1, 1, km, unorth )
 
       if ( jlastxy .lt. jm ) then
-!$omp  parallel do private(i, k)
 
-         do k=1,km
-            do i=ifirstxy,ilastxy
-               ua(i,k,jlastxy) = D0_5 * ( u(i,jlastxy,k) + unorth(i,k) )
-            enddo
-         enddo
-      endif
+         if (am_correction) then
+!$omp  parallel do private(i, k)
+            do k = 1, km
+               do i = ifirstxy, ilastxy
+                  ua(i,k,jlastxy) = 0.5_r8*(u(i,jlastxy,k)*cose(jlastxy) + &
+                                    unorth(i,k)*cose(jlastxy+1))/cosp(jlastxy) 
+               end do
+            end do
+         else
+!$omp  parallel do private(i, k)
+            do k = 1, km
+               do i = ifirstxy, ilastxy
+                  ua(i,k,jlastxy) = 0.5_r8*(u(i,jlastxy,k) + unorth(i,k)) 
+               end do
+            end do
+         end if
+      end if
 #endif
 
+      if (am_correction) then
 !$omp  parallel do private(i,j,k)
-      do k=1,km
-        do j=jfirstxy, jlastxy-1
-          do i=ifirstxy,ilastxy
-            ua(i,k,j) = D0_5*(u(i,j,k) + u(i,j+1,k))
-          enddo
-        enddo
-      enddo
+         do k = 1, km
+            do j = jfirstxy, jlastxy-1
+               do i = ifirstxy, ilastxy
+                  if (cosp(j) .ne. 0.0_r8) then 
+                     ua(i,k,j) = 0.5_r8*(u(i,j,k)*cose(j) + u(i,j+1,k)*cose(j+1))/cosp(j) ! preserve curl-free flow
+                  else 
+                     ua(i,k,j) = (u(i,j,k)*cose(j)+u(i,j+1,k)*cose(j+1))/(cose(j)+cose(j+1)) 
+                  end if
+               end do
+            end do
+         end do
+      else
+!$omp  parallel do private(i,j,k)
+         do k = 1, km
+            do j = jfirstxy, jlastxy-1
+               do i = ifirstxy, ilastxy
+                  ua(i,k,j) = 0.5_r8*(u(i,j,k) + u(i,j+1,k))  ! preserve solid-body flow 
+               end do
+            end do
+         end do
+      end if
 
 ! Set va on A-grid
 

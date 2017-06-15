@@ -1,6 +1,6 @@
-subroutine intdrypar2to3 (lchnk, ncol, Nnatk, Camk, xfacsoain,       & 
-           cintbg, cintbg05, cintbg125, cintbc, cintbc05, cintbc125, & 
-           cintoc, cintoc05, cintoc125, cintsc, cintsc05, cintsc125, &
+subroutine intdrypar2to3 (lchnk, ncol, Nnatk, xct, ict1, xfac, ifac1,   & 
+           cintbg, cintbg05, cintbg125, cintbc, cintbc05, cintbc125,    & 
+           cintoc, cintoc05, cintoc125, cintsc, cintsc05, cintsc125,    &
            cintsa, cintsa05, cintsa125, aaeros, aaerol, vaeros, vaerol, &
            aaerosn,aaeroln,vaerosn,vaeroln,cknorm,cknlt05,ckngt125)
 
@@ -15,11 +15,13 @@ subroutine intdrypar2to3 (lchnk, ncol, Nnatk, Camk, xfacsoain,       &
 !
 ! Input arguments
 !
-   integer, intent(in) :: lchnk                     ! chunk identifier
-   integer, intent(in) :: ncol                      ! number of atmospheric columns
+   integer, intent(in) :: lchnk                       ! chunk identifier
+   integer, intent(in) :: ncol                        ! number of atmospheric columns
    real(r8), intent(in) :: Nnatk(pcols,pver,0:nmodes) ! modal aerosol number concentration  
-   real(r8), intent(in) :: Camk(pcols,pver,nbmodes) ! modal internally mixed SO4+BC+OC conc.
-   real(r8), intent(in) :: xfacsoain(pcols,pver)    ! OC/(SO4+OC) added to the background mode
+   real(r8), intent(in) :: xct(pcols,pver,nmodes)     ! modal internally mixed SO4+BC+OC conc.
+   integer,  intent(in) :: ict1(pcols,pver,nmodes)        
+   real(r8), intent(in) :: xfac(pcols,pver,nbmodes)   ! condensed SOA/(SOA+H2SO4) (1-4) or added carbonaceous fraction (5-10)
+   integer,  intent(in) :: ifac1(pcols,pver,nbmodes)        
 !
 ! Input-Output arguments
 !
@@ -45,15 +47,15 @@ subroutine intdrypar2to3 (lchnk, ncol, Nnatk, Camk, xfacsoain,       &
 !
 !---------------------------Local variables-----------------------------
 !
-      real(r8) a, b, e, eps, catot, xct(pcols,pver), xfac(pcols,pver)
+      real(r8) a, b, e, eps
 
-      integer iv, ierr, ictot, ifac, kcomp, k, icol
-      integer ict1(pcols,pver), ict2(pcols,pver)
+      integer iv, kcomp, k, icol
+
 !      Temporary storage of often used array elements
       integer t_ict1, t_ict2
       real(r8) t_xct,  t_cat1, t_cat2
       real(r8) t_fac1, t_fac2, t_xfac
-      integer  ifac1(pcols,pver), ifac2(pcols,pver), t_ifc1, t_ifc2
+      integer  t_ifc1, t_ifc2
       real(r8) d2mx(2), dxm1(2), invd(2)
       real(r8) opt2d(2,2)
       real(r8) opt1, opt2, opt
@@ -65,10 +67,10 @@ subroutine intdrypar2to3 (lchnk, ncol, Nnatk, Camk, xfacsoain,       &
 
 !       Modes 1-3,  SO4(Ait), BC(Ait) and OC(Ait):
 
-        do kcomp=2,3
+      do kcomp=2,3
 
 !      initialize output fields
-      do k=1,pver
+       do k=1,pver
          do icol=1,ncol
         cintbg(icol,k,kcomp)=0.0_r8
         cintbg05(icol,k,kcomp)=0.0_r8
@@ -96,41 +98,6 @@ subroutine intdrypar2to3 (lchnk, ncol, Nnatk, Camk, xfacsoain,       &
 
         do kcomp=2,2
 
-!      write(*,*) 'Before x-loop'
-      do k=1,pver
-         do icol=1,ncol
-
-          if(Nnatk(icol,k,kcomp)>0.0_r8) then
-!ccccccccc1ccccccccc2ccccccccc3ccccccccc4ccccccccc5ccccccccc6ccccccccc7cc
-          xct(icol,k)  = min(max(Camk(icol,k,kcomp) &
-                /(Nnatk(icol,k,kcomp)+eps),cate(kcomp,1)),cate(kcomp,16))
-          xfac(icol,k) = min(max(xfacsoain(icol,k),fac(1)),fac(6))
-
-!      write(*,*) 'Before cat-loop', kcomp
-      do ictot=1,15
-            if(xct(icol,k)>=cate(kcomp,ictot).and. &
-            xct(icol,k)<=cate(kcomp,ictot+1)) then
-             ict1(icol,k)=ictot
-             ict2(icol,k)=ictot+1
-            endif
-      end do ! ictot
-
-!      write(*,*) 'Before fac-loop', kcomp
-      do ifac=1,5
-            if(xfac(icol,k)>=fac(ifac).and. &
-             xfac(icol,k)<=fac(ifac+1)) then
-             ifac1(icol,k)=ifac
-             ifac2(icol,k)=ifac+1
-            endif
-      end do ! ifac
-
-!ccccccccc1ccccccccc2ccccccccc3ccccccccc4ccccccccc5ccccccccc6ccccccccc7cc
-           endif
-
-          end do ! icol
-        end do ! k
-
-
         do k=1,pver 
           do icol=1,ncol
          
@@ -138,16 +105,16 @@ subroutine intdrypar2to3 (lchnk, ncol, Nnatk, Camk, xfacsoain,       &
 
 !      Collect all the vector elements into temporary storage
 !      to avoid cache conflicts and excessive cross-referencing
-      t_ict1 = ict1(icol,k)
-      t_ict2 = ict2(icol,k)
+      t_ict1 = ict1(icol,k,kcomp)
+      t_ict2 = t_ict1+1
       t_cat1 = cate(kcomp,t_ict1)
       t_cat2 = cate(kcomp,t_ict2)
-      t_xct  = xct(icol,k)
-      t_ifc1 = ifac1(icol,k)
-      t_ifc2 = ifac2(icol,k)
+      t_xct  = xct(icol,k,kcomp)
+      t_ifc1 = ifac1(icol,k,kcomp)
+      t_ifc2 = t_ifc1+1
       t_fac1 = fac(t_ifc1)
       t_fac2 = fac(t_ifc2)
-      t_xfac = xfac(icol,k)
+      t_xfac = xfac(icol,k,kcomp)
 
 !     partial lengths along each dimension (1-2) for interpolation 
       d2mx(1) = (t_cat2-t_xct)
@@ -247,7 +214,7 @@ subroutine intdrypar2to3 (lchnk, ncol, Nnatk, Camk, xfacsoain,       &
          end do ! icol
         end do ! k
 
-        end do  ! kcomp
+       end do  ! kcomp
 
 
       return

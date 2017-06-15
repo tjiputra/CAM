@@ -218,8 +218,15 @@ subroutine rk_stratiform_init_cnst(name, latvals, lonvals, mask, q)
    logical,          intent(in)  :: mask(:)    ! Only initialize where .true.
    real(r8),         intent(out) :: q(:,:)     ! kg tracer/kg dry air (gcol, plev
    !-----------------------------------------------------------------------
+   integer :: k
 
-   if (any(name == cnst_names)) q = 0.0_r8
+   if (any(name == cnst_names)) then
+     do k = 1, size(q, 2)
+       where(mask)
+         q(:, k) = 0.0_r8
+       end where
+     end do
+   end if
 
 end subroutine rk_stratiform_init_cnst
 

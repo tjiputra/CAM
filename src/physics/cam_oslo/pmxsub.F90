@@ -22,10 +22,10 @@ subroutine pmxsub(lchnk, ncol, pint, pmid, coszrs, state, t, qm1, Nnatk, &
 ! by Alf Kirkevaag in 2003, and finally rewritten for CAM3 February 2005.
 ! Modified for new aerosol schemes by Alf Kirkevaag in January 2006.
 ! Updated by Alf Kirkevåg, May 2013: The SO4(Ait) mode now takes into
-! account condensed SOA in addition to H2SO4 (in kcomp1.out, aerocomk1.out,
-! and in aerodry1.out).
-! Updated for CAM5-Oslo with RRTMG by Alf Kirkevåg, 2014-2015, and for new
-! SOA treatment August/September 2015.
+! account condensed SOA in addition to H2SO4.
+! Updated for CAM5-Oslo with RRTMG by Alf Kirkevåg, 2014-2015, for new
+! SOA treatment August/September 2015, and for cleanig up and optimizing
+! the code around interpolations in November 2016.
 
    use ppgrid
    use shr_kind_mod, only: r8 => shr_kind_r8
@@ -47,7 +47,7 @@ subroutine pmxsub(lchnk, ncol, pint, pmid, coszrs, state, t, qm1, Nnatk, &
 
 !
 ! Input arguments
-!
+
    integer, intent(in) :: lchnk                   ! chunk identifier
    integer, intent(in) :: ncol                    ! number of atmospheric columns
    real(r8), intent(in) :: coszrs(pcols)          ! Cosine solar zenith angle
@@ -88,8 +88,7 @@ subroutine pmxsub(lchnk, ncol, pint, pmid, coszrs, state, t, qm1, Nnatk, &
    real(r8) dCtot(pcols,pver), Ctot(pcols,pver)
    real(r8) Cam(pcols,pver,nbmodes), fbcm(pcols,pver,nbmodes), fcm(pcols,pver,nbmodes), &
             faqm(pcols,pver,nbmodes), f_condm(pcols,pver,nbmodes), &
-            f_soam(pcols, pver,nbmodes), &
-            camnull(pcols,pver,nbmodes), faqm4(pcols,pver) 
+            f_soam(pcols, pver,nbmodes), faqm4(pcols,pver) 
    real(r8) xrh(pcols,pver), xrhnull(pcols,pver)
    integer  irh1(pcols,pver), irh2(pcols,pver), irh1null(pcols,pver), irh2null(pcols,pver)
    real(r8) focm(pcols,pver,4)
@@ -126,17 +125,28 @@ subroutine pmxsub(lchnk, ncol, pint, pmid, coszrs, state, t, qm1, Nnatk, &
             cmdry9(pcols), cmdry10(pcols), cmdry12(pcols), cmdry14(pcols)
 #endif
 #endif
-   real(r8) rh0(pcols,pver), rhoda(pcols,pver), cxstot(pcols,pver), akcxs(pcols) 
+   real(r8) rh0(pcols,pver), rhoda(pcols,pver)
    real(r8) ssavis(pcols,pver), asymmvis(pcols,pver), extvis(pcols,pver), dayfoc(pcols,pver)
    real(r8) n_aerorig(pcols,pver), n_aer(pcols,pver)
-!   real(r8) Caitsoa(pcols,pver)        ! = Coc for SO4(Ait) from condensed SOA
-!   real(r8) fcmsoa(pcols,pver)         ! = Coc/(Coc+Cso4) for SO4(Ait)
-   real(r8) cxstotdummy(pcols,pver)    ! dummy variable for cxstot
    type(physics_state), intent(in), target :: state
    real(r8) :: es(pcols,pver)      ! saturation vapor pressure
    real(r8) :: qs(pcols,pver)      ! saturation specific humidity
    real(r8) :: rht(pcols,pver)     ! relative humidity (fraction) (rh is already used in opptab)
    real(r8) :: rh_temp(pcols,pver) ! relative humidity (fraction) for input to LUT
+   real(r8) xfombg(pcols,pver)
+   integer ifombg1(pcols,pver), ifombg2(pcols,pver)
+   real(r8) xct(pcols,pver,nmodes)
+   integer ict1(pcols,pver,nmodes)
+   real(r8) xfac(pcols,pver,nbmodes)
+   integer ifac1(pcols,pver,nbmodes)
+   real(r8) xfbc(pcols,pver,nbmodes)
+   integer ifbc1(pcols,pver,nbmodes)
+   real(r8) xfaq(pcols,pver,nbmodes)
+   integer ifaq1(pcols,pver,nbmodes)
+   real(r8) xfbcbg(pcols,pver)
+   integer ifbcbg1(pcols,pver)
+   real(r8) xfbcbgn(pcols,pver)
+   integer ifbcbgn1(pcols,pver)
 
 #ifdef AEROCOM 
    real(r8) Ctotdry(pcols,pver), Cwater(pcols,pver), mmr_aerh2o(pcols,pver), &
@@ -366,11 +376,13 @@ subroutine pmxsub(lchnk, ncol, pint, pmid, coszrs, state, t, qm1, Nnatk, &
 #ifdef AEROCOM
       character(len=10) :: modeString
       character(len=20) :: varname
+      integer irf,irfmax
       real(r8) Camrel(pcols,pver,nbmodes)
       real(r8) Camtot(pcols,nbmodes)
       real(r8) cxsmtot(pcols,nbmodes)
       real(r8) cxsmrel(pcols,nbmodes)
       real(r8) xctrel,camdiff,cxsm
+      real(r8) cxs(pcols,pver), cxstot(pcols,pver), akcxs(pcols) 
 #endif  
 !-
 
@@ -440,9 +452,8 @@ subroutine pmxsub(lchnk, ncol, pint, pmid, coszrs, state, t, qm1, Nnatk, &
 
 !      Find process tagged bulk aerosol properies (from the life cycle module): 
 
-          call calculateBulkProperties(ncol, qm1, rhoda, Nnatk, &
-                                       Ca, f_c, f_bc, f_aq, f_so4_cond, f_soa, faitbc, fnbc, &
-                                       f_soana)
+          call calculateBulkProperties(ncol, qm1, rhoda, Nnatk, Ca, f_c, f_bc, &
+                                       f_aq, f_so4_cond, f_soa, faitbc, fnbc, f_soana)
 
 !      calculating vulume fractions from mass fractions: 
       do k=1,pver
@@ -469,7 +480,7 @@ subroutine pmxsub(lchnk, ncol, pint, pmid, coszrs, state, t, qm1, Nnatk, &
 
       !==> calls modalapp to partition the mass
       call partitionMass(ncol, nnatk, Ca, f_c, f_bc, f_aq, f_so4_cond, f_soa , &
-                              cam, fcm, fbcm, faqm , f_condm , f_soam )
+                              cam, fcm, fbcm, faqm, f_condm, f_soam )
 
       !The following uses non-standard units, #/cm3 and ug/m3
       Nnatk(:ncol,:,:) = Nnatk(:ncol,:,:)*1.e-6_r8
@@ -484,8 +495,39 @@ subroutine pmxsub(lchnk, ncol, pint, pmid, coszrs, state, t, qm1, Nnatk, &
           enddo
         enddo
       enddo
+      do k=1,pver
+        do icol=1,ncol
+          faqm4(icol,k) = faqm(icol,k,4)
+        end do
+      enddo  
+
+!     find common input parameters for use in the interpolation routines
+
+      call inputForInterpol (lchnk, ncol, rhum, xrh, irh1,   &
+         f_soana, xfombg, ifombg1, faitbc, xfbcbg, ifbcbg1,  &
+         fnbc, xfbcbgn, ifbcbgn1, Nnatk, Cam, xct, ict1,     &
+         focm, fcm, xfac, ifac1, fbcm, xfbc, ifbc1, faqm, xfaq, ifaq1)
+
+!     and define the respective RH input variables for dry aerosols     
+      do k=1,pver
+        do icol=1,ncol
+          xrhnull(icol,k)=rh(1)
+          irh1null(icol,k)=1
+        end do
+      enddo  
+
 
 #ifdef AEROCOM
+
+!     Initialize overshooting mass summed over all modes
+      do k=1,pver
+        do icol=1,ncol
+          cxstot(icol,k)=0.0_r8
+        enddo 
+      enddo  
+      do icol=1,ncol
+        akcxs(icol)=0.0_r8
+      enddo 
 
 !     Initializing total and relative exessive (overshooting w.r.t. 
 !     look-up table maxima) added mass column:
@@ -496,7 +538,6 @@ subroutine pmxsub(lchnk, ncol, pint, pmid, coszrs, state, t, qm1, Nnatk, &
            cxsmrel(icol,i)=0.0_r8
         enddo
       enddo
-!
 !     Calculating added internally mixed mass onto each mode 1-10, relative to
 !     maximum mass which can be added w.r.t. the look-up tables (for level k),
 !     as well as the relative exessive added mass column:
@@ -509,6 +550,11 @@ subroutine pmxsub(lchnk, ncol, pint, pmid, coszrs, state, t, qm1, Nnatk, &
             cxsm=max(0.0_r8,camdiff)
             cxsmtot(icol,i)=cxsmtot(icol,i)+cxsm*deltah_km(icol,k)          
             Camtot(icol,i)=Camtot(icol,i)+Cam(icol,k,i)*deltah_km(icol,k)          
+!t
+            camdiff=Cam(icol,k,i)-xct(icol,k,i)*(Nnatk(icol,k,i)+eps)
+            cxs(icol,k)=max(0.0_r8,camdiff)
+            cxstot(icol,k)= cxstot(icol,k)+cxs(icol,k)
+!t
          enddo 
        enddo  
       enddo  
@@ -521,9 +567,22 @@ subroutine pmxsub(lchnk, ncol, pint, pmid, coszrs, state, t, qm1, Nnatk, &
             cxsm=max(0.0_r8,camdiff)
             cxsmtot(icol,i)=cxsmtot(icol,i)+cxsm*deltah_km(icol,k) 
             Camtot(icol,i)=Camtot(icol,i)+Cam(icol,k,i)*deltah_km(icol,k)          
+!t
+            camdiff=Cam(icol,k,i)-xct(icol,k,i)*(Nnatk(icol,k,i)+eps)
+            cxs(icol,k)=max(0.0_r8,camdiff)
+            cxstot(icol,k)= cxstot(icol,k)+cxs(icol,k)
+!t
          enddo 
        enddo  
       enddo  
+
+!     Total overshooting mass summed over all modes and all levels
+      do icol=1,ncol
+        do k=1,pver
+          akcxs(icol) =akcxs(icol)+cxstot(icol,k)*deltah_km(icol,k)
+        enddo
+      enddo
+      call outfld('AKCXS   ',akcxs ,pcols,lchnk)
 
       do i=1,nbmodes
         do icol=1,ncol
@@ -549,30 +608,6 @@ subroutine pmxsub(lchnk, ncol, pint, pmid, coszrs, state, t, qm1, Nnatk, &
 
 #endif
 
-      do k=1,pver
-        do icol=1,ncol
-          faqm4(icol,k) = faqm(icol,k,4)
-        end do
-      enddo  
-      do i=1,nbmodes
-        do k=1,pver
-          do icol=1,ncol
-            camnull(icol,k,i) = 0.0_r8
-          enddo
-        enddo
-      enddo
-
-!     find common xrh, irh1 and irh2 for use in the interpolation routines
-      call rhForInterpol (lchnk, ncol, rhum, xrh, irh1, irh2)
-
-!     and define the respective variables for dry aerosols     
-      do k=1,pver
-        do icol=1,ncol
-          xrhnull(icol,k)=rh(1)
-          irh1null(icol,k)=1
-          irh2null(icol,k)=2
-        end do
-      enddo  
 
 !     AeroCom: Find dry aerosol asymmetry factor and mass for subsequent 
 !     calculation of condensed water mass below...
@@ -584,8 +619,6 @@ subroutine pmxsub(lchnk, ncol, pint, pmid, coszrs, state, t, qm1, Nnatk, &
         do icol=1,ncol
           Ctotdry(icol,k)=0.0_r8
           rh0(icol,k)=0.0_r8
-          cxstot(icol,k) = 0.0_r8
-          cxstotdummy(icol,k) = 0.0_r8
           asydry_aer(icol,k)=0.0_r8 
         end do
       enddo  
@@ -598,38 +631,41 @@ subroutine pmxsub(lchnk, ncol, pint, pmid, coszrs, state, t, qm1, Nnatk, &
 
       mplus10=0
 !     SO4/SOA(Ait) mode:                                         
-      call interpol1 (lchnk, ncol, daylight, xrhnull, irh1null, irh2null, &
-                      mplus10, Nnatk, f_soana, &                             ! f_soana=xfombgin
-                      Cam, focm, ssa, asym, be, ke, lw_on, kalw, cxstot)     ! focm=xfacin
+      call interpol1 (lchnk, ncol, daylight, xrhnull, irh1null, mplus10, &
+                      Nnatk, xfombg, ifombg1, xct, ict1, xfac, ifac1, &
+                      ssa, asym, be, ke, lw_on, kalw)
 
 !     BC(Ait) and OC(Ait) modes:
-      call interpol2to3 (lchnk, ncol, daylight, xrhnull, irh1null, irh2null, &
-                         mplus10, Nnatk, & 
-                         Cam, focm, ssa, asym, be, ke, lw_on, kalw, cxstot)     ! focm=xfacsoain
+      call interpol2to3 (lchnk, ncol, daylight, xrhnull, irh1null, mplus10, &
+                         Nnatk, xct, ict1, xfac, ifac1, &
+                         ssa, asym, be, ke, lw_on, kalw)
 
 !     BC&OC(Ait) mode:   ------ fcm not valid here (=0). Use faitbc instead
-      call interpol4 (lchnk, ncol, daylight, xrhnull, irh1null, irh2null, &
-                       mplus10, Nnatk, faitbc, & ! faitbc=xfaitbcin
-                      Cam, focm, faqm4, ssa, asym, be, ke, lw_on, kalw, cxstot)   ! focm=xfacsoain  
+      call interpol4 (lchnk, ncol, daylight, xrhnull, irh1null, mplus10, &
+                      Nnatk, xfbcbg, ifbcbg1, xct, ict1, xfac, ifac1, &
+                      xfaq, ifaq1, ssa, asym, be, ke, lw_on, kalw)
 
 !     SO4(Ait75) (5), Mineral (6-7) and Sea-salt (8-10) modes:
-      call interpol5to10 (lchnk, ncol, daylight, xrhnull, irh1null, irh2null, &
-                          Nnatk, Cam, fcm, fbcm, faqm, &
-                          ssa, asym, be, ke, lw_on, kalw, cxstot)
+      call interpol5to10 (lchnk, ncol, daylight, xrhnull, irh1null, &
+                          Nnatk, xct, ict1, xfac, ifac1, &
+                          xfbc, ifbc1, xfaq, ifaq1, &
+                          ssa, asym, be, ke, lw_on, kalw)
  enddo ! iloop
 
 
  do iloop=1,1
       mplus10=1
 !     BC(Ait) and OC(Ait) modes:
-      call interpol2to3 (lchnk, ncol, daylight, xrhnull, irh1null, irh2null, &
-                         mplus10, Nnatk, & 
-                         camnull, focm, ssa, asym, be, ke, lw_on, kalw, cxstotdummy)
+      call interpol2to3 (lchnk, ncol, daylight, xrhnull, irh1null, mplus10, &
+                         Nnatk, xct, ict1, xfac, ifac1, &
+                         ssa, asym, be, ke, lw_on, kalw)
 
 !     BC&OC(n) mode:   ------ fcm not valid here (=0). Use fnbc instead
-      call interpol4 (lchnk, ncol, daylight, xrhnull, irh1null, irh2null, &
-                      mplus10, Nnatk, fnbc, &        ! fnbc=xfaitbcin
-                      camnull, focm, faqm4, ssa, asym, be, ke, lw_on, kalw, cxstotdummy)
+      call interpol4 (lchnk, ncol, daylight, xrhnull, irh1null, mplus10, &
+                      Nnatk, xfbcbgn, ifbcbgn1, xct, ict1, &
+                      xfac, ifac1, xfaq, ifaq1, &
+                      ssa, asym, be, ke, lw_on, kalw)
+
 enddo ! iloop
 
        do i=0,nmodes    ! mode 0 to 14 
@@ -678,16 +714,13 @@ enddo ! iloop
           asydry_aer(icol,k)=asymtot(icol,k,ib)
         end do
        enddo
-!!!
+!
+        call outfld('ASYMMDRY',asydry_aer,pcols,lchnk)
+!
 
 !ccccccccc1ccccccccc2ccccccccc3ccccccccc4ccccccccc5ccccccccc6ccccccccc7cc
 #endif  ! AEROCOM
 
-      do k=1,pver
-        do icol=1,ncol
-          cxstot(icol,k) = 0.0_r8
-        end do
-      enddo  
 !     (Wet) Optical properties for each of the aerosol modes:
 
       lw_on = .true.  ! No LW optics needed for RH=0 (interpol returns 0-values)
@@ -698,24 +731,24 @@ enddo ! iloop
 
       mplus10=0
 !     SO4/SOA(Ait) mode:                                         
-      call interpol1 (lchnk, ncol, daylight, xrh, irh1, irh2, &
-                      mplus10, Nnatk, f_soana, & ! f_soana=xfombgin
-                      Cam, focm, ssa, asym, be, ke, lw_on, kalw, cxstot)         ! focm=xfacin
+      call interpol1 (lchnk, ncol, daylight, xrh, irh1, mplus10, &
+                      Nnatk, xfombg, ifombg1, xct, ict1,    &
+                      xfac, ifac1, ssa, asym, be, ke, lw_on, kalw)
 
 !     BC(Ait) and OC(Ait) modes:
-      call interpol2to3 (lchnk, ncol, daylight, xrh, irh1, irh2, &
-                         mplus10, Nnatk, & 
-                         Cam, focm, ssa, asym, be, ke, lw_on, kalw, cxstot)      ! focm=xfacsoain
+      call interpol2to3 (lchnk, ncol, daylight, xrh, irh1, mplus10, &
+                         Nnatk, xct, ict1, xfac, ifac1, &
+                         ssa, asym, be, ke, lw_on, kalw)
 
 !     BC&OC(Ait) mode:   ------ fcm invalid here (=0). Using faitbc instead
-      call interpol4 (lchnk, ncol, daylight, xrh, irh1, irh2, & 
-                      mplus10, Nnatk, faitbc, & ! faitbc=xfaitbcin
-                      Cam, focm, faqm4, ssa, asym, be, ke, lw_on, kalw, cxstot)  ! focm=xfacsoain  
+      call interpol4 (lchnk, ncol, daylight, xrh, irh1, mplus10, &
+                      Nnatk, xfbcbg, ifbcbg1, xct, ict1,    &
+                      xfac, ifac1, xfaq, ifaq1, ssa, asym, be, ke, lw_on, kalw)
 
 !     SO4(Ait75) (5), Mineral (6-7) and Sea-salt (8-10) modes:
-      call interpol5to10 (lchnk, ncol, daylight, xrh, irh1, irh2, &
-                          Nnatk, Cam, fcm, fbcm, faqm, &
-                          ssa, asym, be, ke, lw_on, kalw, cxstot)
+      call interpol5to10 (lchnk, ncol, daylight, xrh, irh1, &
+                          Nnatk, xct, ict1, xfac, ifac1, &
+                          xfbc, ifbc1, xfaq, ifaq1, ssa, asym, be, ke, lw_on, kalw)
  enddo ! iloop
 
 
@@ -732,20 +765,17 @@ enddo ! iloop
  do iloop=1,1
       mplus10=1
 !     SO4/SOA(Ait) mode: 
-      !do not exist as externally mixed
-      !call interpol1 (lchnk, ncol, daylight, xrh, irh1, irh2, &
-      !                mplus10, Nnatk, f_soan, &      ! f_soan=xfombgin
-      !                camnull, focm, ssa, asym, be, ke, lw_on, kalw, cxstotdummy)
+      !does no longer exist as an externally mixed mode
 
 !     BC(Ait) and OC(Ait) modes:
-      call interpol2to3 (lchnk, ncol, daylight, xrh, irh1, irh2, &
-                         mplus10, Nnatk, & 
-                         camnull, focm, ssa, asym, be, ke, lw_on, kalw, cxstotdummy)
+      call interpol2to3 (lchnk, ncol, daylight, xrh, irh1, mplus10, &
+                         Nnatk, xct, ict1, xfac, ifac1, &
+                         ssa, asym, be, ke, lw_on, kalw)
 
 !     BC&OC(n) mode:    ------ fcm not valid here (=0). Use fnbc instead
-      call interpol4 (lchnk, ncol, daylight, xrh, irh1, irh2, &
-                      mplus10, Nnatk, fnbc, &        ! fnbc=xfaitbcin
-                      camnull, focm, faqm4, ssa, asym, be, ke, lw_on, kalw, cxstotdummy)
+      call interpol4 (lchnk, ncol, daylight, xrh, irh1, mplus10, &
+                      Nnatk, xfbcbgn, ifbcbgn1, xct, ict1,  &
+                      xfac, ifac1, xfaq, ifaq1, ssa, asym, be, ke, lw_on, kalw)
  enddo ! iloop
 
 !ccccccccc1ccccccccc2ccccccccc3ccccccccc4ccccccccc5ccccccccc6ccccccccc7cc
@@ -1052,7 +1082,6 @@ enddo ! iloop
 !          akso4c(icol)=0.0_r8
 !          akbcc(icol)=0.0_r8
 !          akocc(icol)=0.0_r8
-          akcxs(icol)=0.0_r8
           aodvis(icol)=0.0_r8
           absvis(icol)=0.0_r8
 #ifdef COLTST4INTCONS 
@@ -1079,7 +1108,6 @@ enddo ! iloop
 !         Layer thickness, unit km, and layer airmass, unit kg/m2
           deltah=deltah_km(icol,k)
           airmass(icol,k)=1.e3_r8*deltah*rhoda(icol,k)
-          akcxs(icol) =akcxs(icol)+cxstot(icol,k)*deltah
 !          Optical depths at ca. 550 nm (0.442-0.625um) 
           aodvis(icol)=aodvis(icol)+betotvis(icol,k)*deltah
           absvis(icol)=absvis(icol)+batotvis(icol,k)*deltah
@@ -1102,8 +1130,6 @@ enddo ! iloop
          end do  ! k
         end do   ! icol
       
-!        Aerosol mass columns in pmxsub.F
-        call outfld('AKCXS   ',akcxs ,pcols,lchnk)
 !       Extinction and absorption for 0.55 um for the total aerosol, and AODs 
 #ifdef AEROCOM
         call outfld('BETOTVIS',betotvis,pcols,lchnk)
@@ -1156,71 +1182,37 @@ enddo ! iloop
           enddo
         enddo
 
- do iloop=1,1
 
-!       AEROCOM-specific interpolation routine for internally mixed aerosols:
+!000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 
-!     BC(ax) mode (hydrophobic, so no rhum needed here):
-        call intaeropt0(lchnk, ncol, Nnatk, &
-           bext440, bext500, bext550, bext670, bext870,                &
-           bebg440, bebg500, bebg550, bebg670, bebg870,                &
-           bebc440, bebc500, bebc550, bebc670, bebc870,                &
-           beoc440, beoc500, beoc550, beoc670, beoc870,                &
-           besu440, besu500, besu550, besu670, besu870,                &
-           babs440, babs500, babs550, babs670, babs870,                &
-           bebglt1, bebggt1, bebclt1, bebcgt1,                         &
-           beoclt1, beocgt1, bes4lt1, bes4gt1,                         &
-           backsc550, babg550, babc550, baoc550, basu550)
+!     AeroCom diagnostics requiring table look-ups with ambient RH. 
 
-!     SO4(Ait), BC(Ait) and OC(Ait) modes:
-      mplus10=0
-        call intaeropt2to3(lchnk, ncol, xrh, irh1, irh2, mplus10, Nnatk, Cam, focm,&
-           bext440, bext500, bext550, bext670, bext870,                &
-           bebg440, bebg500, bebg550, bebg670, bebg870,                &
-           bebc440, bebc500, bebc550, bebc670, bebc870,                &
-           beoc440, beoc500, beoc550, beoc670, beoc870,                &
-           besu440, besu500, besu550, besu670, besu870,                &
-           babs440, babs500, babs550, babs670, babs870,                &
-           bebglt1, bebggt1, bebclt1, bebcgt1,                         &
-           beoclt1, beocgt1, bes4lt1, bes4gt1,                         &
-           backsc550, babg550, babc550, baoc550, basu550)
-        call intaeropt1(lchnk, ncol, xrh, irh1, irh2, mplus10,         &
-           Nnatk, f_soana, Cam, focm,                                &
-           bext440, bext500, bext550, bext670, bext870,                &
-           bebg440, bebg500, bebg550, bebg670, bebg870,                &
-           bebc440, bebc500, bebc550, bebc670, bebc870,                &
-           beoc440, beoc500, beoc550, beoc670, beoc870,                &
-           besu440, besu500, besu550, besu670, besu870,                &
-           babs440, babs500, babs550, babs670, babs870,                &
-           bebglt1, bebggt1, bebclt1, bebcgt1,                         &
-           beoclt1, beocgt1, bes4lt1, bes4gt1,                         &
-           backsc550, babg550, babc550, baoc550, basu550)
+      do irf=0,0
+        call opticsAtConstRh(lchnk, ncol, pint, rhoda, Nnatk, xrh, irh1, irf, &
+           xct, ict1, xfaq, ifaq1, xfbcbg, ifbcbg1,           &
+           xfbcbgn, ifbcbgn1, xfac, ifac1, xfbc, ifbc1,       &
+           xfombg, ifombg1, vnbcarr, vaitbcarr, v_soana,      &
+           bext440, bext500, bext550, bext670, bext870,       &
+           bebg440, bebg500, bebg550, bebg670, bebg870,       &
+           bebc440, bebc500, bebc550, bebc670, bebc870,       &
+           beoc440, beoc500, beoc550, beoc670, beoc870,       &
+           besu440, besu500, besu550, besu670, besu870,       &
+           babs440, babs500, babs550, babs670, babs870,       &
+           bebglt1, bebggt1, bebclt1, bebcgt1,                &
+           beoclt1, beocgt1, bes4lt1, bes4gt1,                &
+           backsc550, babg550, babc550, baoc550, basu550,     & 
+           bext440n, bext500n, bext550n, bext670n, bext870n,  &
+           bebg440n, bebg500n, bebg550n, bebg670n, bebg870n,  &
+           bebc440n, bebc500n, bebc550n, bebc670n, bebc870n,  &
+           beoc440n, beoc500n, beoc550n, beoc670n, beoc870n,  &
+           besu440n, besu500n, besu550n, besu670n, besu870n,  &
+           babs440n, babs500n, babs550n, babs670n, babs870n,  &
+           bebglt1n, bebggt1n, bebclt1n, bebcgt1n,            &
+           beoclt1n, beocgt1n, bes4lt1n, bes4gt1n,            &
+           backsc550n, babg550n, babc550n, baoc550n, basu550n)
+      end do ! irf
 
-!     BC&OC(Ait) mode:    ------ fcm invalid here (=0). Using faitbc instead
-        call intaeropt4(lchnk, ncol, xrh, irh1, irh2, mplus10, Nnatk, faitbc, Cam, focm, faqm4, &
-           bext440, bext500, bext550, bext670, bext870,                &
-           bebg440, bebg500, bebg550, bebg670, bebg870,                &
-           bebc440, bebc500, bebc550, bebc670, bebc870,                &
-           beoc440, beoc500, beoc550, beoc670, beoc870,                &
-           besu440, besu500, besu550, besu670, besu870,                &
-           babs440, babs500, babs550, babs670, babs870,                &
-           bebglt1, bebggt1, bebclt1, bebcgt1,                         &
-           beoclt1, beocgt1, bes4lt1, bes4gt1,                         & 
-           backsc550, babg550, babc550, baoc550, basu550)
-
-!     SO4(Ait75) (5), Mineral (6-7) and Sea-salt (8-10) modes:
-        call intaeropt5to10(lchnk, ncol, xrh, irh1, irh2, Nnatk, Cam, fcm, fbcm, faqm, &
-           bext440, bext500, bext550, bext670, bext870,                &
-           bebg440, bebg500, bebg550, bebg670, bebg870,                &
-           bebc440, bebc500, bebc550, bebc670, bebc870,                &
-           beoc440, beoc500, beoc550, beoc670, beoc870,                &
-           besu440, besu500, besu550, besu670, besu870,                &
-           babs440, babs500, babs550, babs670, babs870,                &
-           bebglt1, bebggt1, bebclt1, bebcgt1,                         &
-           beoclt1, beocgt1, bes4lt1, bes4gt1,                         &
-           backsc550, babg550, babc550, baoc550, basu550)
-
-      end do  ! iloop
+!000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 
         do k=1,pver
          do icol=1,ncol
@@ -1429,35 +1421,6 @@ enddo ! iloop
                             +Nnatk(icol,k,10)*babg550(icol,k,10)
           end do
         enddo
-
-      do iloop=1,1
-
-!     then to the externally mixed SO4(n), BC(n) and OC(n) modes:
-      mplus10=1
-        call intaeropt2to3(lchnk, ncol, xrh, irh1, irh2, mplus10, Nnatk, camnull, focm, &
-           bext440n, bext500n, bext550n, bext670n, bext870n,                &
-           bebg440n, bebg500n, bebg550n, bebg670n, bebg870n,                &
-           bebc440n, bebc500n, bebc550n, bebc670n, bebc870n,                &
-           beoc440n, beoc500n, beoc550n, beoc670n, beoc870n,                &
-           besu440n, besu500n, besu550n, besu670n, besu870n,                &
-           babs440n, babs500n, babs550n, babs670n, babs870n,                &
-           bebglt1n, bebggt1n, bebclt1n, bebcgt1n,                          &
-           beoclt1n, beocgt1n, bes4lt1n, bes4gt1n,                          &
-           backsc550n, babg550n, babc550n, baoc550n, basu550n)
-
-!     and finally the BC&OC(n) mode:
-        call intaeropt4(lchnk, ncol, xrh, irh1, irh2, mplus10, Nnatk, fnbc, camnull, focm, faqm4, &
-           bext440n, bext500n, bext550n, bext670n, bext870n,                &
-           bebg440n, bebg500n, bebg550n, bebg670n, bebg870n,                &
-           bebc440n, bebc500n, bebc550n, bebc670n, bebc870n,                &
-           beoc440n, beoc500n, beoc550n, beoc670n, beoc870n,                &
-           besu440n, besu500n, besu550n, besu670n, besu870n,                &
-           babs440n, babs500n, babs550n, babs670n, babs870n,                &
-           bebglt1n, bebggt1n, bebclt1n, bebcgt1n,                          &
-           beoclt1n, beocgt1n, bes4lt1n, bes4gt1n,                          &
-           backsc550n, babg550n, babc550n, baoc550n, basu550n)
-
-      end do  ! iloop
 
       do i=11,14
        do k=1,pver
@@ -1851,6 +1814,103 @@ enddo ! iloop
 
          enddo  ! icol
 
+!       extinction, absorption (m-1) and backscatter coefficients (m-1 sr-1)
+        call outfld('EC550AER',ec550_aer,pcols,lchnk)
+        call outfld('ABS550_A',abs550_aer,pcols,lchnk)
+        call outfld('BS550AER',bs550_aer,pcols,lchnk)
+!
+!       speciated extinction coefficients (m-1)
+        call outfld('EC550SO4',ec550_so4,pcols,lchnk)
+        call outfld('EC550BC ',ec550_bc ,pcols,lchnk)
+        call outfld('EC550POM',ec550_pom,pcols,lchnk)
+        call outfld('EC550SS ',ec550_ss ,pcols,lchnk)
+        call outfld('EC550DU ',ec550_du ,pcols,lchnk)
+!
+!       optical depths and absorption as requested by AeroCom
+!       notation: 3=3D, D=DOD, A=ABS, LT=d<1um, GT=d>1um
+        call outfld('DOD440  ',dod440  ,pcols,lchnk)
+        call outfld('ABS440  ',abs440  ,pcols,lchnk)
+        call outfld('DOD500  ',dod500  ,pcols,lchnk)
+        call outfld('ABS500  ',abs500  ,pcols,lchnk)
+        call outfld('DOD550  ',dod550  ,pcols,lchnk)
+        call outfld('ABS550  ',abs550  ,pcols,lchnk)
+        call outfld('ABS550AL',abs550alt,pcols,lchnk)
+        call outfld('DOD670  ',dod670  ,pcols,lchnk)
+        call outfld('ABS670  ',abs670  ,pcols,lchnk)
+        call outfld('DOD870  ',dod870  ,pcols,lchnk)
+        call outfld('ABS870  ',abs870  ,pcols,lchnk)
+        call outfld('A550_SS ',abs550_ss  ,pcols,lchnk)
+        call outfld('A550_DU ',abs550_dust,pcols,lchnk)
+        call outfld('A550_SO4',abs550_so4 ,pcols,lchnk)
+        call outfld('A550_BC ',abs550_bc  ,pcols,lchnk)
+        call outfld('A550_POM',abs550_pom ,pcols,lchnk)
+!
+        call outfld('D440_SS ',dod440_ss  ,pcols,lchnk)
+        call outfld('D440_DU ',dod440_dust,pcols,lchnk)
+        call outfld('D440_SO4',dod440_so4 ,pcols,lchnk)
+        call outfld('D440_BC ',dod440_bc  ,pcols,lchnk)
+        call outfld('D440_POM',dod440_pom ,pcols,lchnk)
+        call outfld('D500_SS ',dod500_ss  ,pcols,lchnk)
+        call outfld('D500_DU ',dod500_dust,pcols,lchnk)
+        call outfld('D500_SO4',dod500_so4 ,pcols,lchnk)
+        call outfld('D500_BC ',dod500_bc  ,pcols,lchnk)
+        call outfld('D500_POM',dod500_pom ,pcols,lchnk)
+        call outfld('D550_SS ',dod550_ss  ,pcols,lchnk)
+        call outfld('D550_DU ',dod550_dust,pcols,lchnk)
+        call outfld('D550_SO4',dod550_so4 ,pcols,lchnk)
+        call outfld('D550_BC ',dod550_bc  ,pcols,lchnk)
+        call outfld('D550_POM',dod550_pom ,pcols,lchnk)
+        call outfld('D670_SS ',dod670_ss  ,pcols,lchnk)
+        call outfld('D670_DU ',dod670_dust,pcols,lchnk)
+        call outfld('D670_SO4',dod670_so4 ,pcols,lchnk)
+        call outfld('D670_BC ',dod670_bc  ,pcols,lchnk)
+        call outfld('D670_POM',dod670_pom ,pcols,lchnk)
+        call outfld('D870_SS ',dod870_ss  ,pcols,lchnk)
+        call outfld('D870_DU ',dod870_dust,pcols,lchnk)
+        call outfld('D870_SO4',dod870_so4 ,pcols,lchnk)
+        call outfld('D870_BC ',dod870_bc  ,pcols,lchnk)
+        call outfld('D870_POM',dod870_pom ,pcols,lchnk)
+        call outfld('DLT_SS  ',dod550lt1_ss,pcols,lchnk)
+        call outfld('DGT_SS  ',dod550gt1_ss,pcols,lchnk)
+        call outfld('DLT_DUST',dod550lt1_dust,pcols,lchnk)
+        call outfld('DGT_DUST',dod550gt1_dust,pcols,lchnk)
+        call outfld('DLT_SO4 ',dod550lt1_so4,pcols,lchnk)
+        call outfld('DGT_SO4 ',dod550gt1_so4,pcols,lchnk)
+        call outfld('DLT_BC  ',dod550lt1_bc,pcols,lchnk)
+        call outfld('DGT_BC  ',dod550gt1_bc,pcols,lchnk)
+        call outfld('DLT_POM ',dod550lt1_pom,pcols,lchnk)
+        call outfld('DGT_POM ',dod550gt1_pom,pcols,lchnk)
+!-        call outfld('DOD5503D',dod5503d,pcols,lchnk)
+!-        call outfld('ABS5503D',abs5503d,pcols,lchnk)
+!-        call outfld('D443_SS ',dod4403d_ss  ,pcols,lchnk)
+!-        call outfld('D443_DU ',dod4403d_dust,pcols,lchnk)
+!-        call outfld('D443_SO4',dod4403d_so4 ,pcols,lchnk)
+!-        call outfld('D443_BC ',dod4403d_bc  ,pcols,lchnk)
+!-        call outfld('D443_POM',dod4403d_pom ,pcols,lchnk)
+!-        call outfld('D503_SS ',dod5003d_ss  ,pcols,lchnk)
+!-        call outfld('D503_DU ',dod5003d_dust,pcols,lchnk)
+!-        call outfld('D503_SO4',dod5003d_so4 ,pcols,lchnk)
+!-        call outfld('D503_BC ',dod5003d_bc  ,pcols,lchnk)
+!-        call outfld('D503_POM',dod5003d_pom ,pcols,lchnk)
+!-        call outfld('D553_SS ',dod5503d_ss  ,pcols,lchnk)
+!-        call outfld('D553_DU ',dod5503d_dust,pcols,lchnk)
+!-        call outfld('D553_SO4',dod5503d_so4 ,pcols,lchnk)
+!-        call outfld('D553_BC ',dod5503d_bc  ,pcols,lchnk)
+!-        call outfld('D553_POM',dod5503d_pom ,pcols,lchnk)
+!-        call outfld('D673_SS ',dod6703d_ss  ,pcols,lchnk)
+!-        call outfld('D673_DU ',dod6703d_dust,pcols,lchnk)
+!-        call outfld('D673_SO4',dod6703d_so4 ,pcols,lchnk)
+!-        call outfld('D673_BC ',dod6703d_bc  ,pcols,lchnk)
+!-        call outfld('D673_POM',dod6703d_pom ,pcols,lchnk)
+!-        call outfld('D873_SS ',dod8703d_ss  ,pcols,lchnk)
+!-        call outfld('D873_DU ',dod8703d_dust,pcols,lchnk)
+!-        call outfld('D873_SO4',dod8703d_so4 ,pcols,lchnk)
+!-        call outfld('D873_BC ',dod8703d_bc  ,pcols,lchnk)
+!-        call outfld('D873_POM',dod8703d_pom ,pcols,lchnk)
+
+
+!000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+
 !       Dry parameters of each aerosol component 
 !       BC(ax) mode
         call intdrypar0(lchnk, ncol, Nnatk,                          & 
@@ -1859,25 +1919,29 @@ enddo ! iloop
            cintsa, cintsa05, cintsa125, aaeros, aaerol, vaeros, vaerol,&
            cknorm,cknlt05,ckngt125)
 !       SO4&SOA(Ait,n) mode
-        call intdrypar1(lchnk, ncol, Nnatk, f_soana, Cam, focm,  & 
+        call intdrypar1(lchnk, ncol, Nnatk, xfombg, ifombg1,         &
+           xct, ict1, xfac, ifac1,                                   & 
            cintbg, cintbg05, cintbg125, cintbc, cintbc05, cintbc125, & 
            cintoc, cintoc05, cintoc125, cintsc, cintsc05, cintsc125, &
            cintsa, cintsa05, cintsa125, aaeros, aaerol, vaeros, vaerol,&
            aaerosn,aaeroln,vaerosn,vaeroln,cknorm,cknlt05,ckngt125)
 !       BC(Ait,n) and OC(Ait,n) modes
-        call intdrypar2to3(lchnk, ncol, Nnatk, Cam, focm,            & 
-           cintbg, cintbg05, cintbg125, cintbc, cintbc05, cintbc125, & 
-           cintoc, cintoc05, cintoc125, cintsc, cintsc05, cintsc125, &
+         call intdrypar2to3(lchnk, ncol, Nnatk, xct, ict1, xfac, ifac1, & 
+           cintbg, cintbg05, cintbg125, cintbc, cintbc05, cintbc125,   & 
+           cintoc, cintoc05, cintoc125, cintsc, cintsc05, cintsc125,   &
            cintsa, cintsa05, cintsa125, aaeros, aaerol, vaeros, vaerol,&
            aaerosn,aaeroln,vaerosn,vaeroln,cknorm,cknlt05,ckngt125)
 !       BC&OC(Ait,n) mode   ------ fcm not valid here (=0). Use faitbc or fnbc instead
-        call intdrypar4(lchnk, ncol, Nnatk, fnbc, faitbc, Cam, focm, faqm4, &
+        call intdrypar4(lchnk, ncol, Nnatk,                          &
+           xfbcbg, ifbcbg1, xfbcbgn, ifbcbgn1,                       &
+           xct, ict1, xfac, ifac1, xfaq, ifaq1,                      &
            cintbg, cintbg05, cintbg125, cintbc, cintbc05, cintbc125, &
            cintoc, cintoc05, cintoc125, cintsc, cintsc05, cintsc125, &
            cintsa, cintsa05, cintsa125, aaeros, aaerol, vaeros, vaerol, &
            aaerosn,aaeroln,vaerosn,vaeroln,cknorm,cknlt05,ckngt125)
 !       SO4(Ait75) (5), mineral (6-7) and Sea-salt (8-10) modes:
-        call intdrypar5to10(lchnk, ncol, Nnatk, Cam, fcm, fbcm, faqm,& 
+        call intdrypar5to10(lchnk, ncol, Nnatk,                      &
+           xct, ict1, xfac, ifac1, xfbc, ifbc1, xfaq, ifaq1,         & 
            cintbg, cintbg05, cintbg125, cintbc, cintbc05, cintbc125, & 
            cintoc, cintoc05, cintoc125, cintsc, cintsc05, cintsc125, &
            cintsa, cintsa05, cintsa125, aaeros, aaerol, vaeros, vaerol,&
@@ -2208,8 +2272,7 @@ enddo ! iloop
         call outfld('DLOAD_S4',dload_s4,pcols,lchnk)
         call outfld('DLOAD_OC',dload_oc,pcols,lchnk)
         call outfld('DLOAD_BC',dload_bc,pcols,lchnk)
-!x
-!       disse gir ogsaa krasj:
+
         call outfld('LOADBCAC',dload_bc_ac,pcols,lchnk)
         call outfld('LOADBC0 ',dload_bc_0,pcols,lchnk)
         call outfld('LOADBC2 ',dload_bc_2,pcols,lchnk)
@@ -2236,113 +2299,48 @@ enddo ! iloop
         call outfld('DERGT05 ',dergt05,pcols,lchnk)
         call outfld('DER     ',der    ,pcols,lchnk)
 !
-!       extinction, absorption (m-1) and backscatter coefficients (m-1 sr-1)
-        call outfld('EC550AER',ec550_aer,pcols,lchnk)
-        call outfld('ABS550_A',abs550_aer,pcols,lchnk)
-        call outfld('BS550AER',bs550_aer,pcols,lchnk)
-!
-!       speciated extinction coefficients (m-1)
-        call outfld('EC550SO4',ec550_so4,pcols,lchnk)
-        call outfld('EC550BC ',ec550_bc ,pcols,lchnk)
-        call outfld('EC550POM',ec550_pom,pcols,lchnk)
-        call outfld('EC550SS ',ec550_ss ,pcols,lchnk)
-        call outfld('EC550DU ',ec550_du ,pcols,lchnk)
-!
-!       optical depths and absorption as requested by AeroCom
-!       notation: 3=3D, D=DOD, A=ABS, LT=d<1um, GT=d>1um
-        call outfld('DOD440  ',dod440  ,pcols,lchnk)
-        call outfld('ABS440  ',abs440  ,pcols,lchnk)
-        call outfld('DOD500  ',dod500  ,pcols,lchnk)
-        call outfld('ABS500  ',abs500  ,pcols,lchnk)
-        call outfld('DOD550  ',dod550  ,pcols,lchnk)
-        call outfld('ABS550  ',abs550  ,pcols,lchnk)
-        call outfld('ABS550AL',abs550alt,pcols,lchnk)
-        call outfld('DOD670  ',dod670  ,pcols,lchnk)
-        call outfld('ABS670  ',abs670  ,pcols,lchnk)
-        call outfld('DOD870  ',dod870  ,pcols,lchnk)
-        call outfld('ABS870  ',abs870  ,pcols,lchnk)
-        call outfld('A550_SS ',abs550_ss  ,pcols,lchnk)
-        call outfld('A550_DU ',abs550_dust,pcols,lchnk)
-        call outfld('A550_SO4',abs550_so4 ,pcols,lchnk)
-        call outfld('A550_BC ',abs550_bc  ,pcols,lchnk)
-        call outfld('A550_POM',abs550_pom ,pcols,lchnk)
-!
-        call outfld('D440_SS ',dod440_ss  ,pcols,lchnk)
-        call outfld('D440_DU ',dod440_dust,pcols,lchnk)
-        call outfld('D440_SO4',dod440_so4 ,pcols,lchnk)
-        call outfld('D440_BC ',dod440_bc  ,pcols,lchnk)
-        call outfld('D440_POM',dod440_pom ,pcols,lchnk)
-        call outfld('D500_SS ',dod500_ss  ,pcols,lchnk)
-        call outfld('D500_DU ',dod500_dust,pcols,lchnk)
-        call outfld('D500_SO4',dod500_so4 ,pcols,lchnk)
-        call outfld('D500_BC ',dod500_bc  ,pcols,lchnk)
-        call outfld('D500_POM',dod500_pom ,pcols,lchnk)
-        call outfld('D550_SS ',dod550_ss  ,pcols,lchnk)
-        call outfld('D550_DU ',dod550_dust,pcols,lchnk)
-        call outfld('D550_SO4',dod550_so4 ,pcols,lchnk)
-        call outfld('D550_BC ',dod550_bc  ,pcols,lchnk)
-        call outfld('D550_POM',dod550_pom ,pcols,lchnk)
-        call outfld('D670_SS ',dod670_ss  ,pcols,lchnk)
-        call outfld('D670_DU ',dod670_dust,pcols,lchnk)
-        call outfld('D670_SO4',dod670_so4 ,pcols,lchnk)
-        call outfld('D670_BC ',dod670_bc  ,pcols,lchnk)
-        call outfld('D670_POM',dod670_pom ,pcols,lchnk)
-        call outfld('D870_SS ',dod870_ss  ,pcols,lchnk)
-        call outfld('D870_DU ',dod870_dust,pcols,lchnk)
-        call outfld('D870_SO4',dod870_so4 ,pcols,lchnk)
-        call outfld('D870_BC ',dod870_bc  ,pcols,lchnk)
-        call outfld('D870_POM',dod870_pom ,pcols,lchnk)
-        call outfld('DLT_SS  ',dod550lt1_ss,pcols,lchnk)
-        call outfld('DGT_SS  ',dod550gt1_ss,pcols,lchnk)
-        call outfld('DLT_DUST',dod550lt1_dust,pcols,lchnk)
-        call outfld('DGT_DUST',dod550gt1_dust,pcols,lchnk)
-        call outfld('DLT_SO4 ',dod550lt1_so4,pcols,lchnk)
-        call outfld('DGT_SO4 ',dod550gt1_so4,pcols,lchnk)
-        call outfld('DLT_BC  ',dod550lt1_bc,pcols,lchnk)
-        call outfld('DGT_BC  ',dod550gt1_bc,pcols,lchnk)
-        call outfld('DLT_POM ',dod550lt1_pom,pcols,lchnk)
-        call outfld('DGT_POM ',dod550gt1_pom,pcols,lchnk)
-        call outfld('DOD5503D',dod5503d,pcols,lchnk)
-        call outfld('ABS5503D',abs5503d,pcols,lchnk)
-!-        call outfld('D443_SS ',dod4403d_ss  ,pcols,lchnk)
-!-        call outfld('D443_DU ',dod4403d_dust,pcols,lchnk)
-!-        call outfld('D443_SO4',dod4403d_so4 ,pcols,lchnk)
-!-        call outfld('D443_BC ',dod4403d_bc  ,pcols,lchnk)
-!-        call outfld('D443_POM',dod4403d_pom ,pcols,lchnk)
-!-        call outfld('D503_SS ',dod5003d_ss  ,pcols,lchnk)
-!-        call outfld('D503_DU ',dod5003d_dust,pcols,lchnk)
-!-        call outfld('D503_SO4',dod5003d_so4 ,pcols,lchnk)
-!-        call outfld('D503_BC ',dod5003d_bc  ,pcols,lchnk)
-!-        call outfld('D503_POM',dod5003d_pom ,pcols,lchnk)
-        call outfld('D553_SS ',dod5503d_ss  ,pcols,lchnk)
-        call outfld('D553_DU ',dod5503d_dust,pcols,lchnk)
-        call outfld('D553_SO4',dod5503d_so4 ,pcols,lchnk)
-        call outfld('D553_BC ',dod5503d_bc  ,pcols,lchnk)
-        call outfld('D553_POM',dod5503d_pom ,pcols,lchnk)
-!-        call outfld('D673_SS ',dod6703d_ss  ,pcols,lchnk)
-!-        call outfld('D673_DU ',dod6703d_dust,pcols,lchnk)
-!-        call outfld('D673_SO4',dod6703d_so4 ,pcols,lchnk)
-!-        call outfld('D673_BC ',dod6703d_bc  ,pcols,lchnk)
-!-        call outfld('D673_POM',dod6703d_pom ,pcols,lchnk)
-!-        call outfld('D873_SS ',dod8703d_ss  ,pcols,lchnk)
-!-        call outfld('D873_DU ',dod8703d_dust,pcols,lchnk)
-!-        call outfld('D873_SO4',dod8703d_so4 ,pcols,lchnk)
-!-        call outfld('D873_BC ',dod8703d_bc  ,pcols,lchnk)
-!-        call outfld('D873_POM',dod8703d_pom ,pcols,lchnk)
 
-        call outfld('ASYMMDRY',asydry_aer,pcols,lchnk)
-
- 
 !000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 
-!     Extra AeroCom diagnostics requiring table look-ups with RH=0%. Note:
-!     intaeropt0 gives the same results as with ambient RH and is not called. 
+!     Extra AeroCom diagnostics requiring table look-ups with RH = constant. 
 
-!     Note: using xrhnull etc from above
-      call opticsAtConstRh(lchnk, ncol, pint, rhoda, Nnatk, xrhnull, irh1null, irh2null, &
-                           Cam, camnull, fcm, fbcm, faqm, &
-                           faqm4, fnbc, faitbc, focm, f_soana,  &
-                           vnbcarr, vaitbcarr, v_soana)
+#ifdef AEROCOM_INSITU
+      irfmax=6
+#else
+      irfmax=1
+#endif  ! AEROCOM_INSITU
+
+!     Note: using xrhnull etc as proxy for constant RH input values (see opttab.F90)
+      do irf=1,irfmax
+       do k=1,pver
+        do icol=1,ncol
+          xrhnull(icol,k)=xrhrf(irf)
+          irh1null(icol,k)=irhrf1(irf)
+        end do
+       enddo  
+        call opticsAtConstRh(lchnk, ncol, pint, rhoda, Nnatk, xrhnull, irh1null, irf, &
+           xct, ict1, xfaq, ifaq1, xfbcbg, ifbcbg1,           &
+           xfbcbgn, ifbcbgn1, xfac, ifac1, xfbc, ifbc1,       &
+           xfombg, ifombg1, vnbcarr, vaitbcarr, v_soana,      &
+           bext440, bext500, bext550, bext670, bext870,       &
+           bebg440, bebg500, bebg550, bebg670, bebg870,       &
+           bebc440, bebc500, bebc550, bebc670, bebc870,       &
+           beoc440, beoc500, beoc550, beoc670, beoc870,       &
+           besu440, besu500, besu550, besu670, besu870,       &
+           babs440, babs500, babs550, babs670, babs870,       &
+           bebglt1, bebggt1, bebclt1, bebcgt1,                &
+           beoclt1, beocgt1, bes4lt1, bes4gt1,                &
+           backsc550, babg550, babc550, baoc550, basu550,     & 
+           bext440n, bext500n, bext550n, bext670n, bext870n,  &
+           bebg440n, bebg500n, bebg550n, bebg670n, bebg870n,  &
+           bebc440n, bebc500n, bebc550n, bebc670n, bebc870n,  &
+           beoc440n, beoc500n, beoc550n, beoc670n, beoc870n,  &
+           besu440n, besu500n, besu550n, besu670n, besu870n,  &
+           babs440n, babs500n, babs550n, babs670n, babs870n,  &
+           bebglt1n, bebggt1n, bebclt1n, bebcgt1n,            &
+           beoclt1n, beocgt1n, bes4lt1n, bes4gt1n,            &
+           backsc550n, babg550n, babc550n, baoc550n, basu550n)
+      end do ! irf
 
 !000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 

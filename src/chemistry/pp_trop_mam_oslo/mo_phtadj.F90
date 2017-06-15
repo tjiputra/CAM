@@ -3,6 +3,8 @@
 
 
 
+
+
       module mo_phtadj
 
       private
@@ -10,29 +12,28 @@
 
       contains
 
-      subroutine phtadj( p_rate, inv, m, ncol )
+      subroutine phtadj( p_rate, inv, m, ncol, nlev )
 
       use chem_mods, only : nfs, phtcnt
       use shr_kind_mod, only : r8 => shr_kind_r8
-      use ppgrid, only : pver
 
       implicit none
 
 !--------------------------------------------------------------------
 ! ... dummy arguments
 !--------------------------------------------------------------------
-      integer, intent(in) :: ncol
-      real(r8), intent(in) :: inv(:,:,:)
-      real(r8), intent(in) :: m(:,:)
-      real(r8), intent(inout) :: p_rate(:,:,:)
+      integer, intent(in) :: ncol, nlev
+      real(r8), intent(in) :: inv(ncol,nlev,max(1,nfs))
+      real(r8), intent(in) :: m(ncol,nlev)
+      real(r8), intent(inout) :: p_rate(ncol,nlev,max(1,phtcnt))
 
 !--------------------------------------------------------------------
 ! ... local variables
 !--------------------------------------------------------------------
       integer :: k
-      real(r8) :: im(ncol)
+      real(r8) :: im(ncol,nlev)
 
-      do k = 1,pver
+      do k = 1,nlev
       end do
 
       end subroutine phtadj

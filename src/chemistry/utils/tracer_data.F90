@@ -1027,8 +1027,8 @@ contains
     if ( .not. file%cyclical ) then
        if ( all( all_data_times(:) > time ) ) then
           write(iulog,*) 'FIND_TIMES: ALL data times are after ', time
-          write(iulog,*) 'FIND_TIMES: data times: ',all_data_times(:)
-          write(iulog,*) 'FIND_TIMES: time: ',time
+          write(iulog,*) 'FIND_TIMES: file: ', trim(file%curr_filename)
+          write(iulog,*) 'FIND_TIMES: time: ', time
           call endrun('find_times: all(all_data_times(:) > time) '// trim(file%curr_filename) )
        endif
 
@@ -1072,8 +1072,6 @@ contains
           write(iulog,*) 'filename = '//trim(file%curr_filename)
           write(iulog,*)' datatimem = ',file%datatimem
           write(iulog,*)' datatimep = ',file%datatimep
-          write(iulog,*)' all_data_times = ',all_data_times
-          !call endrun()
        endif
        return
     endif

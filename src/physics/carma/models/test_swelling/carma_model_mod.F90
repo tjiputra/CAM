@@ -360,11 +360,13 @@ contains
     ! Add initial condition here.
 
     ! Put a horizontally uniform layer at all bin sizes
-!    q(:, 1)        = 100e-9_r8    ! top
-!    q(:, plev/4)   = 100e-9_r8    ! 1/4
-    q(:, plev/2)   = 100e-9_r8    ! middle
-!    q(:, 3*plev/4) = 100e-9_r8    ! 3/4
-!    q(:, plev-1)   = 100e-9_r8    ! bottom
+    where(mask)
+!      q(:, 1)        = 100e-9_r8    ! top
+!      q(:, plev/4)   = 100e-9_r8    ! 1/4
+      q(:, plev/2)   = 100e-9_r8    ! middle
+!      q(:, 3*plev/4) = 100e-9_r8    ! 3/4
+!      q(:, plev-1)   = 100e-9_r8    ! bottom
+    end where
     
     return
   end subroutine CARMA_InitializeParticle

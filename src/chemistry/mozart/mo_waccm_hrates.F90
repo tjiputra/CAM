@@ -307,7 +307,7 @@
       call setrxt_hrates( reaction_rates, state%t, invariants(1,1,indexm), ncol, kbot_hrates )
       call usrrxt_hrates( reaction_rates, state%t, ele_temp_fld, ion_temp_fld, invariants, &
                           h2ovmr, state%pmid, invariants(:,:,indexm), ncol, kbot_hrates )
-      call adjrxt( reaction_rates, invariants, invariants(1,1,indexm), ncol )
+      call adjrxt( reaction_rates, invariants, invariants(1,1,indexm), ncol,pver )
       
 !-----------------------------------------------------------------------      
 !     	... set cp array

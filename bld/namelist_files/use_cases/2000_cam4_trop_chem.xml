@@ -4,6 +4,8 @@
 
 <start_ymd>00010101</start_ymd>
 
+<co2vmr>367.0e-6</co2vmr>
+
 <ncdata hgrid="1.9x2.5" >atm/cam/inic/fv/cami-chem_1990-01-01_1.9x2.5_L26_c080114.nc</ncdata>
 
 <!-- Solar constant from Lean (via Caspar Ammann) -->

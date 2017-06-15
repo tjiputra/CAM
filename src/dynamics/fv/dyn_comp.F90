@@ -42,6 +42,7 @@ module dyn_comp
 
 use shr_kind_mod,       only: r8=>shr_kind_r8
 use spmd_utils,         only: masterproc, iam
+
 use pmgrid,             only: plon, plat, plev
 use constituents,       only: cnst_name, cnst_read_iv, qmin
 
@@ -55,6 +56,7 @@ use dyn_grid,           only: get_block_gcol_d, get_horiz_grid_dim_d
 use spmd_dyn,           only: spmd_readnl
 
 use cam_control_mod,    only: initial_run, ideal_phys, aqua_planet, moist_physics
+use phys_control,       only: phys_setopts
 
 use cam_initfiles,      only: initial_file_get_id, topo_file_get_id, pertlim
 use cam_pio_utils,      only: clean_iodesc_list
@@ -170,9 +172,16 @@ subroutine dyn_readnl(nlfilename)
                                        ! 42 for 4th order div damping plus 2nd order velocity damping
    real(r8):: fv_del2coef    = 3.e5_r8 ! strength of 2nd order velocity damping
 
-   namelist /dyn_fv_inparm/ fv_nsplit, fv_nspltrac, fv_nspltvrm, fv_iord, fv_jord,   &
-                            fv_kord, fv_conserve, fv_filtcw, fv_fft_flt, &
-                            fv_div24del2flag, fv_del2coef
+   logical :: fv_am_correction = .false. ! apply correction for angular momentum (AM)
+                                            ! conservation in SW eqns
+   logical :: fv_am_fixer    = .false. ! apply global fixer to conserve AM
+   logical :: fv_am_fix_lbl  = .false. ! apply global AM fixer level by level
+   logical :: fv_am_diag     = .false. ! turns on an AM diagnostic calculation written to log file
+
+   namelist /dyn_fv_inparm/ fv_nsplit, fv_nspltrac, fv_nspltvrm, fv_iord, fv_jord, &
+                            fv_kord, fv_conserve, fv_filtcw, fv_fft_flt,           &
+                            fv_div24del2flag, fv_del2coef, fv_am_correction,    &
+                            fv_am_fixer, fv_am_fix_lbl, fv_am_diag
 
    type(t_fvdycore_state), pointer :: dyn_state
 
@@ -232,6 +241,23 @@ subroutine dyn_readnl(nlfilename)
    call mpi_bcast(fv_del2coef, 1, mpi_real8, mstrid, mpicom, ierr)
    if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: fv_del2coef")
 
+   call mpi_bcast(fv_am_correction, 1, mpi_logical, mstrid, mpicom, ierr)
+   if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: fv_am_correction")
+
+   ! if fv_am_fix_lbl is true then fv_am_fixer must also be true.
+   if (fv_am_fix_lbl .and. .not. fv_am_fixer) then
+      fv_am_fixer = .true.
+   end if
+
+   call mpi_bcast(fv_am_fixer, 1, mpi_logical, mstrid, mpicom, ierr)
+   if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: fv_am_fixer")
+
+   call mpi_bcast(fv_am_fix_lbl, 1, mpi_logical, mstrid, mpicom, ierr)
+   if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: fv_am_fix_lbl")
+
+   call mpi_bcast(fv_am_diag, 1, mpi_logical, mstrid, mpicom, ierr)
+   if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: fv_am_diag")
+
    ! Store namelist settings in fv state object
    dyn_state => get_dyn_state()
 
@@ -280,6 +306,16 @@ subroutine dyn_readnl(nlfilename)
    dyn_state%div24del2flag = fv_div24del2flag
    dyn_state%del2coef      = fv_del2coef
 
+   dyn_state%am_correction = fv_am_correction
+   dyn_state%am_fixer      = fv_am_fixer
+   dyn_state%am_fix_lbl    = fv_am_fix_lbl
+   dyn_state%am_diag       = fv_am_diag
+
+
+   ! There is a mod for the AM correction in the vertical diffusion code.  Make use
+   ! of the physics control module to communicate whether correction is to be applied there.
+   call phys_setopts(fv_am_correction_in=fv_am_correction)
+
    if (masterproc) then
       write(iulog,*)'FV dycore configuration:'
       write(iulog,*)'  Lagrangian time splits (fv_nsplit)                = ', fv_nsplit
@@ -293,6 +329,12 @@ subroutine dyn_readnl(nlfilename)
       write(iulog,*)'  FFT filter (fv_fft_flt)                           = ', fv_fft_flt
       write(iulog,*)'  Divergence/velocity damping (fv_div24del2flag)    = ', fv_div24del2flag
       write(iulog,*)'  Coef for 2nd order velocity damping (fv_del2coef) = ', fv_del2coef
+      write(iulog,*)'  '
+      write(iulog,*)'  Angular momentum (AM) correction (fv_am_correction) = ', fv_am_correction
+      write(iulog,*)'  Apply AM fixer (fv_am_fixer)                        = ', fv_am_fixer
+      write(iulog,*)'  Level by level AM fixer (fv_am_fix_lbl)             = ', fv_am_fix_lbl
+      write(iulog,*)'  Print AM diagnostics to log file (fv_am_diag)       = ', fv_am_diag
+      write(iulog,*)'  '
    end if
 
    call spmd_readnl(nlfilename)
@@ -694,6 +736,9 @@ subroutine dyn_run(ptop, ndt, te0, dyn_state, dyn_in, dyn_out, rc)
    use pfixer,      only: adjust_press
 #endif
 
+   use shr_reprosum_mod, only: shr_reprosum_calc
+   use angular_momentum, only: am_calc
+
 #if defined( SPMD )
 #include "mpif.h"
 #endif
@@ -832,7 +877,7 @@ subroutine dyn_run(ptop, ndt, te0, dyn_state, dyn_in, dyn_out, rc)
    real(r8), allocatable :: mfx(:,:,:), mfy(:,:,:)
    real(r8), allocatable :: delpf(:,:,:), uc(:,:,:), vc(:,:,:)
    real(r8), allocatable :: dwz(:,:,:), pkc(:,:,:), wz(:,:,:)
-   real(r8), allocatable :: dpt(:,:,:), peln(:,:,:)
+   real(r8), allocatable :: dpt(:,:,:)
    real(r8), allocatable :: pkcc(:,:,:), wzc(:,:,:)
 
    ! The following variables are work arrays for xy=>yz transpose
@@ -908,6 +953,25 @@ subroutine dyn_run(ptop, ndt, te0, dyn_state, dyn_in, dyn_out, rc)
                      dyn_state%grid%kfirst:dyn_state%grid%klast)        ! Courant no. in Y
    real(r8) :: pexy_om(dyn_state%grid%ifirstxy:dyn_state%grid%ilastxy,dyn_state%grid%km+1, &
                        dyn_state%grid%jfirstxy:dyn_state%grid%jlastxy)
+
+   ! angular momentum (AM) conservation
+   logical  :: am_correction         ! apply AM correction?
+   logical  :: am_fixer              ! apply AM fixer?
+   logical  :: am_fix_lbl            ! apply fixer separately on each shallow-water layer?
+   real(r8) :: tmpsum(1,2)
+   real(r8) :: tmpresult(2)
+   real(r8) :: am0, am1, me0
+
+   real(r8) :: don(dyn_state%grid%jm,dyn_state%grid%km), & ! out of cd_core
+               dod(dyn_state%grid%jm,dyn_state%grid%km)    ! out of cd_core
+   real(r8) :: dons(dyn_state%grid%km), &                  ! sums over j
+               dods(dyn_state%grid%km)
+
+   ! AM diagnostic check 
+   logical  :: am_diag                  ! calc angular momentum diagnostic, write to logfile
+   logical  :: not_first_call = .false. ! initialise logic to skip check on first time-step 
+   real(r8) :: ame(dyn_state%grid%jm)
+   real(r8) :: zpe(dyn_state%grid%jfirstxy:dyn_state%grid%jlastxy)
    !--------------------------------------------------------------------------------------
 
    rc       =  DYN_RUN_FAILURE      ! Set initially to fail
@@ -944,8 +1008,12 @@ subroutine dyn_run(ptop, ndt, te0, dyn_state, dyn_in, dyn_out, rc)
    del2coef      = dyn_state%del2coef
    filtcw        = dyn_state%filtcw
 
-   consv     = dyn_state%consv
-   te_method = dyn_state%te_method
+   consv      = dyn_state%consv
+   te_method  = dyn_state%te_method
+   am_correction = dyn_state%am_correction
+   am_fixer   = dyn_state%am_fixer
+   am_fix_lbl = dyn_state%am_fix_lbl
+   am_diag    = dyn_state%am_diag
 
    pi   =  constants%pi
    om   =  constants%omega
@@ -1017,13 +1085,9 @@ subroutine dyn_run(ptop, ndt, te0, dyn_state, dyn_in, dyn_out, rc)
 
    if ( km > 1 ) then         ! not shallow water equations
 
-      if( consv ) then
+      if (consv .or. (am_diag .and. not_first_call)) then
 
          if (grid%iam .lt. grid%npes_xy) then
-
-            ! Compute globally integrated Total Energy (te0)
-
-            call t_startf ('benergy')
 
             ! Tests indicate that t3 does not have consistent
             ! pole values, e.g. t3(:,1,k) are not all the same.
@@ -1049,11 +1113,33 @@ subroutine dyn_run(ptop, ndt, te0, dyn_state, dyn_in, dyn_out, rc)
                end do
             end if
             
-            call benergy(grid, uxy, vxy, t3xy, delpxy,          &
-                         tracer(:,:,:,1), pexy, pelnxy, phisxy, &
-                         zvir, cp,  rair, tte, te0)
+            if (consv) then
+               ! Compute globally integrated Total Energy (te0)
+               call t_startf ('benergy')
 
-            call t_stopf('benergy')
+               call benergy(grid, uxy, vxy, t3xy, delpxy,          &
+                            tracer(:,:,:,1), pexy, pelnxy, phisxy, &
+                            zvir, cp,  rair, tte, te0)
+
+               call t_stopf('benergy')
+            end if
+
+            if (am_diag .and. not_first_call) then
+               ! add appropriate linear fraction of source term before update
+               nsplit = (n2+nv   -1) / nv
+               nsplit = (ns+nsplit*nv-1) / (nsplit*nv)
+               dt     = ndt / real(nsplit*n2*nv,r8)
+               dt     = -0.5_r8*(ndt-dt) ! '-' because this (am0) will be subtracted
+
+               call t_startf ('am_calc')
+
+               call am_calc(constants, grid, dt, uxy, delpxy, &
+                            pexy, pelnxy, phisxy, zvir, cp,   &
+                            rair, ame, am0)
+
+               call t_stopf('am_calc')
+            endif
+
          end if
       end if
    end if
@@ -1109,7 +1195,6 @@ subroutine dyn_run(ptop, ndt, te0, dyn_state, dyn_in, dyn_out, rc)
    allocate(    wz(im,jfirst-1:   jlast+1,   kfirst:klast+1) )
    allocate(  pkcc(im,jfirst  :   jlast  ,   kfirst:klast+1) ) 
    allocate(   wzc(im,jfirst  :   jlast  ,   kfirst:klast+1) ) 
-   allocate(  peln(im,kfirst  :   klast+1,   jfirst:jlast) )    ! For consv = .true.
    allocate(pkkp(im,jfirst:jlast,kfirst:klast+1))
    allocate(wzkp(im,jfirst:jlast,kfirst:klast+1))
    allocate(wzxy(ifirstxy:ilastxy,jfirstxy:jlastxy,km+1))
@@ -1582,18 +1667,70 @@ subroutine dyn_run(ptop, ndt, te0, dyn_state, dyn_in, dyn_out, rc)
                             pkkp, wzkp, cx_om, cy_om, filtcw, s_trac,        &
                             naux, ncx, ncy, nmfx, nmfy, iremotea,            &
                             cxtaga, cytaga, mfxtaga, mfytaga, cdcreqs(1,1),  &
-                            cdcreqs(1,2), cdcreqs(1,3), cdcreqs(1,4))
+                            cdcreqs(1,2), cdcreqs(1,3), cdcreqs(1,4),        &
+                            am_correction, am_fixer, dod, don)
 
                ctreqs(2,:) = cdcreqs(:,1)
                ctreqs(3,:) = cdcreqs(:,2)
                ctreqs(4,:) = cdcreqs(:,3)
                ctreqs(5,:) = cdcreqs(:,4)
-            end if
+            end if !  (grid%iam .lt. grid%npes_yz)
 
             call t_stopf  ('cd_core')
 
-            if ((it == nsplit) .and. (n == n2) .and. (iv == nv)) then
+            ! AM fixer
+            if (am_fixer) then
 
+               call t_barrierf('sync_lfix', grid%commdyn)
+               call t_startf ('lfix')
+               if (grid%iam .lt. grid%npes_yz) then
+
+                  ! level-by-level fix
+                  if (am_fix_lbl) then 
+
+                     do k = kfirst, klast
+                        call par_vecsum(jm, jfirst, jlast, don(1:jm,k), am1, grid%comm_y, grid%npr_y)
+                        dons(k) = am1
+                     end do
+
+                     do k = kfirst, klast
+                        call par_vecsum(jm, jfirst, jlast, dod(1:jm,k), me0, grid%comm_y, grid%npr_y)
+                        dods(k) = me0
+                     end do
+                     
+!$omp parallel do private(i, j, k)
+                     do k = kfirst, klast
+                        do j = jfirst, jlast
+                           do i = 1, im
+                              u(i,j,k) = u(i,j,k) - dons(k)/dods(k)*grid%cose(j)
+                           end do
+                        end do
+                     end do
+
+                  else     ! global fix
+
+                     tmpsum(1,1) = SUM(don)
+                     tmpsum(1,2) = SUM(dod)
+                     call shr_reprosum_calc(tmpsum, tmpresult, 1, 1, 2, commid=grid%commyz)
+                     am1 = tmpresult(1)
+                     me0 = tmpresult(2)
+!$omp parallel do private(i, j, k)
+                     do k = kfirst, klast
+                        do j = jfirst, jlast
+                           do i = 1, im
+                              u(i,j,k) = u(i,j,k) - am1/me0*grid%cose(j)
+                           end do
+                        end do
+                     end do
+
+                  end if  ! (am_fix_lbl)
+
+               end if     ! (grid%iam .lt. grid%npes_yz)
+               call t_stopf  ('lfix')
+
+            end if    ! (am_fixer)
+
+            if ((it == nsplit) .and. (n == n2) .and. (iv == nv)) then
 !$omp  parallel do     &
 !$omp  default(shared) &
 !$omp  private(i,j,k)
@@ -2121,7 +2258,7 @@ subroutine dyn_run(ptop, ndt, te0, dyn_state, dyn_in, dyn_out, rc)
                         nx,       uxy,     vxy,    ptxy,   dyn_out%tracer,  & 
                         phisxy,   cp,      cappa,  kord,   pelnxy,          &
                         te0,      tempxy,  dp0xy,  mfxxy,  mfyxy,           &
-                        te_method )
+                        te_method, am_correction)
 
             if ( .not. convt_local ) then
 !$omp parallel do private(i,j,k)
@@ -2146,6 +2283,38 @@ subroutine dyn_run(ptop, ndt, te0, dyn_state, dyn_in, dyn_out, rc)
 
    end do  !    do iv = 1, nv - vertical re-mapping sub-cycle loop
 
+   ! second call to bam for AM conservation diagnostic
+   if ( km > 1 ) then    ! not shallow water equations
+
+      if (am_diag .and. not_first_call) then
+
+         if (grid%iam .lt. grid%npes_xy) then
+
+            dt = 0.5_r8*(ndt+dt) ! add rest of source term from updated quantities
+            call am_calc(constants, grid, dt, uxy, delpxy, &
+                         pexy, pelnxy, phisxy, zvir, cp,   &
+                         rair, ame, am1)
+
+            call par_xsum(grid, psxy - grid%ptop, jlastxy-jfirstxy+1, zpe ) !axial MoI 
+
+            ame(:) = 0._r8
+            do j = max(2,jfirstxy), min(jm-1,jlastxy)
+               ame(j) = zpe(j)*0.5_r8*(grid%cose(j)**3 + grid%cose(j+1)**3) ! solid-body
+            enddo
+
+            call par_vecsum(jm, jfirstxy, jlastxy, ame, me0, grid%commxy_y, grid%nprxy_y)
+
+            if (masterproc) then
+               write(iulog,'(1x,a21,1x,4(1x,e25.17))') "AM: Li, Lf, MoI, dOma", am0, am1, me0, &
+                                                       (am1-am0)/me0
+            endif
+
+         endif
+      else
+         not_first_call = .true. ! call AM conservation diagnostic after first time-step
+      endif
+   endif
+
    call t_startf ('dyn_run_dealloc')
 
    deallocate( worka )
@@ -2164,7 +2333,6 @@ subroutine dyn_run(ptop, ndt, te0, dyn_state, dyn_in, dyn_out, rc)
    deallocate(  wz   )
    deallocate( pkcc )
    deallocate( wzc )
-   deallocate( peln )
    deallocate( pkkp )
    deallocate( wzkp )
    deallocate( wzxy )
@@ -2255,92 +2423,153 @@ end subroutine dyn_final
 
 !=============================================================================================
 ! Private routines
-!=========================================================================================
+!=============================================================================================
 
 subroutine read_inidat(dyn_in)
+  use inic_analytic,   only: analytic_ic_active, analytic_ic_set_ic
+  use dyn_tests_utils, only: vc_moist_pressure
+  use physconst,       only: pi
+  use dyn_grid,        only: get_horiz_grid_dim_d
+  use commap,          only: clat, clon, clat_staggered, londeg_st
 
-   ! Read initial dataset
+  ! Read initial dataset
 
-   ! Arguments
-   type (dyn_import_t), target, intent(inout) :: dyn_in
+  ! Arguments
+  type (dyn_import_t), target, intent(inout) :: dyn_in
 
-   ! Local variables
-   integer :: ifirstxy, ilastxy, jfirstxy, jlastxy, km
-   integer :: m, ntotq
+  ! Local variables
+  integer                         :: ifirstxy, ilastxy, jfirstxy, jlastxy, km
+  integer                         :: m, ntotq
 
-   character(len=16) :: fieldname
+  character(len=16)               :: fieldname
 
-   type(file_desc_t), pointer :: fh_ini    ! PIO filehandle
-   type(file_desc_t), pointer :: fh_topo
+  type(file_desc_t), pointer      :: fh_ini    ! PIO filehandle
+  type(file_desc_t), pointer      :: fh_topo
 
-   type (t_fvdycore_grid), pointer :: grid
-     
-   character(len=*), parameter :: sub='read_inidat'
-   !----------------------------------------------------------------------------
-    
-   fh_ini  => initial_file_get_id()
-   fh_topo => topo_file_get_id()
+  type (t_fvdycore_grid), pointer :: grid
+  ! variables for analytic initial conditions
+  integer,  allocatable           :: glob_ind(:)
+  integer,  allocatable           :: m_cnst(:)
+  real(r8), allocatable           :: clon_st(:)
+  integer                         :: nglon, nglat
+  integer                         :: i, j
+  integer                         :: jf, gf, uf ! First indices for setting u3s
+  real(r8), parameter             :: deg2rad = pi/180._r8
 
-   grid     => get_dyn_state_grid()
-   ifirstxy =  grid%ifirstxy
-   ilastxy  =  grid%ilastxy
-   jfirstxy =  grid%jfirstxy
-   jlastxy  =  grid%jlastxy
-   km       =  grid%km
-   ntotq    =  grid%ntotq
+  character(len=*), parameter     :: sub='read_inidat'
+  !----------------------------------------------------------------------------
 
-   !-----------
-   ! 2-D fields
-   !-----------
+  fh_ini  => initial_file_get_id()
+  fh_topo => topo_file_get_id()
 
-   fieldname = 'PS'
-   call infld(fieldname, fh_ini, 'lon', 'lat', ifirstxy, ilastxy, jfirstxy, jlastxy, &
-              dyn_in%ps, readvar, gridname='fv_centers')
-   if (.not. readvar) call endrun(sub//': ERROR: PS not found')
-   call process_inidat(fh_ini, grid, dyn_in, 'PS')
+  grid     => get_dyn_state_grid()
+  ifirstxy =  grid%ifirstxy
+  ilastxy  =  grid%ilastxy
+  jfirstxy =  grid%jfirstxy
+  jlastxy  =  grid%jlastxy
+  km       =  grid%km
+  ntotq    =  grid%ntotq
 
-   fieldname = 'PHIS'
-   readvar   = .false.
-   if (ideal_phys .or. aqua_planet .or. .not. associated(fh_topo)) then
+  if (analytic_ic_active()) then
+     readvar   = .false.
+    if (jfirstxy == 1) then
+      jf = 1
+      uf = 2
+      gf = (ilastxy - ifirstxy + 1) + 1 ! Skip the first block of longitudes
+    else
+      jf = jfirstxy-1
+      uf = jfirstxy
+      gf = 1
+    end if
+    allocate(glob_ind((ilastxy - ifirstxy + 1) * (jlastxy - jfirstxy + 1)))
+    call get_horiz_grid_dim_d(nglon, nglat)
+    m = 1
+    do j = jfirstxy, jlastxy
+      do i = ifirstxy, ilastxy
+        ! Create a global column index
+        glob_ind(m) = i + (j-1)*nglon
+        m = m + 1
+      end do
+    end do
+    allocate(m_cnst(ntotq))
+    do i = 1, ntotq
+      m_cnst(i) = i
+    end do
+    allocate(clon_st(ifirstxy:ilastxy))
+    clon_st(ifirstxy:ilastxy) = londeg_st(ifirstxy:ilastxy,1) * deg2rad
+    call analytic_ic_set_ic(vc_moist_pressure, clat_staggered(jf:jlastxy-1),  &
+         clon(ifirstxy:ilastxy,1), glob_ind(gf:), U=dyn_in%u3s(:,uf:,:))
+    call analytic_ic_set_ic(vc_moist_pressure, clat(jfirstxy:jlastxy),        &
+         clon_st(ifirstxy:ilastxy), glob_ind, V=dyn_in%v3s)
+    call analytic_ic_set_ic(vc_moist_pressure, clat(jfirstxy:jlastxy),        &
+         clon(ifirstxy:ilastxy,1), glob_ind, T=dyn_in%t3, PS=dyn_in%ps,       &
+         Q=dyn_in%tracer(:,:,:,1:ntotq), m_cnst=m_cnst)
+    if (.not. associated(fh_topo)) then
+      call analytic_ic_set_ic(vc_moist_pressure, clat(jfirstxy:jlastxy),      &
+           clon(ifirstxy:ilastxy,1), glob_ind, PHIS=dyn_in%phis)
+    end if
+    do m = 1, ntotq
+       call process_inidat(fh_ini, grid, dyn_in, 'CONSTS', m_cnst=m)
+    end do
+    deallocate(glob_ind)
+    deallocate(m_cnst)
+    deallocate(clon_st)
+  else
+    !-----------
+    ! 2-D fields
+    !-----------
+
+    fieldname = 'PS'
+    call infld(fieldname, fh_ini, 'lon', 'lat', ifirstxy, ilastxy, jfirstxy, jlastxy, &
+         dyn_in%ps, readvar, gridname='fv_centers')
+    if (.not. readvar) call endrun(sub//': ERROR: PS not found')
+
+    fieldname = 'PHIS'
+    readvar   = .false.
+    if (ideal_phys .or. aqua_planet .or. .not. associated(fh_topo)) then
       dyn_in%phis(:,:) = 0._r8
-   else
+    else
       call infld(fieldname, fh_topo, 'lon', 'lat', ifirstxy, ilastxy, jfirstxy, jlastxy, &
-            dyn_in%phis, readvar, gridname='fv_centers')
+           dyn_in%phis, readvar, gridname='fv_centers')
       if (.not. readvar) call endrun(sub//': ERROR: PHIS not found')
-      call process_inidat(fh_ini, grid, dyn_in, 'PHIS')
-   end if
+    end if
 
-   !-----------
-   ! 3-D fields
-   !-----------
+    !-----------
+    ! 3-D fields
+    !-----------
 
-   fieldname = 'US'
-   dyn_in%u3s = fillvalue
-   call infld(fieldname, fh_ini, 'lon', 'slat', 'lev',  ifirstxy, ilastxy, jfirstxy, jlastxy, &
-              1, km, dyn_in%u3s, readvar, gridname='fv_u_stagger')
-   if (.not. readvar) call endrun(sub//': ERROR: US not found')
+    fieldname = 'US'
+    dyn_in%u3s = fillvalue
+    call infld(fieldname, fh_ini, 'lon', 'slat', 'lev',  ifirstxy, ilastxy, jfirstxy, jlastxy, &
+         1, km, dyn_in%u3s, readvar, gridname='fv_u_stagger')
+    if (.not. readvar) call endrun(sub//': ERROR: US not found')
 
-   fieldname = 'VS'
-   call infld(fieldname, fh_ini, 'slon', 'lat', 'lev',  ifirstxy, ilastxy, jfirstxy, jlastxy, &
-              1, km, dyn_in%v3s, readvar, gridname='fv_v_stagger')
-   if (.not. readvar) call endrun(sub//': ERROR: VS not found')
+    fieldname = 'VS'
+    call infld(fieldname, fh_ini, 'slon', 'lat', 'lev',  ifirstxy, ilastxy, jfirstxy, jlastxy, &
+         1, km, dyn_in%v3s, readvar, gridname='fv_v_stagger')
+    if (.not. readvar) call endrun(sub//': ERROR: VS not found')
 
-   fieldname = 'T'
-   call infld(fieldname, fh_ini, 'lon', 'lat', 'lev', ifirstxy, ilastxy, jfirstxy, jlastxy, &
-              1, km, dyn_in%t3, readvar, gridname='fv_centers')
-   if (.not. readvar) call endrun(sub//': ERROR: T not found')
-   call process_inidat(fh_ini, grid, dyn_in, 'T')
-        
-   ! Constituents (read and process one at a time)
-   do m = 1, ntotq
+    fieldname = 'T'
+    call infld(fieldname, fh_ini, 'lon', 'lat', 'lev', ifirstxy, ilastxy, jfirstxy, jlastxy, &
+         1, km, dyn_in%t3, readvar, gridname='fv_centers')
+    if (.not. readvar) call endrun(sub//': ERROR: T not found')
+
+    ! Constituents (read and process one at a time)
+    do m = 1, ntotq
       readvar   = .false.
       fieldname = cnst_name(m)
       if (cnst_read_iv(m)) then
-         call infld(fieldname, fh_ini, 'lon', 'lat', 'lev', ifirstxy, ilastxy, jfirstxy, jlastxy, &
-                    1, km, dyn_in%tracer(:,:,:,m), readvar, gridname='fv_centers')
+        call infld(fieldname, fh_ini, 'lon', 'lat', 'lev', ifirstxy, ilastxy, jfirstxy, jlastxy, &
+             1, km, dyn_in%tracer(:,:,:,m), readvar, gridname='fv_centers')
       end if
       call process_inidat(fh_ini, grid, dyn_in, 'CONSTS', m_cnst=m)
-   end do
+    end do
+  end if
+
+  ! These always happen
+  call process_inidat(fh_ini, grid, dyn_in, 'PS')
+  call process_inidat(fh_ini, grid, dyn_in, 'PHIS')
+  call process_inidat(fh_ini, grid, dyn_in, 'T')
 
 end subroutine read_inidat
 
@@ -2349,9 +2578,9 @@ end subroutine read_inidat
 subroutine process_inidat(fh_ini, grid, dyn_in, fieldname, m_cnst)
 
    ! Post-process input fields
+   use commap,              only: clat, clon
    use const_init,          only: cnst_init_default
-   use commap,              only: latdeg, londeg
-   use const_init,          only: cnst_init_default
+   use inic_analytic,       only: analytic_ic_active
 
    ! arguments
    type(file_desc_t),             intent(inout) :: fh_ini
@@ -2402,7 +2631,7 @@ subroutine process_inidat(fh_ini, grid, dyn_in, fieldname, m_cnst)
       if (iam >= npes_xy) return
 
       ! Add random perturbation to temperature if requested
-      if (pertlim /= 0._r8) then
+      if ((pertlim /= 0._r8) .and. (.not. analytic_ic_active())) then
 
          if (masterproc) then
             write(iulog,*) sub//':  Adding random perturbation bounded by +/-', &
@@ -2466,7 +2695,7 @@ subroutine process_inidat(fh_ini, grid, dyn_in, fieldname, m_cnst)
                   //trim(cnst_name(m_cnst))//' must be in KG/KG')
          end if
 
-      else
+      else if (.not. analytic_ic_active()) then
 
          ! Constituents not read from initial file are initialized by the package that implements them.
 
@@ -2476,16 +2705,18 @@ subroutine process_inidat(fh_ini, grid, dyn_in, fieldname, m_cnst)
             call endrun(sub//': ERROR:  Q must be on Initial File')
          end if
 
-         call cnst_init_default(m_cnst, latdeg(jfirstxy:jlastxy), londeg(ifirstxy:ilastxy,1), tracer(:,:,:,m_cnst))
-       end if
+         call cnst_init_default(m_cnst, clat(jfirstxy:jlastxy), clon(ifirstxy:ilastxy,1), tracer(:,:,:,m_cnst))
+      end if
 
-      do k = 1, km
-         do j = jfirstxy, jlastxy
-            do i = ifirstxy, ilastxy                
-               tracer(i,j,k,m_cnst) = max(tracer(i,j,k,m_cnst), qmin(m_cnst))
+      if (.not. analytic_ic_active()) then
+         do k = 1, km
+            do j = jfirstxy, jlastxy
+               do i = ifirstxy, ilastxy                
+                  tracer(i,j,k,m_cnst) = max(tracer(i,j,k,m_cnst), qmin(m_cnst))
+               end do
             end do
          end do
-      end do
+      end if
 
       if (iam >= npes_xy) return
 

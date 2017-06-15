@@ -685,8 +685,8 @@ contains
   ! called from mo_usrrxt
   !-------------------------------------------------------------------------
   subroutine aero_model_surfarea( &
-                  mmr, radmean, relhum, pmid, temp, strato_sad, &
-                  sulfate,  m, ltrop, dlat, het1_ndx, pbuf, ncol, sfc, dm_aer, sad_total )
+                  mmr, radmean, relhum, pmid, temp, strato_sad, sulfate,  m, ltrop, &
+                  dlat, het1_ndx, pbuf, ncol, sfc, dm_aer, sad_total, reff_trop )
 
     use mo_constants, only : pi, avo => avogadro
 
@@ -708,6 +708,7 @@ contains
     real(r8), intent(inout) :: sfc(:,:,:)
     real(r8), intent(inout) :: dm_aer(:,:,:)
     real(r8), intent(inout) :: sad_total(:,:)
+    real(r8), intent(out)   :: reff_trop(:,:)
 
     ! local vars
 
@@ -771,6 +772,8 @@ contains
     log_sd_sulf = log(sd_sulf)
     log_sd_orgc = log(sd_orgc)
     log_sd_bc   = log(sd_bc)
+
+    reff_trop(:,:) = 0._r8
 
     ver_loop: do k = 1,pver
        col_loop: do i = 1,ncol
@@ -977,7 +980,7 @@ contains
   !-------------------------------------------------------------------------
   ! stub
   !-------------------------------------------------------------------------
-  subroutine aero_model_strat_surfarea( ncol, mmr, pmid, temp, ltrop, pbuf, strato_sad )
+  subroutine aero_model_strat_surfarea( ncol, mmr, pmid, temp, ltrop, pbuf, strato_sad, reff_strat )
 
     ! dummy args
     integer,  intent(in)    :: ncol
@@ -987,8 +990,10 @@ contains
     integer,  intent(in)    :: ltrop(:) ! tropopause level indices
     type(physics_buffer_desc), pointer :: pbuf(:)
     real(r8), intent(out)   :: strato_sad(:,:)
-    
+    real(r8), intent(out)   :: reff_strat(:,:)
+
     strato_sad(:,:) = 0._r8
+    reff_strat(:,:) = 0._r8
 
   end subroutine aero_model_strat_surfarea
   

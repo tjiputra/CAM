@@ -130,6 +130,7 @@ subroutine init_restart_dynamics(File, dyn_out)
          else if (ndims==3) then
             ierr = PIO_Def_Var(File, name, pio_double, alldims(1:3), vdesc)
          end if
+         call pio_setframe(File, vdesc, int(-1,kind=pio_offset_kind))
       end if
    end do
 
@@ -281,6 +282,7 @@ subroutine read_restart_dynamics(File, dyn_in, dyn_out)
    do i = 1, restartvarcnt
       call get_restart_var(File, i, name, timelevels, ndims, vdesc)
       ierr = PIO_Inq_varid(File, name, vdesc)
+      call pio_setframe(File, vdesc, int(-1,kind=pio_offset_kind))
       if(ndims==2) then
          call pio_read_darray(File, vdesc, iodesc2d, tmp(1:s2d), ierr)
          restartvars(i)%v2d(:,:) = reshape(tmp(1:s2d), dims3d(1:2))
@@ -492,8 +494,6 @@ subroutine get_restart_var(File, i, name, timelevels, ndims, vdesc)
       allocate(restartvars(i)%vdesc)
    end if
    vdesc      => restartvars(i)%vdesc
-
-   call pio_setframe(File, vdesc, int(-1,kind=pio_offset_kind))
 
 end subroutine get_restart_var
 

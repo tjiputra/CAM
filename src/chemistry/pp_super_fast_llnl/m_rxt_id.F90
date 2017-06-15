@@ -1,12 +1,5 @@
-
-
-
-
-
       module m_rxt_id
-
       implicit none
-
       integer, parameter :: rid_j2oh = 1
       integer, parameter :: rid_jh2o2 = 2
       integer, parameter :: rid_jno2 = 3
@@ -23,7 +16,6 @@
       integer, parameter :: rid_aq_so2_o3 = 28
       integer, parameter :: rid_isop_oh = 29
       integer, parameter :: rid_isop_o3 = 30
-
       integer, parameter :: rid_r0007 = 7
       integer, parameter :: rid_r0009 = 9
       integer, parameter :: rid_r0011 = 11
@@ -38,5 +30,4 @@
       integer, parameter :: rid_r0021 = 21
       integer, parameter :: rid_r0022 = 22
       integer, parameter :: rid_r0024 = 24
-
       end module m_rxt_id

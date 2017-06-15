@@ -350,11 +350,13 @@ contains
     ! Put a horizontally uniform layer of the smallest bin size
     ! in the model.
     if (ibin == 1) then
-!      q(:, 1)        = 100e-9_r8    ! top
-      q(:, plev/4)   = 100e-9_r8    ! 1/4
-!      q(:, plev/2)   = 100e-9_r8    ! middle
-!      q(:, 3*plev/4) = 100e-9_r8    ! 3/4
-!      q(:, plev-1)   = 100e-9_r8    ! bottom
+      where(mask)
+!        q(:, 1)        = 100e-9_r8    ! top
+        q(:, plev/4)   = 100e-9_r8    ! 1/4
+!        q(:, plev/2)   = 100e-9_r8    ! middle
+!        q(:, 3*plev/4) = 100e-9_r8    ! 3/4
+!        q(:, plev-1)   = 100e-9_r8    ! bottom
+      end where
     end if 
     
     return

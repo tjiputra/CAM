@@ -400,8 +400,8 @@ end subroutine aero_model_init
   ! called from mo_usrrxt
   !-------------------------------------------------------------------------
   subroutine aero_model_surfarea( &
-                  mmr, radmean, relhum, pmid, temp, strato_sad, &
-                  sulfate, rho, ltrop, dlat, het1_ndx, pbuf, ncol, sfc, dm_aer, sad_total )
+                  mmr, radmean, relhum, pmid, temp, strato_sad, sulfate, rho, ltrop, &
+                  dlat, het1_ndx, pbuf, ncol, sfc, dm_aer, sad_trop, reff_trop )
    
     use commondefinitions, only: nmodes_oslo => nmodes
     use const            , only: numberToSurface
@@ -425,7 +425,8 @@ end subroutine aero_model_init
 
     real(r8), intent(inout) :: sfc(:,:,:)
     real(r8), intent(inout) :: dm_aer(:,:,:)
-    real(r8), intent(inout) :: sad_total(:,:)
+    real(r8), intent(inout) :: sad_trop(:,:)
+    real(r8), intent(out)   :: reff_trop(:,:)
 
     ! local vars
     !HAVE TO GET RID OF THIS MODE 0!! MESSES UP EVERYTHING!!
@@ -447,11 +448,11 @@ end subroutine aero_model_init
     
     !Convert to area using lifecycle-radius
     sad_mode = 0._r8
-    sad_total = 0._r8
+    sad_trop = 0._r8
     do m=1,nmodes_oslo
        do k=1,pver
          sad_mode(:ncol,k,m) = numberConcentration(:ncol,k,m)*numberToSurface(m)*1.e-2_r8 !m2/m3 ==> cm2/cm3
-         sad_total(:ncol,k) = sad_total(:ncol,k) + sad_mode(:ncol,k,m)
+         sad_trop(:ncol,k) = sad_trop(:ncol,k) + sad_mode(:ncol,k,m)
        end do
     end do
 
@@ -462,6 +463,10 @@ end subroutine aero_model_init
        end do
     end do
 
+    !++ need to implement reff_trop here
+      reff_trop(:,:)=1.0e-6_r8
+    !--
+
 
   end subroutine aero_model_surfarea
 
@@ -469,7 +474,7 @@ end subroutine aero_model_init
   ! provides WET stratospheric aerosol surface area info for modal aerosols
   ! if modal_strat_sulfate = TRUE -- called from mo_gas_phase_chemdr
   !-------------------------------------------------------------------------
-  subroutine aero_model_strat_surfarea( ncol, mmr, pmid, temp, ltrop, pbuf, strato_sad )
+  subroutine aero_model_strat_surfarea( ncol, mmr, pmid, temp, ltrop, pbuf, strato_sad, reff_strat )
 
     ! dummy args
     integer,  intent(in)    :: ncol
@@ -479,6 +484,7 @@ end subroutine aero_model_init
     integer,  intent(in)    :: ltrop(:) ! tropopause level indices
     type(physics_buffer_desc), pointer :: pbuf(:)
     real(r8), intent(out)   :: strato_sad(:,:)
+    real(r8), intent(out)   :: reff_strat(:,:)
 
     ! local vars
     real(r8), pointer, dimension(:,:,:) :: dgnumwet
@@ -486,7 +492,7 @@ end subroutine aero_model_init
     integer :: endlev(ncol)
 
     strato_sad = 0._r8
-
+    reff_strat = 0.1e-6_r8
     !do nothing
     return
 

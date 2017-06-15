@@ -95,7 +95,7 @@ subroutine neu_wetdep_init
          test_name = 'SO2'
       case ( 'CLONO2','BRONO2','HCL','HOCL','HOBR','HBR', 'Pb', 'MACROOH', 'ISOPOOH', 'XOOH', 'H2SO4', 'HF', 'COF2', 'COFCL')
          test_name = 'HNO3'
-      case ( 'NH_50W' ) 
+      case ( 'NH_50W', 'NDEP', 'NHDEP' ) 
          test_name = 'HNO3'
       case ( 'ALKOOH', 'MEKOOH', 'TOLOOH' )
          test_name = 'CH3OOH'        

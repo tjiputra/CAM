@@ -16,7 +16,7 @@ save
    integer, parameter :: numberOfDustModes = 2  !define in aerosoldef?
 
    !This can be refined, but the fractions in coarse/fine mode are approx ok
-   real(r8), parameter, dimension(numberOfDustModes) :: emis_fraction_in_mode = (/0.20_r8, 0.80_r8 /)
+   real(r8), parameter, dimension(numberOfDustModes) :: emis_fraction_in_mode = (/0.13_r8, 0.87_r8 /)
    integer, dimension(numberOfDustModes)             :: tracerMap = (/-99, -99/) !index of dust tracers in the modes
    character(len=6), public, dimension(10)        :: dust_names
    integer, parameter, public                     :: dust_nbin = numberOfDustModes

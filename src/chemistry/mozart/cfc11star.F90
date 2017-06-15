@@ -13,6 +13,7 @@ module cfc11star
   use ppgrid,       only : pcols, pver, begchunk, endchunk
   use spmd_utils,   only : masterproc
   use constituents, only : cnst_get_ind
+  use mo_chem_utls,only  : get_inv_ndx
 
   implicit none
   save 
@@ -25,11 +26,15 @@ module cfc11star
   logical :: do_cfc11star
   character(len=16), parameter :: pbufname = 'CFC11STAR'
   integer :: pbf_idx = -1
-  integer, parameter :: ncfcs = 13
+  integer, parameter :: ncfcs = 14
 
   integer, target :: indices(ncfcs)
+  integer, target :: inv_indices(ncfcs)
   
   real(r8) :: rel_rf(ncfcs)
+  character(len=8), parameter :: species(ncfcs) = &
+    (/ 'CFC11   ','CFC113  ','CFC114  ','CFC115  ','CCL4    ','CH3CCL3 ','CH3CL   ','HCFC22  ',&
+       'HCFC141B','HCFC142B','CF2CLBR ','CF3BR   ','H2402   ','HALONS  ' /)
 
 contains
 
@@ -41,18 +46,18 @@ contains
 
     integer :: m
 
-    character(len=8), parameter :: species(ncfcs) = &
-      (/ 'CFC11   ','CFC113  ','CFC114  ','CFC115  ','CCL4    ','CH3CCL3 ','CH3CL   ','HCFC22  ',&
-         'HCFC141B','HCFC142B','CF2CLBR ','CF3BR   ','H2402   ' /)
     real(r8), parameter :: cfc_rf(ncfcs) = &
       (/  0.25_r8,   0.30_r8,   0.31_r8,   0.18_r8,   0.13_r8,   0.06_r8,   0.01_r8,   0.20_r8,  &
-          0.14_r8,   0.20_r8,   0.30_r8,   0.32_r8,   0.33_r8 /) ! W/m2/ppb
+          0.14_r8,   0.20_r8,   0.30_r8,   0.32_r8,   0.33_r8,   0.25_r8 /) ! W/m2/ppb
 
     do m = 1, ncfcs 
        call cnst_get_ind(species(m), indices(m), abort=.false.)
+       if (indices(m)<=0) then
+         inv_indices(m)=get_inv_ndx(species(m))
+       end if
     enddo
 
-    do_cfc11star = any(indices(:)>0)
+    do_cfc11star = (any(indices(:)>0).or.any(inv_indices(:)>0))
     if (.not.do_cfc11star) return
 
     call pbuf_add_field(pbufname,'global',dtype_r8,(/pcols,pver/),pbf_idx)
@@ -88,9 +93,11 @@ contains
 !---------------------------------------------------------------------------------
 !---------------------------------------------------------------------------------
   subroutine update_cfc11star( pbuf2d, phys_state )
-    use cam_history,  only : outfld
-    use physics_types,only : physics_state
+
+    use cam_history,    only : outfld
+    use physics_types,  only : physics_state
     use physics_buffer, only : physics_buffer_desc, pbuf_get_field, pbuf_get_chunk
+    use tracer_cnst,    only : get_cnst_data_ptr ! returns pointer to 
 
     implicit none
 
@@ -101,6 +108,7 @@ contains
     integer :: lchnk, ncol
     integer :: c, m
     real(r8), pointer :: cf11star(:,:)
+    real(r8), pointer :: cnst_offline(:,:)
 
     if (.not.do_cfc11star) return
     
@@ -115,6 +123,10 @@ contains
           if ( indices(m)>0 ) then
              cf11star(:ncol,:) = cf11star(:ncol,:) &
                                + phys_state(c)%q(:ncol,:,indices(m)) * rel_rf(m) 
+          elseif (inv_indices(m)>0) then
+             call get_cnst_data_ptr( species(m), phys_state(c), cnst_offline, pbuf_get_chunk(pbuf2d, lchnk) )              
+             cf11star(:ncol,:) = cf11star(:ncol,:) &
+                               + cnst_offline(:ncol,:) * rel_rf(m)               
           endif
        enddo
 

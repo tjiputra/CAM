@@ -10,10 +10,10 @@ module phys_control
 !                             Add vars to indicate physics version and chemistry type.
 !-----------------------------------------------------------------------
 
-use spmd_utils,    only: masterproc
-use cam_logfile,   only: iulog
+use spmd_utils,     only: masterproc
+use cam_logfile,    only: iulog
 use cam_abortutils, only: endrun
-use shr_kind_mod,  only: r8 => shr_kind_r8
+use shr_kind_mod,   only: r8 => shr_kind_r8
 
 implicit none
 private
@@ -22,6 +22,7 @@ save
 public :: &
    phys_ctl_readnl,   &! read namelist from file
    phys_getopts,      &! generic query method
+   phys_setopts,      &! generic set method
    phys_deepconv_pbl, &! return true if deep convection is allowed in the PBL
    phys_do_flux_avg,  &! return true to average surface fluxes
    cam_physpkg_is,    &! query for the name of the physics package
@@ -35,7 +36,7 @@ integer,           parameter :: unset_int = huge(1)
 
 ! Namelist variables:
 character(len=16) :: cam_physpkg          = unset_str  ! CAM physics package [cam3 | cam4 | cam5 |
-                                                       !   ideal | adiabatic].
+                                                       !   ideal | adiabatic | spcam_sam1mom | spcam_m2005].
 character(len=32) :: cam_chempkg          = unset_str  ! CAM chemistry package 
 character(len=16) :: waccmx_opt           = unset_str  ! WACCMX run option [ionosphere | neutral | off
 character(len=16) :: deep_scheme          = unset_str  ! deep convection package
@@ -85,16 +86,14 @@ logical :: prog_modal_aero ! determines whether prognostic modal aerosols are pr
 logical, public, protected :: use_hetfrz_classnuc = .false.
 
 ! Which gravity wave sources are used?
-! Orography.
-logical, public, protected :: use_gw_oro = .true.
-! Frontogenesis.
-logical, public, protected :: use_gw_front = .false.
-! Frontogenesis to inertial spectrum.
-logical, public, protected :: use_gw_front_igw = .false.
-! Deep convection.
-logical, public, protected :: use_gw_convect_dp = .false.
-! Shallow convection.
-logical, public, protected :: use_gw_convect_sh = .false.
+logical, public, protected :: use_gw_oro = .true.         ! Orography.
+logical, public, protected :: use_gw_front = .false.      ! Frontogenesis.
+logical, public, protected :: use_gw_front_igw = .false.  ! Frontogenesis to inertial spectrum.
+logical, public, protected :: use_gw_convect_dp = .false. ! Deep convection.
+logical, public, protected :: use_gw_convect_sh = .false. ! Shallow convection.
+
+! FV dycore angular momentum correction
+logical, public, protected :: fv_am_correction = .false.
 
 !======================================================================= 
 contains
@@ -348,6 +347,16 @@ subroutine phys_getopts(deep_scheme_out, shallow_scheme_out, eddy_scheme_out, mi
    if ( present(energy_conservation_type_out  ) ) energy_conservation_type_out   = energy_conservation_type
 
 end subroutine phys_getopts
+
+!===============================================================================
+
+subroutine phys_setopts(fv_am_correction_in)
+
+   logical, intent(in), optional :: fv_am_correction_in
+
+   if ( present(fv_am_correction_in) ) fv_am_correction = fv_am_correction_in
+
+end subroutine phys_setopts
 
 !===============================================================================
 

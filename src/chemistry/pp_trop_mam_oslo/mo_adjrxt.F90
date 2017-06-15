@@ -3,6 +3,8 @@
 
 
 
+
+
       module mo_adjrxt
 
       private
@@ -10,9 +12,8 @@
 
       contains
 
-      subroutine adjrxt( rate, inv, m, ncol )
+      subroutine adjrxt( rate, inv, m, ncol, nlev )
 
-      use ppgrid, only : pver
       use shr_kind_mod, only : r8 => shr_kind_r8
       use chem_mods, only : nfs, rxntot
 
@@ -21,30 +22,30 @@
 !--------------------------------------------------------------------
 ! ... dummy arguments
 !--------------------------------------------------------------------
-      integer, intent(in) :: ncol
-      real(r8), intent(in) :: inv(ncol,pver,nfs)
-      real(r8), intent(in) :: m(ncol,pver)
-      real(r8), intent(inout) :: rate(ncol,pver,rxntot)
+      integer, intent(in) :: ncol, nlev
+      real(r8), intent(in) :: inv(ncol,nlev,nfs)
+      real(r8), intent(in) :: m(ncol,nlev)
+      real(r8), intent(inout) :: rate(ncol,nlev,rxntot)
 
 !--------------------------------------------------------------------
 ! ... local variables
 !--------------------------------------------------------------------
-      real(r8) :: im(ncol,pver)
+      real(r8) :: im(ncol,nlev)
 
 
-         rate(:,:, 3) = rate(:,:, 3) * inv(:,:, 6)
-         rate(:,:, 4) = rate(:,:, 4) * inv(:,:, 6)
-         rate(:,:, 5) = rate(:,:, 5) * inv(:,:, 7)
-         rate(:,:, 7) = rate(:,:, 7) * inv(:,:, 6)
-         rate(:,:, 8) = rate(:,:, 8) * inv(:,:, 5)
-         rate(:,:, 9) = rate(:,:, 9) * inv(:,:, 6)
-         rate(:,:, 10) = rate(:,:, 10) * inv(:,:, 7)
-         rate(:,:, 11) = rate(:,:, 11) * inv(:,:, 5)
-         rate(:,:, 12) = rate(:,:, 12) * inv(:,:, 6)
-         rate(:,:, 13) = rate(:,:, 13) * inv(:,:, 7)
-         im(:,:) = 1._r8 / m(:,:)
-         rate(:,:, 2) = rate(:,:, 2) * inv(:,:, 8) * inv(:,:, 8) * im(:,:)
-         rate(:,:, 6) = rate(:,:, 6) * inv(:,:, 6) * inv(:,:, 1)
+      im(:,:) = 1._r8 / m(:,:)
+      rate(:,:, 3) = rate(:,:, 3) * inv(:,:, 6)
+      rate(:,:, 4) = rate(:,:, 4) * inv(:,:, 6)
+      rate(:,:, 5) = rate(:,:, 5) * inv(:,:, 7)
+      rate(:,:, 7) = rate(:,:, 7) * inv(:,:, 6)
+      rate(:,:, 8) = rate(:,:, 8) * inv(:,:, 5)
+      rate(:,:, 9) = rate(:,:, 9) * inv(:,:, 6)
+      rate(:,:, 10) = rate(:,:, 10) * inv(:,:, 7)
+      rate(:,:, 11) = rate(:,:, 11) * inv(:,:, 5)
+      rate(:,:, 12) = rate(:,:, 12) * inv(:,:, 6)
+      rate(:,:, 13) = rate(:,:, 13) * inv(:,:, 7)
+      rate(:,:, 2) = rate(:,:, 2) * inv(:,:, 8) * inv(:,:, 8) * im(:,:)
+      rate(:,:, 6) = rate(:,:, 6) * inv(:,:, 6) * inv(:,:, 1)
 
       end subroutine adjrxt
 

@@ -22,7 +22,8 @@ end interface cnst_init_default
 CONTAINS
 !==============================================================================
 
-  subroutine cnst_init_default_col(m_cnst, latvals, lonvals, q, mask, verbose)
+  subroutine cnst_init_default_col(m_cnst, latvals, lonvals, q, mask,         &
+       verbose, notfound)
     use constituents,  only: cnst_name
     use aoa_tracers,   only: aoa_tracers_implements_cnst,   aoa_tracers_init_cnst
     use carma_intr,    only: carma_implements_cnst,         carma_init_cnst
@@ -48,12 +49,14 @@ CONTAINS
     real(r8),          intent(out) :: q(:,:)     ! mixing ratio (ncol, plev)
     logical, optional, intent(in)  :: mask(:)    ! Only initialize where .true.
     logical, optional, intent(in)  :: verbose    ! For internal use
+    logical, optional, intent(in)  :: notfound   ! Turn off initial dataset warn
 
     ! Local variables
     logical, allocatable           :: mask_use(:)
     character(len=max_chars)       :: name
     integer                        :: i
     logical                        :: verbose_use
+    logical                        :: notfound_use
 
     name = cnst_name(m_cnst)
 
@@ -73,9 +76,15 @@ CONTAINS
       verbose_use = .true.
     end if
 
+    if (present(notfound)) then
+      notfound_use = notfound
+    else
+      notfound_use = .true.
+    end if
+
     q = 0.0_r8 ! Make sure we start fresh (insurance)
 
-    if(masterproc .and. verbose_use) then
+    if(masterproc .and. verbose_use .and. notfound_use) then
       write(iulog, *) 'Field ',trim(trim(name)),' not found on initial dataset'
     end if
 
@@ -150,6 +159,7 @@ CONTAINS
     logical, optional, intent(in)  :: mask(:)    ! Only initialize where .true.
 
     ! Local variables
+    real(r8), allocatable         :: latblk(:)
     integer                       :: i, bbeg, bend
     integer                       :: size1, size2, size3
     integer                       :: nblks, blksize
@@ -179,26 +189,32 @@ CONTAINS
       end do
     else if ((size(latvals) == size2) .and. (size(lonvals) == size1)) then
       ! Case: lon,lat,lev
-      nblks = size2
-      do i = 1, nblks
-        if (present(mask)) then
-          call endrun('cnst_init_default_cblock: mask not supported for lon/lat')
-        else
-          call cnst_init_default(m_cnst, latvals, lonvals, q(:,i,:), verbose=verbose)
-        end if
-        verbose = .false.
-      end do
+      if (present(mask)) then
+        call endrun('cnst_init_default_cblock: mask not supported for lon/lat')
+      else
+        nblks = size2
+        allocate(latblk(size1))
+        do i = 1, nblks
+          latblk(:) = latvals(i)
+          call cnst_init_default(m_cnst, latblk, lonvals, q(:,i,:), verbose=verbose)
+          verbose = .false.
+        end do
+        deallocate(latblk)
+      end if
     else if ((size(latvals) == size3) .and. (size(lonvals) == size1)) then
       ! Case: lon,lev,lat
-      nblks = size3
-      do i = 1, nblks
-        if (present(mask)) then
-          call endrun('cnst_init_default_cblock: mask not supported for lon/lat')
-        else
-          call cnst_init_default(m_cnst, latvals, lonvals, q(:,:,i), verbose=verbose)
-        end if
-        verbose = .false.
-      end do
+      if (present(mask)) then
+        call endrun('cnst_init_default_cblock: mask not supported for lon/lat')
+      else
+        nblks = size3
+        allocate(latblk(size1))
+        do i = 1, nblks
+          latblk(:) = latvals(i)
+          call cnst_init_default(m_cnst, latblk, lonvals, q(:,:,i), verbose=verbose)
+          verbose = .false.
+        end do
+        deallocate(latblk)
+      end if
     else
       call endrun('cnst_init_default_cblock: Unknown q layout')
     end if

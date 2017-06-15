@@ -256,6 +256,8 @@ subroutine read_inidat()
    ! memory usage.
 
    use cam_pio_utils,    only: cam_pio_get_var
+   use inic_analytic,    only: analytic_ic_active, analytic_ic_set_ic
+   use dyn_tests_utils,  only: vc_moist_pressure
 
    ! Local variables
 
@@ -272,6 +274,10 @@ subroutine read_inidat()
    character(len=3), parameter :: arraydims3(3) = (/ 'lon', 'lev', 'lat' /)
    character(len=3), parameter :: arraydims2(2) = (/ 'lon', 'lat' /)
    character(len=16) fieldname                  ! field name
+   ! variables for analytic initial conditions
+   integer,  allocatable       :: glob_ind(:)
+   integer                     :: m_cnst(1)
+   real(r8), allocatable       :: q4_tmp(:,:,:,:)
 
    character(len=*), parameter :: sub='read_inidat'
    !----------------------------------------------------------------------------
@@ -283,77 +289,112 @@ subroutine read_inidat()
    allocate ( phis_tmp(plon,plat     ) )
    allocate ( q3_tmp  (plon,plev,plat) )
    allocate ( t3_tmp  (plon,plev,plat) )
+   allocate(  arr3d_a(plon,plev,plat)  )
+   allocate(  arr3d_b(plon,plev,plat)  )
 
-   !---------------------
-   ! Read required fields
-   !---------------------
+   if (analytic_ic_active()) then
+      allocate(glob_ind(plon * plat))
+      m = 1
+      do c = 1, plat
+         do i = 1, plon
+            ! Create a global column index
+            glob_ind(m) = i + (c-1)*plon
+            m = m + 1
+         end do
+      end do
+      call analytic_ic_set_ic(vc_moist_pressure, clat(:), clon(:,1),          &
+           glob_ind(:), U=arr3d_a, V=arr3d_b, T=t3_tmp, PS=ps_tmp, PHIS=phis_tmp)
+      readvar = .false.
+      call process_inidat('PS')
+      call process_inidat('UV')
+      call process_inidat('T')
+      ! Only use analytic value (zero) for PHIS if topography is not specified
+      if (.not. associated(fh_topo)) then
+        call process_inidat('PHIS')
+      end if
+      allocate(q4_tmp(plon,plev,plat,1))
+      do m = 1, pcnst
+         m_cnst(1) = m
+         call analytic_ic_set_ic(vc_moist_pressure, clat(:), clon(:,1),        &
+              glob_ind(:), Q=q4_tmp, m_cnst=m_cnst)
+         arr3d_a(:,:,:) = q4_tmp(:,:,:,1)
+         call process_inidat('CONSTS', m_cnst=m, fh=fh_ini)
+      end do
+      deallocate(q4_tmp)
+      deallocate(glob_ind)
+      deallocate(arr3d_a)
+      deallocate(arr3d_b)
+   else
+      !---------------------
+      ! Read required fields
+      !---------------------
 
-   !-----------
-   ! 3-D fields
-   !-----------
+      !-----------
+      ! 3-D fields
+      !-----------
 
-   allocate(arr3d_a(plon,plev,plat))
-   allocate(arr3d_b(plon,plev,plat))
+      fieldname = 'U'
+      call cam_pio_get_var(fieldname, fh_ini, arraydims3, arr3d_a, found=readvar)
+      if (.not. readvar) then
+         call endrun(sub//': ERROR: reading '//trim(fieldname))
+      end if
 
-   fieldname = 'U'
-   call cam_pio_get_var(fieldname, fh_ini, arraydims3, arr3d_a, found=readvar)
-   if (.not. readvar) then
-      call endrun(sub//': ERROR: reading '//trim(fieldname))
+      fieldname = 'V'
+      call cam_pio_get_var(fieldname, fh_ini, arraydims3, arr3d_b, found=readvar)
+      if (.not. readvar) then
+         call endrun(sub//': ERROR: reading '//trim(fieldname))
+      end if
+
+      call process_inidat('UV')
+
+
+      fieldname = 'T'
+      call cam_pio_get_var(fieldname, fh_ini, arraydims3, t3_tmp, found=readvar)
+      if (.not. readvar) then
+         call endrun(sub//': ERROR: reading '//trim(fieldname))
+      end if
+      call process_inidat('T')
+
+      ! Constituents (read and process one at a time)
+
+      do m = 1, pcnst
+
+         readvar   = .false.
+         fieldname = cnst_name(m)
+         if (cnst_read_iv(m)) &
+              call cam_pio_get_var(fieldname, fh_ini, arraydims3, arr3d_a, found=readvar)
+         call process_inidat('CONSTS', m_cnst=m, fh=fh_ini)
+
+      end do
+
+      deallocate ( arr3d_a  )
+      deallocate ( arr3d_b  )
+
+      !-----------
+      ! 2-D fields
+      !-----------
+
+      fieldname = 'PS'
+      call cam_pio_get_var(fieldname, fh_ini, arraydims2, ps_tmp, found=readvar)
+      if (.not. readvar) then
+         call endrun(sub//': ERROR: reading '//trim(fieldname))
+      end if
+      call process_inidat('PS')
    end if
 
-   fieldname = 'V'
-   call cam_pio_get_var(fieldname, fh_ini, arraydims3, arr3d_b, found=readvar)
-   if (.not. readvar) then
-      call endrun(sub//': ERROR: reading '//trim(fieldname))
-   end if
-
-   call process_inidat('UV')
-    
-
-   fieldname = 'T'
-   call cam_pio_get_var(fieldname, fh_ini, arraydims3, t3_tmp, found=readvar)
-   if (.not. readvar) then
-      call endrun(sub//': ERROR: reading '//trim(fieldname))
-   end if
-   call process_inidat('T')
-
-   ! Constituents (read and process one at a time)
-
-   do m = 1, pcnst
-
-      readvar   = .false.
-      fieldname = cnst_name(m)
-      if (cnst_read_iv(m)) &
-         call cam_pio_get_var(fieldname, fh_ini, arraydims3, arr3d_a, found=readvar)
-      call process_inidat('CONSTS', m_cnst=m, fh=fh_ini)
-
-   end do
-
-   deallocate ( arr3d_a  )
-   deallocate ( arr3d_b  )
-
-   !-----------
-   ! 2-D fields
-   !-----------
-    
+   ! PHIS processing for cases without analytic initial conditions
    fieldname = 'PHIS'
    readvar   = .false.
-   if (ideal_phys .or. aqua_planet .or. .not. associated(fh_topo)) then
-      phis_tmp(:,:) = 0._r8
-   else
+   if (associated(fh_topo)) then
       call cam_pio_get_var(fieldname, fh_topo, arraydims2, phis_tmp, found=readvar)
       if (.not. readvar) then
          call endrun(sub//': ERROR: reading '//trim(fieldname))
       end if
+      call process_inidat('PHIS', fh=fh_topo)
+   else if (.not. analytic_ic_active()) then
+      phis_tmp(:,:) = 0._r8
+      call process_inidat('PHIS')
    end if
-   call process_inidat('PHIS', fh=fh_topo)
-
-   fieldname = 'PS'
-   call cam_pio_get_var(fieldname, fh_ini, arraydims2, ps_tmp, found=readvar)
-   if (.not. readvar) then
-      call endrun(sub//': ERROR: reading '//trim(fieldname))
-   end if
-   call process_inidat('PS')
 
    ! Integrals of mass, moisture and geopotential height
    ! (fix mass of moisture as well)
@@ -529,7 +570,7 @@ subroutine process_inidat(fieldname, m_cnst, fh)
             call endrun(sub//': ERROR:  Q must be on Initial File')
          end if
 
-         call cnst_init_default(m_cnst, latdeg, londeg(:,1), arr3d_a)
+         call cnst_init_default(m_cnst, clat, clon(:,1), arr3d_a)
       end if
 
 !$omp parallel do private(lat)

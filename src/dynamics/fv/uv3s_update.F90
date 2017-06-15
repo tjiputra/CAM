@@ -4,7 +4,8 @@
 !
 ! !INTERFACE:
 
-   subroutine uv3s_update(grid, dua, u3s, dva, v3s, dt5)
+subroutine uv3s_update(grid, dua, u3s, dva, v3s, dt5, &
+                       am_correction)
 
 ! !USES:
 
@@ -26,6 +27,7 @@
 ! dvdt on A-grid 
       real(r8),intent(in)  :: dva(grid%ifirstxy:grid%ilastxy,grid%km,grid%jfirstxy:grid%jlastxy)
       real(r8),intent(in)  :: dt5     ! weighting factor
+      logical, intent(in)  :: am_correction
 
 ! !INPUT/OUTPUT PARAMETERS:
       real(r8), intent(inout) :: u3s(grid%ifirstxy:grid%ilastxy,grid%jfirstxy:grid%jlastxy, &
@@ -68,6 +70,12 @@
    real(r8) :: fv3s    (grid%ifirstxy:grid%ilastxy,grid%jfirstxy:grid%jlastxy,grid%km)
    real(r8) :: fu3s_tmp(grid%ifirstxy:grid%ilastxy,grid%km)
    real(r8) :: fv3s_tmp(grid%ifirstxy:grid%ilastxy,grid%km)
+
+   ! AM correction
+   real(r8), pointer :: cosp(:), cose(:)
+
+   cosp => grid%cosp
+   cose => grid%cose
 
    fu3s(:,:,:) = 0._r8
    fv3s(:,:,:) = 0._r8
@@ -113,13 +121,24 @@
 ! Adjust D-grid winds by interpolating A-grid tendencies.
 !
 
-        do j = jfirstxy+1, jlastxy
-          do i = ifirstxy, ilastxy
-             tmp         =  u3s(i,j,k)
-             u3s (i,j,k) =  u3s(i,j,k) + dt5*(dua(i,k,j)+dua(i,k,j-1))
-             fu3s(i,j,k) = (u3s(i,j,k) - tmp)/(2._r8*dt5)
-          enddo
-        enddo
+         if (am_correction) then
+            do j = jfirstxy+1, jlastxy
+               do i = ifirstxy, ilastxy
+                  tmp         =  u3s(i,j,k)
+                  u3s (i,j,k) =  u3s(i,j,k) + dt5*(dua(i,k,j)*cosp(j) + &
+                                                   dua(i,k,j-1)*cosp(j-1))/cose(j) ! torque
+                  fu3s(i,j,k) = (u3s(i,j,k) - tmp)/(2._r8*dt5)
+               end do
+            end do
+         else
+            do j = jfirstxy+1, jlastxy
+               do i = ifirstxy, ilastxy
+                  tmp         =  u3s(i,j,k)
+                  u3s (i,j,k) =  u3s(i,j,k) + dt5*(dua(i,k,j) + dua(i,k,j-1))      ! force
+                  fu3s(i,j,k) = (u3s(i,j,k) - tmp)/(2._r8*dt5)
+               end do
+            end do
+         end if
 
         do j = max(jfirstxy,2), min(jlastxy,jm-1)
            do i=ifirstxy+1,ilastxy
@@ -130,14 +149,27 @@
         enddo
 
 #if defined( SPMD )
-        if ( jfirstxy .gt. 1 ) then
-          do i = ifirstxy, ilastxy
-             tmp                =  u3s(i,jfirstxy,k)
-             u3s (i,jfirstxy,k) =  u3s(i,jfirstxy,k) +                         &
-                         dt5*( dua(i,k,jfirstxy) + duasouth(i,k) )
-             fu3s(i,jfirstxy,k) = (u3s(i,jfirstxy,k) - tmp)/(2._r8*dt5)
-          enddo
-        endif
+        if (am_correction) then
+           if ( jfirstxy .gt. 1 ) then
+              do i = ifirstxy, ilastxy
+                 tmp                =  u3s(i,jfirstxy,k)
+                 u3s (i,jfirstxy,k) =  u3s(i,jfirstxy,k) +                         &
+                                       dt5*( dua(i,k,jfirstxy)*cosp(jfirstxy) +    &
+                                       duasouth(i,k)*cosp(jfirstxy-1))/cose(jfirstxy)
+                 fu3s(i,jfirstxy,k) = (u3s(i,jfirstxy,k) - tmp)/(2._r8*dt5)
+              end do
+           end if
+        else
+           if ( jfirstxy .gt. 1 ) then
+              do i = ifirstxy, ilastxy
+                 tmp                =  u3s(i,jfirstxy,k)
+                 u3s (i,jfirstxy,k) =  u3s(i,jfirstxy,k) +                         &
+                                       dt5*( dua(i,k,jfirstxy) + duasouth(i,k) ) 
+                 fu3s(i,jfirstxy,k) = (u3s(i,jfirstxy,k) - tmp)/(2._r8*dt5)
+              end do
+           end if
+        end if
+
         do j = max(jfirstxy,2), min(jlastxy,jm-1)
            tmp                =  v3s(ifirstxy,j,k)
            v3s (ifirstxy,j,k) =  v3s(ifirstxy,j,k) + dt5*(dva(ifirstxy,k,j)+dvawest(k,j))

@@ -1,4 +1,5 @@
 -spmd -smp
+-pcol 4
 -chem waccm_tsmlt_mam4
 -dyn fv
 -nlev 88

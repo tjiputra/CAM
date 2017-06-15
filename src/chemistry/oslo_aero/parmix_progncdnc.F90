@@ -22,7 +22,7 @@ module parmix_progncdnc
    real(r8), parameter :: coatingLimit = 2.e-9_r8  ![m]
    !The fraction of soluble material required in a components before it
    !will add to any coating
-   real(r8), parameter     :: solubleMassFractionCoatingLimit=0.19_r8
+   real(r8), parameter     :: solubleMassFractionCoatingLimit=0.50_r8
 
    real(r8), parameter :: aThird       = 1.0_r8/3.0_r8 
    real(r8), parameter :: ln10         = log(10.0_r8)
@@ -501,6 +501,7 @@ contains
          end if
 
          hygroscopicityAvg(:,:) = 0.0_r8
+         hygroscopicityCoat(:,:) = 0.0_r8
          volumeCore(:,:,kcomp) = 0.0_r8
          volumeCoat(:,:,kcomp) = 0.0_r8
 
@@ -519,6 +520,7 @@ contains
                                         , volumeCore(:,:,kcomp)         &
                                         , volumeCoat(:,:,kcomp)         &
                                         , hygroscopicityAvg             &
+                                        , hygroscopicityCoat            &
                                         , tracerIndex                   &
                                          ) 
          end do !background tracers in mode (l)
@@ -539,6 +541,7 @@ contains
                                            , volumeCore(:,:,kcomp)         &
                                            , volumeCoat(:,:,kcomp)         &
                                            , hygroscopicityAvg             &
+                                           , hygroscopicityCoat            &
                                            , l_so4_a2                      &
                                             ) 
             endif
@@ -558,6 +561,7 @@ contains
                                            , volumeCore(:,:,kcomp)         &
                                            , volumeCoat(:,:,kcomp)         &
                                            , hygroscopicityAvg             &
+                                           , hygroscopicityCoat            &
                                            , l_so4_a1                      &
                                             ) 
             endif
@@ -574,6 +578,7 @@ contains
                                            , volumeCore(:,:,kcomp)         &
                                            , volumeCoat(:,:,kcomp)         &
                                            , hygroscopicityAvg             &
+                                           , hygroscopicityCoat            &
                                            , l_bc_ac                       &
                                             ) 
             endif
@@ -594,6 +599,7 @@ contains
                                            , volumeCore(:,:,kcomp)         &
                                            , volumeCoat(:,:,kcomp)         &
                                            , hygroscopicityAvg             &
+                                           , hygroscopicityCoat            &
                                            , l_om_ac                       &
                                             ) 
                endif
@@ -607,12 +613,15 @@ contains
 
             !Finally, when the sums are calculated, Apply finally eqn 4 here!!
 
-            where (hasAerosol(:ncol,k,kcomp)) 
-               !If there is enough soluble material, a coating will be formed: In that case, the 
-               !volume of the aerosol in question is only the volume of the coating!
-               hygroscopicityCoat(:ncol,k) = molecularWeightWater*hygroscopicityAvg(:ncol,k) &
-                                             & /( density_water * ( volumeCoat(:ncol,k,kcomp) + smallNumber) ) !Note use of volume Coating here
-            
+            where (hasAerosol(:ncol,k,kcomp))
+               where(VolumeCoat(:ncol,k,kcomp) .gt. 1.e-30_r8)
+                  !If there is enough soluble material, a coating will be formed: In that case, the 
+                  !volume of the aerosol in question is only the volume of the coating!
+                  hygroscopicityCoat(:ncol,k) = molecularWeightWater*hygroscopicityCoat(:ncol,k) &
+                                                & /( density_water * volumeCoat(:ncol,k,kcomp)) !Note use of volume Coating here
+               elsewhere
+                  hygroscopicityCoat(:ncol,k) = 1.e-30_r8
+               endwhere 
                !mode total volume:
                volumeConcentration(:ncol,k,kcomp) = volumeCore(:ncol,k,kcomp) + volumeCoat(:ncol,k,kcomp)
 
@@ -640,7 +649,7 @@ contains
                elsewhere
                   hygroscopicity(:ncol,k,kcomp) = hygroscopicityAvg(:ncol,k)
                endwhere
-            elsewhere
+            elsewhere ! No aerosol
                hygroscopicity(:ncol,k,kcomp) = 1.e-10_r8
             end where
 
@@ -657,6 +666,7 @@ contains
                                       , volumeCore                    & ![m3/m3] volume concentration we are adding
                                       , volumeCoat                    & ![m3/m3] volume concentration we are adding
                                       , hygroscopicityAvg             & ![mol_{aerosol}/mol_{tracer} hygroscopicity
+                                      , hygroscopicityCoat            & ![mol_{aerosol}/mol_{tracer} hygroscopicity coating
                                       , tracerIndex                   & ![idx] which tracer are we talking about (physics space)
                                       )
    
@@ -670,16 +680,17 @@ contains
       real(r8), intent(inout) :: volumeCore(pcols, pver)                  !O [m3/m3] volume of insoluble core
       real(r8), intent(inout) :: volumeCoat(pcols, pver)                  !O [m3/m3] volume of total aerosol
       real(r8), intent(inout) :: hygroscopicityAvg(pcols, pver)           !O [-] average hygroscopicity 
+      real(r8), intent(inout) :: hygroscopicityCoat(pcols, pver)          !O [-] average hygroscopicity 
 
-      real(r8)                :: solubleMassFractionUsed
+      real(r8)                :: massFractionInCoating
 
       integer                 :: k                                        !counter for levels
 
       !Only tracers more soluble than 20% can add to the coating volume
       if(solubleMassFraction(tracerIndex) .gt. solubleMassFractionCoatingLimit)then
-         solubleMassFractionUsed = solubleMassFraction(tracerIndex)
+         massFractionInCoating = 1.0_r8 !all volume goes to coating
       else
-         solubleMassFractionUsed = 0.0_r8
+         massFractionInCoating = 0.0_r8 !zero volume goes to coating
       endif
 
       do k=1,pver
@@ -687,9 +698,9 @@ contains
          where(hasAerosol(:ncol,k) .eqv. .true.)
 
             volumeCore(:ncol,k) = volumeCore(:ncol,k) &
-                     + massConcentrationTracerInMode(:ncol,k)/rhopart(tracerIndex)*(1.0_r8 - solubleMassFractionUsed)
+                     + massConcentrationTracerInMode(:ncol,k)/rhopart(tracerIndex)*(1.0_r8 - massFractionInCoating)
 
-            volumeCoat(:ncol,k) = volumeCoat(:ncol,k) + massConcentrationTracerInMode(:ncol,k)/rhopart(tracerIndex)*solubleMassFractionUsed
+            volumeCoat(:ncol,k) = volumeCoat(:ncol,k) + massConcentrationTracerInMode(:ncol,k)/rhopart(tracerIndex)*massFractionInCoating
 
             !sum up numerator in eqn 4 in Abdul-Razzak et al (average hygrocopicity)
             !Note that molecular weight is that of the AEROSOL TYPE
@@ -699,8 +710,19 @@ contains
                massConcentrationTracerInMode(:ncol,k)*numberOfIons(tracerIndex)*osmoticCoefficient(tracerIndex) &
             *solubleMassFraction(tracerIndex)/aerosol_type_molecular_weight(aerosolType(tracerIndex)) 
 
+            !Contribution to hygroscopicity of coating (only if goes to coating)
+            !sum up numerator in eqn 4 in Abdul-Razzak et al (average hygrocopicity)
+            !Note that molecular weight is that of the AEROSOL TYPE
+            !This is because of some conflict with mozart which needs molecular weight of OC tracers to be 12 when reading emissions
+            !So molecular weight is duplicated, and the molecular weight of the TYPE is used here!
+            hygroscopicityCoat(:ncol,k) = hygroscopicityCoat(:ncol,k) +  &
+               massConcentrationTracerInMode(:ncol,k)*numberOfIons(tracerIndex)*osmoticCoefficient(tracerIndex) &
+            *solubleMassFraction(tracerIndex)/aerosol_type_molecular_weight(aerosolType(tracerIndex))           &
+            *massFractionInCoating !Only add to this if mass goes to coating
+
          elsewhere
             hygroscopicityAvg(:ncol,k) = 1.0e-10_r8
+            hygroscopicityCoat(:ncol,k)= 1.0e-10_r8
          end where
    
       end do

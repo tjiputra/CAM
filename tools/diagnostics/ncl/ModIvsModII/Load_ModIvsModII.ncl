@@ -17,7 +17,6 @@ begin
 
 ; *************************************************************************
 ; **** To be edited by the user if the ncl script is run interactively ****
-;
 ; Define plot type and plot output format
  if (.not. isvar("plot_type")) then      ; is plot_type on command line?
   plot_type = 6                      ; 0 => SO2 load
@@ -28,6 +27,19 @@ begin
                                      ; 5 => DU  load
                                      ; 6 => H2O load
                                      ; 7 => Excess look-up table load
+                                     ; 8 => COLRBC0 BC0 column budren ratio
+                                     ; 9 => COLRBC2 BC2 column budren ratio
+                                     ; 10 => COLRBC4 BC4 column budren ratio
+                                     ; 11 => COLRBC12 BC12 column budren ratio
+                                     ; 12 => COLRBC14 BC14 column budren ratio
+                                     ; 13 => COLRBCAC BCAC column budren ratio
+                                     ; 14 => COLROC4 OC4 column budren ratio
+                                     ; 15 => COLRBC14 BC14 column budren ratio
+                                     ; 16 => COLROCAC OCAC column budren ratio
+                                     ; 17 => COLRSUL1 SUL1 column budren ratio
+                                     ; 18 => COLRSUL5 SUL5 column budren ratio
+                                     ; 19 => COLRSULA SULA column budren ratio
+; Note: column burden ratio for tracer X = (look-up table burden X)/(life-cycle burden X)  
  end if 
  if (.not. isvar("format")) then        ; is format on command line?
   format = "ps"
@@ -138,6 +150,110 @@ begin
  varname="AKCXS"   ; variable name used in text string:
  load_I=(/(f1_I[:]->AKCXS)/)       ; variable to be plotted from I
  load_II=(/(f1_II[:]->AKCXS)/)     ; variable to be plotted from II 
+ else if (plot_type.eq.8) then
+ var="COLRBC0"             ; name of input-variable and plot
+ varname="COLRBC0"   ; variable name used in text string:
+; load_I=(/(f1_I[:]->COLRBC0)/)       ; variable to be plotted from I
+;temporary fix
+ load_I=(/(f1_I[:]->AKCXS)/)*0.0       ; variable to be plotted from I
+ load_II=(/(f1_II[:]->COLRBC0)/)     ; variable to be plotted from II 
+ else if (plot_type.eq.9) then
+ var="COLRBC2"             ; name of input-variable and plot
+ varname="COLRBC2"   ; variable name used in text string:
+; load_I=(/(f1_I[:]->COLRBC2)/)       ; variable to be plotted from I
+;temporary fix
+ load_I=(/(f1_I[:]->AKCXS)/)*0.0       ; variable to be plotted from I
+ load_II=(/(f1_II[:]->COLRBC2)/)     ; variable to be plotted from II 
+ else if (plot_type.eq.10) then
+ var="COLRBC4"             ; name of input-variable and plot
+ varname="COLRBC4"   ; variable name used in text string:
+; load_I=(/(f1_I[:]->COLRBC4)/)       ; variable to be plotted from I
+;temporary fix
+ load_I=(/(f1_I[:]->AKCXS)/)*0.0       ; variable to be plotted from I
+ load_II=(/(f1_II[:]->COLRBC4)/)     ; variable to be plotted from II 
+ else if (plot_type.eq.11) then
+ var="COLRBC12"             ; name of input-variable and plot
+ varname="COLRBC12"   ; variable name used in text string:
+; load_I=(/(f1_I[:]->COLRBC12)/)       ; variable to be plotted from I
+;temporary fix
+ load_I=(/(f1_I[:]->AKCXS)/)*0.0       ; variable to be plotted from I
+ load_II=(/(f1_II[:]->COLRBC12)/)     ; variable to be plotted from II 
+ else if (plot_type.eq.10) then
+ var="COLRBC4"             ; name of input-variable and plot
+ varname="COLRBC4"   ; variable name used in text string:
+; load_I=(/(f1_I[:]->COLRBC4)/)       ; variable to be plotted from I
+;temporary fix
+ load_I=(/(f1_I[:]->AKCXS)/)*0.0       ; variable to be plotted from I
+ load_II=(/(f1_II[:]->COLRBC4)/)     ; variable to be plotted from II 
+ else if (plot_type.eq.12) then
+ var="COLRBC14"             ; name of input-variable and plot
+ varname="COLRBC14"   ; variable name used in text string:
+; load_I=(/(f1_I[:]->COLRBC14)/)       ; variable to be plotted from I
+;temporary fix
+ load_I=(/(f1_I[:]->AKCXS)/)*0.0       ; variable to be plotted from I
+ load_II=(/(f1_II[:]->COLRBC14)/)     ; variable to be plotted from II 
+ else if (plot_type.eq.13) then
+ var="COLRBCAC"             ; name of input-variable and plot
+ varname="COLRBCAC"   ; variable name used in text string:
+; load_I=(/(f1_I[:]->COLRBCAC)/)       ; variable to be plotted from I
+;temporary fix
+ load_I=(/(f1_I[:]->AKCXS)/)*0.0       ; variable to be plotted from I
+ load_II=(/(f1_II[:]->COLRBCAC)/)     ; variable to be plotted from II 
+ else if (plot_type.eq.14) then
+ var="COLROC4"             ; name of input-variable and plot
+ varname="COLROC4"   ; variable name used in text string:
+; load_I=(/(f1_I[:]->COLROC4)/)       ; variable to be plotted from I
+;temporary fix
+ load_I=(/(f1_I[:]->AKCXS)/)*0.0       ; variable to be plotted from I
+ load_II=(/(f1_II[:]->COLROC4)/)     ; variable to be plotted from II 
+ else if (plot_type.eq.15) then
+ var="COLROC14"             ; name of input-variable and plot
+ varname="COLROC14"   ; variable name used in text string:
+; load_I=(/(f1_I[:]->COLROC14)/)       ; variable to be plotted from I
+;temporary fix
+ load_I=(/(f1_I[:]->AKCXS)/)*0.0       ; variable to be plotted from I
+ load_II=(/(f1_II[:]->COLROC14)/)     ; variable to be plotted from II 
+ else if (plot_type.eq.16) then
+ var="COLROCAC"             ; name of input-variable and plot
+ varname="COLROCAC"   ; variable name used in text string:
+; load_I=(/(f1_I[:]->COLROCAC)/)       ; variable to be plotted from I
+;temporary fix
+ load_I=(/(f1_I[:]->AKCXS)/)*0.0       ; variable to be plotted from I
+ load_II=(/(f1_II[:]->COLROCAC)/)     ; variable to be plotted from II 
+ else if (plot_type.eq.17) then
+ var="COLRSUL1"             ; name of input-variable and plot
+ varname="COLRSUL1"   ; variable name used in text string:
+; load_I=(/(f1_I[:]->COLRSUL1)/)       ; variable to be plotted from I
+;temporary fix
+ load_I=(/(f1_I[:]->AKCXS)/)*0.0       ; variable to be plotted from I
+ load_II=(/(f1_II[:]->COLRSUL1)/)     ; variable to be plotted from II 
+ else if (plot_type.eq.18) then
+ var="COLRSUL5"             ; name of input-variable and plot
+ varname="COLRSUL5"   ; variable name used in text string:
+; load_I=(/(f1_I[:]->COLRSUL5)/)       ; variable to be plotted from I
+;temporary fix
+ load_I=(/(f1_I[:]->AKCXS)/)*0.0       ; variable to be plotted from I
+ load_II=(/(f1_II[:]->COLRSUL5)/)     ; variable to be plotted from II 
+ else if (plot_type.eq.19) then
+ var="COLRSULA"             ; name of input-variable and plot
+ varname="COLRSULA"   ; variable name used in text string:
+; load_I=(/(f1_I[:]->COLRSULA)/)       ; variable to be plotted from I
+;temporary fix
+ load_I=(/(f1_I[:]->AKCXS)/)*0.0       ; variable to be plotted from I
+ load_II=(/(f1_II[:]->COLRSULA)/)     ; variable to be plotted from II 
+ end if
+ end if
+ end if
+ end if
+ end if
+ end if
+ end if
+ end if
+ end if
+ end if
+ end if
+ end if
+ end if
  end if
  end if
  end if
@@ -179,8 +295,11 @@ if (var .eq. "C_SO2" .or.  var .eq. "C_SO4") then
     digg=(/0.5,1,2.5,5,10,25,50,100,250,500/)                ; C_DUST
     else if (var .eq. "DAERH2O") then
      digg=(/0.5,1,2.5,5,10,25,50,100,250,500/)               ; C_H2O
-    else  ; AKCXS
-     digg=(/0.01,0.02,0.03,0.05,.1,.2,.3,.5/)                         ; Replace with error message
+     else if (var .eq. "AKCXS") then
+      digg=(/0.01,0.02,0.03,0.05,.1,.2,.3,.5/)               ; AKCXS
+       else 
+      digg=(/0.8,0.85,0.95,0.99,0.995,1.0,1.005,1.01,1.025,1.05/) ; COLR*
+     end if
     end if
    end if
   end if
@@ -229,33 +348,48 @@ end if
 ;  res@cnFillColors   = (/2,3,4,5,6,7,8,9,10,11,12,13,14,15,16/) 
   res@cnFillColors   = (/3,5,6,8,9,10,11,12,13,14,15,16/) 
 ;  res@cnLevels       =   sprintf("%4.1f",digg)             ; min level
+if(plot_type.le.7) then
   res@cnLevels       =   sprintf("%5.2f",digg)             ; min level
+else
+  res@cnLevels       =   sprintf("%5.3f",digg)             ; min level
+end if
 
-;  res@tiMainString   = "CAM4-Oslo"
+;  res@tiMainString   = "ModI"
 if (var .eq. "C_SO2" .or.  var .eq. "C_SO4") then
   res@gsnRightString   = "avg = "+sprintf("%4.2f",(sum(dim_avg_n(load_Ia,0))/area1))+" mg S m~S~-2~N~"
 else if (var .eq. "AKCXS") then
   res@gsnRightString  = "avg = "+sprintf("%6.4f",(sum(dim_avg_n(load_Ia,0))/area1))+" mg m~S~-2~N~"
+else if (plot_type .ge. 8) then
+  res@gsnRightString  = "avg = "+sprintf("%6.4f",(sum(dim_avg_n(load_Ia,0))/area1))
 else
   res@gsnRightString   = "avg = "+sprintf("%4.2f",(sum(dim_avg_n(load_Ia,0))/area1))+" mg m~S~-2~N~"
 end if
 end if
+end if
+if (plot_type.le.7) then
   res@gsnLeftString   = varname + " column burden"
+else
+  res@gsnLeftString   = varname + " column burden ratio"
+end if
   plot(0) = gsn_csm_contour_map_ce(wks,dim_avg_n_Wrap(load_I,0),res)    ; create the plot
 
-;  res@tiMainString   = "CAM5-Oslo"
-if (var .eq. "C_SO2") then
-  res@gsnRightString  = "avg = "+sprintf("%4.2f",(sum(dim_avg_n(load_IIa,0))/area1))+" mg S m~S~-2~N~"
-else if (var .eq. "C_SO4") then
+;  res@tiMainString   = "ModII"
+if (var .eq. "C_SO2" .or.  var .eq. "C_SO4") then
   res@gsnRightString  = "avg = "+sprintf("%4.2f",(sum(dim_avg_n(load_IIa,0))/area1))+" mg S m~S~-2~N~"
 else if (var .eq. "AKCXS") then
   res@gsnRightString  = "avg = "+sprintf("%6.4f",(sum(dim_avg_n(load_IIa,0))/area1))+" mg m~S~-2~N~"
+else if (plot_type .ge. 8) then
+  res@gsnRightString  = "avg = "+sprintf("%6.4f",(sum(dim_avg_n(load_IIa,0))/area1))
 else
   res@gsnRightString  = "avg = "+sprintf("%4.2f",(sum(dim_avg_n(load_IIa,0))/area1))+" mg m~S~-2~N~"
 end if
 end if
 end if
+if (plot_type.le.7) then
   res@gsnLeftString   = varname + " column burden"
+else
+  res@gsnLeftString   = varname + " column burden ratio"
+end if
   plot(1) = gsn_csm_contour_map_ce(wks,dim_avg_n_Wrap(load_II,0),res)   ; create the plot
 
   pres                            = True        ; panel plot mods desired

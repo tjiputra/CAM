@@ -24,16 +24,31 @@ begin
 ;
 ; Define plot type and plot output format
  if (.not. isvar("plot_type")) then      ; is plot_type on command line?
-  plot_type = 1                      ; 1 => SO4 extinction
-                                     ; 2 => BC  extinction
-                                     ; 3 => POM extinction
-                                     ; 4 => SS  extinction
-                                     ; 5 => DU  extinction
+  plot_type = 1                      ; 1 => SO4 mass extinction coefficient
+                                     ; 2 => BC  mass extinction coefficient
+                                     ; 3 => POM mass extinction coefficient
+                                     ; 4 => SS  mass extinction coefficient
+                                     ; 5 => DU  mass extinction coefficient
+                                     ; 6 => Mode 0 (dry) mass extinction coefficient
+                                     ; 7 => Mode 1 (dry) mass extinction coefficient
+                                     ; 8 => Mode 2 (dry) mass extinction coefficient
+                                     ; 9 => Mode 4 (dry) mass extinction coefficient
+                                     ; 10 => Mode 5 (dry) mass extinction coefficient
+                                     ; 11 => Mode 6 (dry) mass extinction coefficient
+                                     ; 12 => Mode 7 (dry) mass extinction coefficient
+                                     ; 12 => Mode 8 (dry) mass extinction coefficient
+                                     ; 14 => Mode 9 (dry) mass extinction coefficient
+                                     ; 15 => Mode 10 (dry) mass extinction coefficient
+                                     ; 16 => Mode 12 (dry) mass extinction coefficient
+                                     ; 17 => Mode 14 (dry) mass extinction coefficient
+                                     ; 18 => BC mass absorbtion coefficient
+                                     ; 19 => alternative BC mass absorbtion coefficient (min)
+                                     ; 20 => alternative BC mass absorbtion coefficient (max)
  end if 
  if (.not. isvar("format")) then        ; is format on command line?
-  format = "ps"
+;  format = "ps"
 ;  format = "eps"
-;  format = "png"
+  format = "png"
 ;  format = "pdf"
  end if
 ;
@@ -139,6 +154,184 @@ begin
  end if
  ext_II=(/f1_II[:]->D550_DU/)/(/(f1_II[:]->cb_DUST)/)*1.e-3   ; variable to be plotted from II 
  load_II=(/f1_II[:]->cb_DUST/)*1.e3                           ; variable to be plotted from II 
+ else if (plot_type.eq.6) then
+; ex: mecdry0=1.e3*float(TAUKC0/CMDRY0)
+ var="MEC_mode0"                            ; name of input-variable and plot
+ varname="Mode 0 extinction coefficient"     ; variable name used in text string:
+;temporary fix for ModI
+ aod_I=(/f1_I[:]->DOD550/)*1.e-9                             
+ load_I=1.e-3*(/f1_I[:]->DOD550/) 
+ ext_I=aod_I/(load_I+1.e-9)
+ aod_II=(/f1_II[:]->TAUKC0/)                             
+ load_II=1.e-3*(/f1_II[:]->CMDRY0/) 
+ ext_II=aod_II/(load_II+1.e-9)
+ else if (plot_type.eq.7) then
+ var="MEC_mode1"                            ; name of input-variable and plot
+ varname="Mode 1 extinction coefficient"     ; variable name used in text string:
+;temporary fix for ModI
+ aod_I=(/f1_I[:]->DOD550/)*1.e-9                             
+ load_I=1.e-3*(/f1_I[:]->DOD550/) 
+ ext_I=aod_I/(load_I+1.e-9)
+ aod_II=(/f1_II[:]->TAUKC1/)                             
+ load_II=1.e-3*(/f1_II[:]->CMDRY1/) 
+ ext_II=aod_II/(load_II+1.e-9)
+ else if (plot_type.eq.8) then
+ var="MEC_mode2"                            ; name of input-variable and plot
+ varname="Mode 2 extinction coefficient"     ; variable name used in text string:
+;temporary fix for ModI
+ aod_I=(/f1_I[:]->DOD550/)*1.e-9                             
+ load_I=1.e-3*(/f1_I[:]->DOD550/) 
+ ext_I=aod_I/(load_I+1.e-9)
+ aod_II=(/f1_II[:]->TAUKC2/)                             
+ load_II=1.e-3*(/f1_II[:]->CMDRY2/) 
+ ext_II=aod_II/(load_II+1.e-9)
+ else if (plot_type.eq.9) then
+ var="MEC_mode4"                            ; name of input-variable and plot
+ varname="Mode 4 extinction coefficient"     ; variable name used in text string:
+;temporary fix for ModI
+ aod_I=(/f1_I[:]->DOD550/)*1.e-9                             
+ load_I=1.e-3*(/f1_I[:]->DOD550/) 
+ ext_I=aod_I/(load_I+1.e-9)
+ aod_II=(/f1_II[:]->TAUKC4/)                             
+ load_II=1.e-3*(/f1_II[:]->CMDRY4/) 
+ ext_II=aod_II/(load_II+1.e-9)
+ else if (plot_type.eq.10) then
+ var="MEC_mode5"                            ; name of input-variable and plot
+ varname="Mode 5 extinction coefficient"     ; variable name used in text string:
+;temporary fix for ModI
+ aod_I=(/f1_I[:]->DOD550/)*1.e-9                             
+ load_I=1.e-3*(/f1_I[:]->DOD550/) 
+ ext_I=aod_I/(load_I+1.e-9)
+ aod_II=(/f1_II[:]->TAUKC5/)                             
+ load_II=1.e-3*(/f1_II[:]->CMDRY5/) 
+ ext_II=aod_II/(load_II+1.e-9)
+ else if (plot_type.eq.11) then
+ var="MEC_mode6"                            ; name of input-variable and plot
+ varname="Mode 6 extinction coefficient"     ; variable name used in text string:
+;temporary fix for ModI
+ aod_I=(/f1_I[:]->DOD550/)*1.e-9                             
+ load_I=1.e-3*(/f1_I[:]->DOD550/) 
+ ext_I=aod_I/(load_I+1.e-9)
+ aod_II=(/f1_II[:]->TAUKC6/)                             
+ load_II=1.e-3*(/f1_II[:]->CMDRY6/) 
+ ext_II=aod_II/(load_II+1.e-9)
+ else if (plot_type.eq.12) then
+ var="MEC_mode7"                            ; name of input-variable and plot
+ varname="Mode 7 extinction coefficient"     ; variable name used in text string:
+;temporary fix for ModI
+ aod_I=(/f1_I[:]->DOD550/)*1.e-9                             
+ load_I=1.e-3*(/f1_I[:]->DOD550/) 
+ ext_I=aod_I/(load_I+1.e-9)
+ aod_II=(/f1_II[:]->TAUKC7/)                             
+ load_II=1.e-3*(/f1_II[:]->CMDRY7/) 
+ ext_II=aod_II/(load_II+1.e-9)
+ else if (plot_type.eq.13) then
+ var="MEC_mode8"                            ; name of input-variable and plot
+ varname="Mode 8 extinction coefficient"     ; variable name used in text string:
+;temporary fix for ModI
+ aod_I=(/f1_I[:]->DOD550/)*1.e-9                             
+ load_I=1.e-3*(/f1_I[:]->DOD550/) 
+ ext_I=aod_I/(load_I+1.e-9)
+ aod_II=(/f1_II[:]->TAUKC8/)                             
+ load_II=1.e-3*(/f1_II[:]->CMDRY8/) 
+ ext_II=aod_II/(load_II+1.e-9)
+ else if (plot_type.eq.14) then
+ var="MEC_mode9"                            ; name of input-variable and plot
+ varname="Mode 9 extinction coefficient"     ; variable name used in text string:
+;temporary fix for ModI
+ aod_I=(/f1_I[:]->DOD550/)*1.e-9                             
+ load_I=1.e-3*(/f1_I[:]->DOD550/) 
+ ext_I=aod_I/(load_I+1.e-9)
+ aod_II=(/f1_II[:]->TAUKC9/)                             
+ load_II=1.e-3*(/f1_II[:]->CMDRY9/) 
+ ext_II=aod_II/(load_II+1.e-9)
+ else if (plot_type.eq.15) then
+ var="MEC_mode10"                            ; name of input-variable and plot
+ varname="Mmode 10 extinction coefficient"     ; variable name used in text string:
+;temporary fix for ModI
+ aod_I=(/f1_I[:]->DOD550/)*1.e-9                             
+ load_I=1.e-3*(/f1_I[:]->DOD550/) 
+ ext_I=aod_I/(load_I+1.e-9)
+ aod_II=(/f1_II[:]->TAUKC10/)                             
+ load_II=1.e-3*(/f1_II[:]->CMDRY10/) 
+ ext_II=aod_II/(load_II+1.e-9)
+ else if (plot_type.eq.16) then
+ var="MEC_mode12"                            ; name of input-variable and plot
+ varname="Mode 12 extinction coefficient"     ; variable name used in text string:
+;temporary fix for ModI
+ aod_I=(/f1_I[:]->DOD550/)*1.e-9                             
+ load_I=1.e-3*(/f1_I[:]->DOD550/) 
+ ext_I=aod_I/(load_I+1.e-9)
+ aod_II=(/f1_II[:]->TAUKC12/)                             
+ load_II=1.e-3*(/f1_II[:]->CMDRY12/) 
+ ext_II=aod_II/(load_II+1.e-9)
+ else if (plot_type.eq.17) then
+ var="MEC_mode14"                            ; name of input-variable and plot
+ varname="Mode 14 extinction coefficient"     ; variable name used in text string:
+;temporary fix for ModI
+ aod_I=(/f1_I[:]->DOD550/)*1.e-9                             
+ load_I=1.e-3*(/f1_I[:]->DOD550/) 
+ ext_I=aod_I/(load_I+1.e-9)
+ aod_II=(/f1_II[:]->TAUKC14/)                             
+ load_II=1.e-3*(/f1_II[:]->CMDRY14/) 
+ ext_II=aod_II/(load_II+1.e-9)
+ else if (plot_type.eq.18) then
+ var="ABS_BC"                              ; name of input-variable and plot
+ varname="BC absorption coefficient"       ; variable name used in text string:
+ aod_I=(/f1_I[:]->A550_BC/)                                  ; variable to be plotted from I
+ aod_II=(/f1_II[:]->A550_BC/)                                ; variable to be plotted from II 
+ if(ModI.eq."CAM4-Oslo") then
+   ext_I=(/f1_I[:]->A550_BC/)/(/(f1_I[:]->C_BC)/)*1.e-3        ; variable to be plotted from I
+   load_I=(/f1_I[:]->C_BC/)*1.e3                               ; variable to be plotted from I
+ else
+   ext_I=(/f1_I[:]->A550_BC/)/(/(f1_I[:]->cb_BC)/)*1.e-3     ; variable to be plotted from I 
+   load_I=(/f1_I[:]->cb_BC/)*1.e3                             ; variable to be plotted from I 
+ end if
+ ext_II=(/f1_II[:]->A550_BC/)/(/(f1_II[:]->cb_BC)/)*1.e-3     ; variable to be plotted from II 
+ load_II=(/f1_II[:]->cb_BC/)*1.e3                             ; variable to be plotted from II 
+ else if (plot_type.eq.19) then
+ var="ABS_BCalt"                              ; name of input-variable and plot
+ varname="BC+SO4+SS absorption coefficient"       ; variable name used in text string:
+ aod_I=(/f1_I[:]->A550_BC/) + (/f1_I[:]->A550_SO4/) + (/f1_I[:]->A550_SS/)
+ aod_II=(/f1_II[:]->A550_BC/) + (/f1_II[:]->A550_SO4/) + (/f1_II[:]->A550_SS/)
+ if(ModI.eq."CAM4-Oslo") then
+   ext_I=((/f1_I[:]->A550_BC/)+(/f1_I[:]->A550_SO4/)+(/f1_I[:]->A550_SS/))/(/(f1_I[:]->C_BC)/)*1.e-3        ; variable to be plotted from I
+   load_I=(/f1_I[:]->C_BC/)*1.e3                               ; variable to be plotted from I
+ else
+   ext_I=((/f1_I[:]->A550_BC/)+(/f1_I[:]->A550_SO4/)+(/f1_I[:]->A550_SS/))/(/(f1_I[:]->cb_BC)/)*1.e-3     ; variable to be plotted from I 
+   load_I=(/f1_I[:]->cb_BC/)*1.e3                             ; variable to be plotted from I 
+ end if
+ ext_II=((/f1_II[:]->A550_BC/)+(/f1_II[:]->A550_SO4/)+(/f1_II[:]->A550_SS/))/(/(f1_II[:]->cb_BC)/)*1.e-3     ; variable to be plotted from II 
+ load_II=(/f1_II[:]->cb_BC/)*1.e3                             ; variable to be plotted from II 
+ else if (plot_type.eq.20) then
+ var="ABS_BCaltmax"                              ; name of input-variable and plot
+ varname="BC+all absorption coefficient"       ; variable name used in text string:
+ aod_I=(/f1_I[:]->A550_BC/) + (/f1_I[:]->A550_SO4/) + (/f1_I[:]->A550_SS/) + (/f1_I[:]->A550_POM/)+ (/f1_I[:]->A550_DU/)
+ aod_II=(/f1_II[:]->A550_BC/) + (/f1_II[:]->A550_SO4/) + (/f1_II[:]->A550_SS/) + (/f1_II[:]->A550_POM/)+ (/f1_II[:]->A550_DU/)
+ if(ModI.eq."CAM4-Oslo") then
+   ext_I=((/f1_I[:]->A550_BC/)+(/f1_I[:]->A550_SO4/)+(/f1_I[:]->A550_SS/)+(/f1_I[:]->A550_POM/)+(/f1_I[:]->A550_DU/))/(/(f1_I[:]->C_BC)/)*1.e-3
+   load_I=(/f1_I[:]->C_BC/)*1.e3                               ; variable to be plotted from I
+ else
+   ext_I=((/f1_I[:]->A550_BC/)+(/f1_I[:]->A550_SO4/)+(/f1_I[:]->A550_SS/)+(/f1_I[:]->A550_POM/)+(/f1_I[:]->A550_DU/))/(/(f1_I[:]->cb_BC)/)*1.e-3
+   load_I=(/f1_I[:]->cb_BC/)*1.e3                             ; variable to be plotted from I 
+ end if
+ ext_II=((/f1_II[:]->A550_BC/)+(/f1_II[:]->A550_SO4/)+(/f1_II[:]->A550_SS/)+(/f1_II[:]->A550_POM/)+(/f1_II[:]->A550_DU/))/(/(f1_II[:]->cb_BC)/)*1.e-3
+ load_II=(/f1_II[:]->cb_BC/)*1.e3                             ; variable to be plotted from II 
+ end if
+ end if
+ end if
+ end if
+ end if
+ end if
+ end if
+ end if
+ end if
+ end if
+ end if
+ end if
+ end if
+ end if
+ end if
  end if
  end if
  end if

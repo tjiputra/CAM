@@ -4,7 +4,8 @@
 module rate_diags
 
   use shr_kind_mod,     only : r8 => shr_kind_r8
-  use shr_kind_mod,     only : CX => SHR_KIND_CX
+  use shr_kind_mod,     only : CL => SHR_KIND_CL
+  use shr_kind_mod,     only : CXX => SHR_KIND_CXX
   use cam_history,      only : fieldname_len
   use cam_history,      only : addfld
   use cam_history,      only : outfld
@@ -31,8 +32,8 @@ module rate_diags
   integer :: ngrps = 0
   type(rate_grp_t), allocatable :: grps(:)  
 
-  integer, parameter :: maxsums = 100
-  character(len=CX) :: rxn_rate_sums(maxsums) = ' '
+  integer, parameter :: maxlines = 200
+  character(len=CL), allocatable :: rxn_rate_sums(:)
 
 contains
 
@@ -52,6 +53,9 @@ contains
 
     namelist /rxn_rate_diags_nl/ rxn_rate_sums
 
+    allocate( rxn_rate_sums( maxlines ) )
+    rxn_rate_sums(:) = ' '
+
     ! Read namelist
     if (masterproc) then
        unitn = getunit()
@@ -69,7 +73,7 @@ contains
 
 #ifdef SPMD
     ! Broadcast namelist variables
-    call mpibcast(rxn_rate_sums,len(rxn_rate_sums(1))*maxsums, mpichar, 0, mpicom)
+    call mpibcast(rxn_rate_sums,len(rxn_rate_sums(1))*maxlines, mpichar, 0, mpicom)
 #endif
   end subroutine rate_diags_readnl
 !--------------------------------------------------------------------------------
@@ -96,6 +100,7 @@ contains
        call addfld(rate_names(i), (/ 'lev' /),'A', 'molecules/cm3/sec','reaction rate')
     enddo
 
+    ! parse the terms of the summations
     call parse_rate_sums()
 
     do i = 1, ngrps
@@ -142,29 +147,47 @@ contains
 ! Private routines :
 !-------------------------------------------------------------------
 !-------------------------------------------------------------------
-  
+
   subroutine parse_rate_sums
 
     integer :: ndxs(512)
     integer :: nelem, spc_len, i,j,k, rxt_ndx
-    character(len=CX) :: tmp_str, tmp_name
+    character(len=CXX) :: tmp_str, tmp_name
 
     character(len=8) :: xchr ! multipler
     real(r8) :: xdbl
 
-    character(len=CX) :: sum_string
+    logical :: more_to_come
+    integer, parameter :: maxgrps = 100
+    character(len=CXX) :: rxn_rate_grps(maxgrps)
+
+    character(len=CXX) :: sum_string
+
+    rxn_rate_grps(:) = ' '
+
+    ! combine lines that have a trailing "&" with the next line
+    i=1
+    j=1
+    do while( len_trim(rxn_rate_sums(i)) > 0 )
+
+       k = scan( rxn_rate_sums(i), '&' )
+       more_to_come = k == len_trim(rxn_rate_sums(i)) ! line ends with "&"
+
+       if ( more_to_come ) then
+          rxn_rate_grps(j) = trim(rxn_rate_grps(j)) //' '//trim(rxn_rate_sums(i)(:k-1))
+       else
+          rxn_rate_grps(j) = trim(rxn_rate_grps(j)) //' '//trim(rxn_rate_sums(i))
+          j = j+1
+       endif
+       i = i+1
+
+    end do
+
+    ngrps = j-1
+
+    deallocate( rxn_rate_sums )
 
     ! a group is  a sum of reaction rates 
-
-    ! count the numger of sums (or groups)
-    sumcnt: do i = 1,maxsums
-       spc_len=len_trim(rxn_rate_sums(i))
-       if ( spc_len > 0 ) then
-          ngrps = ngrps+1
-       else
-          exit sumcnt
-       endif
-    enddo sumcnt
 
     ! parse the individual sum strings...  and form the groupings
     has_grps: if (ngrps>0) then
@@ -177,7 +200,7 @@ contains
           ! parse out the rxn names and multipliers
           ! from first parsing out the terms in the summation equation ("+" separates the terms)
 
-          sum_string = rxn_rate_sums(i)
+          sum_string = rxn_rate_grps(i)
           j = scan( sum_string, '=' )
           nelem = 1
           ndxs(nelem) = j ! ndxs stores the index of each term of the equation

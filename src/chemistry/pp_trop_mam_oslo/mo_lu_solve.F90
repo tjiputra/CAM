@@ -3,6 +3,8 @@
 
 
 
+
+
       module mo_lu_solve
 
       private
@@ -14,6 +16,7 @@
 
 
       use shr_kind_mod, only : r8 => shr_kind_r8
+      use chem_mods, only : clscnt4, nzcnt
 
       implicit none
 
@@ -38,6 +41,7 @@
       end subroutine lu_slv01
       subroutine lu_slv02( lu, b )
       use shr_kind_mod, only : r8 => shr_kind_r8
+      use chem_mods, only : clscnt4, nzcnt
       implicit none
 !-----------------------------------------------------------------------
 ! ... Dummy args
@@ -88,6 +92,7 @@
       end subroutine lu_slv02
       subroutine lu_slv( lu, b )
       use shr_kind_mod, only : r8 => shr_kind_r8
+      use chem_mods, only : clscnt4, nzcnt
       implicit none
 !-----------------------------------------------------------------------
 ! ... Dummy args

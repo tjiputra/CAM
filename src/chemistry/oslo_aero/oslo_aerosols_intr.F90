@@ -428,7 +428,7 @@ contains
                                  *exp(1.5_r8*(logSigma))
                 call modal_aero_depvel_part( ncol, state%t(:,:), state%pmid(:,:), ram1, fv,  & 
                            vlc_dry(:,:,jvlc), vlc_trb(:,jvlc), vlc_grv(:,:,jvlc),  &
-                           rad_aer(:,:), dens_aer(:,:), sg_aer(:,:), 0, lchnk)
+                           rad_aer(:,:), dens_aer(:,:), sg_aer(:,:), 3, lchnk)
              endif
 
           else

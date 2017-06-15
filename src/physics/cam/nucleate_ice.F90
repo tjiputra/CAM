@@ -46,9 +46,6 @@ integer  :: iulog
 real(r8) :: pi
 real(r8) :: mincld
 
-! Subgrid scale factor on relative humidity (dimensionless)
-real(r8) :: subgrid
-
 real(r8), parameter :: Shet   = 1.3_r8     ! het freezing threshold
 real(r8), parameter :: rhoice = 0.5e3_r8   ! kg/m3, Wpice is not sensitive to rhoice
 real(r8), parameter :: minweff= 0.001_r8   ! m/s
@@ -65,7 +62,7 @@ contains
 
 subroutine nucleati_init( &
    use_preexisting_ice_in, use_hetfrz_classnuc_in, use_incloud_nuc_in, iulog_in, pi_in, &
-   mincld_in, subgrid_in)
+   mincld_in)
 
    logical,  intent(in) :: use_preexisting_ice_in
    logical,  intent(in) :: use_hetfrz_classnuc_in
@@ -73,7 +70,6 @@ subroutine nucleati_init( &
    integer,  intent(in) :: iulog_in
    real(r8), intent(in) :: pi_in
    real(r8), intent(in) :: mincld_in
-   real(r8), intent(in) :: subgrid_in
 
    use_preexisting_ice = use_preexisting_ice_in
    use_hetfrz_classnuc = use_hetfrz_classnuc_in
@@ -81,7 +77,6 @@ subroutine nucleati_init( &
    iulog               = iulog_in
    pi                  = pi_in
    mincld              = mincld_in
-   subgrid             = subgrid_in
 
    ci = rhoice*pi/6._r8
 
@@ -92,7 +87,7 @@ end subroutine nucleati_init
 subroutine nucleati(  &
    wbar, tair, pmid, relhum, cldn,      &
    qc, qi, ni_in, rhoair,               &
-   so4_num, dst_num, soot_num,          &
+   so4_num, dst_num, soot_num, subgrid, &
    nuci, onihf, oniimm, onidep, onimey, &
    wpice, weff, fhom, regm, &
    oso4_num, odst_num, osoot_num)
@@ -110,6 +105,7 @@ subroutine nucleati(  &
    real(r8), intent(in) :: so4_num     ! so4 aerosol number (#/cm^3)
    real(r8), intent(in) :: dst_num     ! total dust aerosol number (#/cm^3)
    real(r8), intent(in) :: soot_num    ! soot (hydrophilic) aerosol number (#/cm^3)
+   real(r8), intent(in) :: subgrid     ! subgrid saturation scaling factor
 
    ! Output Arguments
    real(r8), intent(out) :: nuci       ! ice number nucleated (#/kg)
@@ -218,7 +214,7 @@ subroutine nucleati(  &
 
                if(tc.lt.-40._r8 .and. wbar1.gt.1._r8 .and. so4_num >= 1.0e-10_r8) then ! exclude T<-40 & W>1m/s from hetero. nucleation
 
-                  call hf(tc,wbar1,relhum,so4_num,nihf)
+                  call hf(tc,wbar1,relhum*subgrid,so4_num,nihf)
                   niimm=0._r8
                   nidep=0._r8
 
@@ -250,7 +246,7 @@ subroutine nucleati(  &
             ! homogeneous nucleation only
             else if (tc.lt.regm-5._r8 .or. (soot_num+dst_num) < 1.0e-10_r8) then
 
-               call hf(tc,wbar1,relhum,so4_num,nihf)
+               call hf(tc,wbar1,relhum*subgrid,so4_num,nihf)
                niimm=0._r8
                nidep=0._r8
 
@@ -274,7 +270,7 @@ subroutine nucleati(  &
 
                if (tc.lt.-40._r8 .and. wbar1.gt.1._r8) then ! exclude T<-40 & W>1m/s from hetero. nucleation
 
-                  call hf(tc, wbar1, relhum, so4_num, nihf)
+                  call hf(tc, wbar1, relhum*subgrid, so4_num, nihf)
                   niimm = 0._r8
                   nidep = 0._r8
 
@@ -295,7 +291,7 @@ subroutine nucleati(  &
 
                else
 
-                  call hf(regm-5._r8,wbar1,relhum,so4_num,nihf)
+                  call hf(regm-5._r8,wbar1,relhum*subgrid,so4_num,nihf)
                   call hetero(regm,wbar2,soot_num+dst_num,niimm,nidep)
 
                   ! If some homogeneous nucleation happened, assume all of the
@@ -320,10 +316,6 @@ subroutine nucleati(  &
             ! MG is expecting to find.
             ni = n1
 
-            if (.not. use_incloud_nuc) then
-               ni = ni / max(mincld, cldn)
-            end if
-            
             ! If using prexsiting ice, then add it to the total.
             if (use_preexisting_ice) then
               ni = ni + Ni_preice * 1e-6_r8
@@ -344,11 +336,7 @@ subroutine nucleati(  &
 
    if (use_hetfrz_classnuc) nimey = 0._r8
 
-   if (use_incloud_nuc) then
-     nuci=ni + nimey
-   else
-     nuci=ni + nimey / max(mincld,cldn)
-   end if
+   nuci=ni + nimey
 
    if(nuci.gt.9999._r8.or.nuci.lt.0._r8) then
       write(iulog, *) 'Warning: incorrect ice nucleation number (nuci reset =0)'
@@ -442,7 +430,7 @@ subroutine hf(T,ww,RH,Na,Ni)
       C = 1.68_r8  *log(ww)+129.35_r8
       RHw=(A*T*T+B*T+C)*0.01_r8
 
-      if((T.le.-37.0_r8) .and. ((RH*subgrid).ge.RHw)) then
+      if((T.le.-37.0_r8) .and. ((RH).ge.RHw)) then
 
         regm = 6.07_r8*log(ww)-55.0_r8
 

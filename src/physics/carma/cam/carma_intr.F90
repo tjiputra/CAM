@@ -1697,6 +1697,7 @@ contains
     
     integer                      :: igroup             ! group index
     integer                      :: ielem              ! element index
+    integer                      :: ilev               ! level index
     integer                      :: ibin               ! bin index
     integer                      :: icnst              ! constituent index
     integer                      :: rc                 ! CARMA return code
@@ -1727,8 +1728,12 @@ contains
             if (cnst_name(icnst) == name) then
     
               ! By default, initialize all constituents to 0.
-              q(:, :) = 0.0_r8
-              
+              do ilev = 1, size(q, 2)
+                where(mask)
+                  q(:, ilev) = 0.0_r8
+                end where
+              end do
+
               call CARMA_InitializeParticle(carma, ielem, ibin, latvals, lonvals, mask, q, rc)
               if (rc < 0) call endrun('carma_init_cnst::CARMA_InitializeParticle failed.')
             end if

@@ -76,22 +76,22 @@ else
 fi
 
 cd ${CAM_TESTDIR}/case.$1.$2
-echo "./xmlchange -file env_build.xml -id EXEROOT -val ${CAM_TESTDIR}/case.$1.$2/bld"
-./xmlchange -file env_build.xml -id EXEROOT -val ${CAM_TESTDIR}/case.$1.$2/bld
+echo "./xmlchange -id EXEROOT -val ${CAM_TESTDIR}/case.$1.$2/bld"
+./xmlchange -id EXEROOT -val ${CAM_TESTDIR}/case.$1.$2/bld
 
-echo "./xmlchange -file env_run.xml -id RUNDIR -val ${CAM_TESTDIR}/case.$1.$2/run"
-./xmlchange -file env_run.xml -id RUNDIR -val ${CAM_TESTDIR}/case.$1.$2/run
+echo "./xmlchange -id RUNDIR -val ${CAM_TESTDIR}/case.$1.$2/run"
+./xmlchange -id RUNDIR -val ${CAM_TESTDIR}/case.$1.$2/run
 
-echo "./xmlchange -file env_run.xml -id RUN_WITH_SUBMIT -val TRUE"
-./xmlchange -file env_run.xml -id RUN_WITH_SUBMIT -val TRUE
+echo "./xmlchange -id RUN_WITH_SUBMIT -val TRUE"
+./xmlchange -id RUN_WITH_SUBMIT -val TRUE
 
 # chemistry preprocessor
 if [ $usrmech != $2 ]; then
    string1=`grep CAM_CONFIG_OPTS env_build.xml`
    string2=`echo $string1 | cut -d "=" -f 3`
    cfgstring=`echo $string2 | cut -d "\"" -f 2`
-   echo "./xmlchange -file env_build.xml -id CAM_CONFIG_OPTS -val ""$cfgstring -usr_mech_infile ${CAM_SCRIPTDIR}/config_files/$usrmech -build_chem_proc"" "
-   ./xmlchange -file env_build.xml -id CAM_CONFIG_OPTS -val "$cfgstring -usr_mech_infile ${CAM_SCRIPTDIR}/config_files/$usrmech -build_chem_proc" 
+   echo "./xmlchange -id CAM_CONFIG_OPTS -val ""$cfgstring -usr_mech_infile ${CAM_SCRIPTDIR}/config_files/$usrmech -build_chem_proc"" "
+   ./xmlchange -id CAM_CONFIG_OPTS -val "$cfgstring -usr_mech_infile ${CAM_SCRIPTDIR}/config_files/$usrmech -build_chem_proc" 
 fi
 
 #
@@ -99,12 +99,12 @@ fi
 #
 
 for comp in ATM LND ICE OCN CPL GLC ROF WAV ESP; do
-    echo "./xmlchange -file env_mach_pes.xml -id NTASKS_${comp} -val $CAM_TASKS"
-    ./xmlchange -file env_mach_pes.xml -id NTASKS_${comp} -val $CAM_TASKS
+    echo "./xmlchange -id NTASKS_${comp} -val $CAM_TASKS"
+    ./xmlchange -id NTASKS_${comp} -val $CAM_TASKS
 #    echo "./xmlchange DEBUG=TRUE"
 #    ./xmlchange DEBUG=TRUE
-    echo "./xmlchange -file env_mach_pes.xml -id NTHRDS_${comp} -val $CAM_THREADS"
-    ./xmlchange -file env_mach_pes.xml -id NTHRDS_${comp} -val $CAM_THREADS
+    echo "./xmlchange -id NTHRDS_${comp} -val $CAM_THREADS"
+    ./xmlchange -id NTHRDS_${comp} -val $CAM_THREADS
 done
 
 

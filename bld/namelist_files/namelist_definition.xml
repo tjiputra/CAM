@@ -236,6 +236,35 @@ Chooses level of velocity diffusion.
 Default: 3.0e5
 </entry>
 
+<entry id="fv_am_correction" type="logical"  category="dyn_fv"
+       group="dyn_fv_inparm" valid_values="" >
+Flag to turn on corrections that improve angular momentum conservation.
+Default: .false.
+</entry>
+
+<entry id="fv_am_fixer" type="logical"  category="dyn_fv"
+       group="dyn_fv_inparm" valid_values="" >
+Flag to apply an arbitrary fix based on solid-body rotation to the zonal
+velocity fields to improve conservation of angular momentum.
+Default: .false.
+</entry>
+
+<entry id="fv_am_fix_lbl" type="logical"  category="dyn_fv"
+       group="dyn_fv_inparm" valid_values="" >
+Flag to apply the fixer turned on by fv_am_fixer level by level.  The
+intent is to not contaminate the stratospheric circulation with
+tropospheric AM loss, where it is most likely greatest (due to the larger
+divergence fields).  This option is experimental.
+Default: .false.
+</entry>
+
+<entry id="fv_am_diag" type="logical"  category="dyn_fv"
+       group="dyn_fv_inparm" valid_values="" >
+Flag to turn on a diagnostic calculation of angular momentum which is
+written to the log file at each time step.  
+Default: .false.
+</entry>
+
 <!-- MPI configuration for FV dycore -->
 
 <entry id="force_2d" type="integer"  category="dyn_fv"
@@ -2070,6 +2099,38 @@ Switch to control whether MG microphysics performs a uniform calculation or not
 Default: .false.
 </entry>
 
+<entry id="micro_mg_adjust_cpt" type="logical" category="microphys"
+       group="micro_mg_nl" valid_values="" >
+Switch to control whether MG microphysics should adjust the temperature
+at the level containing the cold point tropopause by using the value
+obtain by extrapolating between levels.
+Default: set by build-namelist
+</entry>
+
+<entry id="micro_mg_nccons" type="logical" category="microphys"
+       group="micro_mg_nl" valid_values="" >
+Set .true. to hold cloud droplet number constant.
+Default: .false.
+</entry>
+
+<entry id="micro_mg_nicons" type="logical" category="microphys"
+       group="micro_mg_nl" valid_values="" >
+Set .true. to hold cloud ice number constant.
+Default: .false.
+</entry>
+
+<entry id="micro_mg_ncnst" type="real" category="microphys"
+       group="micro_mg_nl" valid_values="" >
+In-cloud droplet number concentration when micro_mg_nccons=.true.
+Default: 100.e6 m-3
+</entry>
+
+<entry id="micro_mg_ninst" type="real" category="microphys"
+       group="micro_mg_nl" valid_values="" >
+In-cloud ice number concentration when micro_mg_nicons=.true.
+Default: 0.1e6 m-3
+</entry>
+
 <!-- Aerosol microphysics -->
 <entry id="microp_aero_bulk_scale" type="real" category="microphys"
        group="microp_aero_nl" valid_values="" >
@@ -2103,7 +2164,18 @@ Default: .false.
 
 <entry id="nucleate_ice_subgrid" type="real" category="microphys"
        group="nucleate_ice_nl" valid_values="" >
-Subgrid scaling factor for relative humidity in ice nucleation code.
+Subgrid scaling factor for relative humidity in ice nucleation code. If it has
+a value of -1, then indicates that the subgrid scaling factor will be
+calculated on the fly as 1 / qsatfac (i.e. the saturation scaling factor).
+Default: set by build-namelist
+</entry>
+
+<entry id="nucleate_ice_subgrid_strat" type="real" category="microphys"
+       group="nucleate_ice_nl" valid_values="" >
+Subgrid scaling factor for relative humidity in ice nucleation code in the
+stratosphere. If it has a value of -1, then indicates that the subgrid
+scaling factor will be calculated on the fly as 1 / qsatfac (i.e. the
+saturation scaling factor).
 Default: set by build-namelist
 </entry>
 
@@ -2122,6 +2194,14 @@ stratospheric. Provides an increase in homogeneous freezing over the Liu&Penner 
 Temporary solution to adjust ice surface area density and dehydration in the
 polar stratosphere where there doesn't seem to be enough nucleation. A value of
 zero means Liu&Penner is used.
+Default: set by build-namelist
+</entry>
+
+<entry id="nucleate_ice_use_troplev" type="logical" category="microphys"
+       group="nucleate_ice_nl" valid_values="" >
+Indicates whether to use the tropopause level to determine where to adjust
+nucleation for the stratosphere (true) or whether to use a hard coded transition
+level from 100 to 125 hPa applied only in the polar regions (false).
 Default: set by build-namelist
 </entry>
 
@@ -2239,6 +2319,18 @@ Default: set by build-namelist
 <entry id="cldfrc2m_rhmaxi" type="real" category="conv"
        group="cldfrc2m_nl" valid_values="" >
 rhi at which ice cloud fraction = 1.
+Default: set by build-namelist
+</entry>
+
+<entry id="cldfrc2m_rhminis" type="real" category="conv"
+       group="cldfrc2m_nl" valid_values="" >
+Minimum rh for ice cloud fraction &gt; 0 in the stratosphere.
+Default: set by build-namelist
+</entry>
+
+<entry id="cldfrc2m_rhmaxis" type="real" category="conv"
+       group="cldfrc2m_nl" valid_values="" >
+rhi at which ice cloud fraction = 1 in the stratosphere.
 Default: set by build-namelist
 </entry>
 
@@ -3287,13 +3379,10 @@ Default: set by build-namelist
 </entry>
 
 <entry id="cam_chempkg" type="char*32" category="build"
-       group="phys_ctl_nl" valid_values="waccm_ma,waccmx_ma,waccm_ma_mam3,
-                                         waccm_ma_sulfur,waccm_sc,waccm_sc_mam3,
-					 waccm_tsmlt,waccm_tsmlt_mam4,waccm_tsmlt_sulfur,
-					 trop_mozart,trop_mozart_mam3,trop_mozart_soa,
-					 trop_strat_soa,trop_strat_mam3,trop_strat_mam7,trop_strat_mam4_vbs,
-					 super_fast_llnl,super_fast_llnl_mam3,trop_ghg,
-					 trop_bam,trop_mam3,trop_mam4,trop_mam7,trop_mam_oslo,none" >
+       group="phys_ctl_nl" valid_values="trop_mam3,trop_mam4,trop_mam7,trop_mozart,trop_strat_mam4_vbs,
+                                         trop_bam,trop_ghg,waccm_ma,waccm_mad_mam4,waccm_ma_mam4,
+                                         waccm_ma_sulfur,waccm_sc,waccm_sc_mam4,waccm_tsmlt,waccm_tsmlt_mam4,
+                                         waccm_tsmlt_sulfur,super_fast_llnl,super_fast_llnl_mam3,terminator,trop_mam_oslo,none" >
 Name of the CAM chemistry package.  N.B. this variable may not be set by
 the user.  It is set by build-namelist via information in the configure
 cache file to be consistent with how CAM was built.
@@ -4918,6 +5007,14 @@ the rad_climate namelist variable.
 Default: false
 </entry>
 
+<entry id="prescribed_strataero_use_chemtrop" type="logical" category="aerosol"
+       group="prescribed_strataero_nl" valid_values="" >
+Indicates whether to use the unified chemistry tropopause method to set prescribed 
+stratospheric aerosols below the tropopause to zero.  This has a maximum altitude 
+level corresponding to 300 hPa for latitudes poleward of 50 degrees.
+Default: set by build-namelist
+</entry>
+
 <entry id="rsf_file" type="char*256" input_pathname="abs" category="cam_chem"
        group="chem_inparm" valid_values="" >
 Full pathname of dataset for radiative source function used in look up table photloysis
@@ -5340,16 +5437,27 @@ Default: set by build-namelist
 </entry>
 
 
-<entry id="rxn_rate_sums" type="char*512(100)" category="cam_chem"
+<entry id="rxn_rate_sums" type="char*256(200)" category="cam_chem"
        group="rxn_rate_diags_nl" valid_values="" >
 Give the user the ability to specify rate families (or groupings) diagnostics based 
 on reaction tag names. These group names can be added to history fincl variables.
+To indicate the summation continues with next string use "&" character at the end of the string.
 Example:
  rate_sums = 
    'OX_P = NO_HO2 + CH3O2_NO + 2*jo2_b ... ', 
    'OX_L = NO2_O_M + HO2_O3 + CLO_O ...', 
- fincl1 = 'OX_P','OX_L', ...
+   'RO2_RO2_sum = CH3O2_CH3O2a + CH3O2_CH3O2b + C2H5O2_CH3O2 + C2H5O2_C2H5O2 + CH3CO3_CH3O2 &',
+               '+ CH3CO3_CH3CO3 + CH3H7O2_CH3O2 + RO2_CH3O2 + MACRO2_CH3O2 ...',
+ fincl1 = 'OX_P','OX_L', 'RO2_RO2_sum', ...
 Default: none
+</entry>
+
+<entry id="chem_use_chemtrop" type="logical" category="chemistry"
+       group="chem_inparm" valid_values="" >
+Indicates whether to use the unified chemistry tropopause method to set the 
+tropopause used in gas phase and aerosol chemical processes.  This has a maximum altitude 
+level corresponding to 300 hPa for latitudes poleward of 50 degrees.
+Default: set by build-namelist
 </entry>
 
 <entry id="fire_emis_factors_file" type="char*256" input_pathname="abs" category="Fire_emissions"
@@ -5740,6 +5848,14 @@ CAM-SE vertical remap algorithm
 Default: Set by build-namelist.
 </entry>
 
+<!-- Dycore testing  -->
+
+<entry id="analytic_ic_type" type="char*80" category="dyn_test"
+       group="analytic_ic_nl"
+       valid_values="none,held_suarez_1994,baroclinic_wave" >
+Default: 'none'
+</entry>
+
 <!-- PIO  -->
 
 <entry id="pio_stride" type="integer" category="pio"
@@ -5791,13 +5907,7 @@ Default: box rearranger used by pio1, subset is default for pio2.
 
 <!-- DOCN -->
 
-<entry id="restfilm" type="char*256" input_pathname="abs" category="ocn"
-       group="docn_nml" valid_values="" >
-Full pathname of docn restart file.
-Default: set by build-namelist.
-</entry>
-
-<entry id="ocn_in" type="char*24" category="ocn"
+<entry id="restfilm" type="char*256" input_pathname="abs" category="restart"
        group="docn_nml" valid_values="" >
 Full pathname of docn restart file.
 Default: set by build-namelist.
@@ -5809,8 +5919,64 @@ Full pathname of docn restart file.
 Default: set by build-namelist.
 </entry>
 
-<!-- Backwards compatibility options: support for old DOM -->
-<!-- SST Data -->
+<entry id="force_prognostic_true" type="logical" category="ocn"
+       group="docn_nml" valid_values="" >
+Default: set by build-namelist.
+</entry>
+
+<entry id="dataMode" type="char*256" category="ocn"
+       group="shr_strdata_nml" valid_values="" >
+Default: set by build-namelist.
+</entry>
+
+<entry id="domainFile" type="char*256" category="ocn"
+       group="shr_strdata_nml" valid_values="" >
+Default: set by build-namelist.
+</entry>
+
+<entry id="fillalgo" type="char*32" category="ocn"
+       group="shr_strdata_nml" valid_values="" >
+Default: set by build-namelist.
+</entry>
+
+<entry id="fillmask" type="char*32" category="ocn"
+       group="shr_strdata_nml" valid_values="" >
+Default: set by build-namelist.
+</entry>
+
+<entry id="mapalgo" type="char*32" category="ocn"
+       group="shr_strdata_nml" valid_values="" >
+Default: set by build-namelist.
+</entry>
+
+<entry id="mapmask" type="char*32" category="ocn"
+       group="shr_strdata_nml" valid_values="" >
+Default: set by build-namelist.
+</entry>
+
+<entry id="streams" type="char*256" category="ocn"
+       group="shr_strdata_nml" valid_values="" >
+Default: set by build-namelist.
+</entry>
+
+<entry id="taxmode" type="char*32" category="ocn"
+       group="shr_strdata_nml" valid_values="" >
+Default: set by build-namelist.
+</entry>
+
+<entry id="tintalgo" type="char*32" category="ocn"
+       group="shr_strdata_nml" valid_values="" >
+Default: set by build-namelist.
+</entry>
+
+<entry id="vectors" type="char*256" category="ocn"
+       group="shr_strdata_nml" valid_values="" >
+Default: set by build-namelist.
+</entry>
+
+<!-- Specify ocean data and domain files in a component independent way. -->
+<!-- build-namelist associates this information with the component       -->
+<!-- dependend variables.                                                -->
 
 <entry id="bndtvs" type="char*256" input_pathname="abs" category="ocn"
        group="camexp" valid_values="" >
@@ -5830,15 +5996,6 @@ Default: set by build-namelist.
 Full pathname of grid file for time-variant sea-surface temperature and sea-ice
 concentration boundary dataset.
 Default: set by build-namelist.
-</entry>
-
-<entry id="sstcyc" type="logical" category="ocn"
-       group="camexp" valid_values="" >
-Flag for yearly cycling of SST data. If set to FALSE, a multi-year dataset
-is assumed, otherwise a single-year dataset is assumed, and SSTs will be
-cycled over the first 12 values in the file.  Not used if running with
-CCSM.
-Default: TRUE
 </entry>
 
 <!-- CICE: These variables are passed through to the CICE build-namelist.   -->
@@ -5865,6 +6022,15 @@ Default: 0
 Full pathname of master restart file from which to branch. Setting is
 Required for branch run.
 Default: none
+</entry>
+
+<entry id="sstcyc" type="logical" category="ocn"
+       group="dom_inparm" valid_values="" >
+Flag for yearly cycling of SST data. If set to FALSE, a multi-year dataset
+is assumed, otherwise a single-year dataset is assumed, and SSTs will be
+cycled over the first 12 values in the file.  This variable is only recognized
+by the old CAM DOM component.
+Default: TRUE
 </entry>
 
 <!-- ========================================================================================  -->
@@ -6118,10 +6284,8 @@ Default: FALSE
 </entry>
 
 <entry id="aqua_planet_sst" type="integer"  category="driver"
-       group="seq_infodata_inparm" valid_values="1" >
-Set the sst to a particular analytic solution.  **Not currently
-functional** The type of analytic solution is currently hardcoded with a
-parameter in ocn_comp.F90.
+       group="aquap_nl" valid_values="1,2,3,4,5,6,7,8,9,10" value="1" >
+Set the sst to a particular analytic solution.
 Default: 1
 </entry>
 
@@ -6205,6 +6369,12 @@ Default: 1
        group="seq_infodata_inparm" valid_values="" >
 Case title.
 Default: none.
+</entry>
+
+<entry id="cime_model" type="char*4"  category="driver"
+       group="seq_infodata_inparm" valid_values="cesm, acme" >
+cime model version.
+Default: cesm.
 </entry>
 
 <entry id="case_name" type="char*80"  category="driver"

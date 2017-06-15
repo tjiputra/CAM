@@ -1,12 +1,5 @@
-
-
-
-
-
       module m_rxt_id
-
       implicit none
-
       integer, parameter :: rid_jo2_b = 1
       integer, parameter :: rid_jo3_a = 2
       integer, parameter :: rid_jo3_b = 3
@@ -498,7 +491,6 @@
       integer, parameter :: rid_het15 = 505
       integer, parameter :: rid_het16 = 506
       integer, parameter :: rid_het17 = 507
-
       integer, parameter :: rid_r0466 = 466
       integer, parameter :: rid_r0467 = 467
       integer, parameter :: rid_r0468 = 468
@@ -515,5 +507,4 @@
       integer, parameter :: rid_r0479 = 479
       integer, parameter :: rid_r0480 = 480
       integer, parameter :: rid_r0481 = 481
-
       end module m_rxt_id
