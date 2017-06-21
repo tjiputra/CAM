@@ -43,7 +43,7 @@ def buildnml(case, caseroot, compname):
     RUN_REFCASE         = case.get_value("RUN_REFCASE")
     RUN_REFDATE         = case.get_value("RUN_REFDATE")
     RUN_REFTOD          = case.get_value("RUN_REFTOD")
-
+    DMS_MODE            = case.get_value("CCSM_BGC")
     #--------------------------------------------------------------------
     # call buildcpp to set both cppdefs and config_cache.xml file for generating namelist
     #--------------------------------------------------------------------
