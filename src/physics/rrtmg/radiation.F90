@@ -328,7 +328,7 @@ subroutine radiation_init(pbuf2d)
 
    ! Initialize the radiation parameterization, add fields to the history buffer
 
-   use physics_buffer,  only: pbuf_get_index
+   use physics_buffer,  only: pbuf_get_index, pbuf_set_field
    use phys_control,    only: phys_getopts
    use radsw,           only: radsw_init
    use radlw,           only: radlw_init
@@ -337,6 +337,8 @@ subroutine radiation_init(pbuf2d)
    use cloud_rad_props, only: cloud_rad_props_init
    use modal_aer_opt,   only: modal_aer_opt_init
    use rrtmg_state,     only: rrtmg_state_init
+   use time_manager,    only: is_first_step
+
 
    ! arguments
    type(physics_buffer_desc), pointer :: pbuf2d(:,:)
@@ -365,6 +367,10 @@ subroutine radiation_init(pbuf2d)
 
    cld_idx      = pbuf_get_index('CLD')
    cldfsnow_idx = pbuf_get_index('CLDFSNOW',errcode=err)
+
+   if (is_first_step()) then
+      call pbuf_set_field(pbuf2d, qrl_idx, 0._r8)
+   end if
 
    ! Set the radiation timestep for cosz calculations if requested using the adjusted iradsw value from radiation
    if (use_rad_dt_cosz)  then

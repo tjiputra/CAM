@@ -39,6 +39,7 @@
        real(r8) :: energy(lmax)                        ! solar energy
 
        real(r8), pointer :: solar_etf(:)
+       logical :: do_heating(13)
 
        contains
 
@@ -75,10 +76,28 @@
         character(len=200) :: str,fmt            ! string for comments in data file
         character(len=256) :: locfn
 
-        integer :: jeuv_1_ndx, ierr
+        integer :: jeuv_1_ndx, ierr, jndx
+        character(len=2) :: mstring
+        character(len=7) :: jstring
+        logical :: do_jeuv
 
-        jeuv_1_ndx = get_rxt_ndx( 'jeuv_1' )
-        if (.not.jeuv_1_ndx>0) return
+        do_jeuv=.false.
+        do_heating=.false.
+
+        do m = 1,neuv
+           write ( mstring, '(I2)' ) m
+           jstring = 'jeuv_'//trim(adjustl(mstring))
+           jndx = get_rxt_ndx( jstring )
+           if (jndx>0) then
+             do_jeuv=.true.
+             indexer(m) = jndx
+           endif
+           if (jndx>0 .and. m<14) then
+             do_heating(m) = .true.
+           endif
+        enddo
+
+        if (.not.do_jeuv) return
 
         if (solar_euv_data_active) then
            solar_etf => solar_euv_data_etf
@@ -309,10 +328,6 @@
 
 	wc(:)     = .1_r8*(waves(:) + wavel(:))*0.5_r8          ! A to nm
 	energy(:) = heat_eff_fac*hc/wc(:)
-
-        do m = 1,neuv
-           indexer(jeuv_1_ndx+m-1) = m
-        enddo
 
 	end subroutine jeuv_init
 
@@ -616,20 +631,24 @@
         end do
 
 !------------------------------------------------------------------------------
-! set photolysis rate
+! use photolysis rates to compute heating rates
+! only EUV photolysis reactions in the mechanism contribute to heating
 !------------------------------------------------------------------------------
-       prates(:,1)  = p_photon(:,2,1)
-       prates(:,2)  = p_photon(:,3,1)
-       prates(:,3)  = p_photon(:,4,1)
-       prates(:,5)  = p_photon(:,2,2) + p_photon(:,3,2)
-       prates(:,6)  = p_photon(:,2,3) + p_photon(:,3,3)
-       prates(:,7)  = .54_r8*p_photon(:,4,2)
-       prates(:,8)  = .24_r8*p_photon(:,4,2)
-       prates(:,9)  = .22_r8*p_photon(:,4,2)
-       prates(:,10) = .2_r8*p_photon(:,4,3)
-       prates(:,11) = .8_r8*p_photon(:,4,3)
-       prates(:,12) = p_photon(:,5,2)
-       prates(:,13) = p_photon(:,5,3)
+       prates = 0._r8
+
+       if (do_heating(1)) prates(:,1)  = p_photon(:,2,1)
+       if (do_heating(2)) prates(:,2)  = p_photon(:,3,1)
+       if (do_heating(3)) prates(:,3)  = p_photon(:,4,1)
+
+       if (do_heating(5)) prates(:,5)  = p_photon(:,2,2) + p_photon(:,3,2)
+       if (do_heating(6)) prates(:,6)  = p_photon(:,2,3) + p_photon(:,3,3)
+       if (do_heating(7)) prates(:,7)  = .54_r8*p_photon(:,4,2)
+       if (do_heating(8)) prates(:,8)  = .24_r8*p_photon(:,4,2)
+       if (do_heating(9)) prates(:,9)  = .22_r8*p_photon(:,4,2)
+       if (do_heating(10)) prates(:,10) = .2_r8*p_photon(:,4,3)
+       if (do_heating(11)) prates(:,11) = .8_r8*p_photon(:,4,3)
+       if (do_heating(12)) prates(:,12) = p_photon(:,5,2)
+       if (do_heating(13)) prates(:,13) = p_photon(:,5,3)
        hfactor(:)   = avogad/(cparg(:kbot)*mw(:kbot))
        euv_hrates(kbot+1:nlev) = 0._r8
        euv_hrates(:kbot) = ((prates(kbot:1:-1,1) + prates(kbot:1:-1,2) + prates(kbot:1:-1,3))*o_vmr(:kbot) &

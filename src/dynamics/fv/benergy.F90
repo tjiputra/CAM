@@ -6,13 +6,14 @@
 
       subroutine benergy(grid,  u,    v,    t3,   delp,              &
                          qqq,   pe,   peln, phis,                    &
-                         r_vir, cp,   rg,   tte,  te0 )
+                         r_vir, cp3v,  r3v,  tte,  te0 )
 
 ! !USES:
 
       use shr_kind_mod,  only: r8 => shr_kind_r8
       use dynamics_vars, only: T_FVDYCORE_GRID
       use cam_logfile,   only: iulog
+      use par_vecsum_mod,only: par_vecsum
 
 #if defined( SPMD )
       use mod_comm,      only: mp_send3d, mp_recv3d
@@ -61,8 +62,15 @@
                                    grid%jfirstxy:grid%jlastxy)
 
       real(r8), intent(in) :: r_vir  ! Virtual effect constant ( rwv/rg-1 )
-      real(r8), intent(in) :: cp     ! C_p ( = rg / cappa )
-      real(r8), intent(in) :: rg     ! Gas constant for dry air
+
+! C_p 
+      real(r8), intent(in) :: cp3v(grid%ifirstxy:grid%ilastxy,       &
+                                   grid%jfirstxy:grid%jlastxy,       &
+                                   grid%km)
+! R (gas "constant")
+      real(r8), intent(in) :: r3v(grid%ifirstxy:grid%ilastxy,        &
+                                  grid%jfirstxy:grid%jlastxy,        &
+                                  grid%km)
 
 ! !OUTPUT PARAMETERS:
 
@@ -231,7 +239,7 @@
 
       do j=js2g0,jn2g0
          do i=ifirstxy, ilastxy
-            te(i,j,k) = delp(i,j,k) * ( te(i,j,k) + cp*tm(i,j) )
+            te(i,j,k) = delp(i,j,k) * ( te(i,j,k) + cp3v(i,j,k)*tm(i,j) )
          enddo
       enddo
 
@@ -251,7 +259,7 @@
 
       do j=jfirstxy,jlastxy
          do i=ifirstxy,ilastxy
-            dz(i,j,k) = rg*tm(i,j)
+            dz(i,j,k) = r3v(i,j,k)*tm(i,j)
          enddo
       enddo
   enddo
@@ -262,7 +270,7 @@
 !$omp parallel do private(i, k, tmp)
      do k=1,km
         tmp = delp(ifirstxy,1,k) * (D0_5*sp_sum(k)/real(im,r8) +  &
-                                    cp*tm_sp(k))
+                                    cp3v(ifirstxy,1,k)*tm_sp(k))
         do i=ifirstxy,ilastxy
            te(i,1,k)  = tmp
         enddo
@@ -273,7 +281,7 @@
 !$omp parallel do private(i, k, tmp)
      do k=1,km
         tmp = delp(ifirstxy,jm,k) * (D0_5*np_sum(k)/real(im,r8) +& 
-                                     cp*tm_np(k))
+                                     cp3v(ifirstxy,jm,k)*tm_np(k))
         do i=ifirstxy,ilastxy
            te(i,jm,k) = tmp
         enddo

@@ -5,17 +5,17 @@
       use shr_kind_mod, only : r8 => shr_kind_r8
       implicit none
       save
-      integer, parameter :: phtcnt = 86, & ! number of photolysis reactions
-                            rxntot = 288, & ! number of total reactions
+      integer, parameter :: phtcnt = 87, & ! number of photolysis reactions
+                            rxntot = 289, & ! number of total reactions
                             gascnt = 202, & ! number of gas phase reactions
                             nabscol = 2, & ! number of absorbing column densities
-                            gas_pcnst = 73, & ! number of "gas phase" species
+                            gas_pcnst = 74, & ! number of "gas phase" species
                             nfs = 2, & ! number of "fixed" species
                             relcnt = 0, & ! number of relationship species
                             grpcnt = 0, & ! number of group members
                             nzcnt = 630, & ! number of non-zero matrix entries
                             extcnt = 11, & ! number of species with external forcing
-                            clscnt1 = 23, & ! number of species in explicit class
+                            clscnt1 = 24, & ! number of species in explicit class
                             clscnt2 = 0, & ! number of species in hov class
                             clscnt3 = 0, & ! number of species in ebi class
                             clscnt4 = 50, & ! number of species in implicit class
@@ -23,7 +23,7 @@
                             indexm = 1, & ! index of total atm density in invariant array
                             indexh2o = 0, & ! index of water vapor density
                             clsze = 1, & ! loop length for implicit chemistry
-                            rxt_tag_cnt = 288, &
+                            rxt_tag_cnt = 289, &
                             enthalpy_cnt = 53, &
                             nslvd = 16
       integer :: clscnt(5) = 0
@@ -38,7 +38,7 @@
       integer, allocatable :: cph_rid(:)
       integer, allocatable :: rxt_tag_map(:)
       real(r8), allocatable :: pht_alias_mult(:,:)
-      character(len=16), allocatable :: rxt_tag_lst(:)
+      character(len=32), allocatable :: rxt_tag_lst(:)
       character(len=16), allocatable :: pht_alias_lst(:,:)
       character(len=16) :: inv_lst(max(1,nfs))
       character(len=16) :: extfrc_lst(max(1,extcnt))

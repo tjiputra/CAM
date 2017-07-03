@@ -11,6 +11,10 @@ rc=`expr $? + $rc`
 ruby $ADDREALKIND_EXE -r r8 -l 1 -d $CAM_ROOT/components/cam/src/physics/waccmx
 rc=`expr $? + $rc`
 
+#Check Ionosphere
+ruby $ADDREALKIND_EXE -r r8 -l 1 -d $CAM_ROOT/components/cam/src/ionosphere
+rc=`expr $? + $rc`
+
 #Check Chemistry
 ruby $ADDREALKIND_EXE -r r8 -l 1 -d $CAM_ROOT/components/cam/src/chemistry
 rc=`expr $? + $rc`
@@ -21,8 +25,6 @@ rc=`expr $? + $rc`
 ruby $ADDREALKIND_EXE -r r8 -l 1 -d $CAM_ROOT/components/cam/src/dynamics/fv
 rc=`expr $? + $rc`
 ruby $ADDREALKIND_EXE -r r8 -l 1 -d $CAM_ROOT/components/cam/src/dynamics/eul
-rc=`expr $? + $rc`
-ruby $ADDREALKIND_EXE -r r8 -l 1 -d $CAM_ROOT/components/cam/src/dynamics/sld
 rc=`expr $? + $rc`
 
 #Check other

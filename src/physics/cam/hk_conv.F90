@@ -605,8 +605,6 @@ subroutine cmfmca(lchnk   ,ncol    , &
 ! If pre-existing supersaturation in detrainment layer, beta=0
 ! cldwtr is temporarily equal to hlat*l (l=> liquid water)
 !
-!cdir nodep
-!DIR$ CONCURRENT
             do ii=1,len1
                i = indx1(ii)
                temp1     = vtemp4(i)/(1.0_r8 + gam(i,k))
@@ -635,8 +633,6 @@ subroutine cmfmca(lchnk   ,ncol    , &
 ! Second check involves supersaturation of "detrainment layer"
 ! small amount of supersaturation acceptable (by ssfac factor)
 !
-!cdir nodep
-!DIR$ CONCURRENT
             do ii=1,len1
                i = indx1(ii)
                if (hb(i,k-1) < hbs(i,k-1)) then
@@ -659,8 +655,6 @@ subroutine cmfmca(lchnk   ,ncol    , &
 ! noise in the vertical ... constrain adjusted h (or theta e)
 ! so that the adjustment doesn't contribute to "kinks" in h
 !
-!cdir nodep
-!DIR$ CONCURRENT
             do ii=1,len1
                i = indx1(ii)
                g = min(0.0_r8,hb(i,k) - hb(i,k-1))
@@ -688,8 +682,6 @@ subroutine cmfmca(lchnk   ,ncol    , &
 ! Also test for other pathological cases that result in non-
 ! physical states and adjust eta accordingly.
 !
-!cdir nodep
-!DIR$ CONCURRENT
          do ii=1,len1
             i = indx1(ii)
             beta(i) = max(0.0_r8,beta(i))
@@ -738,8 +730,6 @@ subroutine cmfmca(lchnk   ,ncol    , &
 !
 ! Calculate cloud water, rain water, and thermodynamic changes
 !
-!cdir nodep
-!DIR$ CONCURRENT
          do 30 ii=1,len1
             i = indx1(ii)
             icwmr(i,k) = cldwtr(i)*rhlat
@@ -826,8 +816,6 @@ subroutine cmfmca(lchnk   ,ncol    , &
                   rpd(:ncol,:) = rpdel(:ncol,:)
                   pm(:ncol,:) = pmid(:ncol,:)
                endif
-!cdir nodep
-!DIR$ CONCURRENT
                do 40 ii=1,len1
                   i = indx1(ii)
 !
@@ -922,8 +910,6 @@ subroutine cmfmca(lchnk   ,ncol    , &
                   end do
                   call qsat(vtemp1(:2*len1), vtemp2(:2*len1), &
                        vtemp5(:2*len1), vtemp3(:2*len1), gam=vtemp4(:2*len1))
-!cdir nodep
-!DIR$ CONCURRENT
                   do ii=1,len1
                      i = indx1(ii)
                      shbs(i,k  ) = vtemp3(ii     )
@@ -940,7 +926,6 @@ subroutine cmfmca(lchnk   ,ncol    , &
 !
 ! Update thermodynamic information at half (i.e., interface) levels
 !
-!DIR$ CONCURRENT
                   do ii=1,len1
                      i = indx1(ii)
                      sbh (i,k) = 0.5_r8*(sb(i,k) + sb(i,k-1))

@@ -457,7 +457,6 @@ subroutine radclwmx(lchnk   ,ncol    ,doabsems                  , &
       end if
    end do
 
-!DIR$ CONCURRENT
    do ii = 1, npts
       i = indx(ii)
       do k = ntoplw, pverp
@@ -479,7 +478,6 @@ subroutine radclwmx(lchnk   ,ncol    ,doabsems                  , &
 !
 ! Initialize all-sky fluxes. fdl(i,1) & ful(i,pverp) are boundary conditions
 !
-!DIR$ CONCURRENT
    do ii = 1, npts
       i = indx(ii)
       fdl(i,ntoplw) = fsdl(i,ntoplw)
@@ -530,7 +528,6 @@ subroutine radclwmx(lchnk   ,ncol    ,doabsems                  , &
             k1 = kx2(ilon,irgn-1)+1
             kx1(ilon,irgn) = k1
             kx2(ilon,irgn) = k1 - 1
-!cdir novector
             do k2 = pver, k1, -1
                if (pmid(ilon,k2) <= pmxrgn(ilon,irgn)) then
                   kx2(ilon,irgn) = k2
@@ -540,7 +537,6 @@ subroutine radclwmx(lchnk   ,ncol    ,doabsems                  , &
 !
 ! Identify columns with clouds in the given region.
 !
-!cdir novector
             do k = k1, k2
                if (cldp(ilon,k) >= cldmin) then
                   n = n+1
@@ -563,7 +559,6 @@ subroutine radclwmx(lchnk   ,ncol    ,doabsems                  , &
 ! Sort cloud areas and corresponding level indices.
 !
             n = 0
-!cdir novector
             do k = kx1(i,irgn),kx2(i,irgn)
                if (cldp(i,k) >= cldmin) then
                   n = n+1
@@ -595,7 +590,6 @@ subroutine radclwmx(lchnk   ,ncol    ,doabsems                  , &
                call quick_sort(asort(1:nxs(i,irgn)),ksort(1:nxs(i,irgn)))
             endif
 
-!cdir novector
             do l = 1, nxs(i,irgn)
                kxs(l,i,irgn) = ksort(l)
             end do
@@ -626,7 +620,6 @@ subroutine radclwmx(lchnk   ,ncol    ,doabsems                  , &
 !    to TOA such that the "cloud" pseudo-emissivity is between 0 and 1.
 !
             k1 = kx1(ilon,irgn)
-!cdir novector
             do km1 = ntoplw-2, k1-2
                km4 = km1+3
                k2 = k1
@@ -637,7 +630,6 @@ subroutine radclwmx(lchnk   ,ncol    ,doabsems                  , &
                if (emx0 >= 0.0_r8 .and. emx0 <= 1.0_r8) exit
             end do
             km1 = min(km1,k1-2)
-!cdir novector
             do k2 = kx1(ilon,irgn)+1, kx2(ilon,irgn)+1
                k3 = k2+1
                tmp(ilon) = s(ilon,k2,min(k3,pverp))*min(1,pverp2-k3)
@@ -661,7 +653,6 @@ subroutine radclwmx(lchnk   ,ncol    ,doabsems                  , &
 !    to TOA such that the "cloud" pseudo-emissivity is between 0 and 1.
 !
             k1 = kx1(i,irgn)
-!cdir novector
             do km1 = ntoplw-2,k1-2
                km4 = km1+3
                k2 = k1
@@ -685,7 +676,6 @@ subroutine radclwmx(lchnk   ,ncol    ,doabsems                  , &
 !
                if (nxsk < nxs(i,irgn)) then
                   nxsk = 0
-!cdir novector
                   do l = 1, nxs(i,irgn)
                      k1 = kxs(l,i,irgn)
                      if (k >= k1) then
@@ -701,7 +691,6 @@ subroutine radclwmx(lchnk   ,ncol    ,doabsems                  , &
 !
 ! Initialize iterated emissivity factors
 !
-!cdir novector
                do l = 1, nxsk
                   emx(l) = emis(i,ksort(l))
                end do
@@ -736,7 +725,6 @@ subroutine radclwmx(lchnk   ,ncol    ,doabsems                  , &
 !
 ! Loop over number of cloud levels inside region (biggest to smallest cld area)
 !
-!cdir novector
                 do l1 = 0, nxsk
                    km1 = ksort(l1)-1
                    km4 = km1+3
@@ -752,7 +740,6 @@ subroutine radclwmx(lchnk   ,ncol    ,doabsems                  , &
                   cld1 = cldp(i,ksort(l))*min(1,nxsk+1-l)
                   if (cld0 /= cld1) then
                      tfdl = tfdl+(cld0-cld1)*fsdl(i,k2)
-!cdir novector
                      do l1 = 0, l - 1
                         tfdl = tfdl+(cld0-cld1)*emx(l1)*tmp3(l1)
                      end do
@@ -768,7 +755,6 @@ subroutine radclwmx(lchnk   ,ncol    ,doabsems                  , &
 ! Ideally the upper bound on l1 would be l-1, but the sort routine
 !    scrambles the order of layers with identical cloud amounts
 !
-!cdir novector
                      do l1 = 0, nxsk
                         if (ksort(l1) < k1) then
                            emx(l1) = emx(l1)*trans
@@ -815,7 +801,6 @@ subroutine radclwmx(lchnk   ,ncol    ,doabsems                  , &
 !
             k1 = kx2(ilon,irgn)+1
             if (k1 < pverp) then
-!cdir novector
                do km1 = pver-1,kx2(ilon,irgn),-1
                   km3 = km1+2
                   k2 = k1
@@ -832,7 +817,6 @@ subroutine radclwmx(lchnk   ,ncol    ,doabsems                  , &
                emx0 = 1.0_r8
             endif
 
-!cdir novector
             do k2 = kx1(ilon,irgn), kx2(ilon,irgn)
                k3 = k2+1
 !
@@ -862,7 +846,6 @@ subroutine radclwmx(lchnk   ,ncol    ,doabsems                  , &
 !
             k1 = kx2(i,irgn)+1
             if (k1 < pverp) then
-!cdir novector
                do km1 = pver-1,kx2(i,irgn),-1
                   km3 = km1+2
                   k2 = k1
@@ -890,7 +873,6 @@ subroutine radclwmx(lchnk   ,ncol    ,doabsems                  , &
 !
                if (nxsk < nxs(i,irgn)) then
                   nxsk = 0
-!cdir novector
                   do l = 1, nxs(i,irgn)
                      k1 = kxs(l,i,irgn)
                      if (k <= k1) then
@@ -906,7 +888,6 @@ subroutine radclwmx(lchnk   ,ncol    ,doabsems                  , &
 !
 ! Initialize iterated emissivity factors
 !
-!cdir novector
                do l = 1, nxsk
                   emx(l) = emis(i,ksort(l))
                end do
@@ -943,7 +924,6 @@ subroutine radclwmx(lchnk   ,ncol    ,doabsems                  , &
 !
 ! Loop over number of cloud levels inside region (biggest to smallest cld area)
 !
-!cdir novector
                do l1 = 0, nxsk
                   km1 = ksort(l1)-1
                   km3 = km1+2
@@ -962,7 +942,6 @@ subroutine radclwmx(lchnk   ,ncol    ,doabsems                  , &
                   cld1 = cldp(i,ksort(l))*min(1,nxsk+1-l)
                   if (cld0 /= cld1) then
                      tful = tful+(cld0-cld1)*fsul(i,k2)
-!cdir novector
                      do l1 = 0, l - 1
                         tful = tful+(cld0-cld1)*emx(l1)*tmp3(l1)
                      end do
@@ -978,7 +957,6 @@ subroutine radclwmx(lchnk   ,ncol    ,doabsems                  , &
 ! Ideally the upper bound on l1 would be l-1, but the sort routine
 !    scrambles the order of layers with identical cloud amounts
 !
-!cdir novector
                      do l1 = 0, nxsk
                         if (ksort(l1) > k1) then
                            emx(l1) = emx(l1)*trans

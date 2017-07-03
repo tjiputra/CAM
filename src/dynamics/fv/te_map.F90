@@ -1,3 +1,11 @@
+module te_map_mod
+
+implicit none
+save
+private
+public :: te_map
+
+contains
 !-----------------------------------------------------------------------
 !BOP
 ! !ROUTINE: te_map --- Map vertical Lagrangian coordinates to normal grid
@@ -7,13 +15,15 @@
    subroutine te_map(grid,    consv,  convt,   ps,      omga,            &
                      pe,      delp,    pkz,    pk,      mdt,             &
                      nx,      u,       v,      pt,      tracer,          &
-                     hs,      cp,      akap,   kord,    peln,            &
+                     hs,      cp3v,    cap3v,  kord,    peln,            &
                      te0,     te,      dz,     mfx,     mfy,             &
-                     te_method, am_correction)
+                     uc,      vc,     du_s,    du_w,                     &
+                     am_correction, am_diag_lbl)
 !
 ! !USES:
 
    use shr_kind_mod,  only : r8 => shr_kind_r8
+   use spmd_utils,    only : masterproc
    use dynamics_vars, only : T_FVDYCORE_GRID
    use mapz_module,   only : map1_cubic_te, map1_ppm, mapn_ppm_tracer
    use cam_logfile,   only : iulog
@@ -23,6 +33,8 @@
    use mod_comm,      only : mp_send3d, mp_recv3d
 #endif
    use phys_control,  only: waccmx_is !WACCM-X runtime switch
+   use physconst,     only: physconst_calc_kappav
+   use par_vecsum_mod,only: par_vecsum
 
    implicit none
 
@@ -39,19 +51,20 @@
    integer mdt                   ! mapping time step (same as phys)
    integer nx                    ! number of SMP "decomposition" in x
    real(r8) hs(grid%ifirstxy:grid%ilastxy,grid%jfirstxy:grid%jlastxy) ! surface geopotential
-   real(r8) cp
    real(r8) te0
-   integer, intent(in)  ::  te_method     ! Method for vertical total energy remapping
-                                          !     0          :  piecewise-parabolic
-                                          !     1          :  cubic interpolation
-   logical, intent(in)  ::  am_correction ! logical switch for AM correction
- 
+
 ! !INPUT/OUTPUT PARAMETERS:
    real(r8) pk(grid%ifirstxy:grid%ilastxy,grid%jfirstxy:grid%jlastxy,grid%km+1) ! pe to the kappa
    real(r8) u(grid%ifirstxy:grid%ilastxy,grid%jfirstxy:grid%jlastxy,grid%km)    ! u-wind (m/s)
    real(r8) v(grid%ifirstxy:grid%ilastxy,grid%jfirstxy:grid%jlastxy,grid%km)    ! v-wind (m/s)
 ! tracers including specific humidity
 !!!   real(r8) q(grid%ifirstxy:grid%ilastxy,grid%jfirstxy:grid%jlastxy,grid%km,grid%ntotq)
+
+   real(r8), intent(inout) ::   &
+       cp3v(grid%ifirstxy:grid%ilastxy,grid%jfirstxy:grid%jlastxy,grid%km)   ! C_p
+   real(r8), intent(inout) ::   &
+       cap3v(grid%ifirstxy:grid%ilastxy,grid%jfirstxy:grid%jlastxy,grid%km)   ! cappa
+
    real(r8), intent(inout) ::   &
        tracer(grid%ifirstxy:grid%ilastxy,grid%jfirstxy:grid%jlastxy,grid%km,grid%ntotq) ! Tracer array
    real(r8) pe(grid%ifirstxy:grid%ilastxy,grid%km+1,grid%jfirstxy:grid%jlastxy) ! pressure at layer edges
@@ -60,7 +73,7 @@
                                      ! Output: virtual temperature if convt is true
                                      ! false: output is (virtual) potential temperature 
    real(r8)  te(grid%ifirstxy:grid%ilastxy,grid%jfirstxy:grid%jlastxy,grid%km)  ! Work array (cache performance)
-   real(r8)  dz(grid%ifirstxy:grid%ilastxy,grid%jfirstxy:grid%jlastxy,grid%km)     ! Work array (cache performance)
+   real(r8)  dz(grid%ifirstxy:grid%ilastxy,grid%jfirstxy:grid%jlastxy,grid%km)  ! Work array (cache performance)
    real(r8)  mfx(grid%ifirstxy:grid%ilastxy,grid%jfirstxy:grid%jlastxy,grid%km)   
    real(r8)  mfy(grid%ifirstxy:grid%ilastxy,grid%jfirstxy:grid%jlastxy,grid%km)  
  
@@ -69,6 +82,16 @@
    real(r8) omga(grid%ifirstxy:grid%ilastxy,grid%km,grid%jfirstxy:grid%jlastxy)    ! vertical press. velocity (pascal/sec)
    real(r8) peln(grid%ifirstxy:grid%ilastxy,grid%km+1,grid%jfirstxy:grid%jlastxy)  ! log(pe)
    real(r8) pkz(grid%ifirstxy:grid%ilastxy,grid%jfirstxy:grid%jlastxy,grid%km)     ! layer-mean pk for converting t to pt
+
+   ! AM conservation mods
+   logical, intent(in)  ::  am_correction ! logical switch for AM correction
+   logical, intent(in)  ::  am_diag_lbl   ! input
+
+   real(r8), intent(in)                 :: du_s(grid%km)
+   real(r8), intent(inout), allocatable :: du_w(:,:,:)
+
+   real(r8), intent(inout), allocatable :: uc(:,:,:)
+   real(r8), intent(inout), allocatable :: vc(:,:,:)
 
 ! !DESCRIPTION:
 !
@@ -101,7 +124,7 @@
 ! LT 05.11.14 : Call map1_cubic_te for Cubic Interpolation of Total Energy
 ! WP 06.01.18 : Added calls to map1_ppm for horizontal mass fluxes
 ! LT 06.02.08 : Implement code for partial remapping option
-! WS 06.11.29 : Merge CAM/GEOS5; magic numbers isolated; te_method
+! WS 06.11.29 : Merge CAM/GEOS5; magic numbers isolated
 ! CC 07.01.29 : Additions for proper calculation of OMGA
 !
 !EOP
@@ -120,7 +143,6 @@
 
       integer :: im, jm, km            ! x, y, z dimensions
       integer :: nq                    ! number of tracers to be advected
-      integer :: ntotq                 ! Total number of tracers
       integer :: ifirst, ilast         ! starting & ending longitude index
       integer :: jfirst, jlast         ! starting & ending latitude index
       integer :: myidxy_y, iam
@@ -138,6 +160,8 @@
       real(r8), parameter :: psurf = 100001.0_r8
       real(r8), parameter :: bet   = D2_0*alf/(D1_0+alf)
 
+      real(r8), parameter :: lagrangianlevcrit = 1.0e-11_r8 ! Criteria for "Lagrangian levels are crossing" error
+
 ! Local arrays:
 ! -------------
       real(r8) rmin(nx*grid%jm), rmax(nx*grid%jm)
@@ -152,7 +176,6 @@
       real(r8)  pe1(grid%ifirstxy:grid%ilastxy,grid%km+1)
       real(r8)  pe2(grid%ifirstxy:grid%ilastxy,grid%km+1)
       real(r8)  pe3(grid%ifirstxy:grid%ilastxy,grid%km+1)
-      real(r8) phis(grid%ifirstxy:grid%ilastxy,grid%km+1)
       real(r8) u2_sp(grid%ifirstxy:grid%ilastxy,grid%km)
       real(r8) v2_sp(grid%ifirstxy:grid%ilastxy,grid%km)
       real(r8) t2_sp(grid%ifirstxy:grid%ilastxy,grid%km)
@@ -176,12 +199,14 @@
       ! variable for zonal momentum
       real(r8) :: dum(grid%ifirstxy:grid%ilastxy,grid%jfirstxy:grid%jlastxy)
 
+      real(r8) cap3vi(grid%ifirstxy:grid%ilastxy,grid%jfirstxy:grid%jlastxy,grid%km+1)   ! cappa interface
+
       integer i1w, nxu
       integer i, j, k, js2g0, jn2g0, jn1g1
       integer kord
       integer krd
 
-      real(r8) akap, dak, bkh, qmax, qmin
+      real(r8) dak, bkh, qmax, qmin
       real(r8) te_sp(grid%km), te_np(grid%km)
       real(r8) xysum(grid%jfirstxy:grid%jlastxy,2)
       real(r8) tmpik(grid%ifirstxy:grid%ilastxy,grid%km)
@@ -189,11 +214,8 @@
       real(r8) omga_ik(grid%ifirstxy:grid%ilastxy,grid%km)    ! vertical press. velocity (tmp 2-d array)
       real(r8) dtmp
       real(r8) sum
-      real(r8) rdt5
-      real(r8) rg
       real(r8) te1
       real(r8) dlnp
-      real(r8) tvm
 
       integer ixj, jp, it, i1, i2
 
@@ -207,11 +229,14 @@
       integer comm_use, npry_use, itot
 
       logical diag
-
+      logical :: high_alt
+      
       data diag    /.false./
 
       z1 = log(pa/psurf)
       z2 = log(pb/psurf)
+
+      high_alt = grid%high_alt
 
       im = grid%im
       jm = grid%jm
@@ -279,8 +304,8 @@
       endif
 #endif
       call pkez(nxu, im, km, jfirst, jlast, 1, km, ifirst, ilast,        &
-                pe, pk, akap, grid%ks, peln, pkz, .false.)
- 
+                pe, pk, cap3v, grid%ks, peln, pkz, .false., high_alt)
+
 ! Single subdomain case (periodic)
       do k=1,km
          do j=jfirst,jlast
@@ -306,6 +331,10 @@
                       ifirst, ilast, 1, km+1, jfirst, jlast,             &
                       ifirst, ilast, 1, km+1, jlast, jlast, pe )
 #endif
+
+       if (high_alt) then
+          call physconst_calc_kappav( ifirst,ilast,jfirst,jlast,1,km, grid%ntotq, tracer, cap3v, cpv=cp3v)
+       endif
 
 !$omp  parallel do        &
 !$omp  default(shared)    &
@@ -338,7 +367,7 @@
         do j=jfirst,jlast
            do i=ifirst,ilast
               ! convert to Cv*T
-              t2(i,j) = (cp-akap*cp)*pt(i,j,k)
+              t2(i,j) = (cp3v(i,j,k)-cap3v(i,j,k)*cp3v(i,j,k))*pt(i,j,k)
            enddo
         enddo
 
@@ -459,7 +488,7 @@
 !$omp  parallel do           &
 !$omp  default(shared)       &
 !$omp  private(i,j,k,i1w,pe0,pe1,pe2,pe3,log_pe1,log_pe2,ratio)   &
-!$omp  private(dak,bkh,rdt5,phis,krd, ixj,i1,i2) &
+!$omp  private(dak,bkh,krd, ixj,i1,i2) &
 !$omp  private(pe1w, pe2w, omga_ik )
 
 !     do 2000 j=jfirst,jlast
@@ -476,11 +505,11 @@
            do i=i1,i2
               pe1(i,k) = pe(i,k,j)
               if (k>1) then
-                if (pe1(i,k)-pe1(i,k-1)<1.0e-7_r8) then
-                  write(iulog,*) "Lagrangian levels are crossing"
+                if (pe1(i,k)-pe1(i,k-1)<lagrangianlevcrit) then
+                  write(iulog,*) "Lagrangian levels are crossing", lagrangianlevcrit
                   write(iulog,*) "Run will ABORT!"
                   write(iulog,*) "Suggest to increase NSPLTVRM"
-                  call endrun
+                  call endrun('te_map: Lagrangian levels are crossing')
                 endif
               endif
            enddo
@@ -549,7 +578,6 @@
 
 ! Compute omga (dp/dt)
 ! --------------------
-        rdt5 = D0_5 / real(mdt,r8)
         do k=2,km+1
            do i=i1,i2
               pe0(i,k) = pe1(i,k) - pe0(i,k)  ! Delta-P:  PLE(After CD_Core) minus PLE(Remapped based on old PS)
@@ -692,8 +720,9 @@
                           0,    0,   itot, i1-ifirst+1, i2-ifirst+1,      &
                           j,    jfirst, jlast,  -1,    kord)
 
-          ! compute zonal momentum difference due to remapping
           if (am_correction) then
+
+             ! compute zonal momentum difference due to remapping
              do k=1,km
                 do i=i1,i2
                    dum(i,j)=dum(i,j)+u(i,j,k)*(pe3(i,k+1)-pe3(i,k))
@@ -708,6 +737,23 @@
              enddo
           endif
 
+          if (am_diag_lbl) then 
+
+             ! Remap advective wind increment uc
+
+             call map1_ppm ( km,   pe0,   uc,    km,   pe3,   uc,            &
+                             0,    0,   itot, i1-ifirst+1, i2-ifirst+1,      &
+                             j,    jfirst, jlast,  -1,    kord)
+
+             do k=1,km
+                do i=i1,i2
+                   du_w(i,j,k)=du_s(k)
+                enddo
+             enddo
+             call map1_ppm ( km,   pe0,    du_w,    km,   pe3,    du_w, &
+                              0,    0,   itot, i1-ifirst+1, i2-ifirst+1,      &
+                              j,    jfirst, jlast,  -1,    kord)
+          endif
 
 ! ReMap Y-Mass Flux (C-Grid Location)
 ! -----------------------------------
@@ -752,6 +798,13 @@
           call map1_ppm ( km,   pe0,    v,    km,   pe3,    v,         &
                           0,    0,   itot, i1-ifirst+1, i2-ifirst+1,   &
                           j,    jfirst, jlast, -1, kord)
+
+
+          if (am_diag_lbl) then 
+             call map1_ppm ( km,   pe0,    vc,   km,   pe3,   vc,            &
+                             0,    0,   itot, i1-ifirst+1, i2-ifirst+1,      &
+                             j,    jfirst, jlast, -1, kord)
+          end if
 
 ! ReMap X-Mass Flux (C-Grid Location)
 ! -----------------------------------
@@ -798,6 +851,21 @@
        endif
 2000  continue
 
+       if (high_alt) then
+          call physconst_calc_kappav( ifirst,ilast,jfirst,jlast,1,km,grid%ntotq, tracer, cap3v, cpv=cp3v)
+          !$omp parallel do private(i,j,k)
+          do k=2,km
+             do j=jfirst,jlast
+                do i=ifirst,ilast
+                   cap3vi(i,j,k) = 0.5_r8*(cap3v(i,j,k-1)+cap3v(i,j,k))
+                enddo
+             enddo
+          enddo
+          cap3vi(:,:,1) = 1.5_r8 * cap3v(:,:,1) - 0.5_r8 * cap3v(:,:,2)
+          cap3vi(:,:,km+1) = 1.5_r8 * cap3v(:,:,km) - 0.5_r8 * cap3v(:,:,km-1)
+       else
+          cap3vi(:,:,:) =  cap3v(grid%ifirstxy,grid%jfirstxy,1)
+       endif
 
 #if defined( SPMD )
       deallocate( pesouth )
@@ -851,12 +919,12 @@
       do k=1,km+1
         do j=jfirst,jlast
           do i=ifirst,ilast
-            pk(i,j,k) = pe(i,k,j)**akap
+            pk(i,j,k) = pe(i,k,j)**cap3vi(i,j,k)
           enddo
         enddo
       enddo
       call pkez(nxu, im, km, jfirst, jlast, 1, km, ifirst, ilast,  &
-                pe, pk, akap, grid%ks, peln, pkz, .false.)
+                pe, pk, cap3v, grid%ks, peln, pkz, .false., high_alt)
 
 ! Single x-subdomain case (periodic)
       do k = 1, km
@@ -974,15 +1042,15 @@
 !$omp  private(j)
  
        do j=js2g0, jn2g0
-        tte(j) = cp*grid%cosp(j)*(xysum(j,1) - grid%ptop*real(im,r8) -           &
-                 akap*grid%ptop*(xysum(j,2) - peln(ifirst,1,j)*real(im,r8)) )
+        tte(j) = cp3v(ifirst,j,1)*grid%cosp(j)*(xysum(j,1) - grid%ptop*real(im,r8) -           &
+                 cap3v(ifirst,j,1)*grid%ptop*(xysum(j,2) - peln(ifirst,1,j)*real(im,r8)) )
 ! peln(i,1,j) should be independent of i (AAM)
        enddo
 
-       if ( jfirst == 1 ) tte(1) = grid%acap*cp * (ps(ifirst,1) - grid%ptop -    &
-                akap*grid%ptop*(peln(ifirst,km+1,1) - peln(ifirst,1,1) ) )
-       if ( jlast == jm ) tte(jm)= grid%acap*cp * (ps(ifirst,jm) - grid%ptop -   &
-                akap*grid%ptop*(peln(ifirst,km+1,jm) - peln(ifirst,1,jm) ) )
+       if ( jfirst == 1 ) tte(1) = grid%acap*cp3v(ifirst,1,km) * (ps(ifirst,1) - grid%ptop -    &
+                cap3v(ifirst,1,km)*grid%ptop*(peln(ifirst,km+1,1) - peln(ifirst,1,1) ) )
+       if ( jlast == jm ) tte(jm)= grid%acap*cp3v(ifirst,jm,km) * (ps(ifirst,jm) - grid%ptop -   &
+                cap3v(ifirst,jm,km)*grid%ptop*(peln(ifirst,km+1,jm) - peln(ifirst,1,jm) ) )
       endif ! consv
 
       if (consv) then
@@ -1129,3 +1197,4 @@
 !EOC
       end subroutine te_map
 !-----------------------------------------------------------------------
+end module te_map_mod

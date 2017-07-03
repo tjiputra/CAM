@@ -6,12 +6,10 @@ module nlte_lw
   use shr_kind_mod,       only: r8 => shr_kind_r8
   use spmd_utils,         only: masterproc
   use ppgrid,             only: pcols, pver
-  use pmgrid,             only: plon, plat, plev
-  use physconst,          only: cpair
+  use pmgrid,             only: plev
   use rad_constituents,   only: rad_cnst_get_gas, rad_cnst_get_info
   use nlte_fomichev,      only: nlte_fomichev_init, nlte_fomichev_calc, nocooling, o3pcooling
   use waccm_forcing,      only: waccm_forcing_init, waccm_forcing_adv,  get_cnst
-  use cam_abortutils,     only: endrun
   use cam_logfile,        only: iulog
 
   implicit none
@@ -61,7 +59,6 @@ contains
     use physconst,    only: mwco2
     use cam_history,  only: add_default, addfld
     use mo_waccm_hrates,  only: has_hrates
-    use physics_buffer, only : physics_buffer_desc
     use phys_control, only: phys_getopts
 
     real(r8),         intent(in) :: pref_mid(plev)
@@ -171,7 +168,7 @@ contains
     end if
 
 ! add to masterfield list
-    call addfld ('QRLNLTE',(/ 'lev' /), 'A','K/s','Non-LTE LW heating (includes QNO)')
+    call addfld ('QRLNLTE',(/ 'lev' /), 'A','K/s','Non-LTE LW heating (includes QNO and QO3P)')
     call addfld ('QNO',    (/ 'lev' /), 'A','K/s','NO cooling')
     call addfld ('QCO2',   (/ 'lev' /), 'A','K/s','CO2 cooling')
     call addfld ('QO3',    (/ 'lev' /), 'A','K/s','O3 cooling')
@@ -255,7 +252,7 @@ contains
     real(r8), target :: o3mrg(pcols,pver)    ! merged O3
     real(r8), pointer, dimension(:,:) :: to3mmr  ! O3 mmr   (tgcm)
 
-    integer :: i, k
+    integer :: k
 
 !------------------------------------------------------------------------
 
@@ -265,7 +262,7 @@ contains
 ! Get radiatively active ozone
     call rad_cnst_get_gas(0, 'O3', state, pbuf,  xo3mmr)
     if (use_data_o3) then
-       call get_cnst (ncol, lchnk, o3=to3mmr)
+       call get_cnst (lchnk, o3=to3mmr)
        call merge_o3 (ncol, xo3mmr, to3mmr, o3mrg)
        qout(:ncol,:) = o3mrg(:ncol,:)*mwdry/o3_mw
        call outfld ('O3MRG', qout, pcols,lchnk)
@@ -283,7 +280,7 @@ contains
 
     else
 
-       call get_cnst (ncol, lchnk, co2=xco2mmr, o1=xommr, o2=xo2mmr, no=xnommr, h=xhmmr)
+       call get_cnst (lchnk, co2=xco2mmr, o1=xommr, o2=xo2mmr, no=xnommr, h=xhmmr)
 
     endif
     
@@ -300,7 +297,7 @@ contains
     call nocooling (ncol, state%t, state%pmid, xnommr,xommr,xo2mmr,xo3mmr,xn2mmr,nocool)
 
 ! do O3P cooling 
-    call o3pcooling (lchnk, ncol, state%t, xommr, o3pcool)
+    call o3pcooling (ncol, state%t, xommr, o3pcool)
 
     do k = 1,pver
        qrlf(:ncol,k) = qrlf(:ncol,k) + nocool(:ncol,k) + o3pcool(:ncol,k)

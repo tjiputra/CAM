@@ -28,7 +28,8 @@ use eul_control_mod, only: dif2, hdif_order, kmnhdn, hdif_coef, divdampn, eps, &
                            kmxhdc, eul_nsplit
 
 use scamMod,         only: single_column, use_camiop, have_u, have_v, &
-                           have_cldliq, have_cldice, loniop, latiop, scmlat, scmlon
+                           have_cldliq, have_cldice, loniop, latiop, scmlat, scmlon, &
+                           qobs,tobs,scm_cambfb_mode
 
 use cam_pio_utils,   only: clean_iodesc_list
 use pio,             only: file_desc_t, pio_noerr, pio_inq_varid, pio_get_att, &
@@ -306,26 +307,32 @@ subroutine dyn_init(dyn_in, dyn_out)
    end if
 
    if ( history_budget ) then
-      call cnst_get_ind('CLDLIQ', ixcldliq)
-      call cnst_get_ind('CLDICE', ixcldice)
+      if (.not.adiabatic) then
+         call cnst_get_ind('CLDLIQ', ixcldliq)
+         call cnst_get_ind('CLDICE', ixcldice)
+      end if
       ! The following variables are not defined for single column
       if (.not. single_column) then 
          call add_default(hadvnam(       1), history_budget_histfile_num, ' ')
-         call add_default(hadvnam(ixcldliq), history_budget_histfile_num, ' ')
-         call add_default(hadvnam(ixcldice), history_budget_histfile_num, ' ')
          call add_default(vadvnam(       1), history_budget_histfile_num, ' ')
-         call add_default(vadvnam(ixcldliq), history_budget_histfile_num, ' ')
-         call add_default(vadvnam(ixcldice), history_budget_histfile_num, ' ')
+         if (.not.adiabatic) then
+            call add_default(hadvnam(ixcldliq), history_budget_histfile_num, ' ')
+            call add_default(hadvnam(ixcldice), history_budget_histfile_num, ' ')
+            call add_default(vadvnam(ixcldliq), history_budget_histfile_num, ' ')
+            call add_default(vadvnam(ixcldice), history_budget_histfile_num, ' ')
+         end if
       end if
       call add_default(fixcnam(       1), history_budget_histfile_num, ' ')
-      call add_default(fixcnam(ixcldliq), history_budget_histfile_num, ' ')
-      call add_default(fixcnam(ixcldice), history_budget_histfile_num, ' ')
       call add_default(tottnam(       1), history_budget_histfile_num, ' ')
-      call add_default(tottnam(ixcldliq), history_budget_histfile_num, ' ')
-      call add_default(tottnam(ixcldice), history_budget_histfile_num, ' ')
       call add_default(tendnam(       1), history_budget_histfile_num, ' ')
-      call add_default(tendnam(ixcldliq), history_budget_histfile_num, ' ')
-      call add_default(tendnam(ixcldice), history_budget_histfile_num, ' ')
+      if (.not.adiabatic) then
+         call add_default(fixcnam(ixcldliq), history_budget_histfile_num, ' ')
+         call add_default(fixcnam(ixcldice), history_budget_histfile_num, ' ')
+         call add_default(tottnam(ixcldliq), history_budget_histfile_num, ' ')
+         call add_default(tottnam(ixcldice), history_budget_histfile_num, ' ')
+         call add_default(tendnam(ixcldliq), history_budget_histfile_num, ' ')
+         call add_default(tendnam(ixcldice), history_budget_histfile_num, ' ')
+      end if
       call add_default('TTEND',           history_budget_histfile_num, ' ')
       call add_default('TFIX',            history_budget_histfile_num, ' ')
       call add_default('KTOOP',           history_budget_histfile_num, ' ')
@@ -512,7 +519,7 @@ subroutine read_inidat()
    deallocate ( phis_tmp )
 
    if (single_column) then
-      if ( use_camiop ) then
+      if ( scm_cambfb_mode ) then
 
          fieldname = 'CLAT1'
          call infld(fieldname, fh_ini, 'lon', 'lat', 1, pcols, begchunk, endchunk, &
@@ -554,7 +561,6 @@ subroutine read_inidat()
          ierr = pio_get_var(fh_ini,varid,strt,cnt,tmp2d)
          loniop(:)=tmp2d(:,1)
          deallocate(tmp2d)
-
       else
 
          ! Using a standard iop - make the default grid size is
@@ -566,23 +572,11 @@ subroutine read_inidat()
          loniop(1)=(mod(scmlon-2.0_r8+360.0_r8,360.0_r8))*pi/180.0_r8
          loniop(2)=(mod(scmlon+2.0_r8+360.0_r8,360.0_r8))*pi/180.0_r8
          call setiopupdate()
-         call readiopdata()
-         ps(:,:,1)     = ps(:,:,n3)
-         if (have_u) u3(:,:,:,1)   = u3(:,:,:,n3)
-         if (have_v) v3(:,:,:,1)   = v3(:,:,:,n3)
-         t3(:,:,:,1)   = t3(:,:,:,n3)
-         q3(:,:,1,:,1) = q3(:,:,1,:,n3)
-         if (have_cldliq) then 
-            call cnst_get_ind('CLDLIQ', ixcldliq)
-            q3(:,:,ixcldliq,:,1) = q3(:,:,ixcldliq,:,n3)
-         end if
-         if (have_cldice) then
-            call cnst_get_ind('CLDICE', ixcldice)
-            q3(:,:,ixcldice,:,1) = q3(:,:,ixcldice,:,n3)
-         end if
-         vort(:,:,:,1) = vort(:,:,:,n3)
-         div(:,:,:,1)  = div(:,:,:,n3)
-
+         ! readiopdata will set all n1 level prognostics to iop value timestep 0
+         call readiopdata(timelevel=1)
+         ! set t3, and q3(n1) values from iop on timestep 0
+         t3(1,:,1,1) = tobs
+         q3(1,:,1,1,1) = qobs
       end if
    end if
 
@@ -607,6 +601,7 @@ subroutine process_inidat(fieldname, m_cnst, fh)
    use commap
    use comspe
    use spetru
+   use dyn_grid,            only: get_horiz_grid_dim_d
    use const_init,          only: cnst_init_default
 
 #if ( defined SPMD )
@@ -621,6 +616,8 @@ subroutine process_inidat(fieldname, m_cnst, fh)
    !---------------------------Local workspace-----------------------------
 
    integer i,j,k,n,lat,irow               ! grid and constituent indices
+   integer :: nglon, nglat, rndm_seed_sz  ! For pertlim
+   integer, allocatable :: rndm_seed(:)   ! For pertlim
    real(r8) pertval                       ! perturbation value
    integer  varid                         ! netCDF variable id
    integer  ret
@@ -706,15 +703,24 @@ subroutine process_inidat(fieldname, m_cnst, fh)
       if (pertlim .ne. 0.0_r8) then
          if (masterproc) write(iulog,*) sub//': INFO: Adding random perturbation bounded by +/-', &
             pertlim,' to initial temperature field'
+
+         call get_horiz_grid_dim_d(nglon, nglat)
+         call random_seed(size=rndm_seed_sz)
+         allocate(rndm_seed(rndm_seed_sz))
+
          do lat = 1, plat
-            do k = 1, plev
-               do i = 1, plon
+            do i = 1, plon
+               ! seed random_number generator based on global column index
+               rndm_seed = i + (lat-1)*nglon
+               call random_seed(put=rndm_seed)
+               do k = 1, plev
                   call random_number (pertval)
                   pertval = 2._r8*pertlim*(0.5_r8 - pertval)
                   t3_tmp(i,k,lat) = t3_tmp(i,k,lat)*(1._r8 + pertval)
                end do
             end do
          end do
+         deallocate(rndm_seed)
       end if
 
       ! Spectral truncation

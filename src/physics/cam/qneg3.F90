@@ -65,10 +65,8 @@ subroutine qneg3 (subnam  ,idx     ,ncol    ,ncold   ,lver    ,lconst_beg  , &
 ! Test all field values for being less than minimum value. Set q = qmin
 ! for all such points. Trace offenders and identify worst one.
 !
-!DIR$ preferstream
       do k=1,lver
          nval(k) = 0
-!DIR$ prefervector
          nn = 0
          do i=1,ncol
             if (q(i,k,m) < qmin(m)) then
@@ -84,7 +82,6 @@ subroutine qneg3 (subnam  ,idx     ,ncol    ,ncold   ,lver    ,lconst_beg  , &
             found = .true.
             nvals = nvals + nval(k)
             iwtmp = -1
-!cdir nodep,altcode=loopcnt
             do ii=1,nval(k)
                i = indx(ii,k)
                if (q(i,k,m) < worst) then
@@ -94,7 +91,6 @@ subroutine qneg3 (subnam  ,idx     ,ncol    ,ncold   ,lver    ,lconst_beg  , &
             end do
             if (iwtmp /= -1 ) kw = k
             if (iwtmp /= -1 ) iw = indx(iwtmp,k)
-!cdir nodep,altcode=loopcnt
             do ii=1,nval(k)
                i = indx(ii,k)
                q(i,k,m) = qmin(m)

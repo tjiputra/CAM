@@ -90,7 +90,7 @@ subroutine nucleati(  &
    so4_num, dst_num, soot_num, subgrid, &
    nuci, onihf, oniimm, onidep, onimey, &
    wpice, weff, fhom, regm, &
-   oso4_num, odst_num, osoot_num)
+   oso4_num, odst_num, osoot_num, call_frm_zm_in)
 
    ! Input Arguments
    real(r8), intent(in) :: wbar        ! grid cell mean vertical velocity (m/s)
@@ -121,6 +121,9 @@ subroutine nucleati(  &
    real(r8), intent(out) :: odst_num   ! total dust aerosol number (#/cm^3)
    real(r8), intent(out) :: osoot_num  ! soot (hydrophilic) aerosol number (#/cm^3)
 
+   ! Optional Arguments
+   logical,  intent(in), optional :: call_frm_zm_in ! true if called from ZM convection scheme
+
    ! Local workspace
    real(r8) :: nihf                      ! nucleated number from homogeneous freezing of so4
    real(r8) :: niimm                     ! nucleated number from immersion freezing
@@ -139,6 +142,8 @@ subroutine nucleati(  &
    real(r8) :: wpicehet   ! diagnosed Vertical velocity Reduction caused by preexisting ice (m/s), at shet
 
    real(r8) :: weffhet    ! effective Vertical velocity for ice nucleation (m/s)  weff=wbar-wpicehet 
+
+   logical  :: call_frm_zm
    !-------------------------------------------------------------------------------
 
    RHimean = relhum*svp_water(tair)/svp_ice(tair)*subgrid
@@ -151,7 +156,13 @@ subroutine nucleati(  &
    ! entire gridbox.
    fhom = 1._r8
 
-   if (use_preexisting_ice) then
+   if (present(call_frm_zm_in)) then
+     call_frm_zm = call_frm_zm_in
+   else
+     call_frm_zm = .false.
+   end if
+
+   if (use_preexisting_ice .and. (.not. call_frm_zm)) then
 
       Ni_preice = ni_in*rhoair                    ! (convert from #/kg -> #/m3)
       Ni_preice = Ni_preice / max(mincld,cldn)   ! in-cloud ice number density 
@@ -317,7 +328,7 @@ subroutine nucleati(  &
             ni = n1
 
             ! If using prexsiting ice, then add it to the total.
-            if (use_preexisting_ice) then
+            if (use_preexisting_ice .and. (.not. call_frm_zm)) then
               ni = ni + Ni_preice * 1e-6_r8
             end if
          end if

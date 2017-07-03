@@ -12,7 +12,7 @@ module module_ecpp_ppdriver2
 
         use shr_kind_mod, only: r8=>shr_kind_r8
         use ppgrid,       only: pcols, pver, pverp 
-        use constituents, only: pcnst, cnst_name
+        use constituents, only: pcnst, cnst_name, cnst_species_class, cnst_spec_class_aerosol, cnst_spec_class_gas
         use crmclouds_camaerosols, only: ecpp_mixnuc_tend => crmclouds_mixnuc_tend
         use cam_abortutils,   only: endrun
 
@@ -69,11 +69,9 @@ end type ptr2d_t
 !   set pp options (should this be done from driver?)
 !
 
-        num_moist_ecpp = 5
-        num_moist = 5
         num_chem_ecpp = 2* pcnst 
         num_chem = num_chem_ecpp
-        param_first_ecpp = num_moist+1   ! the first index for non-water species
+        param_first_ecpp = 1   ! set to 1 as this can change
         p_qv = 1
         p_qc = 2
        
@@ -206,6 +204,8 @@ end type ptr2d_t
 
 ! add fields into history file
         do ichem=param_first_ecpp, pcnst
+         if ((cnst_species_class(ichem) == cnst_spec_class_aerosol) .or. &
+             (cnst_species_class(ichem) == cnst_spec_class_gas    )) then
            if(trim(cnst_name(ichem))//'EP' == 'EP') then
               write(0, *) ichem, trim(cnst_name(ichem))//'EP'
               call endrun('ecpp init1')
@@ -281,6 +281,7 @@ end type ptr2d_t
                   trim(cnst_name(ichem))//' column-integrated tendency from resupspension in wet removable in ECPP (downdraft)' )
            call addfld(trim(cnst_name(ichem))//'SFCONDN_EP', horiz_only, 'A', 'kg/m2/s', &
                   trim(cnst_name(ichem))//' column-integrated tendency from convective transport in ECPP (downdraft)' )
+          endif 
 
         end do
         do ichem=param_first_ecpp, pcnst
@@ -401,16 +402,17 @@ end type ptr2d_t
             call add_default(trim(cnst_name_cw(ichem))//'SFWETDN_EP', 1, ' ')
             call add_default(trim(cnst_name_cw(ichem))//'SFRESDN_EP', 1, ' ')
             call add_default(trim(cnst_name_cw(ichem))//'SFCONDN_EP', 1, ' ')
-
           end if
 
-          call add_default(trim(cnst_name(ichem))//'SFEP', 1, ' ')
-          call add_default(trim(cnst_name(ichem))//'SFACHEM_EP', 1, ' ')
-          call add_default(trim(cnst_name(ichem))//'SFRENM_EP', 1, ' ')
-          call add_default(trim(cnst_name(ichem))//'SFACT_EP', 1, ' ')
-          call add_default(trim(cnst_name(ichem))//'SFWET_EP', 1, ' ')
-          call add_default(trim(cnst_name(ichem))//'SFWRESU_EP', 1, ' ')
-          call add_default(trim(cnst_name(ichem))//'SFCONV_EP', 1, ' ')
+         if ((cnst_species_class(ichem) == cnst_spec_class_aerosol) .or. &
+             (cnst_species_class(ichem) == cnst_spec_class_gas    )) then
+            call add_default(trim(cnst_name(ichem))//'SFEP', 1, ' ')
+            call add_default(trim(cnst_name(ichem))//'SFACHEM_EP', 1, ' ')
+            call add_default(trim(cnst_name(ichem))//'SFRENM_EP', 1, ' ')
+            call add_default(trim(cnst_name(ichem))//'SFACT_EP', 1, ' ')
+            call add_default(trim(cnst_name(ichem))//'SFWET_EP', 1, ' ')
+            call add_default(trim(cnst_name(ichem))//'SFWRESU_EP', 1, ' ')
+            call add_default(trim(cnst_name(ichem))//'SFCONV_EP', 1, ' ')
 
             call add_default(trim(cnst_name(ichem))//'SFACHQU_EP', 1, ' ')
             call add_default(trim(cnst_name(ichem))//'SFREMQU_EP', 1, ' ')
@@ -432,6 +434,7 @@ end type ptr2d_t
             call add_default(trim(cnst_name(ichem))//'SFWETDN_EP', 1, ' ')
             call add_default(trim(cnst_name(ichem))//'SFRESDN_EP', 1, ' ')
             call add_default(trim(cnst_name(ichem))//'SFCONDN_EP', 1, ' ')
+         end if
 
         end do
 
@@ -439,14 +442,6 @@ end type ptr2d_t
         do ichem=param_first_ecpp, pcnst
          if(trim(cnst_name(ichem)) == 'DMS' .or. trim(cnst_name(ichem)) == 'SO2' .or. &
             trim(cnst_name(ichem)) == 'so4_a1') then
-          if(.not. (cnst_name_cw(ichem) == ' ')) then
-            call add_default(trim(cnst_name_cw(ichem))//'EP', 1, ' ')
-            call add_default(trim(cnst_name_cw(ichem))//'ACHEM_EP', 1, ' ')
-            call add_default(trim(cnst_name_cw(ichem))//'RENM_EP', 1, ' ')
-            call add_default(trim(cnst_name_cw(ichem))//'ACT_EP', 1, ' ')
-            call add_default(trim(cnst_name_cw(ichem))//'WET_EP', 1, ' ')
-            call add_default(trim(cnst_name_cw(ichem))//'CONV_EP', 1, ' ')
-          end if
           call add_default(trim(cnst_name(ichem))//'EP', 1, ' ')
           call add_default(trim(cnst_name(ichem))//'ACHEM_EP', 1, ' ')
           call add_default(trim(cnst_name(ichem))//'RENM_EP', 1, ' ')
@@ -755,7 +750,13 @@ end type ptr2d_t
         ncol = state%ncol
         lchnk = state%lchnk
 
-        lq(:) = .true.
+        lq(:) = .false.
+        do ichem=param_first_ecpp, pcnst
+          if ((cnst_species_class(ichem) == cnst_spec_class_aerosol) .or. &
+             (cnst_species_class(ichem) == cnst_spec_class_gas    )) then
+             lq(ichem)=.true.
+          end if
+        end do
         call physics_ptend_init(ptend, state%psetcols,'ecpp',lq=lq)
         ptend%q(:,:,:) = 0.0_r8
 
@@ -1212,7 +1213,9 @@ end type ptr2d_t
             do k=1, pver
                lk=pver-k+1 
                do ichem=param_first_ecpp, pcnst 
-                  ptend%q(i,k,ichem)= (chem_bar(lk, ichem)-state%q(i,k,ichem))/dtstep
+                  if (ptend%lq(ichem)) then
+                    ptend%q(i,k,ichem)= (chem_bar(lk, ichem)-state%q(i,k,ichem))/dtstep
+                  end if
 !                  ptend_qqcw(i,k,ichem)=(chem_bar(lk, ichem+pcnst)-qqcw(i,k,ichem))/dtstep
 !                  qqcw(i,k,ichem) = chem_bar(lk, ichem+pcnst)
                   if(associated(qqcw(ichem)%fldcw)) then
@@ -1316,6 +1319,8 @@ end type ptr2d_t
         end do
 
         do ichem=param_first_ecpp, pcnst 
+         if ((cnst_species_class(ichem) == cnst_spec_class_aerosol) .or. &
+             (cnst_species_class(ichem) == cnst_spec_class_gas    )) then
            call outfld(trim(cnst_name(ichem))//'EP', ptend%q(:,:,ichem), pcols, lchnk)
            call outfld(trim(cnst_name(ichem))//'ACHEM_EP', ptend_cldchem(:,:,ichem), pcols, lchnk)
            call outfld(trim(cnst_name(ichem))//'RENM_EP', ptend_rename(:,:,ichem), pcols, lchnk)
@@ -1355,8 +1360,7 @@ end type ptr2d_t
            call outfld(trim(cnst_name(ichem))//'SFCONQU_EP', ptend_conv_cls_col(:,1, ichem), pcols, lchnk)
            call outfld(trim(cnst_name(ichem))//'SFCONUP_EP', ptend_conv_cls_col(:,2, ichem), pcols, lchnk)
            call outfld(trim(cnst_name(ichem))//'SFCONDN_EP', ptend_conv_cls_col(:,3, ichem), pcols, lchnk)
-
-
+         end if
         end do 
 
         do ichem=param_first_ecpp, pcnst 

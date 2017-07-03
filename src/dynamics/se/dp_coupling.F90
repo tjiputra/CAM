@@ -283,6 +283,10 @@ CONTAINS
              phys_state(lchnk)%omega(icol,ilyr)=phys_state(lchnk)%omega(icol,ilyr)*phys_state(lchnk)%pmid(icol,ilyr)
           end do
        end do
+
+       if (pcols > ncols) then
+         phys_state(lchnk)%phis(ncols+1:) = 0.0_r8
+       end if
     end do
 
 

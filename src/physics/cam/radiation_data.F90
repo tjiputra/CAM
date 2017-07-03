@@ -28,6 +28,7 @@ module radiation_data
   public :: rad_data_read
   public :: rad_data_enable
 
+  integer :: volcgeom_ifld, volcgeom1_ifld, volcgeom2_ifld, volcgeom3_ifld
   integer :: cld_ifld,rel_ifld,rei_ifld
   integer :: dei_ifld,mu_ifld,lambdac_ifld,iciwp_ifld,iclwp_ifld
   integer :: des_ifld,icswp_ifld,cldfsnow_ifld
@@ -77,7 +78,11 @@ module radiation_data
        iclwp_fldn     = 'rad_iclwp       ' , &
        icswp_fldn     = 'rad_icswp       ' , &
        qrs_fldn       = 'rad_qrs         ' , &
-       qrl_fldn       = 'rad_qrl         ' 
+       qrl_fldn       = 'rad_qrl         ' , &
+       volcgeom_fldn  = 'rad_volc_geom   ' , &
+       volcgeom1_fldn = 'rad_volc_geom1  ' , &
+       volcgeom2_fldn = 'rad_volc_geom2  ' , &
+       volcgeom3_fldn = 'rad_volc_geom3  '
 
   ! for modal aerosols
   character(len=fieldname_len), allocatable :: dgnumwet_fldn(:)
@@ -108,6 +113,7 @@ module radiation_data
   integer :: tropp_idx = -1
 
   logical :: enabled = .false.
+  logical :: gmean_3modes = .false.
 
 contains
 
@@ -191,7 +197,7 @@ contains
     type(physics_buffer_desc), pointer :: pbuf2d(:,:)
 
     ! local vars
-    integer :: i
+    integer :: i, err
     integer :: m,l, nspec
     character(len=64) :: name
     character(len=32) :: aername =  ' '
@@ -204,6 +210,22 @@ contains
 
     call phys_getopts(microp_scheme_out=microp_scheme, radiation_scheme_out=rad_scheme)
     mg_microphys =  (trim(microp_scheme) == 'MG')
+
+    volcgeom_ifld = pbuf_get_index('VOLC_RAD_GEOM',errcode=err) ! might need 3 more for 3-mode inputs
+    volcgeom1_ifld = pbuf_get_index('VOLC_RAD_GEOM1',errcode=err) ! might need 3 more for 3-mode inputs
+    volcgeom2_ifld = pbuf_get_index('VOLC_RAD_GEOM2',errcode=err) ! might need 3 more for 3-mode inputs
+    volcgeom3_ifld = pbuf_get_index('VOLC_RAD_GEOM3',errcode=err) ! might need 3 more for 3-mode inputs
+
+    gmean_3modes = volcgeom1_ifld > 0 .and. volcgeom2_ifld > 0 .and. volcgeom3_ifld > 0 .and. volcgeom_ifld < 1
+
+    if (volcgeom_ifld > 0) then
+       call addfld(volcgeom_fldn, (/ 'lev' /), 'I','m', 'combined volcanic aerosol geometric-mode radius' )
+    endif
+    if (gmean_3modes) then
+       call addfld(volcgeom1_fldn, (/ 'lev' /), 'I','m', 'mode 1 volcanic aerosol geometric-mode radius' )
+       call addfld(volcgeom2_fldn, (/ 'lev' /), 'I','m', 'mode 2 volcanic aerosol geometric-mode radius' )
+       call addfld(volcgeom3_fldn, (/ 'lev' /), 'I','m', 'mode 3 volcanic aerosol geometric-mode radius' )
+    endif
 
     cld_ifld    = pbuf_get_index('CLD')
     rel_ifld    = pbuf_get_index('REL')
@@ -411,7 +433,17 @@ contains
        call add_default (nmxrgn_fldn,    rad_data_histfile_num, ' ')
        call add_default (pmxrgn_fldn,    rad_data_histfile_num, ' ')
     endif
-    
+
+    ! stratospheric aersols geometric mean radius
+    if (volcgeom_ifld > 0) then
+       call add_default (volcgeom_fldn, rad_data_histfile_num, ' ')
+    endif
+    if (gmean_3modes) then
+       call add_default (volcgeom1_fldn, rad_data_histfile_num, ' ')
+       call add_default (volcgeom2_fldn, rad_data_histfile_num, ' ')
+       call add_default (volcgeom3_fldn, rad_data_histfile_num, ' ')
+    endif
+
     ! rad constituents
 
     long_name_description = ' mass mixing ratio used in rad climate calculation'
@@ -685,6 +717,20 @@ contains
        enddo
     endif
 
+    ! stratospheric aersols geometric mean radius
+    if (volcgeom_ifld > 0) then
+       call pbuf_get_field(pbuf, volcgeom_ifld, ptr)
+       call outfld(volcgeom_fldn, ptr, pcols, lchnk)
+    endif
+    if (gmean_3modes) then
+       call pbuf_get_field(pbuf, volcgeom1_ifld, ptr)
+       call outfld(volcgeom1_fldn, ptr, pcols, lchnk)
+       call pbuf_get_field(pbuf, volcgeom2_ifld, ptr)
+       call outfld(volcgeom2_fldn, ptr, pcols, lchnk)
+       call pbuf_get_field(pbuf, volcgeom3_ifld, ptr)
+       call outfld(volcgeom3_fldn, ptr, pcols, lchnk)
+    endif
+
   end subroutine rad_data_write
 
 !=================================================================================
@@ -755,6 +801,11 @@ contains
 
     type(drv_input_2d_t) :: lwup_ptrs(begchunk:endchunk)
     type(drv_input_2d_t) :: ts_ptrs(begchunk:endchunk)
+
+    type(drv_input_3d_t) :: volcgeom_ptrs(begchunk:endchunk)
+    type(drv_input_3d_t) :: volcgeom1_ptrs(begchunk:endchunk)
+    type(drv_input_3d_t) :: volcgeom2_ptrs(begchunk:endchunk)
+    type(drv_input_3d_t) :: volcgeom3_ptrs(begchunk:endchunk)
 
     integer :: i, k, c, ncol, itim
 
@@ -838,6 +889,16 @@ contains
           call pbuf_get_field(pbuf, qaerwat_ifld, qaerwat_ptrs(c)%array )
        endif
 
+       ! stratospheric aersols geometric mean radius
+       if (volcgeom_ifld > 0) then
+          call pbuf_get_field(pbuf, volcgeom_ifld, volcgeom_ptrs(c)%array )
+       endif
+       if (gmean_3modes) then
+          call pbuf_get_field(pbuf, volcgeom1_ifld, volcgeom1_ptrs(c)%array )
+          call pbuf_get_field(pbuf, volcgeom2_ifld, volcgeom2_ptrs(c)%array )
+          call pbuf_get_field(pbuf, volcgeom3_ifld, volcgeom3_ptrs(c)%array )
+       endif
+
     enddo
 
     
@@ -882,6 +943,16 @@ contains
        call drv_input_data_get( indata, cldtau_fldn, 'lev', pver, recno, cldtau_ptrs )
        call drv_input_data_get( indata, cicewp_fldn, 'lev', pver, recno, cicewp_ptrs )
        call drv_input_data_get( indata, cliqwp_fldn, 'lev', pver, recno, cliqwp_ptrs )
+    endif
+
+    ! stratospheric aersols geometric mean radius
+    if (volcgeom_ifld > 0) then
+       call drv_input_data_get( indata, volcgeom_fldn, 'lev', pver, recno, volcgeom_ptrs )
+    endif
+    if (gmean_3modes) then
+       call drv_input_data_get( indata, volcgeom1_fldn, 'lev', pver, recno, volcgeom1_ptrs )
+       call drv_input_data_get( indata, volcgeom2_fldn, 'lev', pver, recno, volcgeom2_ptrs )
+       call drv_input_data_get( indata, volcgeom3_fldn, 'lev', pver, recno, volcgeom3_ptrs )
     endif
 
     call drv_input_data_get( indata, watvap_fldn, 'lev', pver, recno, watvap_ptrs )

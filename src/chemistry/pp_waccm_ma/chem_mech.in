@@ -6,6 +6,7 @@
  CH4, CH3O2, CH3OOH, CH2O, CO
  H2, H, OH, HO2, H2O2
  CLY, BRY
+ SF6
  CL -> Cl, CL2 -> Cl2, CLO -> ClO, OCLO -> OClO, CL2O2 -> Cl2O2
  HCL -> HCl, HOCL -> HOCl, CLONO2 -> ClONO2, BRCL -> BrCl
  BR -> Br, BRO -> BrO, HBR -> HBr, HOBR -> HOBr, BRONO2 -> BrONO2
@@ -43,7 +44,7 @@
        CH4, N2O, CH3CL, CH3BR, CFC11, CFC12, CFC113
        CFC114, CFC115, HCFC22, HCFC141B, HCFC142B, CCL4
        CH3CCL3, CF3BR, CF2CLBR, H1202, H2402, CHBR3, CH2BR2
-       CO2, CLY, BRY
+       CO2, CLY, BRY, SF6
       End explicit
       Implicit
        O3, O, O1D, O2, O2_1S, O2_1D, H2, CO
@@ -118,6 +119,7 @@
  [jco2]                  CO2 + hv -> CO + O
  [jch4_a]                CH4 + hv -> H + CH3O2
  [jch4_b]                CH4 + hv -> 1.44*H2 + 0.18*CH2O + 0.18*O + 0.33*OH + 0.33*H + 0.44*CO2 + 0.38*CO + 0.05*H2O 
+ [jsf6]                  SF6 + hv -> sink
 
 *------------------------------------------------------------------------------
 *   photo-ionization

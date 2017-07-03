@@ -383,7 +383,7 @@ subroutine spmd_readnl(nlfilename)
       call endrun(sub//': ERROR: mpi_comm_split_yz failed')
    end if
    call mpi_comm_size(mpicom_yz, ntemp, ierror)
-   if (ntemp .ne. npes_yz) then
+   if (iam .lt. npes_yz .and. ntemp .ne. npes_yz) then
       write(iulog,*) sub//': ERROR: mpicom_yz has incorrect size of ', ntemp
       call endrun(sub//': ERROR: mpicom_yz has incorrect size')
    end if
@@ -414,7 +414,7 @@ subroutine spmd_readnl(nlfilename)
       call endrun(sub//': ERROR: mpi_comm_split_xy failed')
    endif
    call mpi_comm_size(mpicom_xy, ntemp, ierror)
-   if (ntemp .ne. npes_xy) then
+   if (iam .lt. npes_xy .and. ntemp .ne. npes_xy) then
       write(iulog,*) sub//': ERROR: mpicom_xy has incorrect size of ', ntemp
       call endrun(sub//': ERROR: mpicom_xy has incorrect size')
    endif

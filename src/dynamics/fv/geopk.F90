@@ -33,7 +33,7 @@
 !-----------------------------------------------------------------------
 !
 ! !INTERFACE:
-      subroutine geopk(grid, pe, delp, pk, wz, hs, pt, cp, akap, nx)
+      subroutine geopk(grid, pe, delp, pk, wz, hs, pt, cp3v, cap3v, nx)
 
       use shr_kind_mod, only: r8 => shr_kind_r8
       use dynamics_vars, only: T_FVDYCORE_GRID
@@ -44,7 +44,8 @@
 
       type (T_FVDYCORE_GRID), intent(in) :: grid
       integer nx                        ! # of pieces in longitude direction
-      real(r8)    akap, cp
+      real(r8)    cp3v(grid%ifirstxy:grid%ilastxy,grid%jfirstxy:grid%jlastxy,grid%km)
+      real(r8)    cap3v(grid%ifirstxy:grid%ilastxy,grid%jfirstxy:grid%jlastxy,grid%km)
       real(r8)    hs(grid%ifirstxy:grid%ilastxy,grid%jfirstxy:grid%jlastxy)
       real(r8)    pt(grid%ifirstxy:grid%ilastxy,grid%jfirstxy:grid%jlastxy,grid%km)
       real(r8)  delp(grid%ifirstxy:grid%ilastxy,grid%jfirstxy:grid%jlastxy,grid%km)
@@ -81,6 +82,11 @@
       integer i, j, k
       integer ixj, jp, it, i1, i2, nxu, itot
       real(r8) delpp(grid%ifirstxy:grid%ilastxy,grid%jfirstxy:grid%jlastxy,grid%km)
+      real(r8) cap3vi(grid%ifirstxy:grid%ilastxy,grid%jfirstxy:grid%jlastxy,grid%km+1)
+      real(r8) peln(grid%ifirstxy:grid%ilastxy,grid%km+1,grid%jfirstxy:grid%jlastxy)
+
+      logical :: high_alt
+      high_alt = grid%high_alt
 
       ptop = grid%ptop
       im = grid%im
@@ -96,6 +102,21 @@
       nxu = 1
       it = itot / nxu
       jp = nxu * ( jlast - jfirst + 1 )
+
+      if (grid%high_alt) then
+!$omp parallel do private(i,j,k)
+         do k=2,km
+            do j=grid%jfirstxy,grid%jlastxy
+               do i=grid%ifirstxy,grid%ilastxy
+                  cap3vi(i,j,k) = 0.5_r8*(cap3v(i,j,k-1)+cap3v(i,j,k))
+               enddo
+            enddo
+         enddo
+         cap3vi(:,:,1) = 1.5_r8 * cap3v(:,:,1) - 0.5_r8 * cap3v(:,:,2)
+         cap3vi(:,:,km+1) = 1.5_r8 * cap3v(:,:,km) - 0.5_r8 * cap3v(:,:,km-1)
+      else
+         cap3vi(:,:,:) =  cap3v(grid%ifirstxy,grid%jfirstxy,1)
+      endif
 
 !$omp  parallel do      &
 !$omp  default(shared)  &
@@ -122,16 +143,26 @@
          do k=1,km+1
             do i=i1,i2
                pe(i,k,j)  = pe(i,k,j) + ptop
-               pk(i,j,k) = pe(i,k,j)**akap
+               peln(i,k,j) = log(pe(i,k,j))
+               pk(i,j,k) = pe(i,k,j)**cap3vi(i,j,k)
             enddo
          enddo
 
 ! Bottom up
-         do k=1,km
-            do i=i1,i2
-               delpp(i,j,k) = cp*pt(i,j,k)*(pk(i,j,k+1)-pk(i,j,k))
+         if (high_alt) then
+            do k=1,km
+               do i=i1,i2
+                  delpp(i,j,k) = cp3v(i,j,k)*cap3v(i,j,k)*pt(i,j,k)*pk(i,j,k)*(peln(i,k+1,j)-peln(i,k,j))
+               enddo
             enddo
-         enddo
+         else
+            do k=1,km
+               do i=i1,i2
+                  delpp(i,j,k) = cp3v(i,j,k)*pt(i,j,k)*(pk(i,j,k+1)-pk(i,j,k))
+               enddo
+            enddo
+         endif
+
          do k=km,1,-1
             do i=i1,i2
                wz(i,j,k) = wz(i,j,k+1)+delpp(i,j,k)

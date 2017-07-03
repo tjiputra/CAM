@@ -1,17 +1,19 @@
 * Comments
-* User-given Tag Description: TSMLT1 without H1202 + hv
-* Tag database identifier : 127-TSMLT1-2016-11-03
-* Tag created by : dek
+* User-given Tag Description: TSMLT1 for CESM2
+* Tag database identifier : MZ150_TSMLT1_20170406
+* Tag created by : lke
 * Tag created from branch : TSMLT1
-* Tag created on : 2016-11-03 11:12:43.276222-06
+* Tag created on : 2017-04-06 12:37:39.334374-06
 * Comments for this tag follow:
-*     dek : 2016-11-03 : removed
+*     lke : 2017-04-06 : with aerosol uptake of organic nitrates
 
       SPECIES
 
       Solution
  ALKNIT -> C5H11ONO2,
  ALKOOH -> C5H12O2,
+ bc_a1 -> C,
+ bc_a4 -> C,
  BCARY -> C15H24,
  BENZENE -> C6H6,
  BENZOOH -> C6H8O5,
@@ -27,6 +29,7 @@
  BRCL -> BrCl,
  BRO -> BrO,
  BRONO2 -> BrONO2,
+ BRY,
  BZALD -> C7H6O,
  BZOOH -> C7H8O2,
  C2H2,
@@ -66,12 +69,17 @@
  CL2O2 -> Cl2O2,
  CLO -> ClO,
  CLONO2 -> ClONO2,
+ CLY,
  CO,
  CO2,
  COF2,
  COFCL -> COFCl,
  CRESOL -> C7H8O,
  DMS -> CH3SCH3,
+ dst_a1 -> AlSiO5,
+ dst_a2 -> AlSiO5,
+ dst_a3 -> AlSiO5,
+ E90 -> CO,
  EOOH -> HOCH2CH2OOH,
  F,
  GLYALD -> HOCH2CHO,
@@ -93,7 +101,7 @@
  HO2NO2,
  HOBR -> HOBr,
  HOCL -> HOCl,
- HONITR -> C4H7NO4,
+ HONITR -> C4H9NO4,
  HPALD -> HOOCH2CCH3CHCHO,
  HYAC -> CH3COCH2OH,
  HYDRALD -> HOCH2CCH3CHCHO,
@@ -117,32 +125,44 @@
  N2O5,
  NC4CH2OH -> C5H9NO4,
  NC4CHO -> C5H7NO4,
+ ncl_a1 -> NaCl,
+ ncl_a2 -> NaCl,
+ ncl_a3 -> NaCl,
  NH3,
  NH4,
- NH4NO3,
  NO,
  NO2,
  NO3,
  NOA -> CH3COCH2ONO2,
  NTERPOOH -> C10H17NO5,
+ num_a1 -> H,
+ num_a2 -> H,
+ num_a3 -> H,
+ num_a4 -> H,
  O,
  O2,
  O3,
  O3S -> O3,
  OCLO -> OClO,
  OCS -> OCS,
- ONITR -> CH2CCH3CHONO2CH2OH,
+ ONITR -> C4H7NO4,
  PAN -> CH3CO3NO2,
  PBZNIT -> C7H5O3NO2,
- PHENO -> C6H7O5,
- PHENOL -> C6H6O,
+ PHENO -> C6H5O,
+ PHENOL -> C6H5OH,
  PHENOOH -> C6H8O6,
+ pom_a1 -> C,
+ pom_a4 -> C,
  POOH -> C3H6OHOOH,
  ROOH -> CH3COCH2OOH,
  S -> S,
+ SF6,
  SO -> SO,
  SO2,
  SO3 -> SO3,
+ so4_a1 -> NH4HSO4,
+ so4_a2 -> NH4HSO4,
+ so4_a3 -> NH4HSO4,
  soa1_a1 -> C15H38O2,
  soa1_a2 -> C15H38O2,
  soa2_a1 -> C15H38O2,
@@ -153,6 +173,11 @@
  soa4_a2 -> C15H38O2,
  soa5_a1 -> C15H38O2,
  soa5_a2 -> C15H38O2,
+ SOAG0 -> C15H38O2,
+ SOAG1 -> C15H38O2,
+ SOAG2 -> C15H38O2,
+ SOAG3 -> C15H38O2,
+ SOAG4 -> C15H38O2,
  SVOC -> C22H46,
  TEPOMUC -> C7H8O3,
  TERP2OOH -> C10H16O4,
@@ -169,30 +194,6 @@
  XYLOLOOH -> C8H12O6,
  NHDEP -> N,
  NDEP -> N,
- bc_a1 -> C,
- bc_a4 -> C,
- BRY,
- CLY,
- dst_a1 -> AlSiO5,
- dst_a2 -> AlSiO5,
- dst_a3 -> AlSiO5,
- ncl_a1 -> NaCl,
- ncl_a2 -> NaCl,
- ncl_a3 -> NaCl,
- num_a1 -> H,
- num_a2 -> H,
- num_a3 -> H,
- num_a4 -> H,
- pom_a1 -> C,
- pom_a4 -> C,
- so4_a1 -> NH4HSO4,
- so4_a2 -> NH4HSO4,
- so4_a3 -> NH4HSO4,
- SOAG0 -> C15H38O2,
- SOAG1 -> C15H38O2,
- SOAG2 -> C15H38O2,
- SOAG3 -> C15H38O2,
- SOAG4 -> C15H38O2,
  ACBZO2 -> C7H5O3,
  ALKO2 -> C5H11O2,
  BENZO2 -> C6H7O5,
@@ -301,6 +302,7 @@
 
    Solution classes
       Explicit
+ BRY
  CCL4
  CF2CLBR
  CF3BR
@@ -315,6 +317,7 @@
  CH3CL
  CH4
  CHBR3
+ CLY
  CO2
  H2402
  HCFC141B
@@ -322,15 +325,16 @@
  HCFC22
  N2O
  O3S
+ SF6
  NHDEP
  NDEP
- BRY
- CLY
       End Explicit
 
       Implicit
  ALKNIT
  ALKOOH
+ bc_a1
+ bc_a4
  BCARY
  BENZENE
  BENZOOH
@@ -376,6 +380,10 @@
  COFCL
  CRESOL
  DMS
+ dst_a1
+ dst_a2
+ dst_a3
+ E90
  EOOH
  F
  GLYALD
@@ -416,14 +424,20 @@
  N2O5
  NC4CH2OH
  NC4CHO
+ ncl_a1
+ ncl_a2
+ ncl_a3
  NH3
  NH4
- NH4NO3
  NO
  NO2
  NO3
  NOA
  NTERPOOH
+ num_a1
+ num_a2
+ num_a3
+ num_a4
  O
  O2
  O3
@@ -435,12 +449,17 @@
  PHENO
  PHENOL
  PHENOOH
+ pom_a1
+ pom_a4
  POOH
  ROOH
  S
  SO
  SO2
  SO3
+ so4_a1
+ so4_a2
+ so4_a3
  soa1_a1
  soa1_a2
  soa2_a1
@@ -451,6 +470,11 @@
  soa4_a2
  soa5_a1
  soa5_a2
+ SOAG0
+ SOAG1
+ SOAG2
+ SOAG3
+ SOAG4
  SVOC
  TEPOMUC
  TERP2OOH
@@ -465,28 +489,6 @@
  XYLENOOH
  XYLOL
  XYLOLOOH
- bc_a1
- bc_a4
- dst_a1
- dst_a2
- dst_a3
- ncl_a1
- ncl_a2
- ncl_a3
- num_a1
- num_a2
- num_a3
- num_a4
- pom_a1
- pom_a4
- so4_a1
- so4_a2
- so4_a3
- SOAG0
- SOAG1
- SOAG2
- SOAG3
- SOAG4
  ACBZO2
  ALKO2
  BENZO2
@@ -538,9 +540,6 @@
 
  CHEMISTRY
       Photolysis
-*********************************
-*** unassigned
-*********************************
 *********************************
 *** odd-oxygen
 *********************************
@@ -661,6 +660,7 @@
 [jhobr]                       HOBR + hv -> BR + OH 
 [jhocl]                       HOCL + hv -> OH + CL 
 [joclo]                       OCLO + hv -> O + CLO 
+[jsf6]                        SF6 + hv -> sink 
 *********************************
 *** ions
 *********************************
@@ -720,16 +720,10 @@
 
       Reactions
 *********************************
-*** Not Assigned to a Section
-*********************************
-*********************************
 *** odd-oxygen
 *********************************
 [ag1]                  O2_1D  -> O2                                             ; 0.000258 
 [ag2]                  O2_1S  -> O2                                             ; 0.085 
-[O1D_CH4a]             O1D + CH4  -> CH3O2 + OH                                 ; 1.31e-10 
-[O1D_CH4b]             O1D + CH4  -> CH2O + H + HO2                             ; 3.5e-11 
-[O1D_CH4c]             O1D + CH4  -> CH2O + H2                                  ; 9e-12 
 [O1D_H2]               O1D + H2  -> H + OH                                      ; 1.2e-10 
 [O1D_H2O]              O1D + H2O  -> 2*OH                                       ; 1.63e-10, 60 
 [O1D_N2,cph=189.81]    O1D + N2  -> O + N2                                      ; 2.15e-11, 110 
@@ -861,9 +855,6 @@
 [O1D_HBRa]             O1D + HBR  -> BR + OH                                    ; 9e-11 
 [O1D_HBRb]             O1D + HBR  -> BRO + H                                    ; 3e-11 
 *********************************
-*** odd-iodine
-*********************************
-*********************************
 *** odd-fluorine
 *********************************
 [F_CH4]                F + CH4  -> HF + CH3O2                                   ; 1.6e-10, -260 
@@ -912,6 +903,9 @@
 [HOCH2OO_HO2]          HOCH2OO + HO2  -> HCOOH                                  ; 7.5e-13, 700 
 [HOCH2OO_M]            HOCH2OO  -> CH2O + HO2                                   ; 2.4e+12, -7000 
 [HOCH2OO_NO]           HOCH2OO + NO  -> HCOOH + NO2 + HO2                       ; 2.6e-12, 265 
+[O1D_CH4a]             O1D + CH4  -> CH3O2 + OH                                 ; 1.31e-10 
+[O1D_CH4b]             O1D + CH4  -> CH2O + H + HO2                             ; 3.5e-11 
+[O1D_CH4c]             O1D + CH4  -> CH2O + H2                                  ; 9e-12 
 [O1D_HCN]              O1D + HCN  -> OH                                         ; 1.08e-10, 105 
 [usr_CO_OH_b]          CO + OH  -> CO2 + H                                       
 *********************************
@@ -1047,9 +1041,6 @@
 [XO2_NO3]              XO2 + NO3  -> NO2 + HO2 + 0.5*CO + 0.25*HYAC + 0.25*GLYOXAL + 0.25*CH3COCHO + 0.25*GLYALD ; 2.4e-12 
 [XOOH_OH]              XOOH + OH  -> 0.5*XO2 + 0.5*OH                           ; 1.52e-12, 200 
 *********************************
-*** MBO
-*********************************
-*********************************
 *** C7
 *********************************
 [ACBZO2_HO2]           ACBZO2 + HO2  -> 0.4*C6H5O2 + 0.4*OH                     ; 4.3e-13, 1040 
@@ -1147,14 +1138,18 @@
 [usr_DMS_OH]           DMS + OH  -> 0.5*SO2 + 0.5*HO2                            
 [usr_GLYOXAL_aer]      GLYOXAL  -> SOAG0                                         
 [usr_HO2_aer]          HO2  -> 0.5*H2O2                                          
-[usr_N2O5_aer]         N2O5  -> 2*HNO3                                           
-[usr_NH4NO3_strat_tau] NH4NO3  -> 1*NDEP                                        ; 6.34e-08 
-[usr_NH4_strat_tau]    NH4  -> 1*NHDEP                                          ; 6.34e-08 
 [usr_NO2_aer]          NO2  -> 0.5*OH + 0.5*NO + 0.5*HNO3                        
 [usr_NO3_aer]          NO3  -> HNO3                                              
-*********************************
-*** Sea Salt Aerosol
-*********************************
+[usr_N2O5_aer]         N2O5  -> 2*HNO3                                           
+[usr_HONITR_aer]       HONITR  -> HNO3                                           
+[usr_ISOPNITA_aer]     ISOPNITA  -> HNO3                                         
+[usr_ISOPNITB_aer]     ISOPNITB  -> HNO3                                         
+[usr_NC4CH2OH_aer]     NC4CH2OH  -> HNO3                                         
+[usr_NC4CHO_aer]       NC4CHO  -> HNO3                                           
+[usr_NTERPOOH_aer]     NTERPOOH  -> HNO3                                         
+[usr_ONITR_aer]        ONITR  -> HNO3                                            
+[usr_TERPNIT_aer]      TERPNIT  -> HNO3                                          
+[usr_NH4_strat_tau]    NH4  -> 1*NHDEP                                          ; 6.34e-08 
 *********************************
 *** SOA
 *********************************
@@ -1228,22 +1223,23 @@
 [OH_O3S]               OH + O3S  -> OH                                          ; 1.7e-12, -940 
 [O_O3S]                O + O3S  -> O                                            ; 8e-12, -2060 
 [PHENO_O3S]            PHENO + O3S  -> PHENO                                    ; 2.8e-13 
+[E90_tau]              E90  -> sink                                             ; 1.29e-07 
       End Reactions
 
       Ext Forcing
- so4_a1 <- dataset 
- so4_a2 <- dataset 
- pom_a1 <- dataset 
- bc_a1 <- dataset 
- num_a1 <- dataset 
- num_a2 <- dataset 
- bc_a4 <- dataset 
  NO <- dataset 
+ NO2 <- dataset 
  CO <- dataset 
  SO2 <- dataset 
- NO2 <- dataset 
- SVOC <- dataset 
+ SVOC <- dataset
+ bc_a1 <- dataset 
+ bc_a4 <- dataset 
+ pom_a1 <- dataset 
  pom_a4 <- dataset 
+ so4_a1 <- dataset 
+ so4_a2 <- dataset 
+ num_a1 <- dataset 
+ num_a2 <- dataset 
  num_a4 <- dataset 
  N 
  OH 
@@ -1263,6 +1259,7 @@
         machine = nec
         model   = cam
         model_architecture = VECTOR
+	vector_length = 32
         architecture = hybrid
 *       vec_ftns = on
         namemod = on

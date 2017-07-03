@@ -8,7 +8,7 @@
 ! !USES:
     use shr_kind_mod , only: r8 => shr_kind_r8
     use cam_history  , only: outfld, write_inithist
-    use constituents , only: cnst_name
+    use constituents , only: cnst_name, pcnst
     use dynamics_vars, only: T_FVDYCORE_GRID
 
     implicit none
@@ -92,7 +92,7 @@
           enddo
           call outfld ('VS&IC      ', tmp       , idim, j)
 
-          do m = 1, ntotq
+          do m = 1, pcnst
              do k = 1, km
                 do i = ifirstxy, ilastxy
                    tmp(i,k) = tracer(i,j,k,m)

@@ -89,7 +89,7 @@
 <fincl1>
   'ELECDEN','QIONSUM','QSUM','ALONM','ALATM','BNORTH','BEAST','BDOWN',
   'BMAG','SIGMAPED','SIGMAHAL',
-  'EPOTEN','MLT','EF_EAST','EF_WEST','EF_UP','EF1_MAP','EF2_MAP',
+  'EPOTEN','EF_EAST','EF_WEST','EF_UP','EF1_MAP','EF2_MAP',
   'UI','VI','WI',
 </fincl1>
 <fincl4>

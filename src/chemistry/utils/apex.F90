@@ -48,6 +48,7 @@ module apex
   public :: apex_magloctm
   public :: apex_beg_yr
   public :: apex_end_yr
+  public :: apex_q2g
  
   real(r8),parameter :: re = 6371.2_r8, eps = 1.e-5_r8
 
@@ -114,7 +115,7 @@ module apex
     glatmn,glatmx   ! differently to avoid potential underflow (apex_mka)
 
   ! IGRF coefficients 
-  real(r8), allocatable :: g1(:,:), g2(:,:), gh(:)
+  real(r8), allocatable :: g1(:,:), g2(:,:)
   integer :: n1, n2, ncn1, ncn2, year1, year2
   integer, protected :: apex_beg_yr
   integer, protected :: apex_end_yr
@@ -217,7 +218,7 @@ subroutine apex_set_igrf(coefs_file)
 
   character(len=*), intent(in) :: coefs_file
   
-  integer :: istat, ierr
+  integer :: ierr
   integer :: dim_id, var_id 
   type(file_desc_t) :: ncid
   character(len=256) :: locfn
@@ -290,6 +291,7 @@ subroutine apex_mka(date,gplat,gplon,gpalt,nlat,nlon,nalt,ier)
   real(r8) :: aht,alat,phia,bmag,xmag,ymag,zdown,vmp ! apex_sub output
   real(r8) :: vnor,rp,reqam1,slp,clp,phiar
 
+  ier = 0
 !
 ! Some parts of the legacy apex code use constants to set dtr,rtd,
 ! other parts use rtd=45./atan(1.), dtr=1./rtd. Differences are
@@ -308,7 +310,6 @@ subroutine apex_mka(date,gplat,gplon,gpalt,nlat,nlon,nalt,ier)
 !
   pola = 90._r8-sqrt(precise)*rtd    ! Pole angle (deg)
 
-  ier = 0
 !
 ! Allocate 3d x,y,z,v arrays:
 ! These are not deallocated by this module. They can be deallocated
@@ -339,9 +340,9 @@ subroutine apex_mka(date,gplat,gplon,gpalt,nlat,nlon,nalt,ier)
 ! (these also are not deallocated by this module)
 !
   nglon=nlon ; nglat=nlat ; ngalt=nalt
-  allocate(geolat(nglat),stat=istat)
-  allocate(geolon(nglon),stat=istat)
-  allocate(geoalt(ngalt),stat=istat)
+  if (.not.allocated(geolat)) allocate(geolat(nglat),stat=istat)
+  if (.not.allocated(geolon)) allocate(geolon(nglon),stat=istat)
+  if (.not.allocated(geoalt)) allocate(geoalt(ngalt),stat=istat)
   geolat(:) = gplat(:)
   geolon(:) = gplon(:)
   geoalt(:) = gpalt(:)
@@ -752,7 +753,7 @@ subroutine grapxyzv(alt,cth,sth, &
 ! Args:
   real(r8),intent(in) :: alt,cth,sth
   real(r8),intent(in) :: dfxdln,dfydln,dfzdln,dfvdln
-  real(r8),dimension(3),intent(out) :: gradx,grady,gradz,gradv
+  real(r8),dimension(3),intent(inout) :: gradx,grady,gradz,gradv
 !
 ! Local:
   real(r8) :: d,d2,rho
@@ -1031,7 +1032,7 @@ subroutine linapx(gdlat,glon,alt,aht,alat,alon,xmag,ymag,zmag,fmag)
 ! coordinates of the starting point
 !
   iflag = 2 ! gclat,r are returned
-  call convrt(iflag,gdlat,alt,gclat,r,'linapx')
+  call convrt(iflag,gdlat,alt,gclat,r)
 
   singml = ctp*sin(gclat*dtr) + stp*cos(gclat*dtr)*cos((glon-elon)*dtr)
   cgml2 = max(0.25_r8,1._r8-singml*singml)
@@ -1065,7 +1066,7 @@ subroutine linapx(gdlat,glon,alt,aht,alat,alon,xmag,ymag,zmag,fmag)
   if (nstp >= maxs) then
     rho = sqrt(y(1)*y(1) + y(2)*y(2))
     iflag = 3 ! xlat and ht are returned
-    call convrt(iflag,xlat,ht,rho,y(3),'linapx')
+    call convrt(iflag,xlat,ht,rho,y(3))
     xlon = rtd*atan2(y(2),y(1))
     iflag = 1
     call feldg(iflag,xlat,xlon,ht,bnrth,beast,bdown,babs)
@@ -1085,7 +1086,7 @@ subroutine linapx(gdlat,glon,alt,aht,alat,alon,xmag,ymag,zmag,fmag)
 
 end subroutine linapx
 !-----------------------------------------------------------------------
-subroutine convrt(iflag,gdlat,alt,x1,x2,caller)
+subroutine convrt(iflag,gdlat,alt,x1,x2)
 !
 ! Convert space point from geodetic to geocentric or vice versa.
 !
@@ -1117,7 +1118,6 @@ subroutine convrt(iflag,gdlat,alt,x1,x2,caller)
   integer,intent(in) :: iflag
   real(r8),intent(inout) :: gdlat,alt
   real(r8),intent(inout) :: x1,x2
-  character(len=*),intent(in) :: caller
 !
 ! Local:
   real(r8) :: sinlat,coslat,d,z,rho,rkm,scl,gclat,ri,a2,a4,a6,a8,&
@@ -1210,7 +1210,7 @@ subroutine gd2cart(gdlat,glon,alt,x,y,z)
   integer :: iflag
 
   iflag = 1 ! Convert from geodetic to cylindrical (rho,z are output)
-  call convrt(iflag,gdlat,alt,rho,z,'gd2cart')
+  call convrt(iflag,gdlat,alt,rho,z)
 
   ang = glon*dtr
   x = rho*cos(ang)
@@ -1258,9 +1258,10 @@ subroutine feldg(iflag,glat,glon,alt,bnrth,beast,bdown,babs)
 !             set at the end if iflag==3.
 !
 ! Args:
-  integer,intent(in) :: iflag
+  integer,intent(in)     :: iflag
   real(r8),intent(in)    :: glon
-  real(r8),intent(out)   :: glat,alt
+  real(r8),intent(inout) :: glat
+  real(r8),intent(inout) :: alt
   real(r8),intent(out)   :: bnrth,beast,bdown,babs
 !
 ! Local:
@@ -1573,7 +1574,7 @@ subroutine fndapx(alt,zmag,a,alat,alon)
   iflag_convrt = 3
   do i=1,3
     rho = sqrt(yapx(1,i)**2+yapx(2,i)**2)
-    call convrt(iflag_convrt,gdlt,ht(i),rho,yapx(3,i),'fndapx')
+    call convrt(iflag_convrt,gdlt,ht(i),rho,yapx(3,i))
     gdln = rtd*atan2(yapx(2,i),yapx(1,i))
     call feldg(iflag_feldg,gdlt,gdln,ht(i),x,ydum,z(i),f)
   enddo 
@@ -1750,22 +1751,22 @@ subroutine intrp(glat,glon,alt, gplat,gplon,gpalt, nlat,nlon,nalt, &
     return 
   endif
 
-  call trilin(xarray(i0:i0+1,j0:j0+1,k0:k0+1),nlat,nlon,xi,yj,zk,fx,dfxdn,dfxde,dfxdd)
+  call trilin(xarray(i0:i0+1,j0:j0+1,k0:k0+1),xi,yj,zk,fx,dfxdn,dfxde,dfxdd)
   dfxdth = -dfxdn*rtd/dlat
   dfxdln =  dfxde*rtd/dlon
   dfxdh  = -hti*hti*dfxdd/(re*diht)
 
-  call trilin(yarray(i0:i0+1,j0:j0+1,k0:k0+1),nlat,nlon,xi,yj,zk,fy,dfydn,dfyde,dfydd)
+  call trilin(yarray(i0:i0+1,j0:j0+1,k0:k0+1),xi,yj,zk,fy,dfydn,dfyde,dfydd)
   dfydth = -dfydn*rtd/dlat
   dfydln =  dfyde*rtd/dlon
   dfydh  = -hti*hti*dfydd/(re*diht)
 
-  call trilin(zarray(i0:i0+1,j0:j0+1,k0:k0+1),nlat,nlon,xi,yj,zk,fz,dfzdn,dfzde,dfzdd)
+  call trilin(zarray(i0:i0+1,j0:j0+1,k0:k0+1),xi,yj,zk,fz,dfzdn,dfzde,dfzdd)
   dfzdth = -dfzdn*rtd/dlat
   dfzdln =  dfzde*rtd/dlon
   dfzdh  = -hti*hti*dfzdd/(re*diht)
 
-  call trilin(varray(i0:i0+1,j0:j0+1,k0:k0+1),nlat,nlon,xi,yj,zk,fv,dfvdn,dfvde,dfvdd)
+  call trilin(varray(i0:i0+1,j0:j0+1,k0:k0+1),xi,yj,zk,fv,dfvdn,dfvde,dfvdd)
   dfvdth = -dfvdn*rtd/dlat
   dfvdln =  dfvde*rtd/dlon
   dfvdh  = -hti*hti*dfvdd/(re*diht)
@@ -1779,11 +1780,11 @@ subroutine intrp(glat,glon,alt, gplat,gplon,gpalt, nlat,nlon,nalt, &
     omfac = 1._r8 - fac
     xi = xi - 1._r8
     i0 = i0 + 1
-    call trilin (xarray(i0:i0+1,j0:j0+1,k0:k0+1),nlat,nlon,xi,yj,zk,dmf,dmdfdn,dmdfde,dmdfdd)
+    call trilin (xarray(i0:i0+1,j0:j0+1,k0:k0+1),xi,yj,zk,dmf,dmdfdn,dmdfde,dmdfdd)
     dfxdln = dfxdln*omfac + fac*dmdfde*rtd/dlon
-    call trilin (yarray(i0:i0+1,j0:j0+1,k0:k0+1),nlat,nlon,xi,yj,zk,dmf,dmdfdn,dmdfde,dmdfdd)
+    call trilin (yarray(i0:i0+1,j0:j0+1,k0:k0+1),xi,yj,zk,dmf,dmdfdn,dmdfde,dmdfdd)
     dfydln = dfydln*omfac + fac*dmdfde*rtd/dlon
-    call trilin (varray(i0:i0+1,j0:j0+1,k0:k0+1),nlat,nlon,xi,yj,zk,dmf,dmdfdn,dmdfde,dmdfdd)
+    call trilin (varray(i0:i0+1,j0:j0+1,k0:k0+1),xi,yj,zk,dmf,dmdfdn,dmdfde,dmdfdd)
     dfvdln = dfvdln*omfac + fac*dmdfde*rtd/dlon
   endif
 
@@ -1792,22 +1793,19 @@ subroutine intrp(glat,glon,alt, gplat,gplon,gpalt, nlat,nlon,nalt, &
     omfac = 1._r8 - fac
     xi = xi + 1._r8
     i0 = i0 - 1
-    call trilin (xarray(i0:i0+1,j0:j0+1,k0:k0+1),nlat,nlon,xi,yj,zk,dmf,dmdfdn,dmdfde,dmdfdd)
+    call trilin (xarray(i0:i0+1,j0:j0+1,k0:k0+1),xi,yj,zk,dmf,dmdfdn,dmdfde,dmdfdd)
     dfxdln = dfxdln*omfac + fac*dmdfde*rtd/dlon
-    call trilin (yarray(i0:i0+1,j0:j0+1,k0:k0+1),nlat,nlon,xi,yj,zk,dmf,dmdfdn,dmdfde,dmdfdd)
+    call trilin (yarray(i0:i0+1,j0:j0+1,k0:k0+1),xi,yj,zk,dmf,dmdfdn,dmdfde,dmdfdd)
     dfydln = dfydln*omfac + fac*dmdfde*rtd/dlon
-    call trilin (varray(i0:i0+1,j0:j0+1,k0:k0+1),nlat,nlon,xi,yj,zk,dmf,dmdfdn,dmdfde,dmdfdd)
+    call trilin (varray(i0:i0+1,j0:j0+1,k0:k0+1),xi,yj,zk,dmf,dmdfdn,dmdfde,dmdfdd)
     dfvdln = dfvdln*omfac + fac*dmdfde*rtd/dlon
   endif
 
 end subroutine intrp
 !-----------------------------------------------------------------------
-subroutine trilin(u,nlat,nlon,xi,yj,zk,fu,dfudx,dfudy,dfudz)
+subroutine trilin(u,xi,yj,zk,fu,dfudx,dfudy,dfudz)
 !
 ! Args:
-  integer,intent(in) :: &
-    nlat,               & ! first dimension of u from calling routine
-    nlon                  ! second dimension of u from calling routine
   real(r8),intent(in) :: &
     u(1:2,1:2,1:2),      & ! u(1,1,1) is address of lower corner of interpolation box
     xi,  & ! fractional distance across box in x direction

@@ -39,8 +39,9 @@ contains
     use ioFileMod,     only : getfil
     use mo_chem_utls,  only : get_spc_ndx
 
-    use cam_history,   only : addfld, horiz_only
+    use cam_history,   only : addfld, add_default, horiz_only
     use dyn_grid,      only : get_dyn_grid_parm
+    use phys_control,  only : phys_getopts
 
     implicit none
 
@@ -64,6 +65,9 @@ contains
     real(r8), allocatable :: lons(:)
     real(r8), allocatable :: landmask(:,:)
     character(len=256) :: locfn
+    logical :: history_cesm_forcing
+
+    call phys_getopts( history_cesm_forcing_out = history_cesm_forcing )
 
     no_ndx = get_spc_ndx('NO')
     xno_ndx = get_spc_ndx('XNO')
@@ -117,6 +121,10 @@ contains
     call addfld( 'CLDHGT',       horiz_only,  'I', 'KM',      'cloud top height' )              ! cloud top height
     call addfld( 'DCHGZONE',     horiz_only,  'I', 'KM',      'depth of discharge zone' )       ! depth of discharge zone
     call addfld( 'CGIC',         horiz_only,  'I', 'RATIO',   'ratio of cloud-ground/intracloud discharges' ) ! ratio of cloud-ground/intracloud discharges
+
+    if ( history_cesm_forcing ) then
+       call add_default('LNO_COL_PROD',1,' ')
+    endif
 
   end subroutine lightning_inti
 

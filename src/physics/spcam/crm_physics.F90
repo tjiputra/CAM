@@ -42,13 +42,14 @@ module crm_physics
    integer :: prec_dp_idx, snow_dp_idx, prec_sh_idx, snow_sh_idx
    integer :: prec_sed_idx, snow_sed_idx, prec_pcw_idx, snow_pcw_idx
    integer :: cldo_idx, cld_idx, cldtop_idx
-   integer :: rei_idx, rel_idx, rprdtot_idx, nevapr_idx, prain_idx, prer_evap_idx
+   integer :: rei_idx, rel_idx, rprdtot_idx, nevapr_idx, prain_idx
    integer :: wsedl_idx, dei_idx, des_idx, mu_idx, lambdac_idx
    integer :: rate1_cw2pr_st_idx
    integer :: qme_idx, icwmrdp_idx, rprddp_idx, icwmrsh_idx, rprdsh_idx
-   integer :: nevapr_shcu_idx, nevapr_dpcu_idx, ast_idx, relvar_idx, accre_enhan_idx
+   integer :: nevapr_shcu_idx, nevapr_dpcu_idx, ast_idx
    integer :: fice_idx,acldy_cen_idx, cmfmc_sh_idx
    integer :: clubb_buffer_idx, tk_crm_idx, tke_idx, kvm_idx, kvh_idx, pblh_idx, tpert_idx
+   integer :: sh_frac_idx, dp_frac_idx
 
    integer :: &
               ixcldliq,      &! cloud liquid amount index
@@ -144,11 +145,11 @@ subroutine crm_physics_register()
   call pbuf_add_field('CLD',         'global',  dtype_r8, (/pcols, pver, dyn_time_lvls/),                cld_idx)
   call pbuf_add_field('AST',         'global',  dtype_r8, (/pcols, pver, dyn_time_lvls/),                ast_idx)
 
-  call pbuf_add_field('CRM_T_RAD',   'physpkg', dtype_r8, (/pcols,crm_nx, crm_ny, crm_nz/),              crm_t_rad_idx)
-  call pbuf_add_field('CRM_QV_RAD',  'physpkg', dtype_r8, (/pcols,crm_nx, crm_ny, crm_nz/),              crm_qv_rad_idx)
-  call pbuf_add_field('CRM_QC_RAD',  'physpkg', dtype_r8, (/pcols,crm_nx, crm_ny, crm_nz/),              crm_qc_rad_idx)
-  call pbuf_add_field('CRM_QI_RAD',  'physpkg', dtype_r8, (/pcols,crm_nx, crm_ny, crm_nz/),              crm_qi_rad_idx)
-  call pbuf_add_field('CRM_CLD_RAD', 'physpkg', dtype_r8, (/pcols,crm_nx, crm_ny, crm_nz/),              crm_cld_rad_idx)
+  call pbuf_add_field('CRM_T_RAD',   'physpkg',  dtype_r8, (/pcols,crm_nx, crm_ny, crm_nz/),             crm_t_rad_idx)
+  call pbuf_add_field('CRM_QV_RAD',  'physpkg',  dtype_r8, (/pcols,crm_nx, crm_ny, crm_nz/),             crm_qv_rad_idx)
+  call pbuf_add_field('CRM_QC_RAD',  'physpkg',  dtype_r8, (/pcols,crm_nx, crm_ny, crm_nz/),             crm_qc_rad_idx)
+  call pbuf_add_field('CRM_QI_RAD',  'physpkg',  dtype_r8, (/pcols,crm_nx, crm_ny, crm_nz/),             crm_qi_rad_idx)
+  call pbuf_add_field('CRM_CLD_RAD', 'physpkg',  dtype_r8, (/pcols,crm_nx, crm_ny, crm_nz/),             crm_cld_rad_idx)
   call pbuf_add_field('CRM_QRAD',    'global',  dtype_r8, (/pcols,crm_nx, crm_ny, crm_nz/),              crm_qrad_idx)
 
   call pbuf_add_field('PREC_DP',     'physpkg', dtype_r8, (/pcols/),                                     prec_dp_idx)
@@ -170,7 +171,6 @@ subroutine crm_physics_register()
   call pbuf_add_field('REI',         'physpkg', dtype_r8, (/pcols,pver/),                                rei_idx)
   call pbuf_add_field('REL',         'physpkg', dtype_r8, (/pcols,pver/),                                rel_idx)
   call pbuf_add_field('NEVAPR',      'physpkg', dtype_r8, (/pcols,pver/),                                nevapr_idx)
-  call pbuf_add_field('PRER_EVAP',   'physpkg', dtype_r8, (/pcols,pver/),                                prer_evap_idx)
   call pbuf_add_field('PRAIN',       'physpkg', dtype_r8, (/pcols,pver/),                                prain_idx)
   call pbuf_add_field('WSEDL',       'physpkg', dtype_r8, (/pcols,pver/),                                wsedl_idx)
   call pbuf_add_field('QME',         'physpkg', dtype_r8, (/pcols,pver/),                                qme_idx)
@@ -178,23 +178,21 @@ subroutine crm_physics_register()
   call pbuf_add_field('DES',         'physpkg', dtype_r8, (/pcols,pver/),                                des_idx)
   call pbuf_add_field('MU',          'physpkg', dtype_r8, (/pcols,pver/),                                mu_idx)
   call pbuf_add_field('LAMBDAC',     'physpkg', dtype_r8, (/pcols,pver/),                                lambdac_idx)
-  call pbuf_add_field('RELVAR',      'physpkg', dtype_r8, (/pcols,pver/),                                relvar_idx)
-  call pbuf_add_field('ACCRE_ENHAN', 'physpkg', dtype_r8, (/pcols,pver/),                                accre_enhan_idx)
   call pbuf_add_field('CMFMC_SH',    'physpkg' ,dtype_r8, (/pcols,pverp/),                               cmfmc_sh_idx )
 
-  call pbuf_add_field('FICE',          'physpkg', dtype_r8, (/pcols,pver/),                            fice_idx)
+  call pbuf_add_field('FICE',        'physpkg', dtype_r8, (/pcols,pver/),                                fice_idx)
 
   if (prog_modal_aero) then
      call pbuf_add_field('RATE1_CW2PR_ST','physpkg', dtype_r8, (/pcols,pver/),                            rate1_cw2pr_st_idx)
-     call pbuf_add_field('CRM_QAERWAT',   'physpkg', dtype_r8, (/pcols,crm_nx, crm_ny, crm_nz, nmodes/),  crm_qaerwat_idx)
-     call pbuf_add_field('CRM_DGNUMWET',  'physpkg', dtype_r8, (/pcols,crm_nx, crm_ny, crm_nz, nmodes/),  crm_dgnumwet_idx)
+     call pbuf_add_field('CRM_QAERWAT',   'physpkg',  dtype_r8, (/pcols,crm_nx, crm_ny, crm_nz, nmodes/), crm_qaerwat_idx)
+     call pbuf_add_field('CRM_DGNUMWET',  'physpkg',  dtype_r8, (/pcols,crm_nx, crm_ny, crm_nz, nmodes/), crm_dgnumwet_idx)
   endif
 
   if (is_spcam_m2005) then
-    call pbuf_add_field('CRM_NC_RAD',     'physpkg', dtype_r8, (/pcols, crm_nx, crm_ny, crm_nz/),         crm_nc_rad_idx)
-    call pbuf_add_field('CRM_NI_RAD',     'physpkg', dtype_r8, (/pcols, crm_nx, crm_ny, crm_nz/),         crm_ni_rad_idx)
-    call pbuf_add_field('CRM_QS_RAD',     'physpkg', dtype_r8, (/pcols, crm_nx, crm_ny, crm_nz/),         crm_qs_rad_idx)
-    call pbuf_add_field('CRM_NS_RAD',     'physpkg', dtype_r8, (/pcols, crm_nx, crm_ny, crm_nz/),         crm_ns_rad_idx)
+    call pbuf_add_field('CRM_NC_RAD',     'physpkg',  dtype_r8, (/pcols, crm_nx, crm_ny, crm_nz/),        crm_nc_rad_idx)
+    call pbuf_add_field('CRM_NI_RAD',     'physpkg',  dtype_r8, (/pcols, crm_nx, crm_ny, crm_nz/),        crm_ni_rad_idx)
+    call pbuf_add_field('CRM_QS_RAD',     'physpkg',  dtype_r8, (/pcols, crm_nx, crm_ny, crm_nz/),        crm_qs_rad_idx)
+    call pbuf_add_field('CRM_NS_RAD',     'physpkg',  dtype_r8, (/pcols, crm_nx, crm_ny, crm_nz/),        crm_ns_rad_idx)
 
     ! Fields for crm_micro array
     call pbuf_add_field('CRM_QT',         'global',  dtype_r8, (/pcols, crm_nx, crm_ny, crm_nz/),         crm_qt_idx)
@@ -248,7 +246,7 @@ subroutine crm_physics_init(pbuf2d)
 ! Purpose: initialize some variables, and add necessary fileds into output fields 
 !
 !--------------------------------------------------------------------------------------------------------
-  use physics_buffer,  only: physics_buffer_desc, pbuf_set_field
+  use physics_buffer,  only: physics_buffer_desc, pbuf_set_field, pbuf_get_index
 #ifdef CRM
   use physconst,       only: tmelt, cpair, rh2o, latvap, latice
   use constituents,    only: pcnst, cnst_species_class, cnst_spec_class_gas
@@ -257,6 +255,7 @@ subroutine crm_physics_init(pbuf2d)
   use ndrop,           only: ndrop_init
   use gas_wetdep_opts, only: gas_wetdep_method
   use micro_mg_utils,  only: micro_mg_utils_init
+  use time_manager,    only: is_first_step
 
     use cam_history,     only: fieldname_len
 #ifdef MODAL_AERO
@@ -583,52 +582,6 @@ subroutine crm_physics_init(pbuf2d)
 
     call ndrop_init()
 
-    ! add dropmixnuc tendencies for all modal aerosol species
-    do m = 1, nmodes
-       do lphase = 1, 2
-          do lspec = 0, nspec_amode(m)+1   ! loop over number + chem constituents + water
-             unit = 'kg/m2/s'
-             if (lspec == 0) then   ! number
-                unit = '#/m2/s'
-                if (lphase == 1) then
-                   l = numptr_amode(m)
-                else
-                   l = numptrcw_amode(m)
-                endif
-             else if (lspec <= nspec_amode(m)) then   ! non-water mass
-                if (lphase == 1) then
-                   l = lmassptr_amode(lspec,m)
-                else
-                   l = lmassptrcw_amode(lspec,m)
-                endif
-             else   ! water mass
-                   cycle
-             end if
-
-          end do   ! lspec
-       end do   ! lphase
-    end do   ! m
-
-    icldphy = 5 ! for spcam_m2005, first 5 constituents are cldphysics
-    do i = 1, icldphy
-       call cnst_set_spec_class(i, cnst_spec_class_cldphysics)
-    end do
-
-loop: do i=icldphy+1, pcnst
-       do m=1,ntot_amode
-          if(i==numptr_amode(m)) cycle loop
-          if(i==numptrcw_amode(m)) cycle loop
-          do l=1,nspec_amode(m)
-             if(i==lmassptr_amode(l,m)) cycle loop
-             if(i==lmassptrcw_amode(l,m)) cycle loop
-          enddo
-       enddo
-       !
-       ! No other species, all species except aerosol and cloud physics are gas species.
-       ! This may need to chagne if additional nongas tracers are added in the future
-       call cnst_set_spec_class(i, cnst_spec_class_gas)
-    end do loop
-
     do m=1, pcnst
        if(cnst_species_class(m).eq.cnst_spec_class_gas) then
           fieldname = trim(cnst_name(m)) // '_mixnuc1sp'
@@ -637,11 +590,8 @@ loop: do i=icldphy+1, pcnst
           call add_default( fieldname, 1, ' ' )
        end if
     end do
- 
 
   endif
-
-  call pbuf_set_field (pbuf2d, prer_evap_idx, 0.0_r8)
 
 #endif
   
@@ -649,6 +599,7 @@ loop: do i=icldphy+1, pcnst
   call pbuf_set_field (pbuf2d, prec_dp_idx,   0.0_r8)
   call pbuf_set_field (pbuf2d, prec_sh_idx,   0.0_r8)
   call pbuf_set_field (pbuf2d, snow_sh_idx,   0.0_r8)
+  call pbuf_set_field (pbuf2d, snow_dp_idx,   0.0_r8)
   call pbuf_set_field (pbuf2d, prec_sed_idx,  0.0_r8)
   call pbuf_set_field (pbuf2d, snow_sed_idx,  0.0_r8)
   call pbuf_set_field (pbuf2d, prec_pcw_idx,  0.0_r8)
@@ -699,6 +650,26 @@ loop: do i=icldphy+1, pcnst
   call add_default ('CLOUDTOP', 1, ' ')
   call add_default ('TIMINGF ', 1, ' ')
 
+  sh_frac_idx = pbuf_get_index('SH_FRAC')
+  dp_frac_idx = pbuf_get_index('DP_FRAC')
+  call pbuf_set_field (pbuf2d, sh_frac_idx,   0.0_r8)
+  call pbuf_set_field (pbuf2d, dp_frac_idx,   0.0_r8)
+
+  call pbuf_set_field (pbuf2d, cmfmc_sh_idx,    0.0_r8)
+  call pbuf_set_field (pbuf2d, rprdsh_idx,      0.0_r8)
+  call pbuf_set_field (pbuf2d, icwmrsh_idx,     0.0_r8)
+  call pbuf_set_field (pbuf2d, nevapr_shcu_idx, 0.0_r8)
+
+  call pbuf_set_field (pbuf2d, icwmrdp_idx,     0.0_r8)
+  call pbuf_set_field (pbuf2d, fice_idx,        0.0_r8)
+ 
+  call pbuf_set_field (pbuf2d, prain_idx,       0.0_r8)
+  call pbuf_set_field (pbuf2d, rprdtot_idx,     0.0_r8)
+  call pbuf_set_field (pbuf2d, nevapr_idx,      0.0_r8)
+
+  if (is_first_step()) then
+     call pbuf_set_field (pbuf2d, ast_idx,         0.0_r8)
+  end if
 #endif
 end subroutine crm_physics_init
 
@@ -794,7 +765,7 @@ end subroutine crm_init_cnst
 
    use physics_buffer,  only: physics_buffer_desc, pbuf_old_tim_idx, pbuf_get_index, dyn_time_lvls, pbuf_get_field
    use physics_types,   only: physics_state, physics_tend, physics_ptend, physics_update, physics_ptend_init, &
-                              physics_state_copy, physics_ptend_sum
+                              physics_state_copy, physics_ptend_sum, physics_ptend_scale
    use camsrfexch,      only: cam_in_t
 
    real(r8), intent(in)              :: ztodt                          ! 2 delta t (model time increment)
@@ -1041,6 +1012,9 @@ end subroutine crm_init_cnst
    real(r8), allocatable :: spqclvar(:,:)
 
    real(r8)              :: spcld3d (pcols,pver)
+
+   real(r8) :: tmp4d(pcols,crm_nx, crm_ny, crm_nz)
+   real(r8) :: tmp2d(pcols,pver)
 
    ! Surface fluxes
    real(r8) ::  fluxu0           ! surface momenment fluxes
@@ -1702,9 +1676,11 @@ end subroutine crm_init_cnst
        call outfld('CRM_TKH', crm_tkh(:, :, :, :)  ,pcols   ,lchnk   )
 
        if (is_spcam_sam1mom) then
-          call outfld('CRM_QV  ',(crm_qt(:,:,:,:)-qc_crm-qi_crm),pcols   ,lchnk   )
+          tmp4d(:ncol,:,:,:) = crm_qt(:ncol,:,:,:)-qc_crm(:ncol,:,:,:)-qi_crm(:ncol,:,:,:)
+          call outfld('CRM_QV  ',tmp4d,pcols   ,lchnk   )
        else if (is_spcam_m2005) then 
-          call outfld('CRM_QV  ',crm_qt(:,:,:,:)-qc_crm, pcols   ,lchnk   )
+          tmp4d(:ncol,:,:,:) = crm_qt(:ncol,:,:,:)-qc_crm(:ncol,:,:,:)
+          call outfld('CRM_QV  ',tmp4d, pcols   ,lchnk   )
        endif
 
 
@@ -1863,8 +1839,12 @@ end subroutine crm_init_cnst
 
        ftem(:ncol,:pver) = (ptend_loc%s(:ncol,:pver)-qrs(:ncol,:pver)-qrl(:ncol,:pver))/cpair
 
-       call outfld('SPQRL   ',qrl/cpair                 ,pcols   ,lchnk)
-       call outfld('SPQRS   ',qrs/cpair                 ,pcols   ,lchnk)
+       tmp2d(:ncol,:) = qrl(:ncol,:)/cpair
+       call outfld('SPQRL   ',tmp2d                     ,pcols   ,lchnk)
+
+       tmp2d(:ncol,:) = qrs(:ncol,:)/cpair
+       call outfld('SPQRS   ',tmp2d                     ,pcols   ,lchnk)
+
        call outfld('SPDT    ',ftem                      ,pcols   ,lchnk)
        call outfld('SPDQ    ',ptend_loc%q(1,1,1)        ,pcols   ,lchnk)
        call outfld('SPDQC   ',ptend_loc%q(1,1,ixcldliq) ,pcols   ,lchnk)
@@ -2153,8 +2133,8 @@ end subroutine crm_init_cnst
 
        ! check water and energy conservation
        call check_energy_chng(state_loc, tend_loc, "crm_tend", nstep, ztodt, zero, &
-                prec_dp+(qli_hydro(:,2)-qli_hydro(:,1))/ztodt/1000._r8,  &
-                snow_dp+(qi_hydro(:,2)-qi_hydro(:,1))/ztodt/1000._r8, radflux)
+                prec_dp(:ncol)+(qli_hydro(:ncol,2)-qli_hydro(:ncol,1))/ztodt/1000._r8,  &
+                snow_dp(:ncol)+(qi_hydro(:ncol,2)-qi_hydro(:ncol,1))/ztodt/1000._r8, radflux)
 
        !
        ! calculate total water after crm update
@@ -2195,10 +2175,10 @@ end subroutine crm_init_cnst
    if (is_spcam_m2005) then
        call t_startf('bc_aerosols_mmf')
 
-       where(qc_rad(:,:,:,:)+qi_rad(:,:,:,:) > 1.0e-10_r8) 
-          cld_rad(:,:,:,:) = cld_rad(:,:,:,:)
+       where(qc_rad(:ncol,:,:,:crm_nz)+qi_rad(:ncol,:,:,:crm_nz) > 1.0e-10_r8) 
+          cld_rad(:ncol,:,:,:crm_nz) = cld_rad(:ncol,:,:,:crm_nz)
        elsewhere
-          cld_rad(:,:,:,:) = 0.0_r8
+          cld_rad(:ncol,:,:,:crm_nz) = 0.0_r8
        endwhere
 
        ! temporarily turn on all lq, so it is allocated
@@ -2229,23 +2209,36 @@ end subroutine crm_init_cnst
       dtstep_pp = dtstep_pp_input
       necpp = dtstep_pp/ztodt
 
-       if(nstep.ne.0 .and. mod(nstep, necpp).eq.0) then
+      ! Only call ECPP every necpp th time step
+      ! !!!BE CAUTIOUS (Minghuai Wang, 2017-02)!!!!: 
+      ! ptend_loc from crmclouds_mixnuc_tend and parampollu_driver2 has
+      ! to be multiplied by necpp, as the updates in state occure in tphysbc_spcam, 
+      ! and the normal time step used in tphysbc_spcam is short 
+      ! and ECPP time step is longer (by a facotr of ncecpp). 
+      ! Otherwise, this will lead to underestimation in wet scavenging.
+      ! 
+      if(nstep.ne.0 .and. mod(nstep, necpp).eq.0) then
         call t_startf('crmclouds_mixnuc')
 
         call crmclouds_mixnuc_tend (state_loc, ptend_loc, dtstep_pp, cam_in%cflx, pblh, pbuf,  &
                                     wwqui_cen, wwqui_cloudy_cen, wwqui_bnd, wwqui_cloudy_bnd)
+
+        ! scale ptend_loc by necpp 
+        call physics_ptend_scale(ptend_loc, necpp*1.0_r8, ncol)
         ! Sum into overall ptend
-        call physics_ptend_sum(ptend_loc, ptend, ncol)
-        call physics_update(state_loc, ptend_loc, dtstep_pp, tend_loc)
+        call physics_ptend_sum(ptend_loc, ptend, ncol)  
+        call physics_update(state_loc, ptend_loc, ztodt, tend_loc)
         call t_stopf('crmclouds_mixnuc')
 
         call t_startf('ecpp')
         call parampollu_driver2(state_loc, ptend_loc, pbuf, dtstep_pp, dtstep_pp,  &
                                 acen, abnd, acen_tf, abnd_tf, massflxbnd,   &
                                 rhcen, qcloudcen, qlsinkcen, precrcen, precsolidcen, acldy_cen_tbeg )
+        ! scale ptend_loc by necpp 
+        call physics_ptend_scale(ptend_loc, necpp*1.0_r8, ncol)
         ! Sum into overall ptend
-        call physics_ptend_sum(ptend_loc, ptend, ncol)
-        call physics_update(state_loc, ptend_loc, dtstep_pp, tend_loc)
+        call physics_ptend_sum(ptend_loc, ptend, ncol) 
+        call physics_update(state_loc, ptend_loc, ztodt, tend_loc)
         call t_stopf ('ecpp')
       end if
 

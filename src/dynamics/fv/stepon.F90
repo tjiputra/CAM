@@ -55,8 +55,10 @@ contains
 
 subroutine stepon_init(dyn_in, dyn_out)
 
-   use constituents,       only: pcnst, cnst_get_type_byind
-   use time_manager,       only: get_step_size
+   use constituents, only: pcnst, cnst_get_type_byind
+   use time_manager, only: get_step_size
+   use physconst,    only: physconst_calc_kappav, rair, cpair
+   use inic_analytic,      only: analytic_ic_active
 
    type (dyn_import_t)   :: dyn_in             ! Dynamics import container
    type (dyn_export_t)   :: dyn_out            ! Dynamics export container
@@ -74,6 +76,7 @@ subroutine stepon_init(dyn_in, dyn_out)
    real (r8), pointer :: bk(:)
 
    real(r8), allocatable :: delpdryxy(:,:,:)
+   real(r8), allocatable :: cap3vi(:,:,:), cappa3v(:,:,:)
    !----------------------------------------------------------------------------
 
    if (.not. initial_run) nlres=.true.
@@ -151,27 +154,53 @@ subroutine stepon_init(dyn_in, dyn_out)
    ! Print out diagnostic message if restart run
    !----------------------------------------------------------
 
-   if ( moist_physics ) then
+   if ( moist_physics .and. .not. analytic_ic_active()) then
       call dryairm( grid, .true., dyn_in%ps, dyn_in%tracer,  &
                     dyn_in%delp, dyn_in%pe, nlres )
    endif
 
-  ! Initialize pk, edge pressure to the cappa power.
+   if (grid%iam < grid%npes_xy) then
+
+      allocate( cappa3v(ifirstxy:ilastxy,jfirstxy:jlastxy,km) )
+      allocate( cap3vi(ifirstxy:ilastxy,jfirstxy:jlastxy,km+1) )
+      if (grid%high_alt) then
+         call physconst_calc_kappav( ifirstxy,ilastxy,jfirstxy,jlastxy,1,km, grid%ntotq, dyn_in%tracer, cappa3v )
+
+!$omp parallel do private(i,j,k)
+         do k=2,km
+            do j=jfirstxy,jlastxy
+               do i=ifirstxy,ilastxy
+                  cap3vi(i,j,k) = 0.5_r8*(cappa3v(i,j,k-1)+cappa3v(i,j,k))
+               enddo
+            enddo
+         enddo
+         cap3vi(:,:,1) = 1.5_r8 * cappa3v(:,:,1) - 0.5_r8 * cappa3v(:,:,2)
+         cap3vi(:,:,km+1) = 1.5_r8 * cappa3v(:,:,km) - 0.5_r8 * cappa3v(:,:,km-1)
+      else
+         cappa3v = rair/cpair
+         cap3vi = rair/cpair
+      endif
+
+      ! Initialize pk, edge pressure to the cappa power.  Do this with constituent dependent cappa
 
 !$omp parallel do private(i,j,k)
       do k = 1, km+1
          do j = jfirstxy, jlastxy
             do i = ifirstxy, ilastxy
-               dyn_in%pk(i,j,k) = dyn_in%pe(i,k,j)**cappa
+               dyn_in%pk(i,j,k) = dyn_in%pe(i,k,j)**cap3vi(i,j,k)
             enddo
          enddo
       enddo
 
-   ! Generate pkz, the conversion factor betw pt and t3
+      ! Generate pkz, the conversion factor betw pt and t3
 
-   call pkez(1,      im,   km,       jfirstxy,  jlastxy,              &
-             1,      km,   ifirstxy, ilastxy,    dyn_in%pe,    &
-             dyn_in%pk, cappa,  ks, dyn_out%peln, dyn_out%pkz,  .false. )
+      call pkez(1,      im,   km,       jfirstxy,  jlastxy,              &
+                1,      km,   ifirstxy, ilastxy,    dyn_in%pe,    &
+                dyn_in%pk, cappa3v,  ks, dyn_out%peln, dyn_out%pkz,  .false., grid%high_alt )
+
+      deallocate( cappa3v, cap3vi )
+
+   endif
 
    if (initial_run) then
 
@@ -321,10 +350,11 @@ subroutine stepon_run2( phys_state, phys_tend, dyn_in, dyn_out )
 !
 ! !INPUT/OUTPUT PARAMETERS:
 !
-   type(physics_state), intent(inout):: phys_state(begchunk:endchunk)
-   type(physics_tend), intent(inout):: phys_tend(begchunk:endchunk)
+   type(physics_state), intent(inout) :: phys_state(begchunk:endchunk)
+   type(physics_tend),  intent(inout) :: phys_tend(begchunk:endchunk)
    type (dyn_import_t), intent(inout) :: dyn_in  ! Dynamics import container
    type (dyn_export_t), intent(inout) :: dyn_out ! Dynamics export container
+
    type (T_FVDYCORE_GRID), pointer :: grid
 !
 ! !DESCRIPTION:

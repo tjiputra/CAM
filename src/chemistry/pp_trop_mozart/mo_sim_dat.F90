@@ -160,30 +160,54 @@
          write(iulog,*) 'set_sim_dat: failed to allocate rxt_tag_map; error = ',ios
          call endrun
       end if
-      rxt_tag_lst(:rxt_tag_cnt) = (/ 'jo2             ', 'jo1d            ', 'jo3p            ', 'jn2o            ', &
-                                     'jno2            ', 'jn2o5           ', 'jhno3           ', 'jno3_a          ', &
-                                     'jno3_b          ', 'jho2no2_a       ', 'jho2no2_b       ', 'jch3ooh         ', &
-                                     'jch2o_a         ', 'jch2o_b         ', 'jh2o2           ', 'jch3cho         ', &
-                                     'jpooh           ', 'jch3co3h        ', 'jpan            ', 'jmpan           ', &
-                                     'jmacr_a         ', 'jmacr_b         ', 'jmvk            ', 'jc2h5ooh        ', &
-                                     'jc3h7ooh        ', 'jrooh           ', 'jacet           ', 'jmgly           ', &
-                                     'jxooh           ', 'jonitr          ', 'jisopooh        ', 'jhyac           ', &
-                                     'jglyald         ', 'jmek            ', 'jbigald         ', 'jglyoxal        ', &
-                                     'jalkooh         ', 'jmekooh         ', 'jtolooh         ', 'jterpooh        ', &
-                                     'usr_O_O2        ', 'o1d_n2          ', 'o1d_o2          ', 'ox_l1           ', &
-                                     'ox_l2           ', 'ox_l3           ', 'usr_HO2_HO2     ', 'ox_p1           ', &
-                                     'tag_NO2_NO3     ', 'usr_N2O5_M      ', 'tag_NO2_OH      ', 'usr_HNO3_OH     ', &
-                                     'tag_NO2_HO2     ', 'usr_HO2NO2_M    ', 'ox_p2           ', 'usr_CO_OH_b     ', &
-                                     'tag_C2H4_OH     ', 'ox_l6           ', 'ox_p16          ', 'ox_p5           ', &
-                                     'ox_p4           ', 'tag_CH3CO3_NO2  ', 'usr_PAN_M       ', 'tag_C3H6_OH     ', &
-                                     'ox_l4           ', 'ox_p3           ', 'ox_p9           ', 'usr_CH3COCH3_OH ', &
-                                     'ox_p10          ', 'ox_p15          ', 'ox_p17          ', 'soa5            ', &
-                                     'ox_p14          ', 'ox_l5           ', 'ox_p6           ', 'ox_l7           ', &
-                                     'ox_l8           ', 'ox_p7           ', 'ox_p8           ', 'usr_MCO3_NO2    ', &
-                                     'usr_MPAN_M      ', 'ox_p11          ', 'usr_XOOH_OH     ', 'soa4            ', &
-                                     'ox_p12          ', 'soa2            ', 'soa1            ', 'soa3            ', &
-                                     'ox_p13          ', 'usr_N2O5_aer    ', 'usr_NO3_aer     ', 'usr_NO2_aer     ', &
-                                     'usr_SO2_OH      ', 'usr_DMS_OH      ', 'usr_HO2_aer     ' /)
+      rxt_tag_lst(:rxt_tag_cnt) = (/ 'jo2                             ', 'jo1d                            ', &
+                                     'jo3p                            ', 'jn2o                            ', &
+                                     'jno2                            ', 'jn2o5                           ', &
+                                     'jhno3                           ', 'jno3_a                          ', &
+                                     'jno3_b                          ', 'jho2no2_a                       ', &
+                                     'jho2no2_b                       ', 'jch3ooh                         ', &
+                                     'jch2o_a                         ', 'jch2o_b                         ', &
+                                     'jh2o2                           ', 'jch3cho                         ', &
+                                     'jpooh                           ', 'jch3co3h                        ', &
+                                     'jpan                            ', 'jmpan                           ', &
+                                     'jmacr_a                         ', 'jmacr_b                         ', &
+                                     'jmvk                            ', 'jc2h5ooh                        ', &
+                                     'jc3h7ooh                        ', 'jrooh                           ', &
+                                     'jacet                           ', 'jmgly                           ', &
+                                     'jxooh                           ', 'jonitr                          ', &
+                                     'jisopooh                        ', 'jhyac                           ', &
+                                     'jglyald                         ', 'jmek                            ', &
+                                     'jbigald                         ', 'jglyoxal                        ', &
+                                     'jalkooh                         ', 'jmekooh                         ', &
+                                     'jtolooh                         ', 'jterpooh                        ', &
+                                     'usr_O_O2                        ', 'o1d_n2                          ', &
+                                     'o1d_o2                          ', 'ox_l1                           ', &
+                                     'ox_l2                           ', 'ox_l3                           ', &
+                                     'usr_HO2_HO2                     ', 'ox_p1                           ', &
+                                     'tag_NO2_NO3                     ', 'usr_N2O5_M                      ', &
+                                     'tag_NO2_OH                      ', 'usr_HNO3_OH                     ', &
+                                     'tag_NO2_HO2                     ', 'usr_HO2NO2_M                    ', &
+                                     'ox_p2                           ', 'usr_CO_OH_b                     ', &
+                                     'tag_C2H4_OH                     ', 'ox_l6                           ', &
+                                     'ox_p16                          ', 'ox_p5                           ', &
+                                     'ox_p4                           ', 'tag_CH3CO3_NO2                  ', &
+                                     'usr_PAN_M                       ', 'tag_C3H6_OH                     ', &
+                                     'ox_l4                           ', 'ox_p3                           ', &
+                                     'ox_p9                           ', 'usr_CH3COCH3_OH                 ', &
+                                     'ox_p10                          ', 'ox_p15                          ', &
+                                     'ox_p17                          ', 'soa5                            ', &
+                                     'ox_p14                          ', 'ox_l5                           ', &
+                                     'ox_p6                           ', 'ox_l7                           ', &
+                                     'ox_l8                           ', 'ox_p7                           ', &
+                                     'ox_p8                           ', 'usr_MCO3_NO2                    ', &
+                                     'usr_MPAN_M                      ', 'ox_p11                          ', &
+                                     'usr_XOOH_OH                     ', 'soa4                            ', &
+                                     'ox_p12                          ', 'soa2                            ', &
+                                     'soa1                            ', 'soa3                            ', &
+                                     'ox_p13                          ', 'usr_N2O5_aer                    ', &
+                                     'usr_NO3_aer                     ', 'usr_NO2_aer                     ', &
+                                     'usr_SO2_OH                      ', 'usr_DMS_OH                      ', &
+                                     'usr_HO2_aer                     ' /)
       rxt_tag_map(:rxt_tag_cnt) = (/    1,   2,   3,   4,   5,   6,   7,   8,   9,  10, &
                                        11,  12,  13,  14,  15,  16,  17,  18,  19,  20, &
                                        21,  22,  23,  24,  25,  26,  27,  28,  29,  30, &

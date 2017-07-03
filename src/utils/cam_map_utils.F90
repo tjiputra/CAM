@@ -626,9 +626,9 @@ contains
     logical, optional,         intent(out)   :: isMapped
 
     if (associated(this%map)) then
-      lonIndex = this%map(3, index)
+      lonIndex = this%map(max_srcs + 1, index)
       if (size(this%map,1) > (max_srcs + 1)) then
-        latIndex = this%map(4, index)
+        latIndex = this%map(max_srcs + 2, index)
       else
         latIndex = 0
       end if

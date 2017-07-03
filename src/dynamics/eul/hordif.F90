@@ -60,7 +60,6 @@ subroutine hordif(k,ztdt)
    real(r8) two
 !
 !-----------------------------------------------------------------------
-!DIR$ NOSTREAM
    two=2._r8
 !
 ! Set the horizontal diffusion factors for each wavenumer at this level

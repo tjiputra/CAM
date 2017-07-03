@@ -794,7 +794,7 @@ subroutine vertical_diffusion_tend( &
   ! Upper boundary conditions
   real(r8) :: ubc_t(pcols)            ! Temperature [ K ]
   real(r8) :: ubc_mmr(pcols,pcnst)    ! Mixing ratios [ kg/kg ]
-  real(r8) :: ubc_flux(pcnst)         ! Constituent flux [ kg/s/m^2 ]
+  real(r8) :: ubc_flux(pcols,pcnst)   ! Constituent upper boundary flux (kg/s/m^2)
 
   ! Pressure coordinates used by the solver.
   type(Coords1D) :: p
@@ -858,8 +858,8 @@ subroutine vertical_diffusion_tend( &
   tint(:ncol,pver+1) = state%t(:ncol,pver)
 
   ! Get upper boundary values
-  call ubc_get_vals( state%lchnk, ncol, state%pint, state%zi, &
-       ubc_t, ubc_mmr, ubc_flux )
+  call ubc_get_vals( state%lchnk, ncol, state%pint, state%zi, state%t, state%q, state%omega, state%phis, &
+                     ubc_t, ubc_mmr, ubc_flux )
 
   ! Always have a fixed upper boundary T if molecular diffusion is active. Why ?
   ! For WACCM-X, set ubc temperature to extrapolate from next two lower interface level temperatures

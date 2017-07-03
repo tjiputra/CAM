@@ -93,8 +93,6 @@ def buildcpp(case):
     else:
         config_opts += ["-ocn", comp_ocn]
 
-    config_opts += ["-comp_intf", "mct"]
-    
     # Add user options.
     config_opts += cam_config_opts.split(" ")
 

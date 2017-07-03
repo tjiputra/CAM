@@ -339,16 +339,8 @@ subroutine modal_aer_opt_init()
    if (history_amwg) then 
       call add_default ('AODDUST1'     , 1, ' ')
       call add_default ('AODDUST3'     , 1, ' ')
+      call add_default ('AODDUST'      , 1, ' ')
       call add_default ('AODVIS'       , 1, ' ')
-      call add_default ('BURDEN1'      , 1, ' ')
-      call add_default ('BURDEN2'      , 1, ' ')
-      call add_default ('BURDEN3'      , 1, ' ')
-      call add_default ('BURDENDUST'   , 1, ' ')
-      call add_default ('BURDENSO4'    , 1, ' ')
-      call add_default ('BURDENPOM'    , 1, ' ')
-      call add_default ('BURDENSOA'    , 1, ' ')
-      call add_default ('BURDENBC'     , 1, ' ')
-      call add_default ('BURDENSEASALT', 1, ' ')
    end if
 
    if (history_aero_optics) then 
@@ -1561,7 +1553,6 @@ end subroutine modal_size_parameters
         
         if(ix(1).gt.0) go to 30
         if(im.gt.1)then
-!dir$ SIMD
             do ic=1,ncol
                 do i=1,im
                     if(x(ic).lt.xtab(i))go to 10
@@ -1580,7 +1571,6 @@ end subroutine modal_size_parameters
             t(:ncol)=0._r8
         endif
         if(jm.gt.1)then
-!dir$ SIMD
             do ic=1,ncol
                 do j=1,jm
                     if(y(ic).lt.ytab(j))go to 20
@@ -1599,7 +1589,6 @@ end subroutine modal_size_parameters
             u(:ncol)=0._r8
         endif
         30 continue
-!dir$ SIMD
         do ic=1,ncol
             tu(ic)=t(ic)*u(ic)
             tuc(ic)=t(ic)-tu(ic)
@@ -1613,7 +1602,6 @@ end subroutine modal_size_parameters
             ixc=ix(ic)
             jp1=jp1m(ic)
             ip1=ip1m(ic)
-!dir$ SIMD
             do k=1,km
                 out(ic,k) = tcuc(ic) * table(k,ixc,jyc) + tuc(ic) * table(k,ip1,jyc) + &
                               tu(ic) * table(k,ip1,jp1) + tcu(ic) * table(k,ixc,jp1)

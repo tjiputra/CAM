@@ -1,0 +1,3 @@
+use_init_interp = .true.
+check_finidat_year_consistency = .false.
+finidat ='/glade/scratch/hannay/f.e20.F2000.f09_f09.163/run/f.e20.FHIST.f09_f09.163_01_RMGSSUNSHA.clm2.r.1980-01-01-00000.nc'

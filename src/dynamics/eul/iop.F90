@@ -1,4 +1,3 @@
-
 module iop
 !----------------------------------------------------------------------- 
 !BOP
@@ -10,31 +9,52 @@ module iop
 !
 ! !USES:
 !
-  use shr_kind_mod,     only: r8 => shr_kind_r8
-  use shr_scam_mod,     only: shr_scam_GetCloseLatLon
-  use constituents,     only: readtrace, cnst_get_ind, pcnst, cnst_name
-  use string_utils,     only: to_lower
-  use pmgrid
-  use prognostics
-  use time_manager,     only: timemgr_init, get_curr_date, get_curr_calday,&
-                              get_nstep,get_start_date,timemgr_time_inc
   use cam_abortutils,   only: endrun
-  use scamMod
-  use wrap_nf
   use cam_logfile,      only: iulog
-  use phys_control,     only: phys_getopts
+  use constituents,     only: readtrace, cnst_get_ind, pcnst, cnst_name
   use eul_control_mod,  only: eul_nsplit
+  use netcdf,           only: NF90_NOERR,NF90_CLOSE,NF90_GET_VAR,NF90_INQUIRE_DIMENSION, &
+                              NF90_INQ_DIMID, NF90_INQ_VARID, NF90_NOWRITE, NF90_OPEN, &
+                              NF90_GET_ATT,NF90_GLOBAL,NF90_INQUIRE_ATTRIBUTE
+  use phys_control,     only: phys_getopts
+  use pmgrid,           only: beglat,endlat,plon,plev,plevp
+  use prognostics,      only: n3,t3,q3,u3,v3,ps
+  use scamMod,          only: use_camiop, ioptimeidx, have_ps, use_userdata, have_tsair, &
+                              tobs, have_t, tground, have_tg, qobs, have_q, have_cld,    &
+                              have_clwp, divq, have_divq, vertdivq, have_vertdivq, divq3d, &
+                              have_divq3d, dqfxcam, have_numliq, have_cldliq, have_cldice, &
+                              have_numice, have_divu, have_divv, divt, have_divt, vertdivt, &
+                              have_vertdivt, divt3d, have_divt3d, have_divu3d,  have_divv3d, &
+                              have_ptend, ptend, wfld, uobs, have_u, uobs, vobs, have_v, &
+                              vobs, have_prec, have_q1, have_q2, have_lhflx, have_shflx, &
+                              use_3dfrc, betacam, fixmascam, alphacam, ioptimeidx,doiopupdate, &
+                              use_userdata, cldiceobs,  cldliqobs, cldobs, clwpobs, divu, &
+                              divu3d, divv, divv3d, iopfile, lhflxobs, numiceobs, numliqobs, &
+                              precobs, q1obs, scmlat, scmlon, shflxobs, tsair, have_omega, wfldh
+  use shr_kind_mod,     only: r8 => shr_kind_r8, max_chars=>shr_kind_cl
+  use shr_scam_mod,     only: shr_scam_GetCloseLatLon
+  use spmd_utils,       only: masterproc
+  use string_utils,     only: to_lower
+  use time_manager,     only: timemgr_init, get_curr_date, get_curr_calday,&
+                              get_nstep,is_first_step,get_start_date,timemgr_time_inc
+  use wrap_nf,          only: wrap_inq_dimid,wrap_get_vara_realx
 !
 ! !PUBLIC TYPES:
   implicit none
 
+
   private
 
-  real(r8), allocatable, target :: dqfx3sav(:,:,:,:)       
-  real(r8), allocatable, target :: t2sav(:,:,:)       
-  real(r8), allocatable, target :: divq3dsav(:,:,:,:)
-  real(r8), allocatable, target :: divt3dsav(:,:,:)       
-  real(r8), allocatable, target :: betasav(:)
+  real(r8), allocatable,target :: dqfx3sav(:,:,:,:)       
+  real(r8), allocatable,target :: t2sav(:,:,:)       
+  real(r8), allocatable,target :: fusav(:,:,:)       
+  real(r8), allocatable,target :: fvsav(:,:,:)       
+  real(r8), allocatable,target :: divq3dsav(:,:,:,:)
+  real(r8), allocatable,target :: divt3dsav(:,:,:)       
+  real(r8), allocatable,target :: divu3dsav(:,:,:)       
+  real(r8), allocatable,target :: divv3dsav(:,:,:)       
+  real(r8), allocatable,target :: betasav(:)
+
   integer :: closelatidx,closelonidx,latid,lonid,levid,timeid
 
   real(r8):: closelat,closelon
@@ -47,7 +67,7 @@ module iop
 !  public :: scam_use_iop_srf
 ! !PUBLIC DATA:
   public betasav, &
-         dqfx3sav, divq3dsav, divt3dsav,t2sav
+         dqfx3sav, divq3dsav, divt3dsav,divu3dsav,divv3dsav,t2sav,fusav,fvsav
 
 !
 ! !REVISION HISTORY:
@@ -65,7 +85,7 @@ contains
 ! also writes dynamics variables (on physics grid) to history file
 !------------------------------------------------------------------------------
    implicit none
-
+   character(len=*), parameter ::  sub = "init_iop_fields"
 !-----------------------------------------------------------------------
    if (eul_nsplit>1) then
       call endrun('iop module cannot be used with eul_nsplit>1')
@@ -88,13 +108,29 @@ contains
       allocate (divt3dsav(plon,plev,beglat:endlat))
       divt3dsav(:,:,:)=0._r8
    endif
+   if(.not.allocated(divu3dsav)) then
+      allocate (divu3dsav(plon,plev,beglat:endlat))
+      divu3dsav(:,:,:)=0._r8
+   endif
+   if(.not.allocated(divv3dsav)) then
+      allocate (divv3dsav(plon,plev,beglat:endlat))
+      divv3dsav(:,:,:)=0._r8
+   endif
    if(.not.allocated(t2sav)) then
       allocate (t2sav(plon,plev,beglat:endlat))  ! temp tendency
       t2sav(:,:,:)=0._r8
    endif
+   if(.not.allocated(fusav)) then
+      allocate (fusav(plon,plev,beglat:endlat))  ! U wind tendency
+      fusav(:,:,:)=0._r8
+   endif
+   if(.not.allocated(fvsav)) then
+      allocate (fvsav(plon,plev,beglat:endlat))  ! v wind tendency
+      fvsav(:,:,:)=0._r8
+   endif
   end subroutine init_iop_fields
 
-subroutine readiopdata( )
+subroutine readiopdata(timelevel)
 
 
 !-----------------------------------------------------------------------
@@ -106,40 +142,45 @@ subroutine readiopdata( )
 !     Written by J.  Truesdale    August, 1996, revised January, 1998
 !     
 !-----------------------------------------------------------------------
-        use ppgrid,           only: begchunk, endchunk
-	use phys_grid,        only: clat_p
-	use commap
-        use string_utils,     only: to_lower
-        use getinterpnetcdfdata
-        use shr_sys_mod,      only: shr_sys_flush
-	use hycoef, only : hyam, hybm
-        use eul_control_mod
-        use error_messages, only : handle_ncerr
-        use netcdf
+        use ppgrid,              only: begchunk, endchunk
+	use phys_grid,           only: clat_p
+	use commap,              only: latdeg, clat
+        use getinterpnetcdfdata, only: getinterpncdata
+        use shr_sys_mod,         only: shr_sys_flush
+	use hycoef,              only: hyam, hybm
+        use error_messages,      only: handle_ncerr
 !-----------------------------------------------------------------------
    implicit none
 #if ( defined RS6000 )
    implicit automatic ( a-z )
 #endif
+
+   character(len=*), parameter ::  sub = "read_iop_data"
+
+!------------------------------Input Arguments--------------------------
+!     
+integer, optional, intent(in) :: timelevel
+
 !------------------------------Locals-----------------------------------
 !     
+   integer ntimelevel
    integer NCID, status
    integer time_dimID, lev_dimID,  lev_varID
    integer tsec_varID, bdate_varID,varid
    integer i,j
    integer nlev
    integer total_levs
+   integer u_attlen
 
-   integer bdate, ntime
+   integer bdate, ntime,nstep
    integer, allocatable :: tsec(:)
    integer k, m
    integer icldliq,icldice
-   integer inumliq,inumice
+   integer inumliq,inumice,idx
 
    logical have_srf              ! value at surface is available
    logical fill_ends             ! 
    logical have_cnst(pcnst)
-   real(r8), allocatable :: dplevs( : )
    real(r8) dummy
    real(r8) lat,xlat
    real(r8) srf(1)                  ! value at surface
@@ -149,10 +190,19 @@ subroutine readiopdata( )
    real(r8) weight
    real(r8) tmpdata(1)
    real(r8) coldata(plev)
-   integer strt4(4),cnt4(4)
+   real(r8), allocatable :: dplevs( : )
+   integer strt4(4),cnt4(4),strt5(4),cnt5(4)
    character(len=16) :: lowername
+   character(len=max_chars) :: units ! Units
 
+   nstep = get_nstep()
    fill_ends= .false.
+
+   if (present(timelevel)) then
+      ntimelevel=timelevel
+   else
+      ntimelevel=n3
+   end if
 
 !     
 !     Open IOP dataset
@@ -164,7 +214,7 @@ subroutine readiopdata( )
 !     if the dataset is a CAM generated dataset set use_camiop to true
 !       CAM IOP datasets have a global attribute called CAM_GENERATED_IOP      
 !
-   if ( nf90_inquire_attribute( ncid, NF90_GLOBAL, 'CAM_GENERATED_FORCING', attnum=i ).EQ. NF90_NOERR ) then
+   if ( nf90_inquire_attribute( ncid, NF90_GLOBAL, 'CAM_GENERATED_FORCING', attnum=i )== NF90_NOERR ) then
       use_camiop = .true.
    else
       use_camiop = .false.
@@ -179,7 +229,7 @@ subroutine readiopdata( )
    if (status /= NF90_NOERR) then
       status = nf90_inq_dimid (ncid, 'tsec', time_dimID )
       if (status /= NF90_NOERR) then
-         write(iulog,* )'ERROR - readiopdata.F:Could not find dimension ID for time/tsec'
+         if (masterproc) write(iulog,*) sub//':ERROR - readiopdata.F:Could not find dimension ID for time/tsec'
          status = NF90_CLOSE ( ncid )
          call endrun
       end if
@@ -198,7 +248,7 @@ subroutine readiopdata( )
    if (status /= NF90_NOERR) then
       status = nf90_inq_varid (ncid, 'bdate', bdate_varID )
       if (status /= NF90_NOERR) then
-         write(iulog,* )'ERROR - readiopdata.F:Could not find variable ID for bdate'
+         if (masterproc) write(iulog,*) sub//':ERROR - readiopdata.F:Could not find variable ID for bdate'
          status = NF90_CLOSE ( ncid )
          call endrun
       end if
@@ -212,7 +262,7 @@ subroutine readiopdata( )
 !     
    status = NF90_INQ_DIMID( ncid, 'lev', lev_dimID )
    if ( status .ne. nf90_noerr ) then
-      write(iulog,* )'ERROR - readiopdata.F:Could not find variable dim ID  for lev'
+      if (masterproc) write(iulog,*) sub//':ERROR - readiopdata.F:Could not find variable dim ID  for lev'
       status = NF90_CLOSE ( ncid )
       return
    end if
@@ -224,7 +274,7 @@ subroutine readiopdata( )
 
    status = NF90_INQ_VARID( ncid, 'lev', lev_varID )
    if ( status .ne. nf90_noerr ) then
-      write(iulog,* )'ERROR - readiopdata.F:Could not find variable ID for lev'
+      if (masterproc) write(iulog,*) sub//':ERROR - readiopdata.F:Could not find variable ID for lev'
       status = NF90_CLOSE ( ncid )
       return
    end if
@@ -232,11 +282,17 @@ subroutine readiopdata( )
    call handle_ncerr( nf90_get_var (ncid, lev_varID, dplevs(:nlev)),&
                     'readiopdata.F90', __LINE__)
 !
-!CAM generated forcing already has pressure on millibars
+!CAM generated forcing already has pressure on millibars convert standard IOP if needed.
 !
-   if (.not. use_camiop) then
+   call handle_ncerr(nf90_inquire_attribute(ncid, lev_varID, 'units', len=u_attlen),&
+                    'readiopdata.F90', __LINE__)
+   call handle_ncerr(nf90_get_att(ncid, lev_varID, 'units', units),&
+                    'readiopdata.F90', __LINE__)
+   units=trim(to_lower(units(1:u_attlen)))
+
+   if ( units=='pa' .or. units=='pascal' .or. units=='pascals' ) then
 !
-!     convert pressure to millibars ( lev is expressed in pascals in iop datasets )
+!     convert pressure from Pascals to Millibars ( lev is expressed in pascals in iop datasets )
 !
       do i=1,nlev
          dplevs( i ) = dplevs( i )/100._r8
@@ -268,27 +324,26 @@ subroutine readiopdata( )
    status = nf90_inq_varid( ncid, 'Ps', varid   )
    if ( status .ne. nf90_noerr ) then
       have_ps = .false.
-      write(iulog,*)'Could not find variable Ps'
+      if (masterproc) write(iulog,*) sub//':Could not find variable Ps'
       if ( .not. use_userdata ) then
          status = NF90_CLOSE( ncid )
          return
       else
-         if ( get_nstep() .eq. 0 ) write(iulog,*) 'Using value from Analysis Dataset'
+         if ( is_first_step() .and. masterproc) write(iulog,*) 'Using pressure value from Analysis Dataset'
       endif
    else
-      status = nf90_get_var(ncid, varid, ps(1,1,n3), strt4)
+      status = nf90_get_var(ncid, varid, ps(1,1,ntimelevel), strt4)
       have_ps = .true.
    endif
 
 
-!  for reproducing CAM output don't do interpolation.
-!  the most expedient way of doing this is to set      
-!  the dataset pressure levels to the current
-!  scam model levels
+!  If the IOP dataset has hyam,hybm,etc it is assumed to be a hybrid level
+!  dataset.
 	
-   if ( use_camiop ) then
+   status =  nf90_inq_varid( ncid, 'hyam', varid   )
+   if ( status == nf90_noerr ) then
       do i = 1, plev
-         dplevs( i ) = 1000.0_r8 * hyam( i ) + ps(1,1,n3) * hybm( i ) / 100.0_r8
+         dplevs( i ) = 1000.0_r8 * hyam( i ) + ps(1,1,ntimelevel) * hybm( i ) / 100.0_r8
       end do
    endif
 
@@ -298,18 +353,18 @@ subroutine readiopdata( )
 !
 
    total_levs = nlev+1
-   dplevs(nlev+1) = ps(1,1,n3)/100 ! ps is expressed in pascals
+   dplevs(nlev+1) = ps(1,1,ntimelevel)/100.0_r8 ! ps is expressed in pascals
    do i= nlev, 1, -1
-      if ( dplevs(i) .GT. ps(1,1,n3)/100.0_r8) then
+      if ( dplevs(i) > ps(1,1,ntimelevel)/100.0_r8) then
          total_levs = i
-         dplevs(i) = ps(1,1,n3)/100
+         dplevs(i) = ps(1,1,ntimelevel)/100.0_r8
       end if
    end do
    if (.not. use_camiop ) then
       nlev = total_levs
    endif
-   if ( nlev .eq. 1 ) then
-      write(iulog,*) 'Error - Readiopdata.F: Ps too low!'
+   if ( nlev == 1 ) then
+      if (masterproc) write(iulog,*) sub//':Error - Readiopdata.F: Ps too low!'
       return
    endif
 
@@ -329,102 +384,87 @@ subroutine readiopdata( )
 !      with capital T defined in cam
 !
 
-   if ( get_nstep() .le. 1  ) then
-     tobs(:)=t3(1,:,1,1)
-   else
-     tobs(:)= t3(1,:,1,n3)
-   endif
+   tobs(:)= t3(1,:,1,ntimelevel)
 
    if ( use_camiop ) then
      call getinterpncdata( ncid, scmlat, scmlon, ioptimeidx,'t', have_tsair, &
           tsair(1), fill_ends, &
-          dplevs, nlev,ps(1,1,n3),tobs, status )
+          dplevs, nlev,ps(1,1,ntimelevel),tobs, status )
    else
      call getinterpncdata( ncid, scmlat, scmlon, ioptimeidx,'T', have_tsair, &
           tsair(1), fill_ends, &
-          dplevs, nlev,ps(1,1,n3), tobs, status )
+          dplevs, nlev,ps(1,1,ntimelevel), tobs, status )
    endif
    if ( status .ne. nf90_noerr ) then
       have_t = .false.
-      write(iulog,*)'Could not find variable T'
+      if (masterproc) write(iulog,*) sub//':Could not find variable T'
       if ( .not. use_userdata ) then
          status = NF90_CLOSE( ncid )
          return
       else
-         write(iulog,*) 'Using value from Analysis Dataset'
+         if (masterproc) write(iulog,*) sub//':Using value from Analysis Dataset'
       endif
 !     
 !     set T3 to Tobs on first time step
 !     
    else
       have_t = .true.
-      if (.not.use_camiop .and. get_nstep() .eq. 0) then
-         do i=1, PLEV
-            t3(1,i,1,n3)=tobs(i)  !     set t to tobs at first time step
-         end do
-      endif
    endif
 
    status = nf90_inq_varid( ncid, 'Tg', varid   )
    if (status .ne. nf90_noerr) then
-      write(iulog,*)'Could not find variable Tg'
+      if (masterproc) write(iulog,*) sub//':Could not find variable Tg on IOP dataset'
       if ( have_tsair ) then
-         write(iulog,*) 'Using Tsair'
+         if (masterproc) write(iulog,*) sub//':Using Tsair'
          tground = tsair     ! use surface value from T field
       else
-         write(iulog,*) 'Using T at lowest level'
-         tground = t3(1,plev,1,n3)
+         if (masterproc) write(iulog,*) sub//':Using T at lowest level from IOP dataset'
+         tground = tobs(plev)
       endif
    else
       call wrap_get_vara_realx (ncid,varid,strt4,cnt4,tground)
-      have_tg = .true.
+      have_Tg = .true.
    endif
 
    status = nf90_inq_varid( ncid, 'qsrf', varid   )
+
    if ( status .ne. nf90_noerr ) then
       have_srf = .false.
    else
       status = nf90_get_var(ncid, varid, srf(1), strt4)
       have_srf = .true.
    endif
-!
-   if ( get_nstep() .le. 1  ) then
-     qobs(:)= q3(1,:,1,1,1)
-   else
-     qobs(:)= q3(1,:,1,1,n3)
-   endif
+
+   qobs(:)= q3(1,:,1,1,ntimelevel)
 
    call getinterpncdata( ncid, scmlat, scmlon, ioptimeidx,  'q', have_srf, &
       srf(1), fill_ends, &
-      dplevs, nlev,ps(1,1,n3), qobs, status )
+      dplevs, nlev,ps(1,1,ntimelevel), qobs, status )
    if ( status .ne. nf90_noerr ) then
       have_q = .false.
-      write(iulog,*)'Could not find variable q'
+      if (masterproc) write(iulog,*) sub//':Could not find variable q'
       if ( .not. use_userdata ) then
          status = nf90_close( ncid )
          return
       else
-         write(iulog,*) 'Using values from Analysis Dataset'
+         if (masterproc) write(iulog,*) sub//':Using values from Analysis Dataset'
       endif
    else
-      if (.not. use_camiop .and. get_nstep() .eq. 0) then
-         do i=1, PLEV
-            q3(1,i,1,1,n3)=qobs(i)
-         end do
-         have_q = .true.
-      endif
+      have_q = .true.
    endif
 
+   cldobs = 0._r8
    call getinterpncdata( ncid, scmlat, scmlon, ioptimeidx,  'cld', .false., &
-      dummy, fill_ends, dplevs, nlev,ps(1,1,n3), cldobs, status )
+      dummy, fill_ends, dplevs, nlev,ps(1,1,ntimelevel), cldobs, status )
    if ( status .ne. nf90_noerr ) then
       have_cld = .false.
    else
       have_cld = .true.
    endif
    
+   clwpobs = 0._r8
    call getinterpncdata( ncid, scmlat, scmlon, ioptimeidx,  'clwp', .false., &
-      dummy, fill_ends, dplevs, nlev,ps(1,1,n3), clwpobs, status )
+      dummy, fill_ends, dplevs, nlev,ps(1,1,ntimelevel), clwpobs, status )
    if ( status .ne. nf90_noerr ) then
       have_clwp = .false.
    else
@@ -442,9 +482,11 @@ subroutine readiopdata( )
       have_srf = .true.
    endif
 
+   divq(:,:)=0._r8
+
    call getinterpncdata( ncid, scmlat, scmlon, ioptimeidx, &
         'divq', have_srf, srf(1), fill_ends, &
-        dplevs, nlev,ps(1,1,n3), divq(:,1), status )
+        dplevs, nlev,ps(1,1,ntimelevel), divq(:,1), status )
    if ( status .ne. nf90_noerr ) then
       have_divq = .false.
    else
@@ -462,9 +504,11 @@ subroutine readiopdata( )
       have_srf = .true.
    endif
 
+   vertdivq=0._r8
+
    call getinterpncdata( ncid, scmlat, scmlon, ioptimeidx, 'vertdivq', &
         have_srf, srf(1), fill_ends, &
-        dplevs, nlev,ps(1,1,n3), vertdivq(:,1), status )
+        dplevs, nlev,ps(1,1,ntimelevel), vertdivq(:,1), status )
    if ( status .ne. nf90_noerr ) then
       have_vertdivq = .false.
    else
@@ -483,30 +527,35 @@ subroutine readiopdata( )
 !
 !   add calls to get dynamics tendencies for all prognostic consts
 !
+   divq3d=0._r8
+
    do m = 1, pcnst
 
       call getinterpncdata( ncid, scmlat, scmlon, ioptimeidx, trim(cnst_name(m))//'_dten', &
       have_srf, srf(1), fill_ends, &
-      dplevs, nlev,ps(1,1,n3), divq3d(:,m), status )
-   if ( status .ne. nf90_noerr ) then
-      have_cnst(m) = .false.
-      divq3d(1:,m)=0._r8
-   else
-      have_cnst(m) = .true.
-   endif
-
+      dplevs, nlev,ps(1,1,ntimelevel), divq3d(:,m), status )
+      if ( status .ne. nf90_noerr ) then
+         have_cnst(m) = .false.
+         divq3d(1:,m)=0._r8
+      else
+         if (m==1) have_divq3d = .true.
+         have_cnst(m) = .true.
+      endif
+      
+      coldata = 0._r8
       call getinterpncdata( ncid, scmlat, scmlon, ioptimeidx, trim(cnst_name(m))//'_dqfx', &
       have_srf, srf(1), fill_ends, &
-      dplevs, nlev,ps(1,1,n3), coldata, status )
-       if ( STATUS .NE. NF90_NOERR ) then
-         dqfxcam=0._r8
+      dplevs, nlev,ps(1,1,ntimelevel), coldata, status )
+      if ( STATUS .NE. NF90_NOERR ) then
+         dqfxcam(1,:,m)=0._r8
       else
          dqfxcam(1,:,m)=coldata(:)
       endif
 
+      tmpdata = 0._r8
       call getinterpncdata( ncid, scmlat, scmlon, ioptimeidx, trim(cnst_name(m))//'_alph', &
       have_srf, srf(1), fill_ends, &
-      dplevs, nlev,ps(1,1,n3), tmpdata, status )
+      dplevs, nlev,ps(1,1,ntimelevel), tmpdata, status )
       if ( status .ne. nf90_noerr ) then
 !         have_cnst(m) = .false.
          alphacam(m)=0._r8
@@ -518,74 +567,80 @@ subroutine readiopdata( )
    end do
 
 
+   numliqobs = 0._r8
    call cnst_get_ind('NUMLIQ', inumliq, abort=.false.)
    if ( inumliq > 0 ) then
       have_srf = .false.
       call getinterpncdata( ncid, scmlat, scmlon, ioptimeidx, 'NUMLIQ', &
-         have_srf, srf(1), fill_ends, &
-         dplevs, nlev,ps(1,1,n3), numliqobs, status )
+           have_srf, srf(1), fill_ends, &
+           dplevs, nlev,ps(1,1,ntimelevel), numliqobs, status )
       if ( status .ne. nf90_noerr ) then
          have_numliq = .false.
       else
          have_numliq = .true.
-         if ( get_nstep() .eq. 0) then
-            do i=1, PLEV
-               q3(1,i,inumliq,1,n3)=numliqobs(i)
-            end do
-         endif
-     endif
+         do i=1, PLEV
+            q3(1,i,inumliq,1,ntimelevel)=numliqobs(i)
+         end do
+      endif
+   else
+         have_numliq = .false.
    end if
 
-   call cnst_get_ind('CLDLIQ', icldliq)
-
    have_srf = .false.
-   call getinterpncdata( ncid, scmlat, scmlon, ioptimeidx, 'CLDLIQ', &
-      have_srf, srf(1), fill_ends, &
-      dplevs, nlev,ps(1,1,n3), cldliqobs, status )
-   if ( status .ne. nf90_noerr ) then
-      have_cldliq = .false.
-   else
-      have_cldliq = .true.
-      if ( get_nstep() .eq. 0) then
+
+   cldliqobs = 0._r8
+   call cnst_get_ind('CLDLIQ', icldliq, abort=.false.)
+   if ( icldliq > 0 ) then
+      call getinterpncdata( ncid, scmlat, scmlon, ioptimeidx, 'CLDLIQ', &
+           have_srf, srf(1), fill_ends, &
+           dplevs, nlev,ps(1,1,ntimelevel), cldliqobs, status )
+      if ( status .ne. nf90_noerr ) then
+         have_cldliq = .false.
+      else
+         have_cldliq = .true.
          do i=1, PLEV
-            q3(1,i,icldliq,1,n3)=cldliqobs(i)
+            q3(1,i,icldliq,1,ntimelevel)=cldliqobs(i)
          end do
       endif
+   else
+         have_cldliq = .false.
    endif
 
-   call cnst_get_ind('CLDICE', icldice)
-
-   call getinterpncdata( ncid, scmlat, scmlon, ioptimeidx, 'CLDICE', &
-      have_srf, srf(1), fill_ends, &
-      dplevs, nlev,ps(1,1,n3), cldiceobs, status )
-   if ( status .ne. nf90_noerr ) then
+   cldiceobs = 0._r8
+   call cnst_get_ind('CLDICE', icldice, abort=.false.)
+   if ( icldice > 0 ) then
+      call getinterpncdata( ncid, scmlat, scmlon, ioptimeidx, 'CLDICE', &
+           have_srf, srf(1), fill_ends, &
+           dplevs, nlev,ps(1,1,ntimelevel), cldiceobs, status )
+      if ( status .ne. nf90_noerr ) then
+         have_cldice = .false.
+      else
+         have_cldice = .true.
+         do i=1, PLEV
+            q3(1,i,icldice,1,ntimelevel)=cldiceobs(i)
+         end do
+      endif
+   else
       have_cldice = .false.
-   else
-      have_cldice = .true.
-      if ( get_nstep() .eq. 0) then
-         do i=1, PLEV
-            q3(1,i,icldice,1,n3)=cldiceobs(i)
-         end do
-      endif
    endif
 
+   numiceobs = 0._r8
    call cnst_get_ind('NUMICE', inumice, abort=.false.)
    if ( inumice > 0 ) then
       have_srf = .false.
-
       call getinterpncdata( ncid, scmlat, scmlon, ioptimeidx, 'NUMICE', &
          have_srf, srf(1), fill_ends, &
-         dplevs, nlev,ps(1,1,n3), numiceobs, status )
+         dplevs, nlev,ps(1,1,ntimelevel), numiceobs, status )
       if ( status .ne. nf90_noerr ) then
          have_numice = .false.
       else
          have_numice = .true.
-         if ( get_nstep() .eq. 0) then
-            do i=1, PLEV
-               q3(1,i,inumice,1,n3)=numiceobs(i)
-            end do
-         endif
+         do i=1, PLEV
+            q3(1,i,inumice,1,ntimelevel)=numiceobs(i)
+         end do
       endif
+   else
+      have_numice = .false.
    end if
 
 !
@@ -599,9 +654,10 @@ subroutine readiopdata( )
       have_srf = .true.
    endif
 
+   divu = 0._r8
    call getinterpncdata( ncid, scmlat, scmlon, ioptimeidx, 'divu', &
       have_srf, srf(1), fill_ends, &
-      dplevs, nlev,ps(1,1,n3), divu, status )
+      dplevs, nlev,ps(1,1,ntimelevel), divu, status )
    if ( status .ne. nf90_noerr ) then
       have_divu = .false.
    else
@@ -618,9 +674,10 @@ subroutine readiopdata( )
       have_srf = .true.
    endif
 
+   divv = 0._r8
    call getinterpncdata( ncid, scmlat, scmlon, ioptimeidx, 'divv', &
       have_srf, srf(1), fill_ends, &
-      dplevs, nlev,ps(1,1,n3), divv, status )
+      dplevs, nlev,ps(1,1,ntimelevel), divv, status )
    if ( status .ne. nf90_noerr ) then
       have_divv = .false.
    else
@@ -637,9 +694,11 @@ subroutine readiopdata( )
       have_srf = .true.
    endif
 
+   divt=0._r8
+
    call getinterpncdata( ncid, scmlat, scmlon, ioptimeidx, &
       'divT', have_srf, srf(1), fill_ends, &
-      dplevs, nlev,ps(1,1,n3), divt, status )
+      dplevs, nlev,ps(1,1,ntimelevel), divt, status )
    if ( status .ne. nf90_noerr ) then
       have_divt = .false.
    else
@@ -656,10 +715,12 @@ subroutine readiopdata( )
       status = nf90_get_var(ncid, varid, srf(1), strt4)
       have_srf = .true.
    endif
+   
+   vertdivt=0._r8
 
    call getinterpncdata( ncid, scmlat, scmlon, ioptimeidx, 'vertdivT', &
       have_srf, srf(1), fill_ends, &
-      dplevs, nlev,ps(1,1,n3), vertdivt, status )
+      dplevs, nlev,ps(1,1,ntimelevel), vertdivt, status )
    if ( status .ne. nf90_noerr ) then
       have_vertdivt = .false.
    else
@@ -677,19 +738,43 @@ subroutine readiopdata( )
       have_srf = .true.
    endif
 
+   divT3d = 0._r8
+
    call getinterpncdata( ncid, scmlat, scmlon, ioptimeidx, 'divT3d', &
       have_srf, srf(1), fill_ends, &
-      dplevs, nlev,ps(1,1,n3), divt3d, status )
+      dplevs, nlev,ps(1,1,ntimelevel), divt3d, status )
    if ( status .ne. nf90_noerr ) then
       have_divt3d = .false.
    else
       have_divt3d = .true.
    endif
 
+   divU3d = 0._r8
+
+   call getinterpncdata( ncid, scmlat, scmlon, ioptimeidx, 'divU3d', &
+      have_srf, srf(1), fill_ends, &
+      dplevs, nlev,ps(1,1,ntimelevel), divu3d, status )
+   if ( status .ne. nf90_noerr ) then
+      have_divu3d = .false.
+   else
+      have_divu3d = .true.
+   endif
+
+   divV3d = 0._r8
+
+   call getinterpncdata( ncid, scmlat, scmlon, ioptimeidx, 'divV3d', &
+      have_srf, srf(1), fill_ends, &
+      dplevs, nlev,ps(1,1,ntimelevel), divv3d, status )
+   if ( status .ne. nf90_noerr ) then
+      have_divv3d = .false.
+   else
+      have_divv3d = .true.
+   endif
+
    status = nf90_inq_varid( ncid, 'Ptend', varid   )
    if ( status .ne. nf90_noerr ) then
       have_ptend = .false.
-      write(iulog,*)'Could not find variable Ptend. Setting to zero'
+      if (masterproc) write(iulog,*) sub//':Could not find variable Ptend. Setting to zero'
       ptend = 0.0_r8
    else
       status = nf90_get_var(ncid, varid, srf(1), strt4)
@@ -697,36 +782,35 @@ subroutine readiopdata( )
       ptend= srf(1)
    endif
 
+   wfld=0._r8
+
    call getinterpncdata( ncid, scmlat, scmlon, ioptimeidx, &
       'omega', .true., ptend, fill_ends, &
-      dplevs, nlev,ps(1,1,n3), wfld, status )
+      dplevs, nlev,ps(1,1,ntimelevel), wfld, status )
    if ( status .ne. nf90_noerr ) then
       have_omega = .false.
-      write(iulog,*)'Could not find variable omega'
+      if (masterproc) write(iulog,*) sub//':Could not find variable omega'
       if ( .not. use_userdata ) then
          status = nf90_close( ncid )
          return
       else
-         write(iulog,*) 'Using value from Analysis Dataset'
+         if (masterproc) write(iulog,*) sub//'Using value from Analysis Dataset'
       endif
    else
       have_omega = .true.
    endif
-   call plevs0(1    ,plon   ,plev    ,ps(1,1,n3)   ,pint,pmid ,pdel)
+   call plevs0(1    ,plon   ,plev    ,ps(1,1,ntimelevel)   ,pint,pmid ,pdel)
    call shr_sys_flush( iulog )
 !
 ! Build interface vector for the specified omega profile
 ! (weighted average in pressure of specified level values)
 !
-   wfldh(1) = 0.0_r8
+   wfldh(:) = 0.0_r8
 
    do k=2,plev
       weight = (pint(k) - pmid(k-1))/(pmid(k) - pmid(k-1))
       wfldh(k) = (1.0_r8 - weight)*wfld(k-1) + weight*wfld(k)
    end do
-
-   wfldh(plevp) = 0.0_r8
-
 
    status = nf90_inq_varid( ncid, 'usrf', varid   )
    if ( status .ne. nf90_noerr ) then
@@ -736,18 +820,18 @@ subroutine readiopdata( )
       have_srf = .true.
    endif
 
+   uobs=0._r8
+
    call getinterpncdata( ncid, scmlat, scmlon, ioptimeidx, &
       'u', have_srf, srf(1), fill_ends, &
-      dplevs, nlev,ps(1,1,n3), uobs, status )
+      dplevs, nlev,ps(1,1,ntimelevel), uobs, status )
    if ( status .ne. nf90_noerr ) then
       have_u = .false.
    else
       have_u = .true.
-      if (.not. use_camiop .and. get_nstep() .eq. 0 ) then
-         do i=1, PLEV
-            u3(1,i,1,n3) = uobs(i)  !     set u to uobs at first time step
-         end do
-      endif
+      do i=1, PLEV
+         u3(1,i,1,ntimelevel) = uobs(i)  !     set u to uobs at first time step
+      end do
    endif
 
    status = nf90_inq_varid( ncid, 'vsrf', varid   )
@@ -758,21 +842,20 @@ subroutine readiopdata( )
       have_srf = .true.
    endif
 
+   vobs=0._r8
+
    call getinterpncdata( ncid, scmlat, scmlon, ioptimeidx, &
       'v', have_srf, srf(1), fill_ends, &
-      dplevs, nlev,ps(1,1,n3), vobs, status )
+      dplevs, nlev,ps(1,1,ntimelevel), vobs, status )
    if ( status .ne. nf90_noerr ) then
       have_v = .false.
    else
       have_v = .true.
-      if (.not. use_camiop .and. get_nstep() .eq. 0 ) then
-         do i=1, PLEV
-            v3(1,i,1,n3) = vobs(i)  !     set u to uobs at first time step
-         end do
-      endif
+      do i=1, PLEV
+         v3(1,i,1,ntimelevel) = vobs(i)  !     set u to uobs at first time step
+      end do
    endif
    call shr_sys_flush( iulog )
-
 
    status = nf90_inq_varid( ncid, 'Prec', varid   )
    if ( status .ne. nf90_noerr ) then
@@ -782,18 +865,22 @@ subroutine readiopdata( )
       have_prec = .true.
    endif
 
+   q1obs = 0._r8
+
    call getinterpncdata( ncid, scmlat, scmlon, ioptimeidx, 'Q1', &
       .false., dummy, fill_ends, & ! datasets don't contain Q1 at surface
-      dplevs, nlev,ps(1,1,n3), q1obs, status )
+      dplevs, nlev,ps(1,1,ntimelevel), q1obs, status )
    if ( status .ne. nf90_noerr ) then
       have_q1 = .false.
    else
       have_q1 = .true.
    endif
 
+   q1obs = 0._r8
+
    call getinterpncdata( ncid, scmlat, scmlon, ioptimeidx, 'Q2', &
       .false., dummy, fill_ends, & ! datasets don't contain Q2 at surface
-      dplevs, nlev,ps(1,1,n3), q1obs, status )
+      dplevs, nlev,ps(1,1,ntimelevel), q1obs, status )
    if ( status .ne. nf90_noerr ) then
       have_q2 = .false.
    else
@@ -847,7 +934,7 @@ subroutine readiopdata( )
    endif
 
    if ( .not. have_divt3d .and. have_divt .and. have_vertdivt ) then
-      write(iulog,*) 'Don''t have divt3d - using divt and vertdivt'
+      if (masterproc) write(iulog,*) sub//'Don''t have divt3d - using divt and vertdivt'
       do k=1,plev
          divt3d(k) = divt(k) + vertdivt(k)
       enddo
@@ -863,7 +950,7 @@ subroutine readiopdata( )
    call shr_sys_flush( iulog )
 
    status =  nf90_inq_varid( ncid, 'CLAT', varid   )
-   if ( status .eq. nf90_noerr ) then
+   if ( status == nf90_noerr ) then
       call wrap_get_vara_realx (ncid,varid,strt4,cnt4,clat)
       clat_p(1)=clat(1)
       latdeg(1) = clat(1)*45._r8/atan(1._r8)
@@ -910,6 +997,7 @@ subroutine setiopupdate
 #if ( defined RS6000 )
   implicit automatic (a-z)
 #endif
+   character(len=*), parameter ::  sub = "setiopupdate"
 
 !------------------------------Locals-----------------------------------
 
@@ -927,7 +1015,7 @@ subroutine setiopupdate
    save last_date, last_sec 
 !------------------------------------------------------------------------------
 
-   if ( get_nstep() .eq. 0 ) then
+   if ( is_first_step() ) then
 !     
 !     Open  IOP dataset
 !     
@@ -936,14 +1024,15 @@ subroutine setiopupdate
 !     Read time (tsec) variable 
 !     
       STATUS = NF90_INQ_VARID( NCID, 'tsec', tsec_varID )
-      if ( STATUS .NE. NF90_NOERR ) write(iulog,*)'ERROR - setiopupdate.F:', &
+      if ( STATUS .NE. NF90_NOERR .and. masterproc) write(iulog,*) &
+         sub//':ERROR - setiopupdate.F:', &
          'Cant get variable ID for tsec'
 
       STATUS = NF90_INQ_VARID( NCID, 'bdate', bdate_varID )
       if ( STATUS .NE. NF90_NOERR ) then
          STATUS = NF90_INQ_VARID( NCID, 'basedate', bdate_varID )
-         if ( STATUS .NE. NF90_NOERR )         &
-            write(iulog,*)'ERROR - setiopupdate.F:Cant get variable ID for bdate'
+         if ( STATUS .NE. NF90_NOERR .and. masterproc) write(iulog,*) &
+              sub//':ERROR - setiopupdate.F:Cant get variable ID for bdate'
       endif
 
       STATUS = NF90_INQ_DIMID( NCID, 'time', time_dimID )
@@ -956,23 +1045,23 @@ subroutine setiopupdate
          end if
       end if
 
-      if ( STATUS .NE. NF90_NOERR )  &
-         write(iulog,*)'ERROR - setiopupdate.F:Cant get variable dim ID for time'
+      if ( STATUS .NE. NF90_NOERR .and. masterproc) write(iulog,*) &
+           sub//':ERROR - setiopupdate.F:Cant get variable dim ID for time'
 
       STATUS = NF90_INQUIRE_DIMENSION( NCID, time_dimID, len=ntime )
-      if ( STATUS .NE. NF90_NOERR )then
-         write(iulog,*)'ERROR - setiopupdate.F:Cant get time dimlen'
+      if ( STATUS .NE. NF90_NOERR ) then
+         if (masterproc) write(iulog,*) sub//':ERROR - setiopupdate.F:Cant get time dimlen'
       endif
 
       if (.not.allocated(tsec)) allocate(tsec(ntime))
 
       STATUS = NF90_GET_VAR( NCID, tsec_varID, tsec )
       if ( STATUS .NE. NF90_NOERR )then
-         write(iulog,*)'ERROR - setiopupdate.F:Cant get variable tsec'
+         if (masterproc) write(iulog,*) sub//':ERROR - setiopupdate.F:Cant get variable tsec'
       endif
       STATUS = NF90_GET_VAR( NCID, bdate_varID, bdate )
       if ( STATUS .NE. NF90_NOERR )then
-         write(iulog,*)'ERROR - setiopupdate.F:Cant get variable bdate'
+         if (masterproc) write(iulog,*) sub//':ERROR - setiopupdate.F:Cant get variable bdate'
       endif
 !     Close the netCDF file
       STATUS = NF90_CLOSE( NCID )
@@ -989,8 +1078,8 @@ subroutine setiopupdate
          call get_start_date(yr,mon,day,start_tod)
          start_ymd = yr*10000 + mon*100 + day
 
-         if ( start_ymd .gt. next_date .or. (start_ymd .eq. next_date &
-            .and. start_tod .ge. next_sec)) then
+         if ( start_ymd > next_date .or. (start_ymd == next_date &
+            .and. start_tod >= next_sec)) then
             iopTimeIdx = i
          endif
       enddo
@@ -998,12 +1087,14 @@ subroutine setiopupdate
       call get_curr_date(yr,mon,day,ncsec)
       ncdate=yr*10000 + mon*100 + day
 
-      if (iopTimeIdx == 0.or.iopTimeIdx .ge. ntime) then
+      if (iopTimeIdx == 0.or.iopTimeIdx >= ntime) then
          call timemgr_time_inc(bdate, 0, next_date, next_sec, inc_s=tsec(1))
-         write(iulog,*) 'Error::setiopupdate: Current model time does not fall within IOP period'
-         write(iulog,*) ' Current CAM Date is ',ncdate,' and ',ncsec,' seconds'
-         write(iulog,*) ' IOP start is        ',next_date,' and ',next_sec,' seconds'
-         write(iulog,*) ' IOP end is          ',last_date,' and ',last_sec,' seconds'
+         if (masterproc) then
+            write(iulog,*) 'Error::setiopupdate: Current model time does not fall within IOP period'
+            write(iulog,*) ' Current CAM Date is ',ncdate,' and ',ncsec,' seconds'
+            write(iulog,*) ' IOP start is        ',next_date,' and ',next_sec,' seconds'
+            write(iulog,*) ' IOP end is          ',last_date,' and ',last_sec,' seconds'
+         end if
          call endrun
       endif
 
@@ -1019,36 +1110,35 @@ subroutine setiopupdate
       call get_curr_date(yr, mon, day, ncsec)
       ncdate = yr*10000 + mon*100 + day
 
-      if ( ncdate .gt. next_date .or. (ncdate .eq. next_date &
-         .and. ncsec .ge. next_sec)) then
+      if ( ncdate > next_date .or. (ncdate == next_date &
+         .and. ncsec >= next_sec)) then
          iopTimeIdx = iopTimeIdx + 1
          doiopupdate = .true.
 #if DEBUG > 2
-         write(iulog,*) 'nstep = ',get_nstep()
-         write(iulog,*) 'ncdate=',ncdate,' ncsec=',ncsec
-         write(iulog,*) 'next_date=',next_date,' next_sec=',next_sec
-         write(iulog,*)'******* do iop update'
+         if (masterproc) write(iulog,*) sub//'nstep = ',get_nstep()
+         if (masterproc) write(iulog,*) sub//'ncdate=',ncdate,' ncsec=',ncsec
+         if (masterproc) write(iulog,*) sub//'next_date=',next_date,' next_sec=',next_sec
+         if (masterproc) write(iulog,*) sub//':******* do iop update'
 #endif 
       else
          doiopupdate = .false.
       end if
-   endif                     ! if (endstep .eq. 0 )
+   endif                     ! if (endstep == 0 )
 !
 !     make sure we're
 !     not going past end of iop data
 !
-   if ( ncdate .gt. last_date .or. (ncdate .eq. last_date &
-      .and. ncsec .gt. last_sec))  then
+   if ( ncdate > last_date .or. (ncdate == last_date &
+      .and. ncsec > last_sec))  then
       if ( .not. use_userdata ) then
-         write(iulog,*)'ERROR - setiopupdate.c:Reached the end of the time varient dataset'
-         stop
+         call endrun(sub//':ERROR - setiopupdate.c:Reached the end of the time varient dataset')
       else
          doiopupdate = .false.              
       end if
    endif
 
 #if DEBUG > 1
-   write(iulog,*)'iop time index = ' , ioptimeidx
+   if (masterproc) write(iulog,*) sub//':iop time index = ' , ioptimeidx
 #endif
 
    return

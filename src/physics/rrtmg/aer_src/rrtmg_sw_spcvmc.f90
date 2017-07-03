@@ -315,9 +315,6 @@
       do iplon=1,ncol
          iw(iplon) =0
       end do
-      !dir$ NOFUSION
-      !dir$ SIMD
-      !dir$ vector aligned
       do iplon=1,ncol
 ! Clear-sky    
 !   TOA direct beam    
@@ -345,8 +342,6 @@
          igt = ngc(ibm)
 
 ! Reinitialize g-point counter for each band if output for each band is requested.
-         !dir$ SIMD
-         !dir$ vector aligned
          do iplon=1,ncol
             if (iout.gt.0.and.ibm.ge.2) iw(iplon)= ngs(ibm-1)
          enddo
@@ -361,8 +356,6 @@
 
 ! Top of g-point interval loop within each band (iw is cumulative counter) 
          do jg = 1,igt
-            !dir$ vector always
-            !dir$ vector aligned
             do iplon=1,ncol
               iw(iplon) = iw(iplon)+1
 
@@ -392,8 +385,6 @@
 ! zdbto(jk)  cloudy direct beam transmittance
 ! zdbt(jk)   layer mean direct beam transmittance
 ! ztdbt(jk)  total direct beam transmittance at levels
-         !dir$ SIMD
-         !dir$ vector aligned
          do iplon=1,ncol
             zrefc(iplon,klev+1) =palbp(iplon,ibm)
             zrefdc(iplon,klev+1)=palbd(iplon,ibm)
@@ -409,7 +400,6 @@
 ! Top of layer loop
             do jk=1,klev
                ikl=klev+1-jk
-               !dir$ vector aligned
                do iplon=1,ncol
 ! Note: two-stream calculations proceed from top to bottom; 
 !   RRTMG_SW quantities are given bottom to top and are reversed here
@@ -447,7 +437,6 @@
 !   \/\/\/ This block of code is only needed for unscaled direct beam calculation
                enddo   
                if (idelm .eq. 0) then
-                  !dir$ vector aligned
                   do iplon=1,ncol
 !     
                      zclear(iplon) = 1.0_r8 - pcldfmc(iplon,ikl,iw(iplon))
@@ -459,7 +448,6 @@
 ! Use exponential lookup table for transmittance, or expansion of exponential for low tau
                      ze1(iplon) = ztauc(iplon,jk) / prmu0(iplon)
                   enddo
-                  !dir$ vector aligned
                   do iplon=1,ncol
                      if (ze1(iplon) .le. od_lo) then
                         zdbtmc(iplon) = 1._r8 - ze1(iplon) + 0.5_r8 * ze1(iplon) * ze1(iplon)
@@ -469,7 +457,6 @@
                         zdbtmc(iplon) = exp_tbl(itind(iplon))
                      endif
                   enddo
-                  !dir$ vector aligned
                   do iplon=1,ncol
 
                      zdbtc_nodel(iplon,jk) = zdbtmc(iplon)
@@ -482,7 +469,6 @@
 ! Use exponential lookup table for transmittance, or expansion of exponential for low tau
                      ze1(iplon) = tauorig(iplon) / prmu0(iplon)
                   enddo
-                  !dir$ vector aligned
                   do iplon=1,ncol
                      if (ze1(iplon) .le. od_lo) then
                         zdbtmo(iplon) = 1._r8 - ze1(iplon) + 0.5_r8 * ze1(iplon) * ze1(iplon)
@@ -492,7 +478,6 @@
                         zdbtmo(iplon) = exp_tbl(itind(iplon))
                      endif
                   enddo
-                  !dir$ vector aligned
                   do iplon=1,ncol
 
                      zdbt_nodel(iplon,jk) = zclear(iplon)*zdbtmc(iplon) + zcloud(iplon)*zdbtmo(iplon)
@@ -500,7 +485,6 @@
 
                   enddo
                endif
-               !dir$ vector aligned
                do iplon=1,ncol
 !   /\/\/\ Above code only needed for unscaled direct beam calculation
 
@@ -515,7 +499,6 @@
 ! Total sky optical parameters (cloud properties already delta-scaled)
 !   Use this code if cloud properties are derived in rrtmg_sw_cldprop       
                if (icpr .ge. 1) then
-                  !dir$ vector aligned
                   do iplon=1,ncol
                      ztauo(iplon,jk) = ztauc(iplon,jk) + ptaucmc(iplon,ikl,iw(iplon))
                      zomco(iplon,jk) = ztauc(iplon,jk) * zomcc(iplon,jk) + ptaucmc(iplon,ikl,iw(iplon)) * pomgcmc(iplon,ikl,iw(iplon)) 
@@ -526,7 +509,6 @@
 ! Total sky optical parameters (if cloud properties not delta scaled)
 !   Use this code if cloud properties are not derived in rrtmg_sw_cldprop       
                elseif (icpr .eq. 0) then
-                  !dir$ vector aligned
                   do iplon=1,ncol
                      ztauo(iplon,jk) = ztaur(iplon,ikl,iw(iplon)) + ztaug(iplon,ikl,iw(iplon)) + ptaua(iplon,ikl,ibm) + ptaucmc(iplon,ikl,iw(iplon))
                      zomco(iplon,jk) = ptaua(iplon,ikl,ibm) * pomga(iplon,ikl,ibm) + ptaucmc(iplon,ikl,iw(iplon)) * pomgcmc(iplon,ikl,iw(iplon)) + &
@@ -559,7 +541,6 @@
                             zrefo, zrefdo, ztrao, ztrado)
 
             do jk=1,klev
-               !dir$ vector aligned
                do iplon=1,ncol
 ! Combine clear and cloudy contributions for total sky
                   ikl = klev+1-jk 
@@ -580,7 +561,6 @@
 ! exponential for low tau
                   ze1(iplon) = ztauc(iplon,jk) / prmu0(iplon)
                enddo
-               !dir$ vector aligned
                do iplon=1,ncol
                   if (ze1(iplon) .le. od_lo) then
                      zdbtmc(iplon) = 1._r8 - ze1(iplon) + 0.5_r8 * ze1(iplon) * ze1(iplon)
@@ -631,7 +611,6 @@
 !   layer indexing is reversed to go bottom to top for output arrays
 
             do jk=1,klev+1
-               !dir$ vector aligned
                do iplon=1,ncol
                   ikl=klev+2-jk
 
@@ -653,13 +632,11 @@
                   pbbcd(iplon,ikl) = pbbcd(iplon,ikl) + zincflx(iplon,iw(iplon))*zcd(iplon,jk,iw(iplon))
                enddo
                if (idelm .eq. 0) then
-                  !dir$ vector aligned
                   do iplon=1,ncol
                      pbbfddir(iplon,ikl) = pbbfddir(iplon,ikl) + zincflx(iplon,iw(iplon))*ztdbt_nodel(iplon,jk)
                      pbbcddir(iplon,ikl) = pbbcddir(iplon,ikl) + zincflx(iplon,iw(iplon))*ztdbtc_nodel(iplon,jk)
                   enddo
                elseif (idelm .eq. 1) then
-                  !dir$ vector aligned
                   do iplon=1,ncol
                      pbbfddir(iplon,ikl) = pbbfddir(iplon,ikl) + zincflx(iplon,iw(iplon))*ztdbt(iplon,jk)
                      pbbcddir(iplon,ikl) = pbbcddir(iplon,ikl) + zincflx(iplon,iw(iplon))*ztdbtc(iplon,jk)
@@ -668,19 +645,16 @@
 
 ! Accumulate direct fluxes for UV/visible bands
                if (ibm >= 10 .and. ibm <= 13) then
-                  !dir$ vector aligned
                   do iplon=1,ncol
                      puvcd(iplon,ikl) = puvcd(iplon,ikl) + zincflx(iplon,iw(iplon))*zcd(iplon,jk,iw(iplon))
                      puvfd(iplon,ikl) = puvfd(iplon,ikl) + zincflx(iplon,iw(iplon))*zfd(iplon,jk,iw(iplon))
                   enddo
                   if (idelm .eq. 0) then
-                     !dir$ vector aligned
                      do iplon=1,ncol
                         puvfddir(iplon,ikl) = puvfddir(iplon,ikl) + zincflx(iplon,iw(iplon))*ztdbt_nodel(iplon,jk)
                         puvcddir(iplon,ikl) = puvcddir(iplon,ikl) + zincflx(iplon,iw(iplon))*ztdbtc_nodel(iplon,jk)
                      enddo
                   elseif (idelm .eq. 1) then
-                     !dir$ vector aligned
                      do iplon=1,ncol
                         puvfddir(iplon,ikl) = puvfddir(iplon,ikl) + zincflx(iplon,iw(iplon))*ztdbt(iplon,jk)
                         puvcddir(iplon,ikl) = puvcddir(iplon,ikl) + zincflx(iplon,iw(iplon))*ztdbtc(iplon,jk)
@@ -688,7 +662,6 @@
                   endif
 ! band 9 is half-NearIR and half-Visible
                else if (ibm == 9) then  
-                  !dir$ vector aligned
                   do iplon=1,ncol
                      puvcd(iplon,ikl) = puvcd(iplon,ikl) + 0.5_r8*zincflx(iplon,iw(iplon))*zcd(iplon,jk,iw(iplon))
                      puvfd(iplon,ikl) = puvfd(iplon,ikl) + 0.5_r8*zincflx(iplon,iw(iplon))*zfd(iplon,jk,iw(iplon))
@@ -696,7 +669,6 @@
                      pnifd(iplon,ikl) = pnifd(iplon,ikl) + 0.5_r8*zincflx(iplon,iw(iplon))*zfd(iplon,jk,iw(iplon))
                   enddo
                   if (idelm .eq. 0) then
-                     !dir$ vector aligned
                      do iplon=1,ncol
                         puvfddir(iplon,ikl) = puvfddir(iplon,ikl) + 0.5_r8*zincflx(iplon,iw(iplon))*ztdbt_nodel(iplon,jk)
                         puvcddir(iplon,ikl) = puvcddir(iplon,ikl) + 0.5_r8*zincflx(iplon,iw(iplon))*ztdbtc_nodel(iplon,jk)
@@ -704,7 +676,6 @@
                         pnicddir(iplon,ikl) = pnicddir(iplon,ikl) + 0.5_r8*zincflx(iplon,iw(iplon))*ztdbtc_nodel(iplon,jk)
                      enddo
                   elseif (idelm .eq. 1) then
-                     !dir$ vector aligned
                      do iplon=1,ncol
                         puvfddir(iplon,ikl) = puvfddir(iplon,ikl) + 0.5_r8*zincflx(iplon,iw(iplon))*ztdbt(iplon,jk)
                         puvcddir(iplon,ikl) = puvcddir(iplon,ikl) + 0.5_r8*zincflx(iplon,iw(iplon))*ztdbtc(iplon,jk)
@@ -712,33 +683,28 @@
                         pnicddir(iplon,ikl) = pnicddir(iplon,ikl) + 0.5_r8*zincflx(iplon,iw(iplon))*ztdbtc(iplon,jk)
                      enddo
                   endif
-                  !dir$ vector aligned
                   do iplon=1,ncol
                      pnicu(iplon,ikl) = pnicu(iplon,ikl) + 0.5_r8*zincflx(iplon,iw(iplon))*zcu(iplon,jk,iw(iplon))
                      pnifu(iplon,ikl) = pnifu(iplon,ikl) + 0.5_r8*zincflx(iplon,iw(iplon))*zfu(iplon,jk,iw(iplon))
 ! Accumulate direct fluxes for near-IR bands
                   enddo
                else if (ibm == 14 .or. ibm <= 8) then  
-                  !dir$ vector aligned
                   do iplon=1,ncol
                      pnicd(iplon,ikl) = pnicd(iplon,ikl) + zincflx(iplon,iw(iplon))*zcd(iplon,jk,iw(iplon))
                      pnifd(iplon,ikl) = pnifd(iplon,ikl) + zincflx(iplon,iw(iplon))*zfd(iplon,jk,iw(iplon))
                   enddo
                   if (idelm .eq. 0) then
-                     !dir$ vector aligned
                      do iplon=1,ncol
                         pnifddir(iplon,ikl) = pnifddir(iplon,ikl) + zincflx(iplon,iw(iplon))*ztdbt_nodel(iplon,jk)
                         pnicddir(iplon,ikl) = pnicddir(iplon,ikl) + zincflx(iplon,iw(iplon))*ztdbtc_nodel(iplon,jk)
                      enddo
                   elseif (idelm .eq. 1) then
-                     !dir$ vector aligned
                      do iplon=1,ncol
                         pnifddir(iplon,ikl) = pnifddir(iplon,ikl) + zincflx(iplon,iw(iplon))*ztdbt(iplon,jk)
                         pnicddir(iplon,ikl) = pnicddir(iplon,ikl) + zincflx(iplon,iw(iplon))*ztdbtc(iplon,jk)
                      enddo
                   endif
 ! Added for net near-IR flux diagnostic
-                  !dir$ vector aligned
                   do iplon=1,ncol
                      pnicu(iplon,ikl) = pnicu(iplon,ikl) + zincflx(iplon,iw(iplon))*zcu(iplon,jk,iw(iplon))
                      pnifu(iplon,ikl) = pnifu(iplon,ikl) + zincflx(iplon,iw(iplon))*zfu(iplon,jk,iw(iplon))

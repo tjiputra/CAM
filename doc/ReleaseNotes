@@ -133,6 +133,8 @@ New features in CAM-5.4
 * New switch to use alternative autoconversion scheme in MG2 (following Seifert and Behang 2001): when active this
   uses a different autoconversion and accretion scheme for liquid in MG2
 
+* Add Song and Zhang 2012 version of MG 2-moment microphysics in ZM convective scheme as an option
+
 ## Macrophysics
 
 * Add option for a ice supersaturation closure (supported in both CAM5 and CAM-CLUBB)
@@ -208,6 +210,10 @@ New features in CAM-5.4
 * The SPCAM package allows CLUBB to be used or not.  It is important to note that there is
    a SPCAM-specific version of CLUBB within the CRM package and it is not the same CLUBB being
    used by CAM
+
+## AQUAPLANET
+* CESM-aquaplanet is now supported out-of-the-box via prescribed-SST (QPCx) and 
+   slab-ocean (QSCx) compsets (where x is CAM version).
 
 
 -------------------------------------------------

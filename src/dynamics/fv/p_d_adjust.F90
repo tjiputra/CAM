@@ -4,7 +4,7 @@
 !
 ! !INTERFACE: 
   subroutine p_d_adjust(grid, tracer, pelnxy, pkxy, pkzxy, zvir, &
-                        cappa, delpxy, ptxy, pexy, psxy, ptop)
+                        cap3v, delpxy, ptxy, pexy, psxy, ptop)
 
 ! !USES:
     use shr_kind_mod, only: r8 => shr_kind_r8
@@ -17,6 +17,7 @@
                               shr_reprosum_recompute
     use cam_logfile,   only : iulog
     use perf_mod
+
 !-----------------------------------------------------------------------
     implicit none
 
@@ -24,7 +25,8 @@
     type (T_FVDYCORE_GRID), intent(in) :: grid
     real(r8), intent(in) :: zvir
     real(r8), intent(in) :: ptop
-    real(r8), intent(in) :: cappa
+    real(r8), intent(in) :: cap3v( grid%ifirstxy:grid%ilastxy,                      &
+                                   grid%jfirstxy:grid%jlastxy, grid%km) ! cappa
 
 ! !INPUT/OUTPUT PARAMETERS:
     real(r8), intent(inout) :: tracer(grid%ifirstxy:grid%ilastxy,                     &
@@ -68,6 +70,12 @@
                                                !  Array containing local pole values
     real(r8) :: pole_sum(grid%km,grid%ntotq+2) !  Array containing average of all pole values
     real(r8) :: rel_diff(2,grid%km,grid%ntotq+2)
+
+    real(r8) :: &
+        cap3vi(grid%ifirstxy:grid%ilastxy,grid%jfirstxy:grid%jlastxy,grid%km+1)
+    real(r8) :: &
+        pkln(grid%ifirstxy:grid%ilastxy,grid%km+1,grid%jfirstxy:grid%jlastxy)
+
     real(r8),allocatable :: pole_tmp(:)
 
     integer :: i, k, m, j ! indices
@@ -75,6 +83,7 @@
     integer :: ifirstxy, ilastxy, jfirstxy, jlastxy
 
     logical  :: write_warning
+    logical  :: high_alt
 
 !---------------------------End Local workspace-------------------------
 
@@ -83,7 +92,7 @@
 ! Complete update of dynamics variables
 ! ----------------------------------------------------
 !
-
+    high_alt = grid%high_alt
     im       = grid%im
     jm       = grid%jm
     km       = grid%km
@@ -270,28 +279,56 @@
        enddo
     enddo
 
+    if (high_alt) then
+       !$omp parallel do private(i,j,k)
+       do k=2,km
+          do j=jfirstxy,jlastxy
+             do i=ifirstxy,ilastxy
+                cap3vi(i,j,k) = 0.5_r8*(cap3v(i,j,k-1)+cap3v(i,j,k))
+             enddo
+          enddo
+       enddo
+       cap3vi(:,:,1) = 1.5_r8 * cap3v(:,:,1) - 0.5_r8 * cap3v(:,:,2)
+       cap3vi(:,:,km+1) = 1.5_r8 * cap3v(:,:,km) - 0.5_r8 * cap3v(:,:,km-1)
+    else
+       cap3vi(:,:,:) =  cap3v(grid%ifirstxy,grid%jfirstxy,1)
+    endif
+
+    !
+    ! Update pelnxy and pkxy
+    !
     !$omp parallel do private(i, j, k)
     do j=jfirstxy,jlastxy
-       
-       !
-       ! Update pelnxy and pkxy
-       !
        do k = 1, km+1
           do i = ifirstxy, ilastxy
              pelnxy(i,k,j) = log( pexy(i,k,j) )
-             pkxy  (i,j,k) = pexy(i,k,j) ** cappa
-          enddo
-       enddo
-
-       !
-       ! Update pkzxy
-       !
-       do k = 1,km
-          do i = ifirstxy,ilastxy
-             pkzxy(i,j,k) = (pkxy(i,j,k+1)-pkxy(i,j,k))/(cappa*(pelnxy(i,k+1,j)-pelnxy(i,k,j)))
+             pkxy  (i,j,k) = pexy(i,k,j) ** cap3vi(i,j,k)
+             pkln(i,k,j) = log(pkxy(i,j,k))
           enddo
        enddo
     enddo     ! jfirstxy:jlastxy loop
+    !
+    ! Update pkzxy
+    !
+    if (high_alt) then
+       !$omp parallel do private(i, j, k)
+       do j=jfirstxy,jlastxy
+          do k = 1,km
+             do i = ifirstxy,ilastxy
+                pkzxy(i,j,k) = (pkxy(i,j,k+1)-pkxy(i,j,k))/(pkln(i,k+1,j)-pkln(i,k,j))
+             enddo
+          enddo
+       enddo
+    else
+       !$omp parallel do private(i, j, k)
+       do j=jfirstxy,jlastxy
+          do k = 1,km
+             do i = ifirstxy,ilastxy
+                pkzxy(i,j,k) = (pkxy(i,j,k+1)-pkxy(i,j,k))/(cap3v(i,j,k)*(pelnxy(i,k+1,j)-pelnxy(i,k,j)))
+             enddo
+          enddo
+       enddo
+    endif
 
     !
     ! Calculate virtual potential temperature

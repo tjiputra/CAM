@@ -454,7 +454,6 @@ subroutine rrtmg_sw &
       enddo
    enddo
 
-   !dir$ NOFUSION
    do iplon = 1, ncol
       albdir(iplon,nbndsw) = aldir(iplon)
       albdif(iplon,nbndsw) = aldif(iplon)
@@ -465,7 +464,6 @@ subroutine rrtmg_sw &
    enddo
 
    !  UV/visible bands 25-28 (10-13), 16000-50000 cm-1, 0.200-0.625 micron
-   !dir$ NOFUSION
    do ib=10,13
       do iplon = 1, ncol
          albdir(iplon,ib) = asdir(iplon)
@@ -741,22 +739,16 @@ subroutine inatm_sw (ncol, nlay, icld, iaer, &
    ! to a single scaling factor as needed, or to a different value in each 
    ! band, which may be necessary for paleoclimate simulations. 
 
-   !DIR$ VECTOR ALIGNED
-   !DIR$ SIMD
    do iplon = 1 ,ncol
       adjflux(iplon,:) = 0._r8
    end do
 
    do ib = jpb1,jpb2
-      !DIR$ VECTOR ALIGNED
-      !DIR$ SIMD
       do iplon = 1, ncol
          adjflux(iplon,ib) = adjflx * solvar(ib)
       end do
    end do
 
-   !DIR$ VECTOR ALIGNED
-   !DIR$ SIMD
    do iplon = 1, ncol
       !  Set surface temperature.
       tbound(iplon) = tsfc(iplon)
@@ -779,8 +771,6 @@ subroutine inatm_sw (ncol, nlay, icld, iaer, &
    end do
 
    do l = 1, nlay
-      !DIR$ VECTOR ALIGNED
-      !DIR$ SIMD
       do iplon = 1, ncol
          pavel(iplon,l) = play(iplon,nlay-l+1)
          tavel(iplon,l) = tlay(iplon,nlay-l+1)

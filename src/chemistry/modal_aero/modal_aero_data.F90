@@ -381,7 +381,7 @@
        call cnst_get_ind(solsym(i), idx, abort=.false.)
        if (idx > 0) then
           if (cnst_species_class(idx) == cnst_spec_class_undefined) then
-             call cnst_set_spec_class(i, cnst_spec_class_gas)
+             call cnst_set_spec_class(idx, cnst_spec_class_gas)
           end if
        end if
     end do
@@ -425,10 +425,6 @@
        integer :: soa_ndx
 
        !-----------------------------------------------------------------------
-
-       do i=1, pcnst
-         call cnst_set_spec_class(i, cnst_spec_class_undefined)
-       end do
 
        ! Mode specific properties.
        do m = 1, ntot_amode

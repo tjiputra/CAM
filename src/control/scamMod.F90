@@ -32,9 +32,6 @@ logical, public ::  use_saveinit
 logical, public ::  use_pert_init         ! perturb initial values
 logical, public ::  use_pert_frc          ! perturb forcing 
 logical, public ::  scm_diurnal_avg       ! If using diurnal averaging or not
-logical, public ::  scm_crm_mode          ! column radiation mode
-logical, public ::  use_userdata
-logical, public ::  isrestart             ! If this is a restart step or not
 logical, public ::  switch(num_switches)  ! Logical flag settings from GUI
 logical, public ::  l_uvphys              ! If true, update u/v after TPHYS
 logical, public ::  l_uvadvect            ! If true, T, U & V will be passed to SLT
@@ -63,6 +60,13 @@ character*(max_path_len), public ::  timeinvfile
 character*(max_path_len), public ::  lsmsurffile
 character*(max_path_len), public ::  lsminifile
 
+! note that scm_zadv_q is set to slt to be consistent with CAM BFB testing
+
+
+character(len=16), public    :: scm_zadv_T  = 'eulc            '
+character(len=16), public    :: scm_zadv_q  = 'slt             '
+character(len=16), public    :: scm_zadv_uv = 'eulc            '
+
 real(r8), public ::  fixmascam
 real(r8), public ::  betacam
 real(r8), public ::  alphacam(pcnst)
@@ -70,8 +74,12 @@ real(r8), public ::  dqfxcam(plon,plev,pcnst)
 
 real(r8), public ::      divq3d(plev,pcnst)  ! 3D q advection
 real(r8), public ::      divt3d(plev)        ! 3D T advection
+real(r8), public ::      divu3d(plev)        ! 3D U advection
+real(r8), public ::      divv3d(plev)        ! 3D V advection
 real(r8), public ::      vertdivq(plev,pcnst)! vertical q advection
 real(r8), public ::      vertdivt(plev)      ! vertical T advection
+real(r8), public ::      vertdivu(plev)      ! vertical T advection
+real(r8), public ::      vertdivv(plev)      ! vertical T advection
 real(r8), public ::      ptend               ! surface pressure tendency
 real(r8), public ::      qdiff(plev)         ! model minus observed humidity
 real(r8), public ::      qobs(plev)          ! actual W.V. Mixing ratio
@@ -114,44 +122,77 @@ integer, public ::     steplength            ! Length of time-step
 integer, public ::     base_date             ! Date in (yyyymmdd) of start time
 integer, public ::     base_secs             ! Time of day of start time (sec)
 
-logical, public ::  doiopupdate   ! do we need to read next iop timepoint
-logical, public ::  have_divq     ! dataset contains divq 
-logical, public ::  have_divt     ! dataset contains divt
-logical, public ::  have_divq3d   ! dataset contains divq3d 
-logical, public ::  have_vertdivt ! dataset contains vertdivt
-logical, public ::  have_vertdivq ! dataset contains vertdivq 
-logical, public ::  have_divt3d   ! dataset contains divt3d
-logical, public ::  have_divu     ! dataset contains divu
-logical, public ::  have_divv     ! dataset contains divv 
-logical, public ::  have_omega    ! dataset contains omega
-logical, public ::  have_phis     ! dataset contains phis
-logical, public ::  have_ptend    ! dataset contains ptend
-logical, public ::  have_ps       ! dataset contains ps
-logical, public ::  have_q        ! dataset contains q
-logical, public ::  have_q1       ! dataset contains Q1
-logical, public ::  have_q2       ! dataset contains Q2
-logical, public ::  have_prec     ! dataset contains prec 
-logical, public ::  have_lhflx    ! dataset contains lhflx 
-logical, public ::  have_shflx    ! dataset contains shflx
-logical, public ::  have_t        ! dataset contains t
-logical, public ::  have_tg       ! dataset contains tg
-logical, public ::  have_tsair    ! dataset contains tsair
-logical, public ::  have_u        ! dataset contains u 
-logical, public ::  have_v        ! dataset contains v 
-logical, public ::  have_cld      ! dataset contains cld
-logical, public ::  have_cldliq   ! dataset contains cldliq
-logical, public ::  have_cldice   ! dataset contains cldice
-logical, public ::  have_numliq   ! dataset contains numliq
-logical, public ::  have_numice   ! dataset contains numice
-logical, public ::  have_clwp     ! dataset contains clwp
-logical, public ::  have_aldir    ! dataset contains aldir
-logical, public ::  have_aldif    ! dataset contains aldif
-logical, public ::  have_asdir    ! dataset contains asdir
-logical, public ::  have_asdif    ! dataset contains asdif
-logical, public ::  scm_iop_srf_prop   ! use the specified surface properties
-logical, public ::  scm_relaxation! use relaxation
-logical, public ::  use_camiop    ! use cam generated forcing 
-logical, public ::  use_3dfrc     ! use 3d forcing
+! SCAM public data defaults
+
+logical, public ::  doiopupdate            = .false. ! do we need to read next iop timepoint
+logical, public ::  have_lhflx             = .false. ! dataset contains lhflx 
+logical, public ::  have_shflx             = .false. ! dataset contains shflx
+logical, public ::  have_tg                = .false. ! dataset contains tg
+logical, public ::  have_tsair             = .false. ! dataset contains tsair
+logical, public ::  have_divq              = .false. ! dataset contains divq 
+logical, public ::  have_divt              = .false. ! dataset contains divt
+logical, public ::  have_divq3d            = .false. ! dataset contains divq3d 
+logical, public ::  have_vertdivu          = .false. ! dataset contains vertdivu
+logical, public ::  have_vertdivv          = .false. ! dataset contains vertdivv
+logical, public ::  have_vertdivt          = .false. ! dataset contains vertdivt
+logical, public ::  have_vertdivq          = .false. ! dataset contains vertdivq 
+logical, public ::  have_divt3d            = .false. ! dataset contains divt3d
+logical, public ::  have_divu3d            = .false. ! dataset contains divu3d
+logical, public ::  have_divv3d            = .false. ! dataset contains divv3d
+logical, public ::  have_divu              = .false. ! dataset contains divu
+logical, public ::  have_divv              = .false. ! dataset contains divv 
+logical, public ::  have_omega             = .false. ! dataset contains omega
+logical, public ::  have_phis              = .false. ! dataset contains phis
+logical, public ::  have_ptend             = .false. ! dataset contains ptend
+logical, public ::  have_ps                = .false. ! dataset contains ps
+logical, public ::  have_q                 = .false. ! dataset contains q
+logical, public ::  have_q1                = .false. ! dataset contains Q1
+logical, public ::  have_q2                = .false. ! dataset contains Q2
+logical, public ::  have_prec              = .false. ! dataset contains prec 
+logical, public ::  have_t                 = .false. ! dataset contains t
+logical, public ::  have_u                 = .false. ! dataset contains u 
+logical, public ::  have_v                 = .false. ! dataset contains v 
+logical, public ::  have_cld               = .false. ! dataset contains cld
+logical, public ::  have_cldliq            = .false. ! dataset contains cldliq
+logical, public ::  have_cldice            = .false. ! dataset contains cldice
+logical, public ::  have_numliq            = .false. ! dataset contains numliq
+logical, public ::  have_numice            = .false. ! dataset contains numice
+logical, public ::  have_clwp              = .false. ! dataset contains clwp
+logical, public ::  have_aldir             = .false. ! dataset contains aldir
+logical, public ::  have_aldif             = .false. ! dataset contains aldif
+logical, public ::  have_asdir             = .false. ! dataset contains asdir
+logical, public ::  have_asdif             = .false. ! dataset contains asdif
+logical, public ::  use_camiop             = .false. ! use cam generated forcing 
+logical, public ::  use_3dfrc              = .false. ! use 3d forcing
+logical, public ::  use_userdata           = .false. 
+logical, public ::  isrestart              = .false. ! If this is a restart step or not
+  
+! SCAM namelist defaults
+
+logical, public ::  scm_relaxation         = .false. ! Use relaxation
+logical, public ::  scm_crm_mode           = .false. ! Use column radiation mode
+logical, public ::  scm_cambfb_mode        = .false. ! Use extra CAM IOP fields to assure bit for bit match with CAM run
+logical, public ::  scm_use_obs_T          = .false. ! Use the SCAM-IOP specified observed T   at each time step instead of forecasting.
+logical, public ::  scm_force_latlon       = .false. ! force scam to use the lat lon fields specified in the scam namelist not what is closest to iop avail lat lon
+real*8, public              ::  scm_relax_top_p       = 1.e36_r8 ! upper bound for scm relaxation
+real*8, public              ::  scm_relax_bot_p       = -1.e36_r8 !  lower bound for scm relaxation
+real*8, public              ::  scm_relax_tau_sec       = 10800._r8  ! relaxation time constant (sec)
+
+! +++BPM:
+! modification... allow a linear ramp in relaxation time scale:
+logical, public :: scm_relax_linear = .false.
+real*8, public    :: scm_relax_tau_bot_sec = 10800._r8
+real*8, public    :: scm_relax_tau_top_sec = 10800._r8
+
+!
+! note that scm_use_obs_uv is set to true to be consistent with CAM BFB testing
+!
+
+logical, public ::  scm_use_obs_uv         = .true. ! Use the SCAM-IOP specified observed u,v at each time step instead of forecasting.
+
+logical, public ::  scm_use_obs_qv         = .false. ! Use the SCAM-IOP specified observed qv  at each time step instead of forecasting.
+logical, public ::  scm_iop_lhflxshflxTg   = .false. !turn off LW rad
+logical, public ::  scm_iop_Tg             = .false. !turn off LW rad
 
 character(len=200), public ::  scm_clubb_iop_name   ! IOP name for CLUBB
 
@@ -159,138 +200,109 @@ character(len=200), public ::  scm_clubb_iop_name   ! IOP name for CLUBB
 contains
 !=======================================================================
 
-subroutine scam_readnl(nlfile, single_column_in, scmlat_in, scmlon_in)
+subroutine scam_readnl(nlfile,single_column_in,scmlat_in,scmlon_in)
 
-   use namelist_utils,  only: find_group_name
-   use units,           only: getunit, freeunit
-   use spmd_utils,      only: mpicom, mstrid=>masterprocid, mpi_integer
-   use dycore,          only: dycore_is
-   use wrap_nf,         only: wrap_open, wrap_inq_dimid, wrap_inq_dimlen, wrap_inq_varid
-   use netcdf
+  use namelist_utils,  only: find_group_name
+  use units,           only: getunit, freeunit
+  use dycore,          only: dycore_is
+  use wrap_nf,         only: wrap_open
+  use spmd_utils,      only : masterproc,npes
+  use netcdf,          only : nf90_inquire_attribute,NF90_NOERR,NF90_GLOBAL,NF90_NOWRITE
 
-   character(len=*), intent(in) :: nlfile  ! filepath for file containing namelist input
-   logical,          intent(in) :: single_column_in
-   real(r8),         intent(in) :: scmlat_in
-   real(r8),         intent(in) :: scmlon_in
 
-   ! Local variables
-   integer :: unitn, ierr
-   character(len=*), parameter :: sub = 'scam_readnl'
+!---------------------------Arguments-----------------------------------
 
-   namelist /scam_nl/ iopfile, scm_crm_mode, scm_diurnal_avg, scm_iop_srf_prop, &
-                      scm_clubb_iop_name, scm_relaxation
+  character(len=*), intent(in) :: nlfile  ! filepath for file containing namelist input  (nlfile=atm_in)
+  logical,          intent(in) :: single_column_in
+  real(r8),         intent(in) :: scmlat_in
+  real(r8),         intent(in) :: scmlon_in
 
-   integer  :: ncid
-   integer  :: latdimid, londimid
-   integer  :: latsiz, lonsiz
-   integer  :: latid, lonid
-   integer  :: iatt
-   integer  :: ret
-   integer  :: latidx, lonidx
-   real(r8) :: ioplat,ioplon
-   !-----------------------------------------------------------------------------
+  ! Local variables
+  character(len=*), parameter :: sub = 'scam_readnl'
+  integer :: unitn, ierr
+  integer  :: ncid
+  integer  :: latdimid, londimid
+  integer  :: latsiz, lonsiz
+  integer  :: latid, lonid
+  integer  :: iatt
+  integer  :: ret
+  integer  :: latidx, lonidx
+  real(r8) :: ioplat,ioplon
 
-   single_column = single_column_in
+! this list should include any variable that you might want to include in the namelist
+  namelist /scam_nl/ iopfile, scm_iop_lhflxshflxTg, scm_iop_Tg, scm_relaxation, &
+       scm_relax_top_p,scm_relax_bot_p,scm_relax_tau_sec, &
+       scm_cambfb_mode,scm_crm_mode,scm_zadv_uv,scm_zadv_T,scm_zadv_q,&
+       scm_use_obs_T, scm_use_obs_uv, scm_use_obs_qv, &
+       scm_relax_linear, scm_relax_tau_top_sec, &
+       scm_relax_tau_bot_sec, scm_force_latlon
 
-   iopfile            = ' '
-   scm_crm_mode       = .false.
-   scm_diurnal_avg    = .false.
-   scm_iop_srf_prop   = .false.
-   scm_clubb_iop_name = ' '
-   scm_relaxation     = .false.
+  single_column=single_column_in
 
-   if (single_column) then
+  iopfile            = ' '
+  scm_clubb_iop_name = ' '
+  
+  if( single_column ) then
+     if( npes.gt.1) call endrun('SCAM_READNL: SCAM doesnt support using more than 1 pe.')
 
-      if (.not. dycore_is('EUL') .or. plon /= 1 .or. plat /=1 ) then 
-         call endrun(sub//': must compile model for SCAM mode when namelist '//&
-            'parameter single_column is .true.')
-      endif
+     if (.not. dycore_is('EUL') .or. plon /= 1 .or. plat /=1 ) then 
+        call endrun('SCAM_SETOPTS: must compile model for SCAM mode when namelist parameter single_column is .true.')
+     endif
 
-      scmlat = scmlat_in
-      scmlon = scmlon_in
+     scmlat=scmlat_in
+     scmlon=scmlon_in
+     
+     if( scmlat .lt. -90._r8 .or. scmlat .gt. 90._r8 ) then
+        call endrun('SCAM_READNL: SCMLAT must be between -90. and 90. degrees.')
+     elseif( scmlon .lt. 0._r8 .or. scmlon .gt. 360._r8 ) then
+        call endrun('SCAM_READNL: SCMLON must be between 0. and 360. degrees.')
+     end if
+     
+     ! Read namelist
+     if (masterproc) then
+        unitn = getunit()
+        open( unitn, file=trim(nlfile), status='old' )
+        call find_group_name(unitn, 'scam_nl', status=ierr)
+        if (ierr == 0) then
+           read(unitn, scam_nl, iostat=ierr)
+           if (ierr /= 0) then
+              call endrun(sub // ':: ERROR reading namelist')
+           end if
+        end if
+        close(unitn)
+        call freeunit(unitn)
+     end if
+     
+     ! Error checking:
+     
+     iopfile = trim(iopfile)
+     if( iopfile .ne. "" ) then 
+        use_iop = .true.
+     else
+        call endrun('SCAM_READNL: must specify IOP file for single column mode')
+     endif
 
-      if (scmlat < -90._r8 .or. scmlat > 90._r8) then
-         call endrun(sub//': ERROR: SCMLAT must be between -90. and 90. degrees.')
-      else if (scmlon < 0._r8 .or. scmlon > 360._r8) then
-         call endrun(sub//': ERROR: SCMLON must be between 0. and 360. degrees.')
-      end if
+     call wrap_open( iopfile, NF90_NOWRITE, ncid )
 
-      ! Read namelist
-      unitn = getunit()
-      open( unitn, file=trim(nlfile), status='old' )
-      call find_group_name(unitn, 'scam_nl', status=ierr)
-      if (ierr == 0) then
-         read(unitn, scam_nl, iostat=ierr)
-         if (ierr /= 0) then
-            call endrun(sub//': FATAL: reading namelist')
-         end if
-      end if
-      close(unitn)
-      call freeunit(unitn)
-
-      if (iopfile .ne. "") then 
-         use_iop = .true.
-      else
-         call endrun(sub//': ERROR: must specify IOP file for single column mode')
-      endif
-
-      call wrap_open(iopfile, NF90_NOWRITE, ncid)
-      call wrap_inq_dimid(ncid, 'lon', londimid)
-      call wrap_inq_dimid(ncid, 'lat', latdimid)
-      call wrap_inq_dimlen(ncid, londimid, lonsiz)
-      call wrap_inq_dimlen(ncid, latdimid, latsiz)
-      call wrap_inq_varid(ncid, 'lon', lonid)
-      call wrap_inq_varid(ncid, 'lat', latid)
-
-      if (nf90_inquire_attribute( ncid, NF90_GLOBAL, 'CAM_GENERATED_FORCING', attnum=iatt ) &
-                                 == NF90_NOERR) then
-         use_camiop = .true.
-      else
-         use_camiop = .false.
-      endif
-
-      if (latsiz==1 .and. lonsiz==1) then
-
-         ret = nf90_get_var(ncid, lonid, ioplon)
-         if (ret /= NF90_NOERR) then
-            call endrun(sub//': ERROR: reading longitude variable from iopfile')
-         end if
-         if (ioplon < 0._r8) ioplon = ioplon + 360._r8
-
-         ret = nf90_get_var(ncid, latid, ioplat)
-         if (ret /= NF90_NOERR) then
-            call endrun(sub//': ERROR: reading latitude variable from iopfile')
-         end if
-
-         call shr_scam_GetCloseLatLon(ncid, scmlat, scmlon, ioplat, ioplon, latidx, lonidx)
-      else
-         if (use_camiop) then
-            call shr_scam_GetCloseLatLon(ncid, scmlat, scmlon, ioplat, ioplon, latidx, lonidx)
-         end if
-      endif
-
-      scmlat = ioplat
-      scmlon = ioplon
-
-      write(iulog,*) 'SCAM options:'
-      write(iulog,*) '  scmlat, scmlon         =', scmlat_in, scmlon_in
-      write(iulog,*) '  Using closest lat, lon =', scmlat, scmlon
-      if (use_camiop) then
-         write(iulog,*) '  Using CAM Generated IOP file:', trim(iopfile)
-      else
-         write(iulog,*) '  Using IOP file              :', trim(iopfile)
-      end if
-      write(iulog,*) '  scm_crm_mode           =', scm_crm_mode
-      write(iulog,*) '  scm_diurnal_avg        =', scm_diurnal_avg
-      write(iulog,*) '  scm_iop_srf_prop       =', scm_iop_srf_prop
-      write(iulog,*) '  scm_clubb_iop_name     =', trim(scm_clubb_iop_name)
-      write(iulog,*) '  scm_relaxation         =', scm_relaxation
-
-   else if (dycore_is('EUL') .and. plon ==1 .and. plat ==1) then
-      call endrun(sub//': ERROR: single_column namelist option must be set to true'//&
-         ' when running in single column mode')
-   endif
-
+     if( nf90_inquire_attribute( ncid, NF90_GLOBAL, 'CAM_GENERATED_FORCING', iatt ) .EQ. NF90_NOERR ) then
+        use_camiop = .true.
+     else
+        use_camiop = .false.
+     endif
+     
+     ! If we are not forcing the lat and lon from the namelist use the closest lat and lon that is found in the IOP file.
+     if (.not.scm_force_latlon) then
+        call shr_scam_GetCloseLatLon( ncid, scmlat, scmlon, ioplat, ioplon, latidx, lonidx )
+        write(iulog,*) 'SCAM_READNL: using closest IOP column to lat/lon specified in drv_in'
+        write(iulog,*) '   requested lat,lon    =',scmlat,', ',scmlon
+        write(iulog,*) '   closest IOP lat,lon  =',ioplat,', ',ioplon
+     
+        scmlat = ioplat
+        scmlon = ioplon
+     end if
+     
+  end if
+     
 end subroutine scam_readnl
 
 !===============================================================================

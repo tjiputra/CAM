@@ -536,8 +536,8 @@ real(kind=core_rknd), dimension(nzm) :: &
 
         w(:,:,nz)=0.
         wsub (:) = 0.      !used in clubb, +++mhwang
-        dudt(1:nx,1:ny,1:nzm,1:3) = 0.
-        dvdt(1:nx,1:ny,1:nzm,1:3) = 0.
+        dudt(:,:,:,1:3) = 0.
+        dvdt(:,:,:,1:3) = 0.
         dwdt(1:nx,1:ny,1:nz,1:3) = 0.
         tke(1:nx,1:ny,1:nzm) = 0.
         tk(1:nx,1:ny,1:nzm) = 0.
@@ -746,6 +746,14 @@ real(kind=core_rknd), dimension(nzm) :: &
         qpevp = 0.
         qpfall = 0.
         precflux = 0.
+
+       prec_xy = 0.0
+       total_water_evap = 0.0
+       total_water_prec = 0.0
+       tlat = 0.0
+       pw_xy = 0.0; cw_xy=0.0; iw_xy = 0.0
+       usfc_xy = 0.0; vsfc_xy =0.0; u200_xy =0.0; v200_xy = 0.0; w500_xy = 0.0
+       swvp_xy = 0.0; psfc_xy = 0.0; u850_xy = 0.0; v850_xy = 0.0
 
 !--------------------------------------------------
 #ifdef sam1mom

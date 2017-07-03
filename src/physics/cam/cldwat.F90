@@ -1011,8 +1011,6 @@ subroutine findmcnew (lchnk   ,ncol    , &
       endif
    end do
 
-!cdir nodep
-!DIR$ CONCURRENT
    do ii = 1,ncols
       i = ind(ii)
 !
@@ -1065,8 +1063,6 @@ subroutine findmcnew (lchnk   ,ncol    , &
 !
    call get_rlat_all_p(lchnk, ncol, rlat)
 
-!cdir nodep
-!DIR$ CONCURRENT
    do ii = 1,ncols
       i = ind(ii)
       rhocgs = rho(i)*1.e-3_r8     ! density in cgs units

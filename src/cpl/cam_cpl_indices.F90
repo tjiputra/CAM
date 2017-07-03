@@ -47,6 +47,8 @@ module cam_cpl_indices
   integer :: index_a2x_Faxa_dstdry4    ! flux: Size 4 dust -- dry deposition
   integer :: index_a2x_Sa_co2prog      ! bottom atm level prognostic co2
   integer :: index_a2x_Sa_co2diag      ! bottom atm level diagnostic co2
+  integer :: index_a2x_Faxa_nhx        ! flux: Nitrogen deposition
+  integer :: index_a2x_Faxa_noy        ! flux: Nitrogen deposition
 
   integer :: index_x2a_Sx_t            ! surface temperature             
   integer :: index_x2a_So_t            ! sea surface temperature         
@@ -196,6 +198,8 @@ contains
     index_a2x_Faxa_dstwet4  = mct_avect_indexra(a2x,'Faxa_dstwet4')
     index_a2x_Sa_co2prog    = mct_avect_indexra(a2x,'Sa_co2prog',perrWith='quiet')
     index_a2x_Sa_co2diag    = mct_avect_indexra(a2x,'Sa_co2diag',perrWith='quiet')
+    index_a2x_Faxa_nhx      = mct_avect_indexra(a2x,'Faxa_nhx',perrWith='quiet')
+    index_a2x_Faxa_noy      = mct_avect_indexra(a2x,'Faxa_noy',perrWith='quiet')
 
     call mct_aVect_clean(x2a)
     call mct_aVect_clean(a2x)

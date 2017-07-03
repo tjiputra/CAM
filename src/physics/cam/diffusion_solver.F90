@@ -284,7 +284,7 @@
     end interface
 
     real(r8), intent(in), optional :: ubc_mmr(pcols,ncnst) ! Upper boundary mixing ratios [ kg/kg ]
-    real(r8), intent(in), optional :: ubc_flux(ncnst)      ! Upper boundary flux [ kg/s/m^2 ]
+    real(r8), intent(in), optional :: ubc_flux(pcols,ncnst)      ! Upper boundary flux [ kg/s/m^2 ]
 
     real(r8), intent(in), optional :: kvt(pcols,pver+1) ! Kinematic molecular conductivity
 
@@ -881,7 +881,7 @@
 
                  call decomp%left_div(q(:ncol,:,m), &
                       l_cond=BoundaryFlux( &
-                      spread(-gravit*ubc_flux(m),1,ncol), ztodt, &
+                      -gravit*ubc_flux(:ncol,m), ztodt, &
                       p%del(:,1)))
 
               else

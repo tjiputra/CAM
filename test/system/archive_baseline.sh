@@ -110,7 +110,7 @@ echo "CESM Archiving to /glade/p/cesmdata/cseg/ccsm_baselines/$1"
 echo " "
 case $hostname in
   ys*)
-    ../../../../cime/scripts/Tools/bless_test_results  -t '' -c '' --hist-only  -r $CESM_TESTDIR -b $1 -f -s
+    ../../../../cime/scripts/Tools/bless_test_results -p -t '' -c '' -r $CESM_TESTDIR -b $1 -f -s
 esac
 
 echo

@@ -127,7 +127,6 @@
       kmodts=2
 
       do jk=1, nlayers
-         !DIR$ VECTOR ALWAYS ALIGNED
          do icol = 1,ncol
             if (.not.lrtchk(icol,jk)) then
                pref(icol,jk) =0._r8

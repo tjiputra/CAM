@@ -35,8 +35,7 @@ character(len=16), parameter :: unset_str = 'UNSET'
 integer,           parameter :: unset_int = huge(1)
 
 ! Namelist variables:
-character(len=16) :: cam_physpkg          = unset_str  ! CAM physics package [cam3 | cam4 | cam5 |
-                                                       !   ideal | adiabatic | spcam_sam1mom | spcam_m2005].
+character(len=16) :: cam_physpkg          = unset_str  ! CAM physics package
 character(len=32) :: cam_chempkg          = unset_str  ! CAM chemistry package 
 character(len=16) :: waccmx_opt           = unset_str  ! WACCMX run option [ionosphere | neutral | off
 character(len=16) :: deep_scheme          = unset_str  ! deep convection package
@@ -65,8 +64,12 @@ integer           :: history_budget_histfile_num = 1   ! output history file num
 logical           :: history_waccm        = .false.    ! output variables of interest for WACCM runs
 logical           :: history_waccmx       = .false.    ! output variables of interest for WACCM-X runs
 logical           :: history_chemistry    = .true.     ! output default chemistry-related variables
-logical           :: history_carma        = .true.     ! output default CARMA-related variables
+logical           :: history_carma        = .false.    ! output default CARMA-related variables
 logical           :: history_clubb        = .true.     ! output default CLUBB-related variables
+logical           :: history_cesm_forcing = .false.
+logical           :: history_scwaccm_forcing = .false.
+logical           :: history_chemspecies_srf = .false.
+
 logical           :: do_clubb_sgs
 ! Check validity of physics_state objects in physics_update.
 logical           :: state_debug_checks   = .false.
@@ -75,6 +78,9 @@ logical           :: state_debug_checks   = .false.
 integer           :: cld_macmic_num_steps = 1
 
 logical           :: offline_driver       = .false.    ! true => offline driver is being used
+
+
+logical, public, protected :: use_simple_phys = .false. ! true => simple physics configuration
 
 logical :: use_spcam       ! true => use super parameterized CAM
 
@@ -110,11 +116,13 @@ subroutine phys_ctl_readnl(nlfile)
    integer :: unitn, ierr
    character(len=*), parameter :: subname = 'phys_ctl_readnl'
 
-   namelist /phys_ctl_nl/ cam_physpkg, cam_chempkg, waccmx_opt, deep_scheme, shallow_scheme, &
+   namelist /phys_ctl_nl/ cam_physpkg, use_simple_phys, cam_chempkg, waccmx_opt,  &
+      deep_scheme, shallow_scheme, &
       eddy_scheme, microp_scheme,  macrop_scheme, radiation_scheme, srf_flux_avg, &
       use_subcol_microp, atm_dep_flux, history_amwg, history_vdiag, history_aerosol, history_aero_optics, &
       history_eddy, history_budget,  history_budget_histfile_num, history_waccm, &
       history_waccmx, history_chemistry, history_carma, history_clubb, &
+      history_cesm_forcing, history_scwaccm_forcing, history_chemspecies_srf, &
       do_clubb_sgs, state_debug_checks, use_hetfrz_classnuc, use_gw_oro, use_gw_front, &
       use_gw_front_igw, use_gw_convect_dp, use_gw_convect_sh, cld_macmic_num_steps, &
       offline_driver, convproc_do_aer
@@ -137,6 +145,7 @@ subroutine phys_ctl_readnl(nlfile)
    ! Broadcast namelist variables
    call mpi_bcast(deep_scheme,                 len(deep_scheme),      mpi_character, masterprocid, mpicom, ierr)
    call mpi_bcast(cam_physpkg,                 len(cam_physpkg),      mpi_character, masterprocid, mpicom, ierr)
+   call mpi_bcast(use_simple_phys,             1,                     mpi_logical,   masterprocid, mpicom, ierr)
    call mpi_bcast(cam_chempkg,                 len(cam_chempkg),      mpi_character, masterprocid, mpicom, ierr)
    call mpi_bcast(waccmx_opt,                  len(waccmx_opt),       mpi_character, masterprocid, mpicom, ierr)
    call mpi_bcast(shallow_scheme,              len(shallow_scheme),   mpi_character, masterprocid, mpicom, ierr)
@@ -159,6 +168,9 @@ subroutine phys_ctl_readnl(nlfile)
    call mpi_bcast(history_chemistry,           1,                     mpi_logical,   masterprocid, mpicom, ierr)
    call mpi_bcast(history_carma,               1,                     mpi_logical,   masterprocid, mpicom, ierr)
    call mpi_bcast(history_clubb,               1,                     mpi_logical,   masterprocid, mpicom, ierr)
+   call mpi_bcast(history_cesm_forcing,        1,                     mpi_logical,   masterprocid, mpicom, ierr)
+   call mpi_bcast(history_chemspecies_srf,     1,                     mpi_logical,   masterprocid, mpicom, ierr)
+   call mpi_bcast(history_scwaccm_forcing,     1,                     mpi_logical,   masterprocid, mpicom, ierr)
    call mpi_bcast(do_clubb_sgs,                1,                     mpi_logical,   masterprocid, mpicom, ierr)
    call mpi_bcast(state_debug_checks,          1,                     mpi_logical,   masterprocid, mpicom, ierr)
    call mpi_bcast(use_hetfrz_classnuc,         1,                     mpi_logical,   masterprocid, mpicom, ierr)
@@ -263,6 +275,7 @@ subroutine phys_getopts(deep_scheme_out, shallow_scheme_out, eddy_scheme_out, mi
                         history_budget_out, history_budget_histfile_num_out, &
                         history_waccm_out, history_waccmx_out, history_chemistry_out, &
                         history_carma_out, history_clubb_out, &
+                        history_cesm_forcing_out, history_scwaccm_forcing_out, history_chemspecies_srf_out, &
                         cam_chempkg_out, prog_modal_aero_out, macrop_scheme_out, &
                         do_clubb_sgs_out, use_spcam_out, state_debug_checks_out, cld_macmic_num_steps_out, &
                         offline_driver_out, convproc_do_aer_out)
@@ -297,6 +310,9 @@ subroutine phys_getopts(deep_scheme_out, shallow_scheme_out, eddy_scheme_out, mi
    logical,           intent(out), optional :: history_chemistry_out
    logical,           intent(out), optional :: history_carma_out
    logical,           intent(out), optional :: history_clubb_out
+   logical,           intent(out), optional :: history_cesm_forcing_out
+   logical,           intent(out), optional :: history_chemspecies_srf_out
+   logical,           intent(out), optional :: history_scwaccm_forcing_out
    logical,           intent(out), optional :: do_clubb_sgs_out
    character(len=32), intent(out), optional :: cam_chempkg_out
    logical,           intent(out), optional :: prog_modal_aero_out
@@ -325,6 +341,9 @@ subroutine phys_getopts(deep_scheme_out, shallow_scheme_out, eddy_scheme_out, mi
    if ( present(history_waccm_out       ) ) history_waccm_out        = history_waccm
    if ( present(history_waccmx_out      ) ) history_waccmx_out       = history_waccmx
    if ( present(history_chemistry_out   ) ) history_chemistry_out    = history_chemistry
+   if ( present(history_cesm_forcing_out) ) history_cesm_forcing_out = history_cesm_forcing
+   if ( present(history_chemspecies_srf_out) ) history_chemspecies_srf_out = history_chemspecies_srf
+   if ( present(history_scwaccm_forcing_out) ) history_scwaccm_forcing_out = history_scwaccm_forcing
    if ( present(history_carma_out       ) ) history_carma_out        = history_carma
    if ( present(history_clubb_out       ) ) history_clubb_out        = history_clubb
    if ( present(do_clubb_sgs_out        ) ) do_clubb_sgs_out         = do_clubb_sgs

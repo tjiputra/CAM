@@ -1,3 +1,11 @@
+module par_vecsum_mod
+
+implicit none
+private
+save
+public :: par_vecsum
+
+contains
 !-----------------------------------------------------------------------
 !BOP
 ! !ROUTINE: par_vecsum --- Calculate vector sum bit-wise consistently
@@ -5,7 +13,7 @@
 ! !INTERFACE:
 !****6***0*********0*********0*********0*********0*********0**********72
       subroutine par_vecsum(jm, jfirst, jlast, InVector, te0,    &
-                            incomm, npryuse)
+                            incomm, npryuse, return_sum_in)
 !****6***0*********0*********0*********0*********0*********0**********72
 !
 ! !USES:
@@ -23,6 +31,8 @@
       real (r8) InVector(jm)        ! input vector to be summed
       integer incomm                ! communicator
       integer npryuse               ! number of subdomains
+
+      logical, optional :: return_sum_in
 
 ! !OUTPUT PARAMETERS:
       real (r8) te0                 ! sum of all vector entries
@@ -50,6 +60,7 @@
       real(r8), parameter ::  D0_0                    =  0.0_r8
       real (r8) tte_all(jm)
       integer j
+      logical :: return_sum
 
 #if defined ( SPMD )
       real (r8)     tte_send(npryuse*(jlast-jfirst+1))
@@ -57,6 +68,11 @@
       integer  recvcount(npryuse)
       integer  ipe, icount
 #endif
+      if (present(return_sum_in)) then
+        return_sum = return_sum_in
+      else
+        return_sum = .false.
+      end if
 
       te0 = D0_0
 #if defined ( SPMD ) 
@@ -84,8 +100,11 @@
         te0 = te0 + tte_all(j)
       enddo
 
+      if (return_sum) InVector(1:jm) = tte_all(1:jm)
+
       return
 !EOC
       end
 !-----------------------------------------------------------------------
 
+end module par_vecsum_mod

@@ -268,6 +268,12 @@ contains
           if (index_a2x_Sa_co2diag /= 0) then
              a2x(index_a2x_Sa_co2diag,ig) = cam_out(c)%co2diag(i) ! atm diagnostic co2
           end if
+          if (index_a2x_Faxa_nhx > 0 ) then
+             a2x(index_a2x_Faxa_nhx,ig) = cam_out(c)%nhx_nitrogen_flx(i)
+          endif
+          if (index_a2x_Faxa_noy > 0 ) then
+             a2x(index_a2x_Faxa_noy,ig) = cam_out(c)%noy_nitrogen_flx(i)
+          endif
 
           ig=ig+1
        end do

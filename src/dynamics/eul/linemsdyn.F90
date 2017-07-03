@@ -521,7 +521,6 @@ subroutine linemsdyn_aft(                                          &
    mlength = pmmax
 #endif
    do k=1,plev
-!cdir loopchg
       do i=1,2*mlength
 
          grt1(i,k) = 0.5_r8*(fftbufn(i,tdyndex,k)+fftbufs(i,tdyndex,k))
@@ -551,7 +550,6 @@ subroutine linemsdyn_aft(                                          &
       end do
    end do
 
-!cdir altcode=(loopcnt)
    do i=1,2*mlength
       grlps1(i) = 0.5_r8*(fftbufn(i,bpstrdex,1)+fftbufs(i,bpstrdex,1))
       grlps2(i) = 0.5_r8*(fftbufn(i,bpstrdex,1)-fftbufs(i,bpstrdex,1))

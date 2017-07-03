@@ -120,14 +120,12 @@ echo "TSM.sh: call to build-namelist:"
 echo "        env OMP_NUM_THREADS=${CAM_THREADS} ${cfgdir}/build-namelist -test -runtype startup \
     -ignore_ic_date $use_case_string \
     -config ${CAM_TESTDIR}/TCB.$1/config_cache.xml \
-    -config_cice ${CAM_TESTDIR}/TCB.$1/config_cache_cice.xml \
     -infile ${CAM_TESTDIR}/${test_name}/$nl_file \
     -namelist \"&seq_timemgr_inparm stop_n=$run_length stop_option=\'$stop_option\' $decomp_str /\""  
 
-env OMP_NUM_THREADS=${CAM_THREADS} perl ${cfgdir}/build-namelist -test -runtype startup -cice_nl "&domain_nml distribution_type='roundrobin' /" \
+env OMP_NUM_THREADS=${CAM_THREADS} perl ${cfgdir}/build-namelist -test -runtype startup \
     -ignore_ic_date $use_case_string \
     -config ${CAM_TESTDIR}/TCB.$1/config_cache.xml \
-    -config_cice ${CAM_TESTDIR}/TCB.$1/config_cache_cice.xml \
     -infile ${CAM_TESTDIR}/${test_name}/$nl_file \
     -namelist "&seq_timemgr_inparm stop_n=$run_length stop_option='$stop_option' $decomp_str $history_output/"  > test.log 2>&1
 rc=$?

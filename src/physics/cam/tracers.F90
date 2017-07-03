@@ -42,7 +42,7 @@ public :: &
 integer, parameter :: num_names_max=30
 
 ! Data from namelist variables
-integer           :: test_tracer_num
+integer           :: test_tracer_num = 0
 character(len=16) :: test_tracer_names(num_names_max)
 
 logical :: tracers_flag       = .false.  ! true => turn on test tracer code

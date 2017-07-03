@@ -20,7 +20,7 @@ module radheat
   use spmd_utils,    only: masterproc
   use ppgrid,        only: pcols, pver
   use physics_types, only: physics_state, physics_ptend, physics_ptend_init
-  use physconst,     only: gravit, cpair, cpairv
+  use physconst,     only: gravit, cpairv
   use perf_mod
   use cam_logfile,   only: iulog
 
@@ -118,7 +118,6 @@ contains
 
     use nlte_lw,          only: nlte_init
     use cam_history,      only: add_default, addfld
-    use physics_buffer,   only: physics_buffer_desc
     use phys_control,     only: phys_getopts
 
     ! args
@@ -132,13 +131,15 @@ contains
     logical :: camrt
 
     character(len=16) :: rad_pkg
+    logical :: history_scwaccm_forcing
     logical :: history_waccm
 
 !-----------------------------------------------------------------------
 
 
     call phys_getopts(radiation_scheme_out=rad_pkg, &
-         history_waccm_out=history_waccm)
+                      history_waccm_out=history_waccm, &
+                      history_scwaccm_forcing_out=history_scwaccm_forcing)
     camrt = rad_pkg == 'CAMRT' .or. rad_pkg == 'camrt'
 
     ! set max/min pressures for merging regions.
@@ -229,12 +230,16 @@ contains
     call addfld ('QRS_TOT_24_SIN',(/ 'lev' /), 'A','K/s','SW heating 24hr. sin coeff.')
     call addfld ('QRS_TOT_12_COS',(/ 'lev' /), 'A','K/s','SW heating 12hr. cos coeff.')
     call addfld ('QRS_TOT_12_SIN',(/ 'lev' /), 'A','K/s','SW heating 12hr. sin coeff.')
+    call addfld ('QRS_TOT_08_COS',(/ 'lev' /), 'A','K/s','SW heating  8hr. cos coeff.')
+    call addfld ('QRS_TOT_08_SIN',(/ 'lev' /), 'A','K/s','SW heating  8hr. sin coeff.')
 
 ! Add default history variables to files
     if (history_waccm) then
        call add_default ('QRL_TOT', 1, ' ')
        call add_default ('QRS_TOT', 1, ' ')
-       call add_default ('QRS_TOT', 2, ' ')
+    end if
+    if (history_scwaccm_forcing) then
+       call add_default ('QRS_TOT', 8, ' ')
     end if
 
   end subroutine radheat_init
@@ -301,7 +306,7 @@ contains
     real(r8) :: qrs_mrg(pcols,pver)                 ! merged SW heating
     real(r8) :: qrs_mlt(pcols,pver)                 ! M/LT solar heating rates
     real(r8) :: qout(pcols,pver)                    ! temp for outfld call
-    real(r8) :: dcoef(4)                            ! for tidal component of heating
+    real(r8) :: dcoef(6)                            ! for tidal component of heating
 
 !-----------------------------------------------------------------------
 
@@ -334,6 +339,8 @@ contains
     call outfld( 'QRS_TOT_24_COS', qout(:ncol,:)*dcoef(2), ncol, lchnk )
     call outfld( 'QRS_TOT_12_SIN', qout(:ncol,:)*dcoef(3), ncol, lchnk )
     call outfld( 'QRS_TOT_12_COS', qout(:ncol,:)*dcoef(4), ncol, lchnk )
+    call outfld( 'QRS_TOT_08_SIN', qout(:ncol,:)*dcoef(5), ncol, lchnk )
+    call outfld( 'QRS_TOT_08_COS', qout(:ncol,:)*dcoef(6), ncol, lchnk )
 
     if (waccm_heating.and.waccm_heating_on) then
        call t_startf( 'nltedrv' )

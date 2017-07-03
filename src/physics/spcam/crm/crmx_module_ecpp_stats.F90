@@ -341,6 +341,7 @@ subroutine xyrsumof2d(xin,sumout)
   real, dimension(:,:), intent(in) :: xin
   real, intent(out) :: sumout
 
+  sumout = 0.0
   sumout = sumout + sum(xin(:,:))
 end subroutine xyrsumof2d
 
@@ -355,7 +356,8 @@ subroutine xyrsumof3d(xin,sumout)
   real, dimension(:), intent(out) :: sumout
 
   integer :: k
-
+  
+  sumout(:) = 0.0
   do k=1,ubound(sumout,1)
      sumout(k) = sumout(k) + sum(xin(:,:,k))
   end do

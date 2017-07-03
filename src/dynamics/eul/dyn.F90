@@ -77,7 +77,6 @@
       integer lm, mlength             ! local Fourier wavenumber index
                                       !  and number of local indices
       integer k                       ! level index
-!DIR$ NOSTREAM
 !
 ! Set constants
 !
@@ -95,7 +94,6 @@
 !
 ! Combine constants with Fourier wavenumber m
 !
-!cdir altcode=(loopcnt)
       do lm=1,mlength
          zxm(lm) = ztdtrc*xm(locm(lm,iam))
       end do
@@ -104,7 +102,6 @@
 ! later use in Gaussian quadrature
 !
       do k=1,plev
-!cdir loopchg
          do lm=1,mlength
             grt1(2*lm-1,k) = grt1(2*lm-1,k) + zxm(lm)*grut1(2*lm,k)
             grt1(2*lm,k)   = grt1(2*lm,k)   - zxm(lm)*grut1(2*lm-1,k)

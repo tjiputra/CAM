@@ -11,10 +11,6 @@
 <horiz_grid dyn="eul"   hgrid="8x16"      nlat="8"   nlon="16"  m="5"   n="5"   k="5"   />
 <horiz_grid dyn="eul"   hgrid="1x1"       nlat="1"   nlon="1"   m="1"   n="1"   k="1"   />
 
-<horiz_grid dyn="sld"   hgrid="64x128"    nlat="64"  nlon="128" m="63"  n="63"  k="63"  />
-<horiz_grid dyn="sld"   hgrid="32x64"     nlat="32"  nlon="64"  m="31"  n="31"  k="31"  />
-<horiz_grid dyn="sld"   hgrid="8x16"      nlat="8"   nlon="16"  m="7"   n="7"   k="7"   />
-
 <horiz_grid dyn="fv"    hgrid="0.23x0.31"  nlat="768"  nlon="1152" />
 <horiz_grid dyn="fv"    hgrid="0.47x0.63"  nlat="384"  nlon="576"  />
 <horiz_grid dyn="fv"    hgrid="0.5x0.625"  nlat="361"  nlon="576"  />

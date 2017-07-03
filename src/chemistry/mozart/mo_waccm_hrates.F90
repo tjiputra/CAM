@@ -81,8 +81,8 @@
         attr = 'total jo2 euv photolysis rate'
         call addfld( 'JO2_EUV',    (/ 'lev' /), 'I', '/s', trim(attr) )
 
-        ele_temp_ndx = pbuf_get_index('ElecTemp',errcode=err)! electron temperature index 
-        ion_temp_ndx = pbuf_get_index('IonTemp',errcode=err) ! ion temperature index
+        ele_temp_ndx = pbuf_get_index('TElec',errcode=err)! electron temperature index 
+        ion_temp_ndx = pbuf_get_index('TIon',errcode=err) ! ion temperature index
 
       end subroutine init_hrates
 
@@ -305,8 +305,8 @@
          end do
       end do
       call setrxt_hrates( reaction_rates, state%t, invariants(1,1,indexm), ncol, kbot_hrates )
-      call usrrxt_hrates( reaction_rates, state%t, ele_temp_fld, ion_temp_fld, invariants, &
-                          h2ovmr, state%pmid, invariants(:,:,indexm), ncol, kbot_hrates )
+      call usrrxt_hrates( reaction_rates, state%t, ele_temp_fld, ion_temp_fld, &
+                          h2ovmr, invariants(:,:,indexm), ncol, kbot_hrates )
       call adjrxt( reaction_rates, invariants, invariants(1,1,indexm), ncol,pver )
       
 !-----------------------------------------------------------------------      

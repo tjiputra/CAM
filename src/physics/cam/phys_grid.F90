@@ -2103,8 +2103,6 @@ logical function phys_grid_initialized ()
 !
 !  if (numcols .gt. fdim) call endrun('buff_to_chunk')
 !  do m=1,mdim
-!dir$ concurrent
-!dir$ prefervector, preferstream
 !     do n = 1, numcols
 !        localchunks(columnid(n),m,chunkid(n)) = lbuff(n,m)
 !     end do
@@ -2186,9 +2184,6 @@ logical function phys_grid_initialized ()
 ! copy field into global (process-ordered) chunked data structure
 
       do l=1,ldim
-!DIR$ PREFERVECTOR
-!DIR$ PREFERSTREAM
-!DIR$ CONCURRENT
          do i=1,ngcols_p
             cid  = pgcols(i)%chunk
             lid  = pgcols(i)%ccol
@@ -2215,9 +2210,6 @@ logical function phys_grid_initialized ()
 
 ! copy into local chunked data structure
 
-!DIR$ PREFERVECTOR
-!DIR$ PREFERSTREAM
-!DIR$ CONCURRENT
    do i=1,nlcols
       cid = pgcols(beglcol+i)%chunk
       lcid = chunks(cid)%lcid
@@ -2238,9 +2230,6 @@ logical function phys_grid_initialized ()
 !  local ordering)
 
    do l=1,ldim
-!DIR$ PREFERVECTOR
-!DIR$ PREFERSTREAM
-!DIR$ CONCURRENT
       do i=1,ngcols_p
          cid  = pgcols(i)%chunk
          lcid = chunks(cid)%lcid
@@ -2330,9 +2319,6 @@ logical function phys_grid_initialized ()
    if (masterproc) then
       ! copy field into global (process-ordered) chunked data structure
       do l=1,ldim
-!DIR$ PREFERVECTOR
-!DIR$ PREFERSTREAM
-!DIR$ CONCURRENT
          do i=1,ngcols_p
             cid  = pgcols(i)%chunk
             lid  = pgcols(i)%ccol
@@ -2359,9 +2345,6 @@ logical function phys_grid_initialized ()
 
 ! copy into local chunked data structure
 
-!DIR$ PREFERVECTOR
-!DIR$ PREFERSTREAM
-!DIR$ CONCURRENT
    do i=1,nlcols
       cid = pgcols(beglcol+i)%chunk
       lcid = chunks(cid)%lcid
@@ -2381,9 +2364,6 @@ logical function phys_grid_initialized ()
    ! (pgcol ordering chosen to reflect begchunk:endchunk 
    !  local ordering)
    do l=1,ldim
-!DIR$ PREFERVECTOR
-!DIR$ PREFERSTREAM
-!DIR$ CONCURRENT
       do i=1,ngcols_p
          cid  = pgcols(i)%chunk
          lcid = chunks(cid)%lcid
@@ -2474,9 +2454,6 @@ logical function phys_grid_initialized ()
 ! copy field into global (process-ordered) chunked data structure
 
       do l=1,ldim
-!DIR$ PREFERVECTOR
-!DIR$ PREFERSTREAM
-!DIR$ CONCURRENT
          do i=1,ngcols_p
             cid = pgcols(i)%chunk
             lid = pgcols(i)%ccol
@@ -2503,9 +2480,6 @@ logical function phys_grid_initialized ()
 
 ! copy into local chunked data structure
 
-!DIR$ PREFERVECTOR
-!DIR$ PREFERSTREAM
-!DIR$ CONCURRENT
    do i=1,nlcols
       cid = pgcols(beglcol+i)%chunk
       lcid = chunks(cid)%lcid
@@ -2525,9 +2499,6 @@ logical function phys_grid_initialized ()
 ! (pgcol ordering chosen to reflect begchunk:endchunk 
 !  local ordering)
    do l=1,ldim
-!DIR$ PREFERVECTOR
-!DIR$ PREFERSTREAM
-!DIR$ CONCURRENT
       do i=1,ngcols_p
          cid  = pgcols(i)%chunk
          lcid = chunks(cid)%lcid
@@ -2605,8 +2576,6 @@ logical function phys_grid_initialized ()
 !
 !  if (numcols .gt. fdim) call endrun('chunk_to_buff')
 !  do m=1,mdim
-!dir$ concurrent
-!dir$ prefervector, preferstream
 !     do n = 1, numcols
 !        lbuff(n,m) = localchunks(columnid(n),m,chunkid(n))
 !     end do
@@ -2689,8 +2658,6 @@ logical function phys_grid_initialized ()
 ! copy into local gather data structure
 
    do l=1,ldim
-!DIR$ PREFERVECTOR, PREFERSTREAM
-!DIR$ CONCURRENT
       do i=1,nlcols
          cid = pgcols(beglcol+i)%chunk
          lcid = chunks(cid)%lcid
@@ -2714,8 +2681,6 @@ logical function phys_grid_initialized ()
 
 ! copy gathered columns into lon/lat field
 
-!DIR$ PREFERVECTOR, PREFERSTREAM
-!DIR$ CONCURRENT
       do i=1,ngcols_p
          cid  = pgcols(i)%chunk
          lid  = pgcols(i)%ccol
@@ -2739,8 +2704,6 @@ logical function phys_grid_initialized ()
    ! (pgcol ordering chosen to reflect begchunk:endchunk 
    !  local ordering)
    do l=1,ldim
-!DIR$ PREFERVECTOR, PREFERSTREAM
-!DIR$ CONCURRENT
       do i=1,ngcols_p
          cid  = pgcols(i)%chunk
          lcid = chunks(cid)%lcid
@@ -2836,8 +2799,6 @@ logical function phys_grid_initialized ()
 ! copy into local gather data structure
 
    do l=1,ldim
-!DIR$ PREFERVECTOR, PREFERSTREAM
-!DIR$ CONCURRENT
       do i=1,nlcols
          cid = pgcols(beglcol+i)%chunk
          lcid = chunks(cid)%lcid
@@ -2861,8 +2822,6 @@ logical function phys_grid_initialized ()
 
 ! copy gathered columns into lon/lat field
 
-!DIR$ PREFERVECTOR, PREFERSTREAM
-!DIR$ CONCURRENT
       do i=1,ngcols_p
          cid  = pgcols(i)%chunk
          lid  = pgcols(i)%ccol
@@ -2887,8 +2846,6 @@ logical function phys_grid_initialized ()
 !  local ordering)
 
    do l=1,ldim
-!DIR$ PREFERVECTOR, PREFERSTREAM
-!DIR$ CONCURRENT
       do i=1,ngcols_p
          cid  = pgcols(i)%chunk
          lcid = chunks(cid)%lcid
@@ -2982,8 +2939,6 @@ logical function phys_grid_initialized ()
 ! copy into local gather data structure
 
    do l=1,ldim
-!DIR$ PREFERVECTOR, PREFERSTREAM
-!DIR$ CONCURRENT
       do i=1,nlcols
          cid = pgcols(beglcol+i)%chunk
          lcid = chunks(cid)%lcid
@@ -3007,8 +2962,6 @@ logical function phys_grid_initialized ()
 
 ! copy gathered columns into lon/lat field
 
-!DIR$ PREFERVECTOR, PREFERSTREAM
-!DIR$ CONCURRENT
       do i=1,ngcols_p
          cid  = pgcols(i)%chunk
          lid  = pgcols(i)%ccol
@@ -3032,8 +2985,6 @@ logical function phys_grid_initialized ()
    ! (pgcol ordering chosen to reflect begchunk:endchunk 
    !  local ordering)
    do l=1,ldim
-!DIR$ PREFERVECTOR, PREFERSTREAM
-!DIR$ CONCURRENT
       do i=1,ngcols_p
          cid  = pgcols(i)%chunk
          lcid = chunks(cid)%lcid

@@ -192,7 +192,11 @@ module metdata
   real(r8) :: met_rlx_bot = 50._r8
   real(r8) :: met_rlx_time = 0._r8
 
+#if ( defined OFFLINE_DYN )
   logical  :: met_fix_mass = .true.
+#else
+  logical  :: met_fix_mass = .false.
+#endif
   logical  :: has_ts = .false.
  
 contains
