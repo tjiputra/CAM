@@ -483,6 +483,7 @@ if ($print>=2) {
 # namelist group: seq_cplflds_inparm #
 ######################################
 add_default($nl, 'flds_co2_dmsa',  'val'=>'.false.');
+add_default($nl, 'flds_co2_dmsb',  'val'=>'.false.');
 add_default($nl, 'flds_co2a',      'val'=>'.true.');
 add_default($nl, 'flds_co2b',      'val'=>'.false.');
 add_default($nl, 'flds_co2c',      'val'=>'.false.');
@@ -3161,6 +3162,7 @@ add_default($nl, 'srf_flux_avg', 'eddy_scheme'=>$eddy_scheme);
 # Microphysics scheme
 add_default($nl, 'use_subcol_microp');
 add_default($nl, 'microp_scheme');
+
 
 if ($cfg->get('microphys') =~ /^mg/) {
     add_default($nl, 'micro_mg_version');

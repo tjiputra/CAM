@@ -6118,6 +6118,10 @@ Default: FALSE
        group="seq_cplflds_inparm" valid_values="" >
 Default: FALSE
 </entry>
+<entry id="flds_co2_dmsb" type="logical"  category="driver"
+       group="seq_cplflds_inparm" valid_values="" >
+Default: FALSE
+</entry>
 <entry id="cplflds_custom" type="char*80"  category="driver"
        group="seq_cplflds_userspec" valid_values="" >
 Default: 
