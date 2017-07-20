@@ -177,13 +177,14 @@ end subroutine check_energy_get_integrals
 
     implicit none
 
-    logical          :: history_budget
+    logical          :: history_budget, history_waccm
     integer          :: history_budget_histfile_num ! output history file number for budget fields
 
 !-----------------------------------------------------------------------
 
     call phys_getopts( history_budget_out = history_budget, &
-                       history_budget_histfile_num_out = history_budget_histfile_num)
+                       history_budget_histfile_num_out = history_budget_histfile_num, &
+                       history_waccm_out = history_waccm )
 
 ! register history variables
     call addfld('TEINP',  horiz_only,  'A', 'J/m2', 'Total energy of physics input')
@@ -193,7 +194,10 @@ end subroutine check_energy_get_integrals
     call addfld('DTCORE', (/ 'lev' /), 'A', 'K/s' , 'T tendency due to dynamical core')
 
     if ( history_budget ) then
-       call add_default ('DTCORE   '  , history_budget_histfile_num, ' ')
+       call add_default ('DTCORE', history_budget_histfile_num, ' ')
+    end if
+    if ( history_waccm ) then
+       call add_default ('DTCORE', 1, ' ')
     end if
 
   end subroutine check_energy_init
@@ -524,7 +528,6 @@ end subroutine check_energy_get_integrals
 !-----------------------------------------------------------------------
 
     ! Copy total energy out of input and output states
-!DIR$ CONCURRENT
     do lchnk = begchunk, endchunk
        ncol = state(lchnk)%ncol
        ! input energy

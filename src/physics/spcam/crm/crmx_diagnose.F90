@@ -168,7 +168,6 @@ do j = 1,ny
          if (tmp_lwp.gt.0.01) then
             cloudtopheight(i,j) = z(k)
             cloudtoptemp(i,j) = tabs(i,j,k)
-            cld_xy(i,j) = cld_xy(i,j) + dtfactor
             EXIT
          end if
       end do

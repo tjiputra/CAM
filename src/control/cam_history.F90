@@ -755,6 +755,17 @@ CONTAINS
       end if
     end if
 
+    ! Print out column-output information
+    do t = 1, size(fincllonlat, 2)
+      if (ANY(len_trim(fincllonlat(:,t)) > 0)) then
+        if (collect_column_output(t)) then
+          write(iulog, '(a,i2,a)') 'History file, ',t,', has patch output, columns will be collected into ncol dimension'
+        else
+          write(iulog, '(a,i2,a)') 'History file, ',t,', has patch output, patches will be written to individual variables'
+        end if
+      end if
+    end do
+
     ! Broadcast namelist variables
     call mpi_bcast(ndens, ptapes, mpi_integer, masterprocid, mpicom, ierr)
     call mpi_bcast(nhtfrq, ptapes, mpi_integer, masterprocid, mpicom, ierr)
@@ -2698,7 +2709,7 @@ end subroutine print_active_fldlst
         end if
         do i = 1, size(tape(t)%grid_ids)
           call cam_grid_compute_patch(tape(t)%grid_ids(i), patchptr%patches(i),&
-               beglon, endlon, beglat, endlat)
+               beglon, endlon, beglat, endlat, collect_column_output(t))
         end do
         nullify(patchptr)
       end do
@@ -2904,14 +2915,18 @@ end subroutine print_active_fldlst
     call parseRangeString(lonstr, 'eEwW', beglon, begchar, begname, endlon, endchar, endname)
     ! Convert longitude to degrees East
     if ((begchar == 'w') .or. (begchar == 'W')) then
-      beglon = 360._r8 - beglon
+      if (beglon > 0.0_r8) then
+        beglon = 360._r8 - beglon
+      end if
     end if
     if ((beglon < 0._r8) .or. (beglon > 360._r8)) then
       write(errormsg, *) 'Longitude specification out of range, ', trim(begname)
       call endrun('parseLonLat: '//errormsg)
     end if
     if ((endchar == 'w') .or. (endchar == 'W')) then
-      endlon = 360._r8 - endlon
+      if (endlon > 0.0_r8) then
+        endlon = 360._r8 - endlon
+      end if
     end if
     if ((endlon < 0._r8) .or. (endlon > 360._r8)) then
       write(errormsg, *) 'Longitude specification out of range, ', trim(endname)

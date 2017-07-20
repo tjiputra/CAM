@@ -82,7 +82,8 @@ subroutine cam_init(EClock, &
    use dyn_comp,         only: dyn_init
    use cam_restart,      only: cam_read_restart
    use stepon,           only: stepon_init
-   
+   use ionosphere_interface, only: ionosphere_init
+
 #if (defined BFB_CAM_SCAM_IOP)
    use history_defaults, only: initialize_iop_history
 #endif
@@ -175,6 +176,9 @@ subroutine cam_init(EClock, &
    ! are set in dyn_init
    call chem_surfvals_init()
 
+   ! initialize ionosphere
+   call ionosphere_init()
+
    if (initial_run) then
 
       call dyn_init(dyn_in, dyn_out)
@@ -191,7 +195,6 @@ subroutine cam_init(EClock, &
       call initialize_iop_history()
 #endif
    end if
-
 
    call phys_init( phys_state, phys_tend, pbuf2d,  cam_out )
 
@@ -220,6 +223,7 @@ subroutine cam_run1(cam_in, cam_out)
    
    use physpkg,          only: phys_run1
    use stepon,           only: stepon_run1
+   use ionosphere_interface,only: ionosphere_run1
 
    type(cam_in_t)  :: cam_in(begchunk:endchunk)
    type(cam_out_t) :: cam_out(begchunk:endchunk)
@@ -236,6 +240,11 @@ subroutine cam_run1(cam_in, cam_out)
    call t_startf ('stepon_run1')
    call stepon_run1( dtime_phys, phys_state, phys_tend, pbuf2d, dyn_in, dyn_out )
    call t_stopf  ('stepon_run1')
+
+   !----------------------------------------------------------
+   ! first phase of ionosphere -- write to IC file if needed
+   !----------------------------------------------------------
+   call ionosphere_run1(pbuf2d)
 
    !
    !----------------------------------------------------------
@@ -266,6 +275,7 @@ subroutine cam_run2( cam_out, cam_in )
    
    use physpkg,          only: phys_run2
    use stepon,           only: stepon_run2
+   use ionosphere_interface, only: ionosphere_run2
 
    type(cam_out_t), intent(inout) :: cam_out(begchunk:endchunk)
    type(cam_in_t),  intent(inout) :: cam_in(begchunk:endchunk)
@@ -289,8 +299,14 @@ subroutine cam_run2( cam_out, cam_in )
    call t_barrierf ('sync_stepon_run2', mpicom)
    call t_startf ('stepon_run2')
    call stepon_run2( phys_state, phys_tend, dyn_in, dyn_out )
-
    call t_stopf  ('stepon_run2')
+
+   !
+   ! Ion transport 
+   !
+   call t_startf('ionosphere_run2')
+   call ionosphere_run2( phys_state, dyn_in, pbuf2d )
+   call t_stopf ('ionosphere_run2')
 
    if (is_first_step() .or. is_first_restart_step()) then
       call t_startf ('cam_run2_memusage')
@@ -404,6 +420,8 @@ subroutine cam_final( cam_out, cam_in )
    use physpkg,          only: phys_final
    use cam_initfiles,    only: cam_initfiles_close
    use camsrfexch,       only: atm2hub_deallocate, hub2atm_deallocate
+   use ionosphere_interface, only: ionosphere_final
+
    !
    ! Arguments
    !
@@ -417,6 +435,7 @@ subroutine cam_final( cam_out, cam_in )
 
    call phys_final( phys_state, phys_tend , pbuf2d)
    call stepon_final(dyn_in, dyn_out)
+   call ionosphere_final()
 
    if (initial_run) then
       call cam_initfiles_close()

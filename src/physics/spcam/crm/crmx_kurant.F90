@@ -14,6 +14,8 @@ real cfl, cfl_sgs
 ncycle = 1
 	
 wm(nz)=0.
+w_max =0.
+u_max =0.
 do k = 1,nzm
  wm(k) = maxval(abs(w(1:nx,1:ny,k)))
  uhm(k) = sqrt(maxval(u(1:nx,1:ny,k)**2+YES3D*v(1:nx,1:ny,k)**2))

@@ -228,7 +228,7 @@ contains
     integer :: ncol                                ! number of columns
     character*40 :: name    ! param and tracer name for qneg3
 
-    integer :: ixo, ixo2, ixh, ixh2, ixn    ! indices for O, O2, H2, and N
+    integer :: ixh, ixh2    ! constituent indices for H, H2
 
     real(r8) :: zvirv(state%psetcols,pver)  ! Local zvir array pointer
 
@@ -398,13 +398,7 @@ contains
     ! Get indices for molecular weights and call WACCM-X physconst_update
     !------------------------------------------------------------------------
     if ( waccmx_is('ionosphere') .or. waccmx_is('neutral') ) then 
-      call cnst_get_ind('O', ixo)
-      call cnst_get_ind('O2', ixo2)
-      call cnst_get_ind('N', ixn)             
-
-      call physconst_update(state%q, state%t, &
-                            cnst_mw(ixo), cnst_mw(ixo2), cnst_mw(ixh), cnst_mw(ixn), &
-                            ixo, ixo2, ixh, pcnst, state%lchnk, ncol)
+       call physconst_update(state%q, state%t, state%lchnk, ncol)
     endif
    
     if ( waccmx_is('ionosphere') .or. waccmx_is('neutral') ) then 
@@ -1208,6 +1202,7 @@ end subroutine physics_ptend_copy
 
     ! adjust dry mass in each layer back to input value, while conserving
     ! constituents, momentum, and total energy
+    state%ps(:ncol) = state%pint(:ncol,1)
     do k = 1, pver
 
        ! adjusment factor is just change in water vapor
@@ -1239,6 +1234,7 @@ end subroutine physics_ptend_copy
 
 ! compute new total pressure variables
        state%pdel  (:ncol,k  ) = state%pdel(:ncol,k  ) * fdq(:ncol)
+       state%ps(:ncol)         = state%ps(:ncol)       + state%pdel(:ncol,k)
        state%pint  (:ncol,k+1) = state%pint(:ncol,k  ) + state%pdel(:ncol,k)
        state%lnpint(:ncol,k+1) = log(state%pint(:ncol,k+1))
        state%rpdel (:ncol,k  ) = 1._r8/ state%pdel(:ncol,k  )

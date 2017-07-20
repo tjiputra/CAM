@@ -1,4 +1,3 @@
-
 module metdata
 !----------------------------------------------------------------------- 
 !
@@ -203,7 +202,11 @@ module metdata
   real(r8) :: met_rlx_bot = 50._r8
   real(r8) :: met_rlx_time = 0._r8
 
+#if ( defined OFFLINE_DYN )
   logical  :: met_fix_mass = .true.
+#else
+  logical  :: met_fix_mass = .false.
+#endif
   logical  :: has_ts = .false.
  
 contains
@@ -1606,7 +1609,7 @@ contains
     deltat = datatimep - datatimem
     fact1 = (datatimep - curr_mod_time)/deltat
     fact2 = D1_0-fact1
-
+    
 
     do c=begchunk,endchunk
        ncol = get_ncols_p(c)
@@ -1633,7 +1636,7 @@ contains
           enddo
        enddo
     endif
-
+    
   end subroutine interp_phys_srf_flds
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
@@ -1953,7 +1956,7 @@ contains
     use hycoef, only: hypm, ps0
 
     integer :: k, k_cnt, k_top
-    real(r8), parameter :: h0 = 7._r8   ! scale height (km)
+    real(r8), parameter :: h0 = 7._r8        ! scale height (km)
     real(r8), parameter :: hsec = 3600._r8   ! seconds per hour
     real(r8) :: p_top, p_bot
     real(r8) ::  met_max_rlxdt,  dtime_hrs
@@ -2046,7 +2049,7 @@ contains
           write(iulog,fmt=993) 'set_met_rlx:      met_max_rlxdt = ', met_max_rlxdt
           write(iulog,fmt=999) 'set_met_rlx:            met_rlx = ', met_rlx
        endif
-      call endrun('Offline meteorology relaxation function not set correctly.')
+       call endrun('Offline meteorology relaxation function not set correctly.')
     endif
 
   end subroutine set_met_rlx

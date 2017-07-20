@@ -119,6 +119,10 @@
          write(30,100) trim(line)
          line = ' '
          write(30,100) trim(line)
+         if ( march == 'VECTOR' ) then
+            line = '      use chem_mods, only: veclen'
+            write(30,100) trim(line)
+         end if
       end if
       line = '      private'
       write(30,100) trim(line)
@@ -595,13 +599,13 @@ Rates_loop : &
             if( model == 'MOZART' ) then
 	       select case( march )
 	       case ( 'VECTOR' )
-                  write(line,'(''      call '',a,''nlnmat_finit( ofl, ofu, mat, lmat, dti )'')') up_hdr
+                  write(line,'(''      call '',a,''nlnmat_finit( avec_len, mat, lmat, dti )'')') up_hdr
 	       case default
                   write(line,'(''      call '',a,''nlnmat_finit( mat, lmat, dti )'')') up_hdr
 	       end select
             else
                if ( march ==  'VECTOR' ) then
-                  write(line,'(''      call '',a,''nlnmat_finit( ofl, ofu, chnkpnts, mat, lmat, dti )'')') up_hdr
+                  write(line,'(''      call '',a,''nlnmat_finit( avec_len, mat, lmat, dti )'')') up_hdr
                else
                   write(line,'(''      call '',a,''nlnmat_finit( mat, lmat, dti )'')') up_hdr
                endif
@@ -645,11 +649,19 @@ Rates_loop : &
 	    if( lin_mat_pat(l) .or. nln_mat_pat(l) ) then
                write(num,'(i4)') l
 	       m = len_trim( num )
-               line(10:) = trim( mat_piece ) // num(:m) // ') = ' // trim(mat_piece) // num(:m) // ') - dti'
+               if( model == 'CAM' .and. march == 'VECTOR' ) then
+                 line(10:) = trim( mat_piece ) // num(:m) // ') = ' // trim(mat_piece) // num(:m) // ') - dti(k)'
+               else
+                 line(10:) = trim( mat_piece ) // num(:m) // ') = ' // trim(mat_piece) // num(:m) // ') - dti'
+               endif
 	    else
                write(num,'(i4)') l
 	       m = len_trim( num )
-               line(10:) = trim( mat_piece ) // num(:m) // ') = -dti'
+               if( model == 'CAM' .and. march == 'VECTOR' ) then
+                 line(10:) = trim( mat_piece ) // num(:m) // ') = -dti(k)'
+               else
+                 line(10:) = trim( mat_piece ) // num(:m) // ') = -dti'
+               endif
 	    end if
             write(30,100) trim(line)
 	 end do
@@ -674,7 +686,7 @@ Rates_loop : &
 	    case ( 'SCALAR' )
                write(line,'(''      call '',a,''nlnmat'',a,''( mat, y, rxt )'')') up_hdr,num(2:3)
 	    case ( 'VECTOR' )
-               write(line,'(''      call '',a,''nlnmat'',a,''( ofl, ofu, chnkpnts, mat, y, rxt )'')') &
+               write(line,'(''      call '',a,''nlnmat'',a,''( avec_len, mat, y, rxt )'')') &
                 up_hdr,num(2:3)
 	    case default
                if( model /= 'CAM' ) then
@@ -690,7 +702,7 @@ Rates_loop : &
 	    case ( 'SCALAR' )
                write(line,'(''      call '',a,''nlnmat_finit( mat, lmat, dti )'')') up_hdr
 	    case ( 'VECTOR' )
-               write(line,'(''      call '',a,''nlnmat_finit( ofl, ofu, chnkpnts, mat, lmat, dti )'')') up_hdr
+               write(line,'(''      call '',a,''nlnmat_finit( avec_len, mat, lmat, dti )'')') up_hdr
 	    case default
                if( model /= 'CAM' ) then
                   write(line,'(''      call '',a,''nlnmat_finit( mat, lmat, dti )'')') up_hdr
@@ -761,11 +773,11 @@ Rates_loop : &
             end if
 	 case ( 'VECTOR' )
             if( sub_cnt > 0 ) then
-               write(line,'(''      subroutine '',a,''nlnmat'',a,''( ofl, ofu, chnkpnts, mat, y, rxt )'')') up_hdr,num(2:3)
+               write(line,'(''      subroutine '',a,''nlnmat'',a,''( avec_len, mat, y, rxt )'')') up_hdr,num(2:3)
             else if( sub_cnt < 0 ) then
-               write(line,'(''      subroutine '',a,''nlnmat_finit( ofl, ofu, chnkpnts, mat, lmat, dti )'')') up_hdr
+               write(line,'(''      subroutine '',a,''nlnmat_finit( avec_len, mat, lmat, dti )'')') up_hdr
             else
-               write(line,'(''      subroutine '',a,''nlnmat( ofl, ofu, chnkpnts, mat, y, rxt, lmat, dti )'')') up_hdr
+               write(line,'(''      subroutine '',a,''nlnmat( avec_len, mat, y, rxt, lmat, dti )'')') up_hdr
             end if
 	 case default
             if( model /= 'CAM' ) then
@@ -870,11 +882,7 @@ Rates_loop : &
                line = '      real, intent(inout) ::  mat(:)'
             end if
          case ( 'VECTOR' )
-            line = '      integer, intent(in) ::  ofl'
-            write(30,100) trim(line)
-            line = '      integer, intent(in) ::  ofu'
-            write(30,100) trim(line)
-            line = '      integer, intent(in) ::  chnkpnts'
+            line = '      integer, intent(in) ::  avec_len'
             write(30,100) trim(line)
             if( sub_cnt <= 0 ) then
                if( model /= 'CAM' ) then
@@ -882,9 +890,9 @@ Rates_loop : &
                   write(30,100) trim(line)
                   line = '      real, intent(in)    ::  lmat(plnplv,' // trim(hdr) // 'nzcnt)'
                else
-                  line = '      real(r8), intent(in)    ::  dti'
+                  line = '      real(r8), intent(in)    ::  dti(veclen)'
                   write(30,100) trim(line)
-                  line = '      real(r8), intent(in)    ::  lmat(chnkpnts,nzcnt)'
+                  line = '      real(r8), intent(in)    ::  lmat(veclen,nzcnt)'
                end if
                write(30,100) trim(line)
             end if
@@ -894,16 +902,16 @@ Rates_loop : &
                   write(30,100) trim(line)
                   line = '      real, intent(in)    ::  rxt(plnplv,rxntot)'
                else
-                  line = '      real(r8), intent(in)    ::  y(chnkpnts,gas_pcnst)'
+                  line = '      real(r8), intent(in)    ::  y(veclen,gas_pcnst)'
                   write(30,100) trim(line)
-                  line = '      real(r8), intent(in)    ::  rxt(chnkpnts,rxntot)'
+                  line = '      real(r8), intent(in)    ::  rxt(veclen,rxntot)'
                end if
                write(30,100) trim(line)
             end if
             if( model /= 'CAM' ) then
                line = '      real, intent(inout) ::  mat(plnplv,' // hdr // 'nzcnt)'
             else
-               line = '      real(r8), intent(inout) ::  mat(chnkpnts,nzcnt)'
+               line = '      real(r8), intent(inout) ::  mat(veclen,nzcnt)'
             end if
 	 case ( 'CACHE' )
 	    if( sub_cnt <= 0 ) then
@@ -964,7 +972,7 @@ Rates_loop : &
          line = ' '
          write(30,100) trim(line)
 	 if( march == 'VECTOR' ) then
-            line(7:) = 'do k = ofl,ofu'
+            line(7:) = 'do k = 1,avec_len'
          else if( march == 'CACHE' ) then
             if( model == 'MOZART' ) then
                line(7:) = 'do k = 1,clsze'

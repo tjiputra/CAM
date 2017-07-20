@@ -32,8 +32,6 @@
                       'PS:I      ','PHIS:I    ','FU:I      ','FV:I      ','RELHUM:I  ',
  FINCL6              = 'T:I       ','U:I       ','V:I       ','Q:I       ','DTCOND:I  ',
                       'PS:I      ','PHIS:I    ','FU:I      ','FV:I      ','RELHUM:I  ',
- FINCL7              = 'T:I       ','U:I       ','V:I       ','Q:I       ','DTCOND:I  ',
-                      'PS:I      ','PHIS:I    ','FU:I      ','FV:I      ','RELHUM:I  ',
 
  collect_column_output = .false.,.false.,.true., .true., .false.,.false.
  interpolate_output    = .false.,.false.,.false.,.false.,.true., .true.,.false.

@@ -144,6 +144,14 @@ adjustment. Must be less than plev (the number of vertical levels).
 Default: 3
 </entry>
 
+<entry id="dadadj_niter" type="integer"  category="dry_conv_adj"
+       group="dadadj_nl" valid_values="" >
+The maximum number of iterations to achieve convergence in dry adiabatic adjustment.
+For WACCM-X it can be advantageous to use a number which is much higher than the CAM
+default.
+Default: 15
+</entry>
+
 <!-- Dynamics: Finite Volume -->
 
 <entry id="fv_nsplit" type="integer"  category="dyn_fv"
@@ -261,8 +269,16 @@ Default: .false.
 <entry id="fv_am_diag" type="logical"  category="dyn_fv"
        group="dyn_fv_inparm" valid_values="" >
 Flag to turn on a diagnostic calculation of angular momentum which is
-written to the log file at each time step.  
+written to the log file at each time step.  Also enables calculation of
+fields written to history file which are used in conjuction with those
+enabled by do_circulation_diags for detailed analysis.
 Default: .false.
+</entry>
+
+<entry id="fv_high_altitude" type="logical"  category="dyn_fv"
+       group="dyn_fv_inparm" valid_values="" >
+Switch to apply variable physics appropriate for the thermosphere and ionosphere
+Default: set by build-namelist
 </entry>
 
 <!-- MPI configuration for FV dycore -->
@@ -1022,6 +1038,93 @@ Default: set by build-namelist.
        group="gw_drag_nl" valid_values="" >
 Whether or not to use tapering at the poles to reduce the effects of
 mid-scale gravity waves from frontogenesis.
+Default: set by build-namelist.
+</entry>
+
+<!-- Gravity Wave Ridge -->
+
+<entry id="gw_rdg_do_divstream" type="logical" category="gw_rdg"
+       group="gw_rdg_nl" valid_values="" >
+If .true. use separate dividing streamlines for downslope wind and flow splitting regimes (“DS” configuration). 
+If .false. use single dividing streamline as in Scinocca&McFarlane 2000 (“SM” configuration).
+Default: set by build-namelist.
+</entry>
+
+<entry id="gw_rdg_do_smooth_regimes" type="logical" category="gw_rdg"
+       group="gw_rdg_nl" valid_values="" >
+If true, then use smooth regimes
+Default: set by build-namelist.
+</entry>
+
+<entry id="gw_rdg_do_adjust_tauoro" type="logical" category="gw_rdg"
+       group="gw_rdg_nl" valid_values="" >
+If true, then adujust tauoro
+Default: set by build-namelist.
+</entry>
+
+<entry id="gw_rdg_do_backward_compat" type="logical" category="gw_rdg"
+       group="gw_rdg_nl" valid_values="" >
+If true, then adjust for bit-for-bit answers with the ("N5") configuration
+Default: set by build-namelist.
+</entry>
+
+<entry id="gw_rdg_C_BetaMax_DS" type="real"  category="gw_rdg"
+       group="gw_rdg_nl" valid_values="" >
+Enhancement factor for downslope wind stress in DS configuration.
+Default: set by build-namelist.
+</entry>
+
+<entry id="gw_rdg_C_GammaMax" type="real"  category="gw_rdg"
+       group="gw_rdg_nl" valid_values="" >
+Enhancement factor for depth of downslope wind regime in DS configuration
+Default: set by build-namelist.
+</entry>
+
+<entry id="gw_rdg_Frx0" type="real"  category="gw_rdg"
+       group="gw_rdg_nl" valid_values="" >
+Lower inverse Froude number limits on linear ramp terminating downslope wind regime for high mountains in DS configuration
+Default: set by build-namelist.
+</entry>
+
+<entry id="gw_rdg_Frx1" type="real"  category="gw_rdg"
+       group="gw_rdg_nl" valid_values="" >
+Upper inverse Froude number limits on linear ramp terminating downslope wind regime for high mountains in DS configuration
+Default: set by build-namelist.
+</entry>
+
+<entry id="gw_rdg_C_BetaMax_SM" type="real"  category="gw_rdg"
+       group="gw_rdg_nl" valid_values="" >
+Enhancement factor for downslope wind stress in SM configuration.
+Default: set by build-namelist.
+</entry>
+
+<entry id="gw_rdg_Fr_c" type="real"  category="gw_rdg"
+       group="gw_rdg_nl" valid_values="" >
+Critical inverse4 Froude number
+Default: set by build-namelist.
+</entry>
+
+<entry id="gw_rdg_orohmin" type="real"  category="gw_rdg"
+       group="gw_rdg_nl" valid_values="" >
+minimum surface displacement height for orographic waves (m)
+Default: set by build-namelist.
+</entry>
+
+<entry id="gw_rdg_orovmin" type="real"  category="gw_rdg"
+       group="gw_rdg_nl" valid_values="" >
+Minimum wind speed for orographic waves
+Default: set by build-namelist.
+</entry>
+
+<entry id="gw_rdg_orostratmin" type="real"  category="gw_rdg"
+       group="gw_rdg_nl" valid_values="" >
+Minimum stratification allowing wave behavior
+Default: set by build-namelist.
+</entry>
+
+<entry id="gw_rdg_orom2min" type="real"  category="gw_rdg"
+       group="gw_rdg_nl" valid_values="" >
+Minimum stratification allowing wave behavior
 Default: set by build-namelist.
 </entry>
 
@@ -2190,10 +2293,10 @@ Default: set by build-namelist
 <entry id="nucleate_ice_strat" type="real" category="microphys"
        group="nucleate_ice_nl" valid_values="" >
 Fraction of Aitken mode sulfate particles assumed to nucleate ice in the polar
-stratospheric. Provides an increase in homogeneous freezing over the Liu&Penner method.
+stratospheric. Provides an increase in homogeneous freezing over the Liu&ampPenner method.
 Temporary solution to adjust ice surface area density and dehydration in the
 polar stratosphere where there doesn't seem to be enough nucleation. A value of
-zero means Liu&Penner is used.
+zero means Liu&ampPenner is used.
 Default: set by build-namelist
 </entry>
 
@@ -2299,14 +2402,14 @@ Default: 700.e2
 
 <entry id="cldfrc_iceopt" type="integer" category="conv"
        group="cldfrc_nl" valid_values="" >
-Scheme for ice cloud fraction: 1=wang & sassen, 2=schiller (iciwc),  
-3=wood & field, 4=Wilson (based on smith), 5=modified slingo (ssat & empyt cloud)
+Scheme for ice cloud fraction: 1=wang &amp sassen, 2=schiller (iciwc),  
+3=wood &amp field, 4=Wilson (based on smith), 5=modified slingo (ssat &amp empyt cloud)
 Default: 5
 </entry>
 
 <entry id="cldfrc_icecrit" type="real" category="conv"
        group="cldfrc_nl" valid_values="" >
-Critical RH for ice clouds (Wilson & Ballard scheme).
+Critical RH for ice clouds (Wilson &amp Ballard scheme).
 Default: 0.93
 </entry>
 
@@ -2384,6 +2487,12 @@ Include organization parameterization in ZM
 Default: .false.
 </entry>
 
+<entry id="zmconv_microp" type="logical" category="conv"
+       group="zmconv_nl" valid_values="" >
+Turn on convective microphysics
+Default: .false.
+</entry>
+
 <entry id="zmconv_num_cin" type="integer" category="conv"
        group="zmconv_nl" valid_values="" >
 The number of negative buoyancy regions that are allowed before the convection top and CAPE calculations are completed.
@@ -2405,7 +2514,7 @@ Default: set by build-namelist
 <entry id="wv_sat_scheme" type="char*16" category="wv_sat"
        group="wv_sat_nl" valid_values="GoffGratch,MurphyKoop" >
 Type of water vapor saturation vapor pressure scheme employed.  'GoffGratch' for
-Goff and Gratch (1946); 'MurphyKoop' for Murphy & Koop (2005)
+Goff and Gratch (1946); 'MurphyKoop' for Murphy &amp Koop (2005)
 Default: GoffGratch
 </entry>
 
@@ -2530,6 +2639,31 @@ Default: set by build-namelist
 <entry id="do_clubb_sgs" type="logical" category="conv"
        group="phys_ctl_nl" valid_values="" >
 Switch for CLUBB_SGS
+Default: FALSE
+</entry>
+
+<entry id="scm_fixed_nl" type="real" catagory="conv"
+       group="phys_ctl_nl" valid_values="" >
+Liquid droplet concentration (in #/cc) when scm_nlni_instr_fixed=.true.
+Default: set by build-namelist
+</entry>
+
+<entry id="scm_fixed_ni" type="real" catagory="conv"
+       group="phys_ctl_nl" valid_values="" >
+Liquid droplet concentration (in #/cc) when scm_nlni_instr_fixed=.true.
+Default: set by build-namelist
+</entry>
+
+<entry id="scm_force_latlon" type="logical" category="scam"
+       group="scam_nl" valid_values="">
+Force scam to use the lat/lon specified in the namelist and not use the closest lat/lon found in the IOP file
+Default: FALSE
+</entry>
+
+
+<entry id="scm_nlni_instr_fixed" type="logical" category="scam"
+       group="scam_nl" valid_values="">
+Specify in-stratus cloud droplet number concentration for stratiform microphysics and radiation.
 Default: FALSE
 </entry>
 
@@ -3371,8 +3505,16 @@ Default: TRUE
 <!-- Physics control -->
 
 <entry id="cam_physpkg" type="char*16" category="build"
-       group="phys_ctl_nl" valid_values="cam3,cam4,cam5,ideal,adiabatic" >
+       group="phys_ctl_nl" valid_values="cam3,cam4,cam5,cam6,adiabatic,held_suarez,kessler" >
 Name of the CAM physics package.  N.B. this variable may not be set by
+the user.  It is set by build-namelist via information in the configure
+cache file to be consistent with how CAM was built.
+Default: set by build-namelist
+</entry>
+
+<entry id="use_simple_phys" type="logical" category="build"
+       group="phys_ctl_nl" valid_values="" >
+Flag for simple physics package.  N.B. this variable may not be set by
 the user.  It is set by build-namelist via information in the configure
 cache file to be consistent with how CAM was built.
 Default: set by build-namelist
@@ -3389,12 +3531,46 @@ cache file to be consistent with how CAM was built.
 Default: set by build-namelist
 </entry>
 
-<entry id="waccmx_opt" type="char*16" category="waccm"
+<entry id="waccmx_opt" type="char*16" category="waccmx"
        group="phys_ctl_nl" valid_values="ionosphere,neutral,off" >
 Runtime options of upper thermosphere WACCM-X.  'ionosphere' for 
-full ionopshere and neutral thermosphere, 'neutral' for just 
+full ionosphere and neutral thermosphere, 'neutral' for just 
 neutral thermosphere, and off for no WACCM-X.
 Default: 'off'
+</entry>
+
+<entry id="oplus_adiff_limiter" type="real" category="waccmx"
+       group="ionosphere_nl" valid_values="" >
+Limiter for ambipolar diffusion coefficient used in O+ transport in the
+ionosphere.
+Default: 1.5e+8
+</entry>
+
+<entry id="oplus_shapiro_const" type="real" category="waccmx"
+       group="ionosphere_nl" valid_values="" >
+Shapiro constant for spatial smoother used in O+ transport in the
+ionosphere.
+Default: 0.03
+</entry>
+
+<entry id="oplus_enforce_floor" type="logical"  category="waccmx"
+       group="ionosphere_nl" valid_values="">
+Switch to apply floor to O+ concentrations within in ionosphere O+ transport. 
+Default: TRUE
+</entry>
+
+<entry id="ionos_xport_active" type="logical"  category="waccmx"
+       group="ionosphere_nl" valid_values="">
+Switch to to turn on/off O+ transport in ionosphere.
+Default: set by build-namelist
+</entry>
+
+<entry id="ionos_edyn_active" type="logical"  category="waccmx"
+       group="ionosphere_nl" valid_values="">
+Switch to invoke electro-dynamo to compute ion drift velocities used in 
+O+ transport in ionosphere.  If false, ExB empirical model is used to 
+provide the ion drift velocities for O+ transport.
+Default: set by build-namelist
 </entry>
 
 <!-- Reference Pressures -->
@@ -3551,6 +3727,24 @@ Default: .true.
        group="phys_ctl_nl" valid_values="" >
 Switch for diagnostics specific to CLUBB.
 Default: .true.
+</entry>
+
+<entry id="history_cesm_forcing" type="logical"  category="diagnostics"
+       group="phys_ctl_nl" valid_values="" >
+Switch to turn on/off default output specific to CESM forcings.
+Default: .false.
+</entry>
+
+<entry id="history_scwaccm_forcing" type="logical"  category="diagnostics"
+       group="phys_ctl_nl" valid_values="" >
+Switch to turn on/off default output specific to WACCM-SC forcings.
+Default: .false.
+</entry>
+
+<entry id="history_chemspecies_srf" type="logical"  category="diagnostics"
+       group="phys_ctl_nl" valid_values="" >
+Switch to turn on/off default output chemical species mixing ratios in the surface layer.
+Default: .false.
 </entry>
 
 <entry id="offline_driver" type="logical" category="offline_unit_driver"
@@ -3812,6 +4006,12 @@ Full pathname of IOP dataset.
 Default: set by build-namelist.
 </entry>
 
+<entry id="scm_cambfb_mode" type="logical" category="scam"
+       group="scam_nl" valid_values="">
+Column bfb match with cam generated IOP.
+Default: FALSE
+</entry>
+
 <entry id="scm_crm_mode" type="logical" category="scam"
        group="scam_nl" valid_values="">
 Column radiation mode.
@@ -3821,6 +4021,12 @@ Default: FALSE
 <entry id="scm_diurnal_avg" type="logical" category="scam"
        group="scam_nl" valid_values="">
 If using diurnal averaging or not.
+Default: FALSE
+</entry>
+
+<entry id="scm_iop_tg" type="logical" category="scam"
+       group="scam_nl" valid_values="">
+Use the specified surface properties.
 Default: FALSE
 </entry>
 
@@ -3838,9 +4044,80 @@ Default: ""
 
 <entry id="scm_relaxation" type="logical" category="scam"
        group="scam_nl" valid_values="">
-Use relaxation.
+Use relaxation. 
+Default: FALSE 
+</entry>
+
+<entry id="scm_relax_linear" type="logical" category="scam"
+       group="scam_nl" valid_values="">
+Use relaxation. Linearly interpolate the timescale within specified
+pressure range. (bpm) 
+Default: FALSE 
+</entry>
+
+<entry id="scm_relax_top_p" type="real" category="scam"
+       group="scam_nl" valid_values="">
+Upper most pressure that will be relaxed.
+Default: 1e36
+</entry>
+
+<entry id="scm_relax_bot_p" type="real" category="scam"
+       group="scam_nl" valid_values="">
+Lower most pressure that will be relaxed.
+Default: -1e36
+</entry>
+
+<entry id="scm_relax_tau_sec" type="real" category="scam"
+       group="scam_nl" valid_values="">
+SCAM relaxation time constant in seconds 
+Default: 10800 
+</entry>
+
+<entry id="scm_relax_tau_top_sec" type="real" category="scam"
+       group="scam_nl" valid_values="">
+SCAM relaxation time constant in seconds that will be used at
+top of pressure range (i.e., the smaller pressure value). Will
+be used from top of pressure range to model top.
+Default: 10800 
+</entry>
+
+<entry id="scm_relax_tau_bot_sec" type="real" category="scam"
+       group="scam_nl" valid_values="">
+SCAM relaxation time constant in seconds that will be used at
+bottom of pressure range (i.e., the larger pressure value).
+Default: 10800 
+</entry>
+
+<entry id="scm_use_obs_T" type="logical" category="scam"
+       group="scam_nl" valid_values="">
+Use the SCAM-IOP specified T instead of using forecasted T at each time step.
 Default: FALSE
 </entry>
+
+<entry id="scm_use_obs_uv" type="logical" category="scam"
+       group="scam_nl" valid_values="">
+Use the SCAM-IOP specified u,v instead of using forecasted u,v at each time step.
+Default: FALSE
+</entry>
+
+<entry id="scm_zadv_T"  type="char*16" category="scam"
+       group="scam_nl" valid_values="iop,eulc,off">
+Use specific type of vertical advection for T.
+Default: set by build-namelist
+</entry>
+
+<entry id="scm_zadv_uv" type="char*16" category="scam"
+       group="scam_nl" valid_values="iop,eulc,off">
+Use specific type of vertical advection for uv.
+Default: set by build-namelist
+</entry>
+
+<entry id="scm_zadv_q" type="char*16" category="scam"
+       group="scam_nl" valid_values="iop,eulc,slt,off">
+Use specific type of vertical advection for q.
+Default: set by build-namelist
+</entry>
+
 
 <!-- Solar Parameters -->
 
@@ -4275,6 +4552,14 @@ Default: set by build-namelist.
        group="iondrag_nl" valid_values="" >
 Full pathname of dataset for coefficient data used in WACCM to calculate ion drag 
 from the Weimer96 high latitude electric potential model.
+Default: set by build-namelist.
+</entry>
+
+<entry id="empirical_ion_velocities" type="logical" category="waccm_phys"
+       group="iondrag_nl" valid_values="" >
+Switch to turn on empirical ExB ion drift velocities model for use in ion drag 
+parameterizations.  If this is false then it is assumed ion drift velocities are
+supplied by an active ionosphere model.
 Default: set by build-namelist.
 </entry>
 
@@ -5002,8 +5287,14 @@ Default: 0 seconds
 
 <entry id="prescribed_strataero_feedback" type="logical" category="cam_chem"
        group="camexp" valid_values="" >
-Switch to turn on climate feed backs due to  prescribed stratospheric aerosols via
+Switch to turn on climate feed backs due to prescribed stratospheric aerosols via
 the rad_climate namelist variable.
+Default: false
+</entry>
+
+<entry id="prescribed_strataero_3modes" type="logical" category="cam_chem"
+       group="camexp" valid_values="" >
+If true the prescribed stratospheric aerosols have three distribution modes.
 Default: false
 </entry>
 
@@ -5441,12 +5732,12 @@ Default: set by build-namelist
        group="rxn_rate_diags_nl" valid_values="" >
 Give the user the ability to specify rate families (or groupings) diagnostics based 
 on reaction tag names. These group names can be added to history fincl variables.
-To indicate the summation continues with next string use "&" character at the end of the string.
+To indicate the summation continues with next string use "&amp" character at the end of the string.
 Example:
  rate_sums = 
    'OX_P = NO_HO2 + CH3O2_NO + 2*jo2_b ... ', 
    'OX_L = NO2_O_M + HO2_O3 + CLO_O ...', 
-   'RO2_RO2_sum = CH3O2_CH3O2a + CH3O2_CH3O2b + C2H5O2_CH3O2 + C2H5O2_C2H5O2 + CH3CO3_CH3O2 &',
+   'RO2_RO2_sum = CH3O2_CH3O2a + CH3O2_CH3O2b + C2H5O2_CH3O2 + C2H5O2_C2H5O2 + CH3CO3_CH3O2 &amp',
                '+ CH3CO3_CH3CO3 + CH3H7O2_CH3O2 + RO2_CH3O2 + MACRO2_CH3O2 ...',
  fincl1 = 'OX_P','OX_L', 'RO2_RO2_sum', ...
 Default: none
@@ -5479,6 +5770,11 @@ Otherwise they are treated as surface emissions.
 Default: TRUE
 </entry>
 
+<entry id="ndep_list" type="char*16(2)" category="Nitrogen Deposition"
+       group="ndep_inparm" valid_values="" >
+List of nitrogen deposition fluxes to be sent from CAM to surfae models.
+Default: set by build-namelist.
+</entry>
 
 <entry id="megan_factors_file" type="char*256" input_pathname="abs" category="VOC_emissions"
        group="megan_emis_nl" valid_values="" >
@@ -5774,7 +6070,7 @@ Default: Set by build-namelist.
 <entry id="se_nu_div" type="real" category="se"
        group="dyn_se_inparm" valid_values="" >
 Weighting of divergence component when applying hyperviscosity.
-If < 0, uses nu.
+If &lt 0, uses nu.
 Default: value of nu
 </entry>
 
@@ -5788,7 +6084,7 @@ Default: Set by build-namelist.
 <entry id="se_nu_q" type="real" category="se"
        group="dyn_se_inparm" valid_values="" >
 Hyperviscosity applied during tracer advection [m^4/s].
-If < 0, uses nu.
+If &lt 0, uses nu.
 Default: Set by build-namelist.
 </entry>
 
@@ -5831,8 +6127,8 @@ se_tstep_type=0  pure Leapfrog except for very first timestep
 se_tstep_type=1  RK2 followed by qsplit-1 Leapfrog steps; second-order accurate in time (CESM1.2.0 setting)
 se_tstep_type=2  RK2-SSP 3 stage (as used by tracers)
 se_tstep_type=3  classic Runga-Kutta (RK) 3 stage
-se_tstep_type=4  Kinnmark&Gray Runga-Kutta (RK) 4 stage
-se_tstep_type=5  Kinnmark&Gray Runga-Kutta (RK) 5 stage (3rd order accurate in time)
+se_tstep_type=4  Kinnmark&ampGray Runga-Kutta (RK) 4 stage
+se_tstep_type=5  Kinnmark&ampGray Runga-Kutta (RK) 5 stage (3rd order accurate in time)
 Default: 5
 </entry>
 
@@ -6289,15 +6585,6 @@ Set the sst to a particular analytic solution.
 Default: 1
 </entry>
 
-<entry id="atm_adiabatic" type="logical"  category="driver"
-       group="seq_infodata_inparm" valid_values="" >
-If TRUE, do not run model physics, only run the dynamical core.
-Only one of
-<varname>atm_adiabatic</varname>, <varname>atm_ideal_phys</varname>, or
-<varname>aqua_planet</varname> can be true.
-Default: FALSE
-</entry>
-
 <entry id="atm_dep_flux" type="logical" category="driver"
        group="phys_ctl_nl" valid_values="" >
 If FALSE then CAM will set the deposition fluxes to zero before sending
@@ -6306,15 +6593,6 @@ variable <varname>chem_rad_passive</varname> to TRUE is that this variable
 will be set to FALSE (the deposition fluxes must be set to zero in order
 for the chemistry not to impact the climate).
 Default: TRUE
-</entry>
-
-<entry id="atm_ideal_phys" type="logical"  category="driver"
-       group="seq_infodata_inparm" valid_values="" >
-If TRUE run the idealized Held&amp;Suarez physics package.
-Only one of
-<varname>atm_adiabatic</varname>, <varname>atm_ideal_phys</varname>, or
-<varname>aqua_planet</varname> can be true.
-Default: FALSE
 </entry>
 
 <entry id="bfbflag" type="logical"  category="driver"
@@ -6375,6 +6653,12 @@ Default: none.
        group="seq_infodata_inparm" valid_values="cesm, acme" >
 cime model version.
 Default: cesm.
+</entry>
+
+<entry id="gust_fac" type="integer"  category="driver"
+       group="seq_infodata_inparm" valid_values="0" >
+gust_fac value - for CESM is 0
+Default: 0.
 </entry>
 
 <entry id="case_name" type="char*80"  category="driver"

@@ -1,29 +1,32 @@
-
+!----------------------------------------------------------------------------------
+! Modal aerosol implementation
+!----------------------------------------------------------------------------------
 module sox_cldaero_mod
-   use shr_kind_mod, only : r8 => shr_kind_r8
-   use cam_abortutils,  only : endrun
-   use ppgrid,          only : pcols, pver
-   use mo_chem_utls,    only : get_spc_ndx
-   use aerosoldef, only: l_so4_a2, chemistryIndex
-   use cldaero_mod,     only : cldaero_conc_t, cldaero_allocate, cldaero_deallocate
-   use chem_mods,       only : adv_mass
-   use physconst,       only : gravit
-   use phys_control,    only : phys_getopts
-   use cldaero_mod,     only : cldaero_uptakerate
-   use chem_mods,       only : gas_pcnst
 
-   implicit none
-   private
+  use shr_kind_mod,    only : r8 => shr_kind_r8
+  use cam_abortutils,  only : endrun
+  use ppgrid,          only : pcols, pver
+  use mo_chem_utls,    only : get_spc_ndx
+  use aerosoldef,     only: l_so4_a2, chemistryIndex
+  use cldaero_mod,     only : cldaero_conc_t, cldaero_allocate, cldaero_deallocate
+  use chem_mods,       only : adv_mass
+  use physconst,       only : gravit
+  use phys_control,    only : phys_getopts
+  use cldaero_mod,     only : cldaero_uptakerate
+  use chem_mods,       only : gas_pcnst
 
-   public :: sox_cldaero_init
-   public :: sox_cldaero_create_obj
-   public :: sox_cldaero_update
-   public :: sox_cldaero_destroy_obj
+  implicit none
+  private
 
-   integer :: id_msa, id_h2so4, id_so2, id_h2o2, id_nh3
-   integer :: id_so4_1a
+  public :: sox_cldaero_init
+  public :: sox_cldaero_create_obj
+  public :: sox_cldaero_update
+  public :: sox_cldaero_destroy_obj
 
-   real(r8), parameter :: small_value = 1.e-20_r8
+  integer :: id_msa, id_h2so4, id_so2, id_h2o2, id_nh3
+  integer :: id_so4_1a
+
+  real(r8), parameter :: small_value = 1.e-20_r8
 
 contains
 
@@ -35,22 +38,22 @@ contains
     integer :: l, m
     logical :: history_aerosol      ! Output the MAM aerosol tendencies
 
-      id_msa    = get_spc_ndx( 'MSA' )
-      id_h2so4  = get_spc_ndx( 'H2SO4' )
-      id_so2    = get_spc_ndx( 'SO2' )
-      id_h2o2 = get_spc_ndx( 'H2O2' )
-      id_nh3 = get_spc_ndx( 'NH3' )
+    id_msa = get_spc_ndx( 'MSA' )
+    id_h2so4 = get_spc_ndx( 'H2SO4' )
+    id_so2 = get_spc_ndx( 'SO2' )
+    id_h2o2 = get_spc_ndx( 'H2O2' )
+    id_nh3 = get_spc_ndx( 'NH3' )
 
-      id_so4_1a = chemistryIndex(l_so4_a2) 
+    id_so4_1a = chemistryIndex(l_so4_a2) 
 
-      if (id_h2so4<1 .or. id_so2<1 .or. id_h2o2<1) then
-         call endrun('sox_cldaero_init:MAM mech does not include necessary species' &
+    if (id_h2so4<1 .or. id_so2<1 .or. id_h2o2<1) then
+      call endrun('sox_cldaero_init:MAM mech does not include necessary species' &
                   //' -- should not invoke sox_cldaero_mod ')
-      endif
+    endif
 
-      call phys_getopts( history_aerosol_out        = history_aerosol   )
-      !
-      !   add to history
+    call phys_getopts( history_aerosol_out        = history_aerosol   )
+    !
+    !   add to history
     !
   
   end subroutine sox_cldaero_init
@@ -107,14 +110,14 @@ contains
 
   
   end function sox_cldaero_create_obj
-  
+
 !----------------------------------------------------------------------------------
 ! Update the mixing ratios
 !----------------------------------------------------------------------------------
   subroutine sox_cldaero_update( &
        ncol, lchnk, loffset, dtime, mbar, pdel, press, tfld, cldnum, cldfrc, cfact, xlwc, &
        delso4_hprxn, xh2so4, xso4, xso4_init, nh3g, hno3g, xnh3, xhno3, xnh4c,  xno3c, xmsa, xso2, xh2o2, qcw, qin, &
-       aqso4, aqh2so4, aqso4_h2o2, aqso4_o3 )
+       aqso4, aqh2so4, aqso4_h2o2, aqso4_o3, aqso4_h2o2_3d, aqso4_o3_3d)
 
     ! args 
 
@@ -155,6 +158,9 @@ contains
     real(r8), intent(out) :: aqh2so4(:,:)                 ! aqueous phase chemistry
     real(r8), intent(out) :: aqso4_h2o2(:)                ! SO4 aqueous phase chemistry due to H2O2 (kg/m2)
     real(r8), intent(out) :: aqso4_o3(:)                  ! SO4 aqueous phase chemistry due to O3 (kg/m2)
+    real(r8), intent(out), optional :: aqso4_h2o2_3d(:,:)                ! SO4 aqueous phase chemistry due to H2O2 (kg/m2)
+    real(r8), intent(out), optional :: aqso4_o3_3d(:,:)                  ! SO4 aqueous phase chemistry due to O3 (kg/m2)
+
 
     ! local vars ...
 
@@ -172,12 +178,12 @@ contains
     real(r8) :: fwetrem, sumf, uptkrate
     real(r8) :: delnh3, delnh4
 
-
     integer :: l, n, m
     integer :: ntot_msa_c
 
     integer :: i,k
     real(r8) :: xl
+
     ! make sure dqdt is zero initially, for budgets
     dqdt_aqso4(:,:,:) = 0.0_r8
     dqdt_aqh2so4(:,:,:) = 0.0_r8
@@ -191,12 +197,12 @@ contains
 
              IF (XL .ge. 1.e-8_r8) THEN !! WHEN CLOUD IS PRESENTED
 
-                 delso4_o3rxn = xso4(i,k) - xso4_init(i,k)
+                delso4_o3rxn = xso4(i,k) - xso4_init(i,k)
 
-                 if (id_nh3>0) then
-                    delnh3 = nh3g(i,k) - xnh3(i,k)
-                    delnh4 = - delnh3
-                 endif
+                if (id_nh3>0) then
+                   delnh3 = nh3g(i,k) - xnh3(i,k)
+                   delnh4 = - delnh3
+                endif
 
                  !In the case of OSLO-AEROSOLS, 
                  !set no MSA in cloud droplets
@@ -295,18 +301,20 @@ contains
        enddo col_loop
     enddo lev_loop
 
-        !==============================================================
-        !       ... Update the mixing ratios
-        !==============================================================
-        do k = 1,pver
-           qin(:,k,id_so2)   =  MAX( qin(:,k,id_so2), small_value )
-           qcw(:,k,id_so4_1a) =  MAX( qcw(:,k,id_so4_1a), small_value )
+    !==============================================================
+    ! ... Update the mixing ratios
+    !==============================================================
+    do k = 1,pver
 
-           if ( id_nh3 > 0 ) then
-              qin(:,k,id_nh3) =  MAX( qin(:,k,id_nh3),    small_value )
-           endif
+       qcw(:,k,id_so4_1a) =  MAX( qcw(:,k,id_so4_1a), small_value )
 
-        end do
+       qin(:,k,id_so2) =  MAX( qin(:,k,id_so2),    small_value )
+
+       if ( id_nh3 > 0 ) then
+          qin(:,k,id_nh3) =  MAX( qin(:,k,id_nh3),    small_value )
+       endif
+
+    end do
 
     ! diagnostics
 
@@ -336,6 +344,16 @@ contains
        enddo
     enddo
 
+    if (present(aqso4_h2o2_3d)) then 
+       aqso4_h2o2_3d(:,:) = 0._r8
+       do k=1,pver
+          do i=1,ncol
+             aqso4_h2o2_3d(i,k)=dqdt_aqhprxn(i,k)*adv_mass(l)/mbar(i,k) &
+                                *pdel(i,k)/gravit ! kg SO4 /m2/s
+          enddo
+       enddo
+    end if
+
     aqso4_o3(:)=0._r8
     do k=1,pver
        do i=1,ncol
@@ -343,6 +361,16 @@ contains
                   *pdel(i,k)/gravit ! kg SO4 /m2/s
        enddo
     enddo
+
+    if (present(aqso4_o3_3d)) then
+       aqso4_o3_3d(:,:)=0._r8
+       do k=1,pver
+          do i=1,ncol
+             aqso4_o3_3d(i,k)=dqdt_aqo3rxn(i,k)*adv_mass(l)/mbar(i,k) &
+                              *pdel(i,k)/gravit ! kg SO4 /m2/s
+          enddo
+       enddo
+    end if
 
   end subroutine sox_cldaero_update
 

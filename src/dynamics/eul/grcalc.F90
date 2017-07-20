@@ -95,12 +95,10 @@ subroutine grcalcs (irow    ,ztodt   ,grts    ,grths   ,grds    ,&
 !
 ! Compute alpn and dalpn
 !
-!DIR$ NOSTREAM
    lmwave0 = -1
    lmrwave0 = 0
    dalpn(2) = 0.0_r8
    mlength = numm(iam)
-!cdir novector
    do lm=1,mlength
       m = locm(lm,iam)
       lmr = lnstart(lm)
@@ -120,12 +118,10 @@ subroutine grcalcs (irow    ,ztodt   ,grts    ,grths   ,grds    ,&
    grpls (:)   = 0._r8
    grpms (:)   = 0._r8
    grdpss(:)   = 0._r8
-!cdir collapse
    tmpGRcoef (:,:) = 0._r8
 !
 ! Loop over n for t,q,d,and end of u and v
 !
-!cdir novector
    do lm=1,mlength
       m = locm(lm,iam)
       lmr = lnstart(lm)
@@ -136,7 +132,6 @@ subroutine grcalcs (irow    ,ztodt   ,grts    ,grths   ,grds    ,&
       end do
    end do
 !
-!cdir novector
    do lm=1,mlength
       m = locm(lm,iam)
       lmr = lnstart(lm)
@@ -158,7 +153,6 @@ subroutine grcalcs (irow    ,ztodt   ,grts    ,grths   ,grds    ,&
 ! Save accumulated results to gr* arrays
 !
    do lm=1,mlength
-!DIR$ PREFERVECTOR
       do k=1,plev
          grus (2*lm-1,k) = tmpGRcoef(k        ,lm)
          grus (2*lm  ,k) = tmpGRcoef(k+plev   ,lm)
@@ -194,12 +188,10 @@ subroutine grcalcs (irow    ,ztodt   ,grts    ,grths   ,grds    ,&
 !
 ! Computation for 1-level variables (ln(p*) and derivatives).
 !
-!cdir novector
    do lm=1,mlength
       m = locm(lm,iam)
       lmr = lnstart(lm)
       lmc = 2*lmr
-!cdir shortloop
       do n=1,nlen(m),2
          ir = lmc + 2*n - 1
          ii = ir + 1
@@ -212,12 +204,10 @@ subroutine grcalcs (irow    ,ztodt   ,grts    ,grths   ,grds    ,&
       end do
    end do
 
-!cdir novector
    do lm=1,mlength
       m = locm(lm,iam)
       lmr = lnstart(lm)
       lmc = 2*lmr
-!cdir shortloop
       do n=2,nlen(m),2
          ir = lmc + 2*n - 1
          ii = ir + 1
@@ -331,9 +321,7 @@ subroutine grcalca (irow    ,ztodt   ,grta    ,grtha   ,grda    ,&
 !
 ! Compute alpn and dalpn
 !
-!DIR$ NOSTREAM
    mlength = numm(iam)
-!cdir novector
    do lm=1,mlength
       m = locm(lm,iam)
       lmr = lnstart(lm)
@@ -348,12 +336,10 @@ subroutine grcalca (irow    ,ztodt   ,grta    ,grtha   ,grda    ,&
    grpla (:) = 0._r8
    grpma (:) = 0._r8
    grdpsa(:) = 0._r8
-!cdir collapse
    tmpGRcoef(:,:) = 0._r8
 !
 ! Loop over n for t,q,d,and end of u and v
 !
-!cdir novector
    do lm=1,mlength
       m = locm(lm,iam)
       lmr = lnstart(lm)
@@ -364,7 +350,6 @@ subroutine grcalca (irow    ,ztodt   ,grta    ,grtha   ,grda    ,&
       end do
    end do
 
-!cdir novector
    do lm=1,mlength
       m = locm(lm,iam)
       lmr = lnstart(lm)
@@ -386,7 +371,6 @@ subroutine grcalca (irow    ,ztodt   ,grta    ,grtha   ,grda    ,&
 ! Save accumulated results to gr* arrays
 !
    do lm=1,mlength
-!DIR$ PREFERVECTOR
       do k=1,plev
          grua (2*lm-1,k) = tmpGRcoef(k        ,lm)
          grua (2*lm  ,k) = tmpGRcoef(k+plev   ,lm)
@@ -412,12 +396,10 @@ subroutine grcalca (irow    ,ztodt   ,grta    ,grtha   ,grda    ,&
 !
 ! Computation for 1-level variables (ln(p*) and derivatives).
 !
-!cdir novector
    do lm=1,mlength
       m = locm(lm,iam)
       lmr = lnstart(lm)
       lmc = 2*lmr
-!cdir shortloop
       do n=1,nlen(m),2
          ir = lmc + 2*n - 1
          ii = ir + 1
@@ -427,12 +409,10 @@ subroutine grcalca (irow    ,ztodt   ,grta    ,grtha   ,grda    ,&
       end do
    end do
 
-!cdir novector
    do lm=1,mlength
       m = locm(lm,iam)
       lmr = lnstart(lm)
       lmc = 2*lmr
-!cdir shortloop
       do n=2,nlen(m),2
          ir = lmc + 2*n - 1
          ii = ir + 1

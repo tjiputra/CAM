@@ -34,12 +34,15 @@ module mo_apex
    private
    public :: mo_apex_readnl
    public :: mo_apex_init
+   public :: mo_apex_init1
    public :: alatm, alonm, bnorth, beast, bdown, bmag
    public :: d1vec, d2vec, colatp, elonp
    public :: maglon0 ! geographic longitude at the equator where geomagnetic longitude is zero (radians)
 
    ! year to initialize apex
    real(r8), public, protected :: geomag_year = -1._r8
+   logical, public, protected :: geomag_year_updated = .true.
+
    integer :: fixed_geomag_year = -1
 
 !-------------------------------------------------------------------------------
@@ -58,7 +61,7 @@ module mo_apex
      d2vec       ! base vectors more-or-less magnetic downward/equatorward direction
    real(r8), protected :: &
      colatp,   & ! geocentric colatitude of geomagnetic dipole north pole (deg)
-     elonp	 ! East longitude of geomagnetic dipole north pole (deg)
+     elonp       ! East longitude of geomagnetic dipole north pole (deg)
 
    real(r8), protected :: maglon0
 
@@ -105,53 +108,11 @@ end subroutine mo_apex_readnl
 
 !======================================================================
 !======================================================================
-subroutine mo_apex_init(phys_state)
-!-------------------------------------------------------------------------------
-! Driver for apex code to calculate apex magnetic coordinates at 
-!   current geographic spatial resolution for given year. This calls
-!   routines in apex_subs.F.
-!
-! This is called once per run from sub inti.
-!-------------------------------------------------------------------------------
-
-   use physconst,only : pi
-   use physics_types, only: physics_state
-   use epp_ionization,only: epp_ionization_setmag
+subroutine mo_apex_init1()
    use time_manager,  only: get_curr_date
    use dyn_grid,      only: get_horiz_grid_dim_d
 
-   ! Input/output arguments
-   type(physics_state), intent(in), dimension(begchunk:endchunk) :: phys_state
-
-!-------------------------------------------------------------------------------
-! Local variables
-!-------------------------------------------------------------------------------
-   real(r8), parameter :: re    = 6.378165e8_r8 ! earth radius (cm)
-   real(r8), parameter :: h0    = 9.0e6_r8      ! base height (90 km)
-   real(r8), parameter :: hs    = 1.3e7_r8
-   real(r8), parameter :: eps   = 1.e-6_r8      ! epsilon
-   real(r8), parameter :: cm2km = 1.e-5_r8
-
-   integer  :: c, i, j, ist           ! indices
-   integer  :: ncol
-
-   real(r8) :: alt, hr, alon, alat, & ! apxmall args
-               vmp, w, d, be3, sim, xlatqd, f, si, collat, collon
-
-!-------------------------------------------------------------------------------
-! Non-scalar arguments returned by APXMALL:
-!-------------------------------------------------------------------------------
-   real(r8) :: bhat(3)
-   real(r8) :: d3(3)
-   real(r8) :: e1(3), e2(3), e3(3)
-   real(r8) :: f1(2), f2(2)
-
-   real(r8) :: bg(3), d1g(3), d2g(3), bmg
-
-   real(r8) :: rdum
-
-   real(r8), parameter :: rtd = 180._r8/pi     ! radians to degrees
-   real(r8), parameter :: dtr = pi/180._r8     ! degrees to radians
+   integer  :: i, j, ist          ! indices
 
    integer :: nglats
    integer :: nglons
@@ -161,7 +122,6 @@ subroutine mo_apex_init(phys_state)
    real(r8), allocatable :: gridlons(:)
    real(r8) :: gridalts(ngalts)                   ! altitudes passed to apxmka
 
-   real(r8) :: maglat(pcols,begchunk:endchunk)
    integer :: ngcols, hdim1_d, hdim2_d
    integer :: yr, mon, day, sec
 
@@ -177,14 +137,14 @@ subroutine mo_apex_init(phys_state)
    if ( yr < apex_beg_yr )   yr = apex_beg_yr
    if ( yr > apex_end_yr-1 ) yr = apex_end_yr-1
 
-   if (.not.(yr > geomag_year)) return
+   if (.not.(yr > geomag_year)) then
+      geomag_year_updated = .false.
+      return
+   else
+      geomag_year_updated = .true.
+   endif
 
    geomag_year = dble(yr)+0.5_r8
-
-!-------------------------------------------------------------------------------
-! Allocate output arrays
-!-------------------------------------------------------------------------------
-   call allocate_arrays
 
 !-------------------------------------------------------------------------------
 ! Center min, max altitudes about 130 km
@@ -226,11 +186,78 @@ subroutine mo_apex_init(phys_state)
                   nglats, nglons, ngalts, ist )
 
    if( ist /= 0 ) then
-     write(iulog,"(/,'>>> mo_apex_init: Error from apxmka: ist=',i5)") ist
-     call endrun("mo_apex_init: Error from apxmka")
+      write(iulog,"(/,'>>> mo_apex_init: Error from apxmka: ist=',i5)") ist
+      call endrun("mo_apex_init: Error from apxmka")
    end if
 
    deallocate( gridlats, gridlons )
+
+   if (masterproc) then
+      if (fixed_geomag_year<1) then
+         write(iulog, "('mo_apex_init: model yr,mon,day,sec ',4i6)") yr, mon, day, sec
+      endif
+      write(iulog, "('mo_apex_init: nglons,nglats ', 2i6)") nglons, nglats
+   endif
+
+end subroutine mo_apex_init1
+
+!======================================================================
+!======================================================================
+subroutine mo_apex_init(phys_state)
+!-------------------------------------------------------------------------------
+! Driver for apex code to calculate apex magnetic coordinates at 
+!   current geographic spatial resolution for given year. This calls
+!   routines in apex_subs.F.
+!
+! This is called once per run from sub inti.
+!-------------------------------------------------------------------------------
+
+   use physconst,only : pi
+   use physics_types, only: physics_state
+   use epp_ionization,only: epp_ionization_setmag
+
+   ! Input/output arguments
+   type(physics_state), intent(in), dimension(begchunk:endchunk) :: phys_state
+
+!-------------------------------------------------------------------------------
+! Local variables
+!-------------------------------------------------------------------------------
+   real(r8), parameter :: re    = 6.378165e8_r8 ! earth radius (cm)
+   real(r8), parameter :: h0    = 9.0e6_r8      ! base height (90 km)
+   real(r8), parameter :: hs    = 1.3e7_r8
+   real(r8), parameter :: eps   = 1.e-6_r8      ! epsilon
+   real(r8), parameter :: cm2km = 1.e-5_r8
+
+   integer  :: c, i, ist           ! indices
+   integer  :: ncol
+
+   real(r8) :: alt, hr, alon, alat, & ! apxmall args
+               vmp, w, d, be3, sim, xlatqd, f, si, collat, collon
+
+!-------------------------------------------------------------------------------
+! Non-scalar arguments returned by APXMALL:
+!-------------------------------------------------------------------------------
+   real(r8) :: bhat(3)
+   real(r8) :: d3(3)
+   real(r8) :: e1(3), e2(3), e3(3)
+   real(r8) :: f1(2), f2(2)
+
+   real(r8) :: bg(3), d1g(3), d2g(3), bmg
+
+   real(r8) :: rdum
+
+   real(r8) :: maglat(pcols,begchunk:endchunk)
+
+   real(r8), parameter :: rtd = 180._r8/pi     ! radians to degrees
+   real(r8), parameter :: dtr = pi/180._r8     ! degrees to radians
+
+   call mo_apex_init1()
+   if ((.not.geomag_year_updated) .and. (allocated(alatm))) return
+
+!-------------------------------------------------------------------------------
+! Allocate output arrays
+!-------------------------------------------------------------------------------
+   call allocate_arrays()
 
    alt   = hs*cm2km    ! altitude for apxmall (km)
    hr    = alt         ! reference altitude (km)
@@ -284,14 +311,10 @@ subroutine mo_apex_init(phys_state)
    maglon0 = -alon*dtr ! (radians) geograghic latitude where the geomagnetic latitude is zero
                        ! where longitude ranges from -180E to 180E
 
-   call apex_dypol( colatp, elonp, rdum )	! get geomagnetic dipole north pole 
+   call apex_dypol( colatp, elonp, rdum )       ! get geomagnetic dipole north pole 
 
    if (masterproc) then
-      write(iulog, "('mo_apex_init: nglons,nglats ', 2i6)") nglons, nglats
       write(iulog, "('mo_apex_init: colatp,elonp ', 2f12.6)") colatp, elonp
-      if (fixed_geomag_year<1) then
-         write(iulog, "('mo_apex_init: model yr,mon,day,sec ',4i6)") yr, mon, day, sec
-      endif
       write(iulog, "('mo_apex_init: Calculated apex magnetic coordinates for year AD ',f8.2)") geomag_year
    endif
 

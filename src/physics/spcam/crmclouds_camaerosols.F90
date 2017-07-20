@@ -544,6 +544,9 @@ subroutine crmclouds_mixnuc_tend (state, ptend, dtime, cflx, pblht, pbuf,   &
   qi(:ncol,:pver) = state%q(:ncol,:pver,ixcldice)
   nc(:ncol,:pver) = state%q(:ncol,:pver,ixnumliq)
   cldliqf(:,:)    = 1._r8
+  lcldn(:,:)      = 0._r8
+  lcldo(:,:)      = 0._r8
+  
 
   do k=1,pver
    do i=1,ncol
@@ -724,7 +727,7 @@ subroutine crmclouds_convect_tend(state,  ptend,  ztodt,  pbuf)
                   ptend%lq,state%q, pcnst,  mu(:,:), md(:,:),   &
                   du(:,:), eu(:,:), ed(:,:), dp(:,:), dsubcld(:),  &
                   jt(:),maxg(:),ideep(:), 1, lengath,  &
-                  nstep,   fracis,  ptend%q, dpdry  )
+                  nstep,   fracis,  ptend%q, dpdry, ztodt  )
 
 end subroutine crmclouds_convect_tend
 !=====================================================================================================

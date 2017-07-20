@@ -94,6 +94,7 @@ subroutine read_namelist(nlfilename, single_column, scmlat, scmlon)
    use tracers,             only: tracers_readnl
 
    use dyn_comp,            only: dyn_readnl
+   use ionosphere_interface,only: ionosphere_readnl
 
    !---------------------------Arguments-----------------------------------
 
@@ -189,6 +190,7 @@ subroutine read_namelist(nlfilename, single_column, scmlat, scmlon)
    call scam_readnl(nlfilename, single_column, scmlat, scmlon)
 
    call dyn_readnl(nlfilename)
+   call ionosphere_readnl(nlfilename)
 
 end subroutine read_namelist
 

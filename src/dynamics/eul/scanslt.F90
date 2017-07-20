@@ -1093,6 +1093,7 @@ else
       do k = 1,plev
          do i = 1,nlon
             fhr(i,k,m) = adv_state%qminus(i1+i-1,k,m,jcen)
+            hadv(i,k,m,jgc) = 0._r8
          end do
       end do
    end do

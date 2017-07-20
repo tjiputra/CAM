@@ -174,7 +174,7 @@ integer:: nclubb = 1 ! SAM timesteps per CLUBB timestep
 
 real uhl        ! current large-scale velocity in x near sfc
 real vhl        ! current large-scale velocity in y near sfc
-real   taux0    ! surface stress in x, m2/s2
-real   tauy0    ! surface stress in y, m2/s2
+real ::  taux0 = 0.   ! surface stress in x, m2/s2
+real ::  tauy0 = 0.   ! surface stress in y, m2/s2
 
 end module crmx_params

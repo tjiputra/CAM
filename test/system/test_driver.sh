@@ -7,6 +7,7 @@
 ## General syntax help function
 ## Usage: help <exit status>
 ##
+
 help () {
   local hname="Usage: `basename ${0}` [ OPTION [ OPTION ... ] ]"
   local hprefix="`echo ${hname} | tr '[!-~]' ' '`"
@@ -21,7 +22,7 @@ help () {
   echo "${hprefix} [ --cesm <test_name> ] (default aux_cam)"
   echo "${hprefix} [ --no-cesm ] (do not run any CESM test or test suite)"
   echo "${hprefix} [ --no-cam ] (do not run CAM regression tests"
-  echo "${hprefix} [ --rerun-cesm ] (rerun the cesm tests with the --use-existing-flag)"
+  echo "${hprefix} [ --rerun-cesm <test_id> ] (rerun the cesm tests with the --use-existing-flag)"
   echo ""
   echo "${hprefix} **pass environment variables by preceding above commands with:"
   echo "${hprefix}   'env var1=setting var2=setting '"
@@ -40,7 +41,6 @@ help () {
   echo "CAM_TAG:           Default = none (used to set CESM baseline dir)"
   echo "CAM_TASKS:         Default = 32"
   echo "CAM_TESTDIR:       Default = <user_scratch_dir>/test-driver.<jobid>"
-  echo "CESM_TESTDIR:      Default = <user_scratch_dir>/test-cesm.<jobid>"
   echo ""
   echo "Less common ENVIRONMENT variables"
   echo "CALDERA_BATCHQ:    Default = caldera"
@@ -59,7 +59,7 @@ perr() {
   echo -e "\nERROR: ${@}\n"
   help 1
 }
-# usage on hobart, leehill, yellowstone, edison
+# usage on hobart, leehill, yellowstone, cheyenne, edison
 # ./test_driver.sh
 #
 # **more details in the CAM testing user's guide, accessible 
@@ -75,8 +75,9 @@ cesm_test_suite="aux_cam"
 force=false
 gmake_j=8
 interactive=false
+chey_comp=false
 run_cam_regression=true
-use_existing=false
+use_existing=''
 
 while [ "${1:0:1}" == "-" ]; do
     case $1 in
@@ -128,7 +129,11 @@ while [ "${1:0:1}" == "-" ]; do
             ;;
 
         --rerun-cesm )
-            use_existing=true
+            if [ $# -lt 2 ]; then
+                perr "${1} requires a test_id from a previous run)"
+            fi
+            use_existing="${2}"
+            shift
             ;;
 
     esac
@@ -147,6 +152,186 @@ cur_time=`date '+%H%M%S'`
 hostname=`hostname`
 
 case $hostname in
+
+    ##cheyenne
+    ch* | r* )
+    submit_script="`pwd -P`/test_driver_cheyenne${cur_time}.sh"
+    submit_script_comp="`pwd -P`/test_driver_cheyenne_comp${cur_time}.sh"
+
+    if [ -z "$CAM_ACCOUNT" ]; then
+        export CAM_ACCOUNT=`grep -i "^${LOGNAME}:" /glade/u/ssg/ys/opt/lsf/conf/configdir/project.ncar | cut -f 1 -d "," | cut -f 2 -d ":" `
+        if [ -z "${CAM_ACCOUNT}" ]; then
+            echo "ERROR: unable to locate an account number to charge for this job under user: $LOGNAME"
+            exit 2
+        fi
+    fi
+ 
+    if [ -z "$CAM_BATCHQ" ]; then
+        export CAM_BATCHQ="regular"
+    fi
+
+    if [ "$CAM_BATCHQ" = "small" ]; then
+        wallclock_limit="2:00"
+    else
+        wallclock_limit="8:00"
+    fi
+
+    if [ $gmake_j = 0 ]; then
+        gmake_j=8
+    fi
+
+    if [ -z "$CAM_TASKS" ]; then
+        CAM_TASKS=32
+    fi
+    if [ -z "$CAM_RESTART_TASKS" ]; then
+        CAM_RESTART_TASKS=$(( 2 * $CAM_TASKS ))
+    fi
+
+##vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv writing to batch script vvvvvvvvvvvvvvvvvvv
+cat > ${submit_script_comp} << EOF
+
+############
+# This script compiles directly on the cheyenne login node and may be run in the background
+############
+
+chey_comp=true
+
+if [ -z "$CAM_RBOPTIONS" ]; then
+    export CAM_RBOPTIONS="build_only"
+fi
+
+## create_newcase looks for account number in ACCOUNT environment variable
+export ACCOUNT=$CAM_ACCOUNT
+
+##omp threads
+export CAM_THREADS=2
+export CAM_RESTART_THREADS=1
+
+##mpi tasks
+export CAM_TASKS=$CAM_TASKS
+export CAM_RESTART_TASKS=$CAM_RESTART_TASKS
+
+# This is a floor preventing the use of 32 MPI tasks per node, which is
+# frequently broken, but allowing 32 threads.
+export min_cpus_per_task=1
+
+module purge
+
+if [ "\$CAM_FC" = "PGI" ]; then
+  module load ncarenv/1.0
+  module load ncarbinlibs/1.0
+  module load pgi/12.5
+  module load ncarcompilers
+  module load netcdf/4.2
+  module load pnetcdf/1.3.0
+  module load perlmods
+  module load python
+  export CFG_STRING=" -cc mpicc -fc_type pgi -fc mpif90 -cppdefs -DNO_MPI2 -cppdefs -DNO_MPIMOD "
+else
+  module load ncarenv/1.0
+  module load intel/16.0.3
+  module load mkl/11.3.3
+  module load mpt/2.15
+  module load ncarcompilers/0.3.5
+  module load netcdf-mpi/4.4.1.1
+  module load pnetcdf/1.8.0
+  module load python
+  export CFG_STRING="-cc mpicc -fc mpif90 -fc_type intel "
+fi
+
+export MAKE_CMD="gmake -j $gmake_j"
+export CCSM_MACH="cheyenne"
+export MACH_WORKSPACE="/glade/scratch"
+export CPRNC_EXE=${CESMDATAROOT}/tools/cime/tools/cprnc/cprnc.cheyenne
+export ADDREALKIND_EXE=/fs/cgd/csm/tools/addrealkind/addrealkind
+dataroot=${CESMDATAROOT}
+echo_arg="-e"
+input_file="tests_pretag_cheyenne"
+
+EOF
+
+mach_workspace="/glade/scratch"
+#-------------------------------------------
+
+cat > ${submit_script} << EOF
+#!/bin/sh
+#
+
+#PBS -N test_dr
+#PBS -q $CAM_BATCHQ
+#PBS -A $CAM_ACCOUNT
+#PBS -l walltime=$wallclock_limit
+#PBS -l select=1:ncpus=32:mpiprocs=32
+#PBS -j oe
+if [ -n "\$PBS_JOBID" ]; then    #batch job
+    export JOBID=\`echo \${PBS_JOBID} | cut -f1 -d'.'\`
+    initdir=`pwd -P`
+    interactive=false
+    chey_comp=true
+fi
+
+if [ -z "$CAM_RBOPTIONS" ]; then
+    export CAM_RBOPTIONS="run_only"
+fi
+
+##omp threads
+export CAM_THREADS=2
+export CAM_RESTART_THREADS=1
+
+##mpi tasks
+export CAM_TASKS=$CAM_TASKS
+export CAM_RESTART_TASKS=$CAM_RESTART_TASKS
+
+# This is a floor preventing the use of 32 MPI tasks per node, which is
+# frequently broken, but allowing 32 threads.
+export min_cpus_per_task=1
+
+module purge
+
+if [ "\$CAM_FC" = "PGI" ]; then
+  module load ncarenv
+  module load ncarbinlibs
+  module load pgi
+  module load ncarcompilers
+  module load netcdf
+  module load pnetcdf
+  module load perlmods
+  module load python
+  export CFG_STRING=" -cc mpicc -fc_type pgi -fc mpif90 -cppdefs -DNO_MPI2 -cppdefs -DNO_MPIMOD "
+else
+  module load ncarenv/1.0
+  module load intel/16.0.3
+  module load mkl/11.3.3
+  module load mpt/2.15
+  module load ncarcompilers/0.3.5
+  module load netcdf-mpi/4.4.1.1
+  module load pnetcdf/1.8.0
+  module load python
+  export CFG_STRING="-cc mpicc -fc mpif90 -fc_type intel "
+fi
+
+
+
+#export MP_MPILIB=\${MPILIB}
+#CAF export INC_NETCDF=\${NETCDF}/include
+#CAF export LIB_NETCDF=\${NETCDF}/lib
+#export INC_PNETCDF=/contrib/parallel-netcdf-1.2.0-svn961/include
+#export LIB_PNETCDF=/contrib/parallel-netcdf-1.2.0-svn961/lib
+export MAKE_CMD="gmake -j $gmake_j"
+export CCSM_MACH="cheyenne"
+export MACH_WORKSPACE="/glade/scratch"
+export CPRNC_EXE=${CESMDATAROOT}/tools/cime/tools/cprnc/cprnc.cheyenne
+export ADDREALKIND_EXE=/fs/cgd/csm/tools/addrealkind/addrealkind
+dataroot=${CESMDATAROOT}
+echo_arg="-e"
+input_file="tests_pretag_cheyenne"
+#input_file="mylist"
+
+EOF
+
+##^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ writing to batch script ^^^^^^^^^^^^^^^^^^^
+mach_workspace="/glade/scratch"
+    ;;
 
     ##yellowstone (or caldera)
     ye* | ys* | ca* )
@@ -382,7 +567,7 @@ mach_workspace="/glade/scratch"
     fi
 
     if [ -z "$CAM_TASKS" ]; then
-        CAM_TASKS=48
+        CAM_TASKS=24
     fi
     if [ -z "$CAM_RESTART_TASKS" ]; then
         CAM_RESTART_TASKS=$(( $CAM_TASKS / 2))
@@ -396,7 +581,7 @@ cat > ${submit_script} << EOF
 # Name of the queue (CHANGE THIS if needed)
 #PBS -q $CAM_BATCHQ
 # Number of nodes (CHANGE THIS if needed)
-#PBS -l walltime=$wallclock_limit,nodes=1:ppn=48
+#PBS -l walltime=$wallclock_limit,nodes=1:ppn=24
 # output file base name
 #PBS -N test_dr
 # Put standard error and standard out in same file
@@ -455,7 +640,7 @@ elif [ "\$CAM_FC" = "NAG" ]; then
     input_file="tests_pretag_hobart_nag"
     export CCSM_MACH="hobart_nag"
 else
-    module load compiler/pgi/15.1
+    module load compiler/pgi/17.05
     export CFG_STRING=" -cc mpicc -fc_type pgi -fc mpif90 -cppdefs -DNO_MPI2 -cppdefs -DNO_MPIMOD "
     export INC_NETCDF=\${NETCDF_PATH}/include
     export LIB_NETCDF=\${NETCDF_PATH}/lib
@@ -632,7 +817,7 @@ esac
 cb_flag=0
 
 
-for file in ${submit_script} ${submit_script_cb}
+for file in ${submit_script} ${submit_script_cb} ${submit_script_comp}
 do
 cat >> ${file} << EOF
 
@@ -713,7 +898,7 @@ if [ ! -f \${input_file} ]; then
     exit 5
 fi
 
-if \$interactive ; then
+if  \$interactive && ! \$chey_comp ; then
     echo "reading tests from \${input_file}"
 else
     echo "reading tests from \${input_file}" >> \${cam_log}
@@ -723,7 +908,7 @@ num_tests=\`wc -w < \${input_file}\`
 echo "STATUS OF CAM TESTING UNDER JOB \${JOBID};  scheduled to run \$num_tests tests from:" >> \${cam_status}
 echo "\$input_file" >> \${cam_status}
 echo "" >> \${cam_status}
-if [ ! \$interactive ]; then
+if  \$interactive && ! \$chey_comp ; then
     echo "see \${cam_log} for more detailed output" >> \${cam_status}
 fi
 echo "" >> \${cam_status}
@@ -756,7 +941,7 @@ for test_id in \${test_list}; do
 
     status_out="\${count} \${status_out}"
 
-    if  \$interactive ; then
+    if  \$interactive && ! \$chey_comp ; then
         echo ""
         echo "************************************************************"
         echo "\${status_out}"
@@ -781,7 +966,7 @@ for test_id in \${test_list}; do
 
 
 
-    if \$interactive ; then
+    if  \$interactive && ! \$chey_comp ; then
         \${CAM_SCRIPTDIR}/\${test_cmd} \$CAM_RBOPTIONS
         rc=\$?
     else
@@ -802,7 +987,7 @@ for test_id in \${test_list}; do
         pending_tests="YES"
     else
         echo "FAIL! rc= \$rc at \$(date)" >> \${cam_status}
-	if \$interactive ; then
+        if  \$interactive && ! \$chey_comp ; then
 	    if [ "\$CAM_SOFF" != "FALSE" ]; then
 		echo "stopping on first failure"
 		echo "stopping on first failure" >> \${cam_status}
@@ -820,7 +1005,7 @@ done
 
 
 echo "end of input" >> \${cam_status}
-if  \$interactive ; then
+if  \$interactive && ! \$chey_comp ; then
     echo "end of input"
 else
     echo "end of input" >> \${cam_log}
@@ -831,7 +1016,7 @@ if [ "\$skipped_tests" = "YES" ]; then
 fi
 if [ "\$pending_tests" = "YES" ]; then
     echo "** tests that are pending must be checked manually for a successful completion" >> \${cam_status}
-    if  ! \$interactive ; then
+    if  \$interactive && ! \$chey_comp ; then
 	echo "   see the test's output in \${cam_log} " >> \${cam_status}
 	echo "   for the location of test results" >> \${cam_status}
     fi
@@ -878,6 +1063,14 @@ exit 0
 EOF
 fi
 
+if [ -n "${submit_script_comp}" ]; then
+cat >> ${submit_script_comp} << EOF
+echo "qsub < ${submit_script}" >> \${cam_log}
+qsub < ${submit_script} >> \${cam_log} 2>&1
+exit 0
+EOF
+fi
+
 if [ -n "${submit_script_cb}" ]; then
 cat >> ${submit_script_cb} << EOF
 echo "bsub < ${submit_script}" >> \${cam_log}
@@ -887,7 +1080,7 @@ EOF
 fi
 ##^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ add summary to output or email ^^^^^^^^^^^^^^^
 
-for file in ${submit_script} ${submit_script_cb}
+for file in ${submit_script} ${submit_script_cb} ${submit_script_comp}
 do
   chmod a+x $file
 done
@@ -895,6 +1088,8 @@ done
 if $interactive ; then
     if [ ${submit_script_cb} ]; then
       ${submit_script_cb}
+    elif [ ${submit_script_comp} ]; then
+      ${submit_script_comp}
     else
       ${submit_script}
     fi
@@ -918,15 +1113,24 @@ fi
 ##vvvvvvvvvvvvvvvvvvvvvv start CAM aux test suite vvvvvvvvvvvvvvvvvvvvvvvvvvvv
 cesm_test_mach="false"
 if [ "${hostname:0:2}" == "ye" -o "${hostname:0:2}" == "ys" -o "${hostname:0:2}" == "ca" ]; then
+  testargs="--xml-machine yellowstone "
+  cesm_test_mach="true"
+fi
+if [ "${hostname:0:2}" == "ch" ]; then
+  testargs="--xml-machine cheyenne "
   cesm_test_mach="true"
 fi
 if [ "${cesm_test_suite}" != "none" -a "${cesm_test_mach}" == "true" ]; then
   module load python
 
-  idstr="`date '+%Y%m%d%H%M%S'`"
-  test_id=${cesm_test_suite}"_"${idstr}
+  if [ -n "${use_existing}" ]; then
+    test_id="${use_existing}"
+  else
+    idstr="`date '+%Y%m%d%H%M%S'`"
+    test_id=${cesm_test_suite}"_"${idstr}
+  fi
   currdir="`pwd -P`"
-  logfile="${currdir}/aux_cam_test_${idstr}.log"
+  logfile="${currdir}/${test_id}.log"
   tdir="$( cd $( dirname $0 ); pwd -P )"
   root_dir="$( dirname $( dirname $( dirname $( dirname ${tdir} ) ) ) )"
   script_dir="${root_dir}/cime/scripts"
@@ -940,15 +1144,11 @@ if [ "${cesm_test_suite}" != "none" -a "${cesm_test_mach}" == "true" ]; then
   fi
 
   ##setup CESM work directory
-  if [ -z "$CESM_TESTDIR" ]; then
-    cesm_testdir=$mach_workspace/$LOGNAME/$test_id
-    echo " --- CESM tests will be written to $cesm_testdir"
-  else
-    cesm_testdir=${CESM_TESTDIR}
-  fi
+  cesm_testdir=$mach_workspace/$LOGNAME/$test_id
+  echo " --- CESM tests will be written to $cesm_testdir"
 
   if [ -e ${cesm_testdir} ]; then
-     if $use_existing ; then
+     if [ -n "${use_existing}" ]; then
         echo " Using existing tests in ${cesm_testdir}"
      else
         echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! "
@@ -962,20 +1162,30 @@ if [ "${cesm_test_suite}" != "none" -a "${cesm_test_mach}" == "true" ]; then
   fi
 
   cd ${script_dir}
-  testargs="--xml-machine yellowstone --xml-compiler intel --xml-category ${cesm_test_suite}"
-  testargs="${testargs} --queue ${CAM_BATCHQ} --test-root ${cesm_testdir}  --project ${CAM_ACCOUNT}"
+  testargs="${testargs} --xml-compiler intel --xml-category ${cesm_test_suite}"
+  testargs="${testargs} --queue ${CAM_BATCHQ} --test-root ${cesm_testdir} --output-root ${cesm_testdir} --project ${CAM_ACCOUNT}"
   testargs="${testargs} --test-id ${test_id} --walltime 3:00"
   if [ -n "${BL_TESTDIR}" ]; then
     testargs="${testargs} --compare $( basename ${BL_TESTDIR} )"
   fi
-  if $use_existing; then
+  if [ -n "${use_existing}" ]; then
     testargs="${testargs} --use-existing"
   fi
   echo ""
-  echo "CESM test results will be in: ${cesm_testdir}/${test_id}" | tee {logfile}
+  echo "CESM test results will be in: ${cesm_testdir}" | tee {logfile}
   echo "Running ./create_test ${testargs}" | tee ${logfile}
   echo ""
-  bsub -q caldera -n1 -P$CAM_ACCOUNT -W06:00 ./create_test ${testargs} >> ${logfile} 2>&1
+  if [ "${hostname:0:2}" == "ch" ]; then
+     nohup ./create_test ${testargs} --wait >> ${logfile} 2>&1 &
+     pids="$!"
+     pgid=`ps -o "%r%y " $pids `
+     pgid_split=`echo $pgid | awk '{print($3)}'`
+     echo "If need to kill the CESM and CAM job:  type < kill -9 -$pgid_split >" | tee ${logfile}
+  fi
+  if [ "${hostname:0:2}" == "ye" -o "${hostname:0:2}" == "ys" -o "${hostname:0:2}" == "ca" ]; then
+    bsub -q caldera -n1 -P$CAM_ACCOUNT -W06:00 ./create_test ${testargs} >> ${logfile} 2>&1 
+  fi
+
   cd ${currdir}
 
 fi
@@ -988,6 +1198,13 @@ if $run_cam_regression; then
     ye* | ys* | ca*)
       export LSB_JOB_REPORT_MAIL=Y
       bsub < ${submit_script_cb}
+      ;;
+
+    ch* | r* )
+#       setsid nohup ${submit_script_comp} &
+       nohup ${submit_script_comp} &
+       pid_comp="$!"
+       echo "If need to kill the CAM job: type  <kill -9 "$pid_comp"> "
       ;;
 
     ##hobart  

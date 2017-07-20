@@ -22,6 +22,7 @@ module rayleigh_friction
 use shr_kind_mod,     only: r8 => shr_kind_r8
 use ppgrid,           only: pver
 use spmd_utils,       only: masterproc
+use phys_control,     only: use_simple_phys
 use cam_logfile,      only: iulog
 use cam_abortutils,   only: endrun
 
@@ -70,6 +71,8 @@ subroutine rayleigh_friction_readnl(nlfile)
 
    namelist /rayleigh_friction_nl/ rayk0, raykrange, raytau0
    !-----------------------------------------------------------------------------
+
+   if (use_simple_phys) return
 
    if (masterproc) then
       unitn = getunit()

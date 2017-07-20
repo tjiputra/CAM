@@ -156,7 +156,6 @@
   use phys_control,      only : cam_physpkg_is
   
   use physics_buffer,    only : pbuf_get_index, physics_buffer_desc, pbuf_set_field
-  use time_manager,      only : is_first_step
 
   real(r8),                  intent(in) :: pref_edge(plevp)  ! Reference pressures at interfaces
   type(physics_buffer_desc), pointer    :: pbuf2d(:,:)
@@ -318,6 +317,9 @@
   concld_idx   = pbuf_get_index('CONCLD')
   rprddp_idx   = pbuf_get_index('RPRDDP')
 
+  call pbuf_set_field(pbuf2d, sh_flxprc_idx, 0._r8)
+  call pbuf_set_field(pbuf2d, sh_flxsnw_idx, 0._r8)
+
   end subroutine convect_shallow_init
 
 !==================================================================================================
@@ -362,7 +364,7 @@
    use uwshcu,          only : compute_uwshcu_inv
    use unicon_cam,      only : unicon_out_t, unicon_cam_tend
 
-   use time_manager,    only : get_nstep, is_first_step
+   use time_manager,    only : get_nstep
    use wv_saturation,   only : qsat
    use physconst,       only : latice, latvap, rhoh2o
 

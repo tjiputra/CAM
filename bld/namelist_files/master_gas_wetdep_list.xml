@@ -2,6 +2,13 @@
 
 <!-- list of gas phase species that under go wet deposition -->
 
+<list id="MAM">
+  NH4, NH4NO3
+</list>
+<list id="XNOx">
+ XNH4NO3
+</list>
+
 <list id="gas">
   HCN
   CH3CN

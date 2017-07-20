@@ -1030,7 +1030,10 @@ subroutine radiation_tend( &
          if (hist_fld_active('FSNR')) then
             do i = 1,ncol
                call vertinterp(1, 1, pverp, state%pint(i,:), p_trop(i), fns(i,:), rd%fsnr(i))
+               rd%fsnr(i) = rd%fsnr(i)*cgs2mks
             enddo
+         else
+            rd%fsnr(:) = 0._r8
          endif
 
          ! Convert units of shortwave fields needed by rest of model from CGS to MKS
@@ -1052,7 +1055,6 @@ subroutine radiation_tend( &
             rd%fsntoac(i) = rd%fsntoac(i) *cgs2mks
             rd%fsn200(i)  = rd%fsn200(i)  *cgs2mks
             rd%fsn200c(i) = rd%fsn200c(i) *cgs2mks
-            rd%fsnr(i)    = rd%fsnr(i)    *cgs2mks
             rd%swcf(i)    = rd%fsntoa(i) - rd%fsntoac(i)
          end do
 
@@ -1123,6 +1125,8 @@ subroutine radiation_tend( &
             do i = 1,ncol
                call vertinterp(1, 1, pverp, state%pint(i,:), p_trop(i), fnl(i,:), rd%flnr(i))
             enddo
+         else
+            rd%flnr(:) = 0._r8
          endif
 
          ! Convert units of longwave fields needed by rest of model from CGS to MKS

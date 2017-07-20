@@ -261,6 +261,8 @@ type T_FVDYCORE_GRID
    integer                         :: ktlo              ! lower tracer index (local)
    integer                         :: kthi              ! upper tracer index (local)
 
+   logical :: high_alt  ! high-altitude physics parameters switch
+
 end type T_FVDYCORE_GRID
 
 ! Constants used by fvcore
@@ -296,7 +298,7 @@ type t_fvdycore_state
    logical  :: am_correction ! apply correction for angular momentum (AM) conservation in SW eqns
    logical  :: am_fixer      ! apply global fixer to conserve AM
    logical  :: am_fix_lbl    ! apply global AM fixer level by level
-   logical  :: am_diag       ! turns on an AM diagnostic calculation written to log file
+   logical  :: am_diag       ! turns on an AM diagnostic calculations
 end type t_fvdycore_state
 
 !========================================================================================

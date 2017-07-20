@@ -46,7 +46,7 @@
 # PIO_INSTALL_DIR Directory containing PIO libraries and include files (pio2 only)
 #
 # Note: An internal implementation of the ESMF time-manager interface is provided
-#       with the CESM distribution in $ROOTDIR/cime/share/esmf_wrf_timemgr.
+#       with the CESM distribution in $ROOTDIR/cime/src/share/esmf_wrf_timemgr.
 #
 #------------------------------------------------------------------------
 
@@ -148,7 +148,7 @@ endif
 # Rules to build MCT library. 
 # SRCDIR is passed via the commandline because of a bug in the MCT configure.
 $(MCT_LIBDIR)/mct/libmct.a: 
-	$(MAKE) -C $(MCT_LIBDIR) SRCDIR=$(ROOTDIR)/cime/externals/mct
+	$(MAKE) -C $(MCT_LIBDIR) SRCDIR=$(ROOTDIR)/cime/src/externals/mct
 shr_kind_mod.o: $(MCT_LIBDIR)/mct/libmct.a
 perf_utils.o: $(MCT_LIBDIR)/mct/libmct.a
 RtmSpmd.o: $(MCT_LIBDIR)/mct/libmct.a
@@ -190,7 +190,7 @@ endif
 	$(AS) -m  $<
 
 %.F90: %.F90.in
-	 $(ROOTDIR)/cime/externals/genf90/genf90.pl $< > $@
+	 $(ROOTDIR)/cime/src/externals/genf90/genf90.pl $< > $@
 
 # Rules used for the tests run by "configure -test"
 test_fc: test_fc.o
@@ -395,7 +395,6 @@ ifeq ($(FC_TYPE),intel)
 
   CPPDEF        += -DCPRINTEL $(CONTIGUOUS_FLAG)
   CFLAGS        += -std=gnu99
-
   FC_FLAGS      := -ftz -convert big_endian -fp-model source \
                    -qno-opt-dynamic-align -assume realloc_lhs -xHost
   FC_FLAGS_O3OPT:= $(FC_FLAGS)
@@ -518,7 +517,7 @@ ifeq ($(FC_TYPE),gnu)
   endif
 
   ifeq ($(DEBUG),TRUE)
-    FC_FLAGS += -g -ggdb -ffpe-trap='invalid,zero,overflow'
+    FC_FLAGS += -g -ggdb -ffpe-trap='invalid,zero,overflow' -finit-real=snan 
     CFLAGS   += -g -ggdb
   else
     # Check for override of default Fortran compiler optimizations
@@ -596,7 +595,7 @@ ifeq ($(FC_TYPE), nag)
   # Bit of a pain: MPI functions are overloaded, so must specify
   # not to check them. -mismatch_all is alternative, but less
   # targeted option.
-  nag_mismatch_flag := -wmismatch=mpi_send,mpi_recv,mpi_bcast,mpi_allreduce,mpi_reduce,mpi_isend,mpi_irecv,mpi_irsend,mpi_rsend,mpi_gatherv,mpi_scatterv,mpi_allgather,mpi_alltoallv,mpi_alltoallw,mpibcast,mpiscatterv
+  nag_mismatch_flag := -wmismatch=mpi_send,mpi_recv,mpi_bcast,mpi_allreduce,mpi_reduce,mpi_isend,mpi_irecv,mpi_irsend,mpi_rsend,mpi_gatherv,mpi_scatterv,mpi_allgather,mpi_alltoall,mpi_alltoallv,mpi_alltoallw,mpibcast,mpiscatterv
   FC_FLAGS      := $(nag_mismatch_flag) -Wp,-macro=no_com
   FC_FLAGS_NOOPT:= $(FC_FLAGS)
 
@@ -605,8 +604,8 @@ ifeq ($(FC_TYPE), nag)
   LDFLAGS       := 
 
   ifeq ($(DEBUG),TRUE)
-    FC_FLAGS       += -g -time -f2003 -ieee=stop
-    FC_FLAGS_NOOPT += -g -time -f2003 -ieee=stop
+    FC_FLAGS       += -g -time -f2003 -ieee=stop -nan
+    FC_FLAGS_NOOPT += -g -time -f2003 -ieee=stop -nan
     CFLAGS         += -g
 
     # Turns on all checks except -C=undefined (which is not binary-compatible

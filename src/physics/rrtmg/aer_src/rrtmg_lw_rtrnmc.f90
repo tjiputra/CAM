@@ -445,7 +445,6 @@
 
 ! Process longwave output from band for total and clear streams.
 ! Calculate upward, downward, and net flux.
-         !DIR$ NOFUSION
          do lev = nlayers, 0, -1
             uflux(lev) = urad(lev)*wtdiff
             dflux(lev) = drad(lev)*wtdiff
@@ -457,7 +456,6 @@
             clrdrad(lev) = 0.0_r8
          enddo
 
-         !DIR$ SIMD
          do lev = nlayers, 0, -1
             totuflux(lev) = totuflux(lev) + uflux(lev) * delwave(iband)
             totdflux(lev) = totdflux(lev) + dflux(lev) * delwave(iband)

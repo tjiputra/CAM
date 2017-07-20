@@ -642,48 +642,15 @@ itstep_hybrid_loop:   &
                 tmph = max( 0.0_r8, precr_sub2(k,icc,jcls,1) ) + &
                        max( 0.0_r8, precs_sub2(k,icc,jcls,1) )
                 tmpa = tmpg*tmpe + tmph*tmpf
-                if (icc == 1) then
-                    tmpvecsvb(k) = tmpvecsvb(k) + tmpa
-                else
-                    tmpvecsvc(k) = tmpvecsvc(k) + tmpa
-                end if
             end do
         end do
         end do
-        tmpvecsva(1:4) = tmpvecsva(1:4) + tmpveca(1:4)
-!   3600 factor converts from kg/m2/s=mm/s to mm/h
-!        write(165,'(a,f7.1,4f10.3,3x,4f10.3)') 'precp at sfc', (ktau*dtstep/3600.0), &
-!            tmpveca(1:4)*3600.0, tmpvecsva(1:4)*3600.0/max(ktau,1)
 
         if (mod(ktau,18) == 0 .and. ktau.ge.1) then
-!            write(165,'(/a,i5)') 'precp for clear, cldy, both at ktau =', ktau
             tmpa = 3600.0_r8/ktau  ! converts accumulated precip to time avg and mm/h
-!            do k = ktecen, kts, -1
-!                write(165,'(i5,4f10.3)') k, tmpvecsvb(k)*tmpa, tmpvecsvc(k)*tmpa, &
-!                        (tmpvecsvb(k)+tmpvecsvc(k))*tmpa
-!            end do
-!            write(165,'(a)')
-        end if
-
-
-        if (mod(ktau,18) == 0 .and. ktau.ge.1) then
-!            if (ktau == 18) write(166,'(a)') &
-!                'ktau, k, sum(rh), sum(precr), sum(precall), sum(qcloud)'
-!            write(166,'(a)')
-!            do k = kts, ktecen, 5
-!                write(166,'(2i4,1p,5e11.3)') &
-!                    ktau, k, sum( rh_sub2(k,1:2,1:ncls_use,1:2) ), &
-!                    sum( precr_sub2(k,1:2,1:ncls_use,1:2) ), &
-!                    sum( precr_sub2(k,1:2,1:ncls_use,1:2)    &
-!                       + precs_sub2(k,1:2,1:ncls_use,1:2) ), &
-!                    sum( qcloud_sub2(k,1:2,1:ncls_use,1:2) )
-!            end do
         end if
 
         if (mod(ktau,18) == 0 .and. ktau.ge.1) then
-!            if (ktau == 18) write(167,'(a)') &
-!                'ktau, k, sum(a*rh), sum(a*precr), sum(a*precall), sum(a*qcloud)'
-!            write(167,'(a)')
             do k = kts, ktecen, 5
                 tmpveca(:) = 0.0_r8
                 do jcls = 1, ncls_use
@@ -705,8 +672,6 @@ itstep_hybrid_loop:   &
                 end do
                 end do
                 tmpveca(3) = tmpveca(3) + tmpveca(2)
-!                write(167,'(2i4,1p,5e11.3)') &
-!                    ktau, k, tmpveca(1:4)
             end do
         end if
 
@@ -5029,8 +4994,7 @@ acwxx1_k_loop: &
 	write(lun,9400) 'kts, kte, ncls_ecpp_clm'
 	write(lun,9410) kts, ktebnd, ncls_ecpp
 
-	write(lun,9400) 'num_moist, num_chem'
-	write(lun,9410) num_moist_ecpp, num_chem_ecpp
+	write(lun,9410) num_chem_ecpp
 
 	write(lun,9400) 'rho,z,w bnd'
 	do k = kts, ktebnd
@@ -5041,11 +5005,6 @@ acwxx1_k_loop: &
 	write(lun,9400) 'p,t,rho cen'
 	do k = kts, ktecen
 	    write(lun,9420) pcen_bar(k), tcen_bar(k), rhocen_bar(k)
-	end do
-
-	do l = 1, num_moist_ecpp
-	    write(lun,9415) 'moist', l
-	    write(lun,9420) (0.0_r8, k=kts,ktecen)
 	end do
 
 	do l = 1, num_chem_ecpp

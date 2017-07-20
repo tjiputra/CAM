@@ -119,9 +119,6 @@ CONTAINS
    call tp2d(va, h, crx, cry, im, jm, iord, jord, ng,fx, fy, ffsl,    &
              xfx, yfx, cosp, id, jfirst, jlast)
 
-#if defined(INNER_OMP)
-!$omp parallel do default(shared) private(j,i)
-#endif
    do j=js2g0,jn2g0
       do i=1,im-1
          dh(i,j) = fx(i,j) - fx(i+1,j) + (fy(i,j)-fy(i,j+1))*acosp(j)
@@ -235,9 +232,6 @@ CONTAINS
              jfirst-ng, jlast+ng, jfirst-ng, jlast+ng,  &
              jfirst-ng, jlast+ng, jfirst-ng, jlast+ng)
 
-#if defined(INNER_OMP)
-!$omp parallel do default(shared) private(j,i)
-#endif
     do j=js2gng,jn2gng               !  adx needed on N*ng S*ng
 
        do i=1,im-1
@@ -263,9 +257,6 @@ CONTAINS
 
      call ytp(im,jm,fy, adx,cry,yfx,ng,jord,0,jfirst,jlast)
 
-#if defined(INNER_OMP)
-!$omp parallel do default(shared) private(j,i,jp)
-#endif
       do j=js2g0,jn2g0
         do i=1,im
            jp = j-va(i,j)
@@ -359,9 +350,6 @@ CONTAINS
 
    imp = im + 1
 
-#if defined(INNER_OMP)
-!$omp parallel do default(shared) private(j,i,iuw,iue,iu,itmp,isave,tmp,qmax,qmin,dm,rut,ist,al,ar,a6)
-#endif
   do j = jlow, jhigh
 
    do i=1,im
@@ -1048,9 +1036,6 @@ CONTAINS
    jn1g1  = min(jm,jlast+1)     ! Ghost N*1
      
    if(jord == 1) then
-#if defined(INNER_OMP)
-!$omp parallel do default(shared) private(j,i,jt)
-#endif
         do j=js2g0,jn1g1
           do i=1,im
             jt = real(j,r8) - c(i,j)
@@ -1072,9 +1057,6 @@ CONTAINS
 !
 ! JORD can either have the value 2 or -2 at this point
 !
-#if defined(INNER_OMP)
-!$omp parallel do default(shared) private(j,i,jt)
-#endif
           do j=js2g0,jn1g1
             do i=1,im
               jt = real(j,r8) - c(i,j)
@@ -1084,9 +1066,6 @@ CONTAINS
         endif
    endif
 
-#if defined(INNER_OMP)
-!$omp parallel do default(shared) private(j,i)
-#endif
       do j=js2g0,jn1g1
         do i=1,im
           fy(i,j) = fy(i,j)*yfx(i,j)
@@ -1150,9 +1129,6 @@ CONTAINS
     jm1 = jm - 1
     im2 = im / 2
 
-#if defined(INNER_OMP)
-!$omp parallel do default(shared) private(j,i)
-#endif
       do j=js2gng1,jn2gng1
         do i=1,im
            dm(i,j) = D0_25*(q(i,j+1) - q(i,j-1))
@@ -1225,9 +1201,6 @@ CONTAINS
 !
 ! Applies monotonic slope constraint (off if jord less than zero)
 !
-#if defined(INNER_OMP)
-!$omp parallel do default(shared) private(j,i,qmax,qmin)
-#endif
         do j=js2gng1,jn2gng1
           do i=1,im
             qmax = max(q(i,j-1),q(i,j),q(i,j+1)) - q(i,j)
@@ -1316,9 +1289,6 @@ CONTAINS
       jn1g2  = min(jm,jlast+2)         ! Ghost N*2
       jn2g1  = min(jm-1,jlast+1)       ! Ghost N*1
 
-#if defined(INNER_OMP)
-!$omp parallel do default(shared) private(j,i)
-#endif
       do j=js2g1,jn1g2                 ! AL needed N2S
         do i=1,im                      ! P, dm ghosted N2S2 (at least)
           al(i,j) = D0_5*(q(i,j-1)+q(i,j)) + r3*(dm(i,j-1) - dm(i,j))
@@ -1329,9 +1299,6 @@ CONTAINS
 !     if(steep) call steepy(im,   jm,   jfirst,   jlast,       &
 !                           ng,    q,       al,   dm )
 
-#if defined(INNER_OMP)
-!$omp parallel do default(shared) private(j,i)
-#endif
       do j=js1g1,jn2g1                 ! AR needed NS
         do i=1,im
           ar(i,j) = al(i,j+1)          ! AL ghosted N2S
@@ -1377,9 +1344,6 @@ CONTAINS
    endif
 
    if( jord == 3 .or. jord == 5 ) then
-#if defined(INNER_OMP)
-!$omp parallel do default(shared) private(j,i)
-#endif
       do j=js1g1,jn1g1               ! A6 needed NS
         do i=1,im
           a6(i,j) = D3_0*(q(i,j)+q(i,j) - (al(i,j)+ar(i,j)))
@@ -1408,9 +1372,6 @@ CONTAINS
                    al(1,js1g1),  q(1,js1g1), im*(jn1g1-js1g1+1), lmt)
 #endif
 
-#if defined(INNER_OMP)
-!$omp parallel do default(shared) private(j,i)
-#endif
       do j=js2g0,jn1g1                 ! flux needed N
         do i=1,im
           if(c(i,j).gt.D0_0) then
@@ -1512,9 +1473,6 @@ CONTAINS
              jfirst-ng_d, jlast+ng_d, jfirst-ng_c, jlast+ng_c,  &
              jfirst-ng_c, jlast+ng_c, jfirst-1, jlast+2)
 
-#if defined(INNER_OMP)
-!$omp parallel do default(shared) private(j,i)
-#endif
       do j=js2gs,jn1gn
 
         do i=1,im-1
@@ -1556,9 +1514,6 @@ CONTAINS
         enddo
       endif
 
-#if defined(INNER_OMP)
-!$omp parallel do default(shared) private(j,i,jp)
-#endif
       do j=js2g0,jn2g0
         do i=1,im
           jp = j-va(i,j)
@@ -1645,9 +1600,6 @@ CONTAINS
    jn2g0  = min(jm-1,jlast)
       
    if(jord == 1) then
-#if defined(INNER_OMP)
-!$omp parallel do default(shared) private(j,i,jt)
-#endif
         do j=js2giv,jn2g0                      ! FY needed on S*iv
           do i=1,im
 ! jt=j if vc > 0; jt=j+1 if vc <=0
@@ -1658,9 +1610,6 @@ CONTAINS
 
    else
 
-#if defined(INNER_OMP)
-!$omp parallel do default(shared) private(j,i)
-#endif
         do j=js3giv,jn2g1                      ! dc needed N*1, S*iv
           do i=1,im
             dc(i,j) = D0_25*(q(i,j+1)-q(i,j-1)) ! q ghosted N*2, S*(iv+1)
@@ -1721,9 +1670,6 @@ CONTAINS
 
         if( jord > 0 ) then
 ! Monotonic constraint
-#if defined(INNER_OMP)
-!$omp parallel do default(shared) private(j,i,qmax,qmin)
-#endif
           do j=js3giv,jn2g1            ! DC needed N*1, S*iv
             do i=1,im                  ! P ghosted N*2, S*(iv+1)
               qmax = max(q(i,j-1),q(i,j),q(i,j+1)) - q(i,j)
@@ -1746,9 +1692,6 @@ CONTAINS
           endif
         endif
 
-#if defined(INNER_OMP)
-!$omp parallel do default(shared) private(j,i,jt)
-#endif
        do j=js2giv,jn2g0                   ! fy needed S*iv
          do i=1,im                       
            jt = real(j+1,r8)  - vc(i,j)      ! vc, ymass ghosted like fy
@@ -1917,7 +1860,6 @@ CONTAINS
 ! Flux-Form Semi-Lagrangian transport
 
 !call ftrace_region_begin("xtpv_2")
-!dir$ concurrent
    do ja = 1, jatn
       j = jat(ja)
 
@@ -1940,7 +1882,6 @@ CONTAINS
    enddo
 !call ftrace_region_end("xtpv_2")
 
-!dir$ concurrent
 !call ftrace_region_begin("xtpv_3")
    do ja = 1, jattn
       j = jatt(ja)
@@ -1960,7 +1901,6 @@ CONTAINS
    enddo
 !call ftrace_region_end("xtpv_3")
 
-!dir$ concurrent
 !call ftrace_region_begin("xtpv_4")
    do ja = 1, jatfn
       j = jatf(ja)
@@ -1988,7 +1928,6 @@ CONTAINS
               iuwv, iuev, ffslv, isave, jatftn, jatft, jlow, jhigh,     &
               jl2, jh2, jl3, jh3, jl5, jh5, jl7, jh7, jl11, jh11)
 
-!dir$ concurrent
 !call ftrace_region_begin("xtpv_5")
    do ja = 1, jatffn
       j = jatff(ja)
@@ -2010,7 +1949,6 @@ CONTAINS
    enddo
 !call ftrace_region_end("xtpv_5")
 
-!dir$ concurrent
 !call ftrace_region_begin("xtpv_6")
    do ja = 1, jatn
       j = jat(ja)
@@ -2048,8 +1986,6 @@ CONTAINS
 ! Regular PPM (Eulerian without FFSL extension)
 
 !call ftrace_region_begin("xtpv_7")
-!dir$ concurrent
-!cdir nodep
    do ja = 1, jafn
       j = jaf(ja)
 
@@ -2057,7 +1993,6 @@ CONTAINS
       qtmpv(  0,j) = qv(im,j)
    enddo
 
-!dir$ concurrent
    do ja = 1, jaftn
       j = jaft(ja)
 
@@ -2067,8 +2002,6 @@ CONTAINS
       enddo
    enddo
 
-!dir$ concurrent
-!cdir nodep
    do ja = 1, jaffn
       j = jaff(ja)
 
@@ -2078,7 +2011,6 @@ CONTAINS
    enddo
 !call ftrace_region_end("xtpv_7")
 
-!dir$ concurrent
 !call ftrace_region_begin("xtpv_8")
    do ja = 1, jafftn1
       j = jafft1(ja)
@@ -2099,7 +2031,6 @@ CONTAINS
    enddo
 !call ftrace_region_end("xtpv_8")
 
-!dir$ concurrent
 !call ftrace_region_begin("xtpv_9")
    do ja = 1, jafffn1
       j = jafff1(ja)
@@ -2130,8 +2061,6 @@ CONTAINS
 !call ftrace_region_end("xtpv_9")
 
 !call ftrace_region_begin("xtpv_10")
-!dir$ concurrent
-!cdir nodep
    do ja = 1, jaffn
       j = jaff(ja)
 
@@ -2140,7 +2069,6 @@ CONTAINS
    enddo
 !call ftrace_region_end("xtpv_10")
 
-!dir$ concurrent
 !call ftrace_region_begin("xtpv_11")
    do ja = 1, jafftn2
       j = jafft2(ja)
@@ -2227,7 +2155,6 @@ CONTAINS
    steep = .false.
  endif
 
-!dir$ concurrent
  do jj = 1, jan
    j = ja(jj)
 
@@ -2243,7 +2170,6 @@ CONTAINS
 
  endif
 
-!dir$ concurrent
  do jj = 1, jan
    j = ja(jj)
 
@@ -2262,7 +2188,6 @@ CONTAINS
 
    if(iord .eq. 3 .or. iord .eq. 5) then
 
-!dir$ concurrent
      do jj = 1, jan
        j = ja(jj)
 
@@ -2282,7 +2207,6 @@ CONTAINS
 
  jbtn = 0
  jbfn = 0
-!dir$ concurrent
  do jj = 1, jan
    j = ja(jj)
    if( ffsl(j) ) then
@@ -2294,7 +2218,6 @@ CONTAINS
    endif
  enddo
 
-!dir$ concurrent
  do jj = 1, jbtn
    j = jbt(jj)
 
@@ -2328,7 +2251,6 @@ CONTAINS
 
  enddo
 
-!dir$ concurrent
  do jj = 1, jbfn
    j = jbf(jj)
 
@@ -2394,7 +2316,6 @@ CONTAINS
  real (r8) eta(0:im,jlow:jhigh)
  real (r8) xxx, bbb, ccc
 
-!dir$ concurrent
  do jj = 1, jan
    j = ja(jj)
 
@@ -2477,7 +2398,6 @@ CONTAINS
  real(r8) pmin
  real(r8) pmax
 
-!dir$ concurrent
    do jj = 1, jan
       j = ja(jj)
 
@@ -2592,7 +2512,6 @@ CONTAINS
 
 ! Full constraint
 
-!dir$ concurrent
     do jj = 1, jan
       j = ja(jj)
 
@@ -2621,7 +2540,6 @@ CONTAINS
 
 ! Improved (Lin 2001?) full constraint
 
-!dir$ concurrent
     do jj = 1, jan
       j = ja(jj)
 
@@ -2640,7 +2558,6 @@ CONTAINS
 
 ! Positive definite constraint
 
-!dir$ concurrent
     do jj = 1, jan
       j = ja(jj)
 
@@ -2669,7 +2586,6 @@ CONTAINS
 
 ! Quasi-monotone constraint
 
-!dir$ concurrent
     do jj = 1, jan
       j = ja(jj)
 

@@ -515,6 +515,7 @@ contains
     integer                                 :: i, ierr
     logical                                 :: col_only
     logical                                 :: unstruct
+    character(len=*), parameter             :: subname = 'history_patch_write_attrs'
 
     num_patches = size(this%patches)
     if (associated(this%header_info)) then
@@ -522,7 +523,7 @@ contains
       if (size(this%header_info) /= num_patches) then
         write(errormsg, '(a,2(i0,a))') 'Size mismatch between header_info (', &
              size(this%header_info), ') and patches (', num_patches, ')'
-        call endrun('history_patch_write_attrs: '//errormsg)
+        call endrun(subname//': '//errormsg)
       end if
     else
       allocate(this%header_info(num_patches))
@@ -537,7 +538,7 @@ contains
       col_only = this%collected_output
       if (num_patches == 1) then
         ! Backwards compatibility
-        if (unstruct) then
+        if (unstruct .or. col_only) then
           col_name = 'ncol'
         else
           col_name = ''
@@ -548,11 +549,11 @@ contains
         call patchptr%get_axis_names(lat_name, lon_name, col_name, col_only)
       end if
       ! Define the dimensions (latx/lonx or ncolx)
-      ! col_name is set for unstructured output (ncolx)
+      ! col_name is set for unstructured output or collected columns (ncolx)
       if (len_trim(col_name) > 0) then
         call patchptr%get_global_size(gsize=temp1)
         if (temp1 <= 0) then
-          call endrun('history_patch_write_attrs: col dimsize must be positive')
+          call endrun(subname//': col dimsize must be positive')
         end if
         if (unstruct .and. (.not. col_only)) then
           ! For the case of unstructured output without collected column
@@ -567,13 +568,13 @@ contains
         lat_name = trim(lat_name)//'_'//trim(this%lat_axis_name)
         call patchptr%get_global_size(temp1, temp2)
         if (temp1 <= 0) then
-          call endrun('history_patch_write_attrs: lat dimsize must be positive')
+          call endrun(subname//': lat dimsize must be positive')
         end if
         call cam_pio_def_dim(File, trim(lat_name), temp1, dimid1, existOK=.true.)
         latid = dimid1
         lon_name = trim(lon_name)//'_'//trim(this%lon_axis_name)
         if (temp2 <= 0) then
-          call endrun('history_patch_write_attrs: lon dimsize must be positive')
+          call endrun(subname//': lon dimsize must be positive')
         end if
         call cam_pio_def_dim(File, trim(lon_name), temp2, dimid2, existOK=.true.)
         lonid = dimid2
@@ -591,12 +592,12 @@ contains
       call patchptr%get_coord_long_name('lat', temp_str)
       if (len_trim(temp_str) > 0) then
         ierr = pio_put_att(File, vardesc_lat, 'long_name', trim(temp_str))
-        call cam_pio_handle_error(ierr, 'history_patch_write_attrs: Unable to define long_name')
+        call cam_pio_handle_error(ierr, subname//': Unable to define long_name')
       end if
       call patchptr%get_coord_units('lat', temp_str)
       if (len_trim(temp_str) > 0) then
         ierr = pio_put_att(File, vardesc_lat, 'units', trim(temp_str))
-        call cam_pio_handle_error(ierr, 'history_patch_write_attrs: Unable to define units')
+        call cam_pio_handle_error(ierr, subname//': Unable to define units')
       end if
       !! Define the lonx (coordinate) variable
       if (unstruct .and. (.not. col_only)) then
@@ -610,12 +611,12 @@ contains
       call patchptr%get_coord_long_name('lon', temp_str)
       if (len_trim(temp_str) > 0) then
         ierr = pio_put_att(File, vardesc_lon, 'long_name', trim(temp_str))
-        call cam_pio_handle_error(ierr, 'history_patch_write_attrs: Unable to define long_name')
+        call cam_pio_handle_error(ierr, subname//': Unable to define long_name')
       end if
       call patchptr%get_coord_units('lon', temp_str)
       if (len_trim(temp_str) > 0) then
         ierr = pio_put_att(File, vardesc_lon, 'units', trim(temp_str))
-        call cam_pio_handle_error(ierr, 'history_patch_write_attrs: Unable to define units')
+        call cam_pio_handle_error(ierr, subname//': Unable to define units')
       end if
       call this%header_info(i)%set_varids(vardesc_lon, vardesc_lat)
       nullify(vardesc_lat, vardesc_lon) ! They belong to the header_info now
@@ -668,8 +669,10 @@ contains
     class(history_patch_t)                     :: this
     character(len=*),            intent(inout) :: name
 
-    ! Add patch description info to the variable name
-    name = trim(name)//'_'//trim(this%lon_axis_name)//'_'//trim(this%lat_axis_name)
+    if (.not. this%collected_output) then
+      ! Add patch description info to the variable name
+      name = trim(name)//'_'//trim(this%lon_axis_name)//'_'//trim(this%lat_axis_name)
+    end if
   end subroutine history_patch_field_name
 
   ! history_patch_num_hdims: Find the number of horizontal dimensions for
@@ -800,14 +803,6 @@ contains
     use pio,           only: file_desc_t, var_desc_t, io_desc_t
     use pio,           only: pio_write_darray
     use cam_pio_utils, only: cam_pio_handle_error, cam_pio_var_info
-!!XXgoldyXX: v debug only
-use pio, only: pio_inq_dimname
-
-character(len=256) :: dbgstr
-character(len=16) :: sep
-character(len=64) :: dimname
-integer :: slen
-!!XXgoldyXX: ^ debug only
 
     ! Dummy arguments
     class(history_patch_t)                   :: this

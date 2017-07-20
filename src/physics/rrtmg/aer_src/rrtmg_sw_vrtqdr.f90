@@ -102,7 +102,6 @@
                    
 ! Link lowest layer with surface
              
-      !dir$ VECTOR ALIGNED
       do icol=1,ncol
          zreflect = 1._r8 / (1._r8 - prefd(icol,klev+1) * prefd(icol,klev))
          prup(icol,klev) = pref(icol,klev) + (ptrad(icol,klev) * &
@@ -114,7 +113,6 @@
 ! Pass from bottom to top 
       end do
       do jk = 1,klev-1
-         !dir$ vector aligned
          do icol=1,ncol
             ikp = klev+1-jk                       
             ikx = ikp-1
@@ -128,7 +126,6 @@
       enddo
     
 ! Upper boundary conditions
-      !dir$ vector aligned
       do icol=1,ncol
          ztdn(icol,1) = 1._r8
          prdnd(icol,1) = 0._r8
@@ -138,7 +135,6 @@
 ! Pass from top to bottom
       end do
       do jk = 2,klev
-         !dir$ vector aligned
          do icol=1,ncol
             ikp = jk+1
             zreflect = 1._r8 / (1._r8 - prefd(icol,jk) * prdnd(icol,jk))
@@ -152,7 +148,6 @@
 ! Up and down-welling fluxes at levels
 
       do jk = 1,klev+1
-         !dir$ vector aligned
          do icol=1,ncol
             zreflect = 1._r8 / (1._r8 - prdnd(icol,jk) * prupd(icol,jk))
             pfu(icol,jk,kw(icol)) = (ptdbt(icol,jk) * prup(icol,jk) + &

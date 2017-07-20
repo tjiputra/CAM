@@ -27,7 +27,7 @@
 
       subroutine euvac_init (euvac_file)
 !---------------------------------------------------------------
-!	... initialize euvac etf module
+!       ... initialize euvac etf module
 !---------------------------------------------------------------
 
       use cam_pio_utils,  only : cam_pio_openfile
@@ -40,7 +40,7 @@
       character(len=*), intent(in) :: euvac_file
 
 !---------------------------------------------------------------
-!	... local variables
+!       ... local variables
 !---------------------------------------------------------------
       type(file_desc_t)  :: ncid
       integer  :: ierr
@@ -53,25 +53,25 @@
       if (.not.euvac_on) return
 
 !-----------------------------------------------------------------------
-!	... readin the etf data
+!       ... readin the etf data
 !-----------------------------------------------------------------------
       call getfil( euvac_file, locfn, 0 )
       call cam_pio_openfile (ncid, trim(locfn), PIO_NOWRITE)
 !-----------------------------------------------------------------------
-!	... get number of bins
+!       ... get number of bins
 !-----------------------------------------------------------------------
       ierr = pio_inq_dimid( ncid, 'bin', dimid )
       ierr = pio_inq_dimlen( ncid, dimid, nbins )
 
 !-----------------------------------------------------------------------
-!	... allocate primary arrays
+!       ... allocate primary arrays
 !-----------------------------------------------------------------------
       allocate( refmin(nbins), afac(nbins), euvac_etf(nbins), stat=astat )
       if( astat /= 0 ) then
          call alloc_err( astat, 'euvac_init', 'wc ... euvac_etf', nbins )
       end if
 !-----------------------------------------------------------------------
-!	... read primary arrays
+!       ... read primary arrays
 !-----------------------------------------------------------------------
       ierr = pio_inq_varid( ncid, 'REFMIN', varid )
       ierr = pio_get_var( ncid, varid, refmin )
@@ -84,7 +84,7 @@
 
       subroutine euvac_set_etf( f107, f107a )
 !---------------------------------------------------------------
-!	... set euvac etf
+!       ... set euvac etf
 !---------------------------------------------------------------
 
       use spmd_utils,     only : masterproc
@@ -92,13 +92,13 @@
       implicit none
 
 !---------------------------------------------------------------
-!	... dummy arguments
+!       ... dummy arguments
 !---------------------------------------------------------------
       real(r8), intent(in) :: f107
       real(r8), intent(in) :: f107a
 
 !---------------------------------------------------------------
-!	... local variables
+!       ... local variables
 !---------------------------------------------------------------
       real(r8), parameter :: factor = 80._r8
       real(r8) :: pindex

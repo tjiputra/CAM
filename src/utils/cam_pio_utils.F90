@@ -793,6 +793,7 @@ contains
     integer                          :: ndims
     integer                          :: dimids(3)
     logical                          :: exists
+    character(len=PIO_MAX_NAME)      :: filedims(4)
 
     if ( (present(start) .and. (.not. present(kount))) .or.                   &
          (present(kount) .and. (.not. present(start)))) then
@@ -806,7 +807,7 @@ contains
       call endrun(trim(subname)//': '//trim(varname)//' not found')
     end if
     if (exists) then
-      call cam_pio_var_info(File, varid, ndims, dimids, cnt, varname=varname)
+      call cam_pio_var_info(File, varid, ndims, dimids, cnt, dimnames=filedims, varname=varname)
 
       if (present(start)) then
         ! start and kount override other options and are not error checked
@@ -816,7 +817,7 @@ contains
         cnt(3) = 1
       else
         strt = 1     ! cnt set by cam_pio_var_info
-        exists = use_scam_limits(File, strt, cnt)
+        exists = use_scam_limits(File, strt, cnt,filedims)
       end if
       if (ndims == 3) then
         ierr = pio_inq_dimname(File, dimids(3), tmpname)
@@ -888,7 +889,7 @@ contains
         cnt(1:2) = kount
       else
         strt = 1   ! cnt set by cam_pio_var_info
-        exists = use_scam_limits(File, strt, cnt)
+        exists = use_scam_limits(File, strt, cnt,filedims)
       end if
       if ( ((ndims == 2) .and. (trim(filedims(2)) /= 'time')) .or.            &
            ((ndims == 3) .and. (trim(filedims(3)) == 'time'))) then
@@ -936,6 +937,7 @@ contains
     integer                          :: ndims
     integer                          :: dimids(4)
     logical                          :: exists
+    character(len=PIO_MAX_NAME)      :: filedims(4)
 
     if ( (present(start) .and. (.not. present(kount))) .or.                   &
          (present(kount) .and. (.not. present(start)))) then
@@ -950,7 +952,7 @@ contains
       call endrun(trim(subname)//': '//trim(varname)//' not found')
     end if
     if (exists) then
-      call cam_pio_var_info(File, varid, ndims, dimids, cnt, varname=varname)
+      call cam_pio_var_info(File, varid, ndims, dimids, cnt,dimnames=filedims, varname=varname)
 
       if (present(start)) then
         ! start and kount override other options and are not error checked
@@ -960,7 +962,7 @@ contains
         cnt(4) = 1
       else
         strt = 1    ! cnt set by cam_pio_var_info
-        exists = use_scam_limits(File, strt, cnt)
+        exists = use_scam_limits(File, strt, cnt,filedims)
       end if
 
       if (ndims == 4) then
@@ -1033,7 +1035,7 @@ contains
         cnt(1:3) = kount
       else
         strt = 1   ! cnt set by cam_pio_var_info
-        exists = use_scam_limits(File, strt, cnt)
+        exists = use_scam_limits(File, strt, cnt,filedims)
       end if
 
       if ( ((ndims == 3) .and. (trim(filedims(3)) /= 'time')) .or.            &

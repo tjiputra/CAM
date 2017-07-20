@@ -786,6 +786,7 @@ end subroutine dyn_init
       ! First, initialize all the variables, then assign
       allocate(dbuf4(npsq, nlev, nelemd, (pcnst + 4)))
       dbuf4 = 0.0_r8
+      phis_tmp = 0.0_r8
       call analytic_ic_set_ic(vcoord, latvals, lonvals, glob_ind,              &
            PS=dbuf4(:,1,:,(pcnst+1)), PHIS=phis_tmp, U=dbuf4(:,:,:,(pcnst+2)), &
            V=dbuf4(:,:,:,(pcnst+3)), T=dbuf4(:,:,:,(pcnst+4)),                 &

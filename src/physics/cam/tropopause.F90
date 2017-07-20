@@ -1150,11 +1150,13 @@ contains
     return
   end subroutine tropopause_find
   
-  
   ! Searches all the columns in the chunk and attempts to identify the "chemical"
-  ! tropopause. This is the lapse rate tropopause backed up by the climatology.
-  ! However at high latitude >50, a pressure level is used because the lapse rate
-  ! tropopause sometimes finds the tropopause at high altitudes.
+  ! tropopause. This is the lapse rate tropopause, backed up by the climatology
+  ! if the lapse rate fails to find the tropopause at pressures higher than a certain
+  ! threshold. This pressure threshold depends on latitude. Between 50S and 50N, 
+  ! the climatology is used if the lapse rate tropopause is not found at P > 75 hPa. 
+  ! At high latitude (poleward of 50), the threshold is increased to 125 hPa to 
+  ! eliminate false events that are sometimes detected in the cold polar stratosphere.
   !
   ! NOTE: This routine was adapted from code in chemistry.F90 and mo_gasphase_chemdr.F90.
   subroutine tropopause_findChemTrop(pstate, tropLev, primary, backup)
@@ -1171,26 +1173,36 @@ contains
     real(r8)            :: dlats(pcols)
     integer             :: i
     integer             :: ncol
+    integer             :: backAlg
 
-    ! Use the lapse rate tropopause backed by the climatology.
+    ! First use the lapse rate tropopause.
     ncol = pstate%ncol
-    call tropopause_find(pstate, tropLev, primary=primary, backup=backup)
+    call tropopause_find(pstate, tropLev, primary=primary, backup=TROP_ALG_NONE)
    
-    ! Now check high latitudes and set the level to the first level greater than 300 hPa.
-    ! Set vertical level separating tropospheric and stratospheric reactions
-    ! at tropopause, with minimum pressure of 300 hPa poleward of 50 latitude.
+    ! Now check high latitudes (poleward of 50) and set the level to the
+    ! climatology if the level was not found or is at P <= 125 hPa.
     dlats(:ncol) = pstate%lat(:ncol) * rad2deg ! convert to degrees
 
+    if (present(backup)) then
+      backAlg = backup
+    else
+      backAlg = default_backup
+    end if
+    
     do i = 1, ncol
-      if (abs(dlats(i) ) > 50._r8) then
-        if (tropLev(i) .eq. NOTFOUND) then
-          tropLev(i) = 1
-        end if 
-        do while (pstate%pmid(i, tropLev(i)) < 30000._r8)
-          tropLev(i) = tropLev(i) + 1
-        end do
+      if (abs(dlats(i)) > 50._r8) then
+        if (tropLev(i) .ne. NOTFOUND) then
+          if (pstate%pmid(i, tropLev(i)) <= 12500._r8) then
+            tropLev(i) = NOTFOUND
+          end if
+        end if
       end if
     end do
+        
+    ! Now use the backup algorithm
+    if ((backAlg /= TROP_ALG_NONE) .and. any(tropLev(:) == NOTFOUND)) then
+      call tropopause_findUsing(pstate, backAlg, tropLev)
+    end if
     
     return
   end subroutine tropopause_findChemTrop

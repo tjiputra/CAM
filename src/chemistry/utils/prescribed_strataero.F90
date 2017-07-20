@@ -34,10 +34,24 @@ module prescribed_strataero
   character(len=16), parameter :: mass_column_name = 'VOLC_MASS_C'
   character(len=16), parameter :: dens_name = 'VOLC_DENS'
 
+  character(len=16), parameter :: mmr_name1 = 'VOLC_MMR1'
+  character(len=16), parameter :: mmr_name2 = 'VOLC_MMR2'
+  character(len=16), parameter :: mmr_name3 = 'VOLC_MMR3'
+  character(len=16), parameter :: rad_name1 = 'VOLC_RAD_GEOM1'
+  character(len=16), parameter :: rad_name2 = 'VOLC_RAD_GEOM2'
+  character(len=16), parameter :: rad_name3 = 'VOLC_RAD_GEOM3'
+  character(len=16), parameter :: mass_name1 = 'VOLC_MASS1'
+  character(len=16), parameter :: mass_name2 = 'VOLC_MASS2'
+  character(len=16), parameter :: mass_name3 = 'VOLC_MASS3'
+  character(len=16), parameter :: mass_column_name1 = 'VOLC_MASS_C1'
+  character(len=16), parameter :: mass_column_name2 = 'VOLC_MASS_C2'
+  character(len=16), parameter :: mass_column_name3 = 'VOLC_MASS_C3'
+  character(len=16), parameter :: dens_name1 = 'VOLC_DENS1'
+  character(len=16), parameter :: dens_name2 = 'VOLC_DENS2'
+  character(len=16), parameter :: dens_name3 = 'VOLC_DENS3'
+
   ! These variables are settable via the namelist (with longer names)
-  character(len=32)  :: specifier(3) = (/'VOLC_MMR:H2SO4_mass             ', &
-                                         'VOLC_RAD_GEOM:rmode             ', &
-                                         'VOLC_SAD:sad                    ' /)
+  character(len=32)  :: specifier(7) = ' '
   character(len=256) :: filename = ''
   character(len=256) :: filelist = ''
   character(len=256) :: datapath = ''
@@ -46,11 +60,17 @@ module prescribed_strataero
   integer            :: cycle_yr  = 0
   integer            :: fixed_ymd = 0
   integer            :: fixed_tod = 0
-  integer            :: rad_ndx = -1
+  integer            :: rad_ndx1 = -1
+  integer            :: rad_ndx2 = -1
+  integer            :: rad_ndx3 = -1
   integer            :: sad_ndx = -1
-  integer            :: mmr_ndx = -1
+  integer            :: mmr_ndx1 = -1
+  integer            :: mmr_ndx2 = -1
+  integer            :: mmr_ndx3 = -1
 
   logical            :: prescribed_strataero_use_chemtrop = .false.
+  logical            :: three_mode = .true.
+  integer :: rad_fld_no=-1, sad_fld_no=-1
 
 contains
 
@@ -68,7 +88,7 @@ subroutine prescribed_strataero_readnl(nlfile)
    integer :: unitn, ierr
    character(len=*), parameter :: subname = 'prescribed_strataero_readnl'
 
-   character(len=32)  :: prescribed_strataero_specifier(3)
+   character(len=32)  :: prescribed_strataero_specifier(7)
    character(len=256) :: prescribed_strataero_file
    character(len=256) :: prescribed_strataero_filelist
    character(len=256) :: prescribed_strataero_datapath
@@ -151,14 +171,71 @@ end subroutine prescribed_strataero_readnl
 !-------------------------------------------------------------------
   subroutine prescribed_strataero_register()
     use ppgrid,         only: pver,pcols
-    use physics_buffer, only : pbuf_add_field, dtype_r8
+    use physics_buffer, only: pbuf_add_field, dtype_r8
+    use pio,            only: var_desc_t, file_desc_t, pio_closefile, pio_inq_varid, pio_seterrorhandling, &
+                              PIO_INTERNAL_ERROR, PIO_BCAST_ERROR, PIO_NOERR
+    use cam_pio_utils,  only: cam_pio_openfile
+    use ioFileMod, only : getfil
 
-    integer :: idx
+    type(var_desc_t)  :: varid
+    type(file_desc_t) :: file_handle
+    character(len=256) :: filepath, filen
+    integer :: ierr
 
     if (has_prescribed_strataero) then
-       call pbuf_add_field(mmr_name, 'physpkg', dtype_r8,(/pcols,pver/), mmr_ndx)
-       call pbuf_add_field(rad_name, 'physpkg', dtype_r8,(/pcols,pver/), rad_ndx)
-       call pbuf_add_field(sad_name, 'physpkg', dtype_r8,(/pcols,pver/), sad_ndx)
+
+       filepath = trim(datapath)//'/'//trim(filename)
+
+       call getfil( filepath, filen, 0 )
+       call cam_pio_openfile( file_handle, filen, 0 )
+
+       call pio_seterrorhandling(file_handle, PIO_BCAST_ERROR)
+
+       ierr = pio_inq_varid( file_handle, 'so4mass_a1', varid )
+       three_mode = three_mode .and. (ierr.eq.PIO_NOERR)
+       ierr = pio_inq_varid( file_handle, 'so4mass_a2', varid )
+       three_mode = three_mode .and. (ierr.eq.PIO_NOERR)
+       ierr = pio_inq_varid( file_handle, 'so4mass_a3', varid )
+       three_mode = three_mode .and. (ierr.eq.PIO_NOERR)
+       ierr = pio_inq_varid( file_handle, 'diamwet_a1', varid )
+       three_mode = three_mode .and. (ierr.eq.PIO_NOERR)
+       ierr = pio_inq_varid( file_handle, 'diamwet_a2', varid )
+       three_mode = three_mode .and. (ierr.eq.PIO_NOERR)
+       ierr = pio_inq_varid( file_handle, 'diamwet_a3', varid )
+       three_mode = three_mode .and. (ierr.eq.PIO_NOERR)
+
+       call pio_seterrorhandling(file_handle, PIO_INTERNAL_ERROR)
+
+       call pio_closefile( file_handle )
+
+       if (three_mode) then
+          call pbuf_add_field(mmr_name1, 'physpkg', dtype_r8,(/pcols,pver/), mmr_ndx1)
+          call pbuf_add_field(mmr_name2, 'physpkg', dtype_r8,(/pcols,pver/), mmr_ndx2)
+          call pbuf_add_field(mmr_name3, 'physpkg', dtype_r8,(/pcols,pver/), mmr_ndx3)
+          call pbuf_add_field(rad_name1, 'physpkg', dtype_r8,(/pcols,pver/), rad_ndx1)
+          call pbuf_add_field(rad_name2, 'physpkg', dtype_r8,(/pcols,pver/), rad_ndx2)
+          call pbuf_add_field(rad_name3, 'physpkg', dtype_r8,(/pcols,pver/), rad_ndx3)
+          call pbuf_add_field(sad_name, 'physpkg', dtype_r8,(/pcols,pver/), sad_ndx)
+          specifier(1:7) = (/'VOLC_MMR1:so4mass_a1            ', &
+                             'VOLC_MMR2:so4mass_a2            ', &
+                             'VOLC_MMR3:so4mass_a3            ', &
+                             'VOLC_RAD_GEOM1:diamwet_a1       ', &
+                             'VOLC_RAD_GEOM2:diamwet_a2       ', &
+                             'VOLC_RAD_GEOM3:diamwet_a3       ', &
+                             'VOLC_SAD:SAD_AERO               ' /)
+          rad_fld_no = 4
+          sad_fld_no = 7
+       else
+          print*,' pbuf add mmr_name = '//trim(mmr_name)
+          call pbuf_add_field(mmr_name, 'physpkg', dtype_r8,(/pcols,pver/), mmr_ndx1)
+          call pbuf_add_field(rad_name, 'physpkg', dtype_r8,(/pcols,pver/), rad_ndx1)
+          call pbuf_add_field(sad_name, 'physpkg', dtype_r8,(/pcols,pver/), sad_ndx)
+          specifier(1:3) = (/'VOLC_MMR:H2SO4_mass             ', &
+                             'VOLC_RAD_GEOM:rmode             ', &
+                             'VOLC_SAD:sad                    ' /)
+          rad_fld_no = 2
+          sad_fld_no = 3
+       endif
     endif
 
   endsubroutine prescribed_strataero_register
@@ -169,16 +246,7 @@ end subroutine prescribed_strataero_readnl
 
     use tracer_data, only : trcdata_init
     use cam_history, only : addfld, horiz_only
-    use ppgrid,      only : pver
     use error_messages, only: handle_err
-    use ppgrid,         only: pcols, pver, begchunk, endchunk
-    
-    use physics_buffer, only: physics_buffer_desc, pbuf_get_index
-
-    implicit none
-
-    integer :: ndx, istat
-    integer :: errcode
     
     if ( has_prescribed_strataero ) then
        if ( masterproc ) then
@@ -195,12 +263,30 @@ end subroutine prescribed_strataero_readnl
     call trcdata_init( specifier, filename, filelist, datapath, fields, file, &
                        rmv_file, cycle_yr, fixed_ymd, fixed_tod, data_type)
 
-    call addfld(dens_name, (/ 'lev' /), 'I','molecules/cm3', 'prescribed volcanic aerosol number density' )
-    call addfld(mmr_name, (/ 'lev' /), 'I','kg/kg', 'prescribed volcanic aerosol dry mass mixing ratio' )
-    call addfld(rad_name, (/ 'lev' /), 'I','m', 'volcanic aerosol geometric-mean radius' )
-    call addfld(mass_name, (/ 'lev' /), 'I','kg/m^2', 'volcanic aerosol vertical mass path in layer' )
-    call addfld(mass_column_name, horiz_only, 'I','kg/m^2', 'volcanic aerosol column mass' )
-    call addfld(sad_name, (/ 'lev' /), 'I','cm2/cm3', 'stratospheric aerosol density' )
+    if (three_mode) then
+       call addfld(dens_name1, (/ 'lev' /), 'I','molecules/cm3', 'prescribed volcanic aerosol number density in Mode 1' )
+       call addfld(dens_name2, (/ 'lev' /), 'I','molecules/cm3', 'prescribed volcanic aerosol number density in Mode 2' )
+       call addfld(dens_name3, (/ 'lev' /), 'I','molecules/cm3', 'prescribed volcanic aerosol number density in Mode 3' )
+       call addfld(mmr_name1, (/ 'lev' /), 'I','kg/kg', 'prescribed volcanic aerosol dry mass mixing ratio in Mode 1' )
+       call addfld(mmr_name2, (/ 'lev' /), 'I','kg/kg', 'prescribed volcanic aerosol dry mass mixing ratio in Mode 2' )
+       call addfld(mmr_name3, (/ 'lev' /), 'I','kg/kg', 'prescribed volcanic aerosol dry mass mixing ratio in Mode 3' )
+       call addfld(rad_name1, (/ 'lev' /), 'I','m', 'volcanic aerosol geometric-mode radius in Mode 1' )
+       call addfld(rad_name2, (/ 'lev' /), 'I','m', 'volcanic aerosol geometric-mode radius in Mode 2' )
+       call addfld(rad_name3, (/ 'lev' /), 'I','m', 'volcanic aerosol geometric-mode radius in Mode 3' )
+       call addfld(mass_name1, (/ 'lev' /), 'I','kg/m^2', 'volcanic aerosol vertical mass path in layer in Mode 1' )
+       call addfld(mass_name2, (/ 'lev' /), 'I','kg/m^2', 'volcanic aerosol vertical mass path in layer in Mode 2' )
+       call addfld(mass_name3, (/ 'lev' /), 'I','kg/m^2', 'volcanic aerosol vertical mass path in layer in Mode 3' )
+       call addfld(mass_column_name1, horiz_only, 'I','kg/m^2', 'volcanic aerosol column mass in Mode 1' )
+       call addfld(mass_column_name2, horiz_only, 'I','kg/m^2', 'volcanic aerosol column mass in Mode 2' )
+       call addfld(mass_column_name3, horiz_only, 'I','kg/m^2', 'volcanic aerosol column mass IN Mode 3' )
+    else
+       call addfld(dens_name, (/ 'lev' /), 'I','molecules/cm3', 'prescribed volcanic aerosol number density' )
+       call addfld(mmr_name,  (/ 'lev' /), 'I','kg/kg', 'prescribed volcanic aerosol dry mass mixing ratio' )
+       call addfld(rad_name,  (/ 'lev' /), 'I','m', 'volcanic aerosol geometric-mode radius' )
+       call addfld(mass_name, (/ 'lev' /), 'I','kg/m^2', 'volcanic aerosol vertical mass path in layer' )
+       call addfld(mass_column_name, horiz_only, 'I','kg/m^2', 'volcanic aerosol column mass' )
+    endif
+    call addfld(sad_name, (/ 'lev' /), 'I','cm2/cm3', 'stratospheric aerosol surface area density' )
 
   end subroutine prescribed_strataero_init
 
@@ -221,8 +307,6 @@ end subroutine prescribed_strataero_readnl
     use physics_buffer, only : physics_buffer_desc, pbuf_get_field, pbuf_get_chunk
     use physconst,      only : pi
 
-    implicit none
-
     type(physics_state), intent(in)    :: state(begchunk:endchunk)                 
     
     type(physics_buffer_desc), pointer :: pbuf2d(:,:)
@@ -232,18 +316,22 @@ end subroutine prescribed_strataero_readnl
     integer :: c,ncol,i,k
     real(r8) :: to_mmr(pcols,pver)
     real(r8), parameter :: molmass = 4._r8/3._r8*98.0_r8 !convert dry mass to wet mass of h2so4 
-    real(r8) :: ptrop
-    real(r8) :: concvolc ! micrograms of wetted aerosol per cubic centimeter
-    real(r8) :: volcmass(pcols,pver)
-    real(r8) :: columnmass(pcols)
-    real(r8) :: mmrvolc
+    real(r8) :: volcmass1(pcols,pver)
+    real(r8) :: volcmass2(pcols,pver)
+    real(r8) :: volcmass3(pcols,pver)
+    real(r8) :: columnmass1(pcols)
+    real(r8) :: columnmass2(pcols)
+    real(r8) :: columnmass3(pcols)
     integer  :: tropLev(pcols)
     real(r8) :: area_fact, radius_fact
 
-    real(r8) :: outdata(pcols,pver)
-    real(r8), pointer :: mass(:,:)
+    real(r8), pointer :: mass1(:,:)
+    real(r8), pointer :: mass2(:,:)
+    real(r8), pointer :: mass3(:,:)
     real(r8), pointer :: area(:,:)
-    real(r8), pointer :: radius(:,:)
+    real(r8), pointer :: radius1(:,:)
+    real(r8), pointer :: radius2(:,:)
+    real(r8), pointer :: radius3(:,:)
 
     !WACCM-derived relation between mass concentration and wet aerosol radius in meters
     real(r8),parameter :: radius_conversion = 1.9e-4_r8
@@ -266,7 +354,7 @@ end subroutine prescribed_strataero_readnl
        case ("molecules/cm3air", "molec/cm3","/cm3","molecules/cm3","cm^-3","cm**-3")
           to_mmr(:ncol,:) = (molmass*1.e6_r8*boltz*state(c)%t(:ncol,:))/(mwdry*state(c)%pmiddry(:ncol,:))
        case ('kg/kg','mmr','kg kg-1')
-          to_mmr(:ncol,:) = 1._r8
+          to_mmr(:ncol,:) = 1._r8 ! input file must have converted to wet sulfate mass (=4/3*dry mass)
        case ('mol/mol','mole/mole','vmr','fraction')
           to_mmr(:ncol,:) = molmass/mwdry
        case default
@@ -274,34 +362,55 @@ end subroutine prescribed_strataero_readnl
           call endrun('prescribed_strataero_adv: mass units are not recognized')
        end select
 
-       call pbuf_get_field(pbuf_chnk, mmr_ndx, mass)
+       if (mmr_ndx1>0) call pbuf_get_field(pbuf_chnk, mmr_ndx1, mass1)
+       if (mmr_ndx2>0) call pbuf_get_field(pbuf_chnk, mmr_ndx2, mass2)
+       if (mmr_ndx3>0) call pbuf_get_field(pbuf_chnk, mmr_ndx3, mass3)
 
-       call outfld( dens_name, mass(:,:), pcols, state(c)%lchnk)
+       if (three_mode) then
+          call outfld( dens_name1, mass1(:,:), pcols, state(c)%lchnk)
+          call outfld( dens_name2, mass2(:,:), pcols, state(c)%lchnk)
+          call outfld( dens_name3, mass3(:,:), pcols, state(c)%lchnk)
+       else
+          call outfld( dens_name, mass1(:,:), pcols, state(c)%lchnk)
+       endif
 
-       mass(:ncol,:) = to_mmr(:ncol,:) * mass(:ncol,:) ! mmr
+       if (mmr_ndx1>0) mass1(:ncol,:) = to_mmr(:ncol,:) * mass1(:ncol,:) ! mmr
+       if (mmr_ndx2>0) mass2(:ncol,:) = to_mmr(:ncol,:) * mass2(:ncol,:) ! mmr
+       if (mmr_ndx3>0) mass3(:ncol,:) = to_mmr(:ncol,:) * mass3(:ncol,:) ! mmr
 
-       call pbuf_get_field(pbuf_chnk, rad_ndx, radius)
+       if (rad_ndx1>0) call pbuf_get_field(pbuf_chnk, rad_ndx1, radius1)
+       if (rad_ndx2>0) call pbuf_get_field(pbuf_chnk, rad_ndx2, radius2)
+       if (rad_ndx3>0) call pbuf_get_field(pbuf_chnk, rad_ndx3, radius3)
 
-       select case ( to_lower(trim(fields(2)%units(:GLC(fields(2)%units)))) )
+       select case ( to_lower(trim(fields(rad_fld_no)%units(:GLC(fields(rad_fld_no)%units)))) )
        case ("m","meters")
           radius_fact = 1._r8
        case ("cm","centimeters")
           radius_fact = 1.e-2_r8
        case default
-          write(iulog,*) 'prescribed_strataero_adv: radius units = ',trim(fields(2)%units) ,' are not recognized'
+          write(iulog,*) 'prescribed_strataero_adv: radius units = ',trim(fields(rad_fld_no)%units) ,' are not recognized'
           call endrun('prescribed_strataero_adv: radius units are not recognized')
        end select
-       radius(:ncol,:) = radius_fact*radius(:ncol,:)
+
+       !MAM output is diamter so we need to half the value
+       if (three_mode) then
+          radius1(:ncol,:) = radius_fact*radius1(:ncol,:)*0.5_r8
+          radius2(:ncol,:) = radius_fact*radius2(:ncol,:)*0.5_r8
+          radius3(:ncol,:) = radius_fact*radius3(:ncol,:)*0.5_r8
+       else
+          radius1(:ncol,:) = radius_fact*radius1(:ncol,:)
+       endif
 
        call pbuf_get_field(pbuf_chnk, sad_ndx, area)
 
-       select case ( to_lower(trim(fields(3)%units(:7))) )
+       select case ( to_lower(trim(fields(sad_fld_no)%units(:7))) )
        case ("um2/cm3")
           area_fact = 1.e-8_r8
        case ("cm2/cm3")
           area_fact = 1._r8
        case default
-          write(iulog,*) 'prescribed_strataero_adv: surface area density units = ',trim(fields(3)%units) ,' are not recognized'
+          write(iulog,*) 'prescribed_strataero_adv: surface area density units = ',&
+                         trim(fields(rad_fld_no)%units) ,' are not recognized'
           call endrun('prescribed_strataero_adv: surface area density units are not recognized')
        end select
        area(:ncol,:) = area_fact*area(:ncol,:)
@@ -317,20 +426,44 @@ end subroutine prescribed_strataero_readnl
              endif
              ! set to zero at and below tropopause
              if ( zero_aerosols ) then
-                mass(i,k) = 0._r8
-                radius(i,k) = 0._r8
+                if (mmr_ndx1>0) mass1(i,k) = 0._r8
+                if (mmr_ndx2>0) mass2(i,k) = 0._r8
+                if (mmr_ndx3>0) mass3(i,k) = 0._r8
+                if (rad_ndx1>0) radius1(i,k) = 0._r8
+                if (rad_ndx2>0) radius2(i,k) = 0._r8
+                if (rad_ndx3>0) radius3(i,k) = 0._r8
                 area(i,k) = 0._r8
              endif
           enddo
        enddo
 
-       volcmass(:ncol,:) = mass(:ncol,:)*state(c)%pdel(:ncol,:)/gravit
-       columnmass(:ncol) = sum(volcmass(:ncol,:), 2)
+       volcmass1(:ncol,:) = mass1(:ncol,:)*state(c)%pdel(:ncol,:)/gravit
+       columnmass1(:ncol) = sum(volcmass1(:ncol,:), 2)
 
-       call outfld( mmr_name,         mass(:,:),     pcols, state(c)%lchnk)
-       call outfld( mass_name,        volcmass(:,:), pcols, state(c)%lchnk)
-       call outfld( mass_column_name, columnmass(:), pcols, state(c)%lchnk)
-       call outfld( rad_name,         radius(:,:),   pcols, state(c)%lchnk)
+       if (three_mode) then
+          volcmass2(:ncol,:) = mass2(:ncol,:)*state(c)%pdel(:ncol,:)/gravit
+          volcmass3(:ncol,:) = mass3(:ncol,:)*state(c)%pdel(:ncol,:)/gravit
+          columnmass2(:ncol) = sum(volcmass2(:ncol,:), 2)
+          columnmass3(:ncol) = sum(volcmass3(:ncol,:), 2)
+          call outfld( mmr_name1,         mass1(:,:),     pcols, state(c)%lchnk)
+          call outfld( mmr_name2,         mass2(:,:),     pcols, state(c)%lchnk)
+          call outfld( mmr_name3,         mass3(:,:),     pcols, state(c)%lchnk)
+          call outfld( mass_name1,        volcmass1(:,:), pcols, state(c)%lchnk)
+          call outfld( mass_name2,        volcmass2(:,:), pcols, state(c)%lchnk)
+          call outfld( mass_name3,        volcmass3(:,:), pcols, state(c)%lchnk)
+          call outfld( mass_column_name1, columnmass1(:), pcols, state(c)%lchnk)
+          call outfld( mass_column_name2, columnmass2(:), pcols, state(c)%lchnk)
+          call outfld( mass_column_name3, columnmass3(:), pcols, state(c)%lchnk)
+          call outfld( rad_name1,         radius1(:,:),   pcols, state(c)%lchnk)
+          call outfld( rad_name2,         radius2(:,:),   pcols, state(c)%lchnk)
+          call outfld( rad_name3,         radius3(:,:),   pcols, state(c)%lchnk)
+       else
+          call outfld( mmr_name,         mass1(:,:),     pcols, state(c)%lchnk)
+          call outfld( mass_name,        volcmass1(:,:), pcols, state(c)%lchnk)
+          call outfld( mass_column_name, columnmass1(:), pcols, state(c)%lchnk)
+          call outfld( rad_name,         radius1(:,:),   pcols, state(c)%lchnk)
+       endif
+
        call outfld( sad_name,         area(:,:),     pcols, state(c)%lchnk)
 
     enddo
@@ -341,7 +474,7 @@ end subroutine prescribed_strataero_readnl
   subroutine init_prescribed_strataero_restart( piofile )
     use pio, only : file_desc_t
     use tracer_data, only : init_trc_restart
-    implicit none
+
     type(file_desc_t),intent(inout) :: pioFile     ! pio File pointer
 
     call init_trc_restart( 'prescribed_strataero', piofile, file )
@@ -351,7 +484,6 @@ end subroutine prescribed_strataero_readnl
   subroutine write_prescribed_strataero_restart( piofile )
     use tracer_data, only : write_trc_restart
     use pio, only : file_desc_t
-    implicit none
 
     type(file_desc_t) :: piofile
 
@@ -363,7 +495,6 @@ end subroutine prescribed_strataero_readnl
   subroutine read_prescribed_strataero_restart( pioFile )
     use tracer_data, only : read_trc_restart
     use pio, only : file_desc_t
-    implicit none
 
     type(file_desc_t) :: piofile
 

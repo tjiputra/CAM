@@ -12,7 +12,7 @@ use spmd_utils,     only: masterproc
 use ppgrid,         only: pcols, pver
 use physconst,      only: pi, rair, tmelt
 use constituents,   only: pcnst, cnst_get_ind
-use physics_types,  only: physics_state, physics_ptend, physics_ptend_init 
+use physics_types,  only: physics_state, physics_ptend, physics_ptend_init
 use physics_buffer, only: physics_buffer_desc, pbuf_get_index, pbuf_old_tim_idx, pbuf_get_field
 use phys_control,   only: use_hetfrz_classnuc
 use physics_buffer, only: pbuf_add_field, dtype_r8, pbuf_old_tim_idx, &
@@ -48,11 +48,11 @@ public :: &
 ! Namelist variables
 logical, public, protected :: use_preexisting_ice = .false.
 logical                    :: hist_preexisting_ice = .false.
-logical                    :: nucleate_ice_incloud = .false. 
+logical                    :: nucleate_ice_incloud = .false.
 logical                    :: nucleate_ice_use_troplev = .false.
 real(r8)                   :: nucleate_ice_subgrid = -1._r8
 real(r8)                   :: nucleate_ice_subgrid_strat = -1._r8
-real(r8)                   :: nucleate_ice_strat = 0.0_r8  
+real(r8)                   :: nucleate_ice_strat = 0.0_r8
 
 ! Vars set via init method.
 real(r8) :: mincld      ! minimum allowed cloud fraction
@@ -115,14 +115,14 @@ subroutine nucleate_ice_oslo_readnl(nlfile)
 
   end if
 
- ! Broadcast namelist variables
- call mpi_bcast(use_preexisting_ice,  1, mpi_logical,masterprocid, mpicom, ierr)
- call mpi_bcast(hist_preexisting_ice, 1, mpi_logical,masterprocid, mpicom, ierr)
- call mpi_bcast(nucleate_ice_subgrid, 1, mpi_real8,  masterprocid, mpicom, ierr)
- call mpi_bcast(nucleate_ice_subgrid_strat, 1, mpi_real8,  masterprocid, mpicom, ierr)
- call mpi_bcast(nucleate_ice_strat,   1, mpi_real8,  masterprocid, mpicom, ierr)
- call mpi_bcast(nucleate_ice_incloud, 1, mpi_logical,masterprocid, mpicom, ierr)
- call mpi_bcast(nucleate_ice_use_troplev, 1, mpi_logical,masterprocid, mpicom, ierr)
+  ! Broadcast namelist variables
+  call mpi_bcast(use_preexisting_ice,  1, mpi_logical,masterprocid, mpicom, ierr)
+  call mpi_bcast(hist_preexisting_ice, 1, mpi_logical,masterprocid, mpicom, ierr)
+  call mpi_bcast(nucleate_ice_subgrid, 1, mpi_real8,  masterprocid, mpicom, ierr)
+  call mpi_bcast(nucleate_ice_subgrid_strat, 1, mpi_real8,  masterprocid, mpicom, ierr)
+  call mpi_bcast(nucleate_ice_strat,   1, mpi_real8,  masterprocid, mpicom, ierr)
+  call mpi_bcast(nucleate_ice_incloud, 1, mpi_logical,masterprocid, mpicom, ierr)
+  call mpi_bcast(nucleate_ice_use_troplev, 1, mpi_logical,masterprocid, mpicom, ierr)
 
 end subroutine nucleate_ice_oslo_readnl
 
@@ -138,6 +138,7 @@ end subroutine nucleate_ice_oslo_register
 !================================================================================================
 
 subroutine nucleate_ice_oslo_init(mincld_in, bulk_scale_in)
+   use phys_control, only: phys_getopts
 
    real(r8), intent(in) :: mincld_in
    real(r8), intent(in) :: bulk_scale_in
@@ -149,7 +150,9 @@ subroutine nucleate_ice_oslo_init(mincld_in, bulk_scale_in)
 
    character(len=32) :: str32
    character(len=*), parameter :: routine = 'nucleate_ice_cam_init'
+   logical :: history_cesm_forcing
    !--------------------------------------------------------------------------------------------
+   call phys_getopts(history_cesm_forcing_out = history_cesm_forcing)
 
    mincld     = mincld_in
    bulk_scale = bulk_scale_in
@@ -175,7 +178,7 @@ subroutine nucleate_ice_oslo_init(mincld_in, bulk_scale_in)
    if (((nucleate_ice_subgrid .eq. -1._r8) .or. (nucleate_ice_subgrid_strat .eq. -1._r8)) .and. (qsatfac_idx .eq. -1)) then
      call endrun(routine//': ERROR qsatfac is required when subgrid = -1 or subgrid_strat = -1')
    end if
-
+   
    call addfld('NIHF',  (/ 'lev' /), 'A', '1/m3', 'Activated Ice Number Concentation due to homogenous freezing')
    call addfld('NIDEP', (/ 'lev' /), 'A', '1/m3', 'Activated Ice Number Concentation due to deposition nucleation')
    call addfld('NIIMM', (/ 'lev' /), 'A', '1/m3', 'Activated Ice Number Concentation due to immersion freezing')
@@ -184,16 +187,18 @@ subroutine nucleate_ice_oslo_init(mincld_in, bulk_scale_in)
    call addfld('NIREGM',(/ 'lev' /), 'A', 'C', 'Ice Nucleation Temperature Threshold for Regime')
    call addfld('NISUBGRID',(/ 'lev' /), 'A', '', 'Ice Nucleation subgrid saturation factor')
    call addfld('NITROP_PD',(/ 'lev' /), 'A', '', 'Chemical Tropopause probability')
-
+   if ( history_cesm_forcing ) then
+      call add_default('NITROP_PD',8,' ')
+   endif
 
    if (use_preexisting_ice) then
       call addfld('fhom',      (/ 'lev' /), 'A','fraction', 'Fraction of cirrus where homogeneous freezing occur'   ) 
       call addfld ('WICE',     (/ 'lev' /), 'A','m/s','Vertical velocity Reduction caused by preexisting ice'  )
       call addfld ('WEFF',     (/ 'lev' /), 'A','m/s','Effective Vertical velocity for ice nucleation' )
       call addfld ('INnso4',   (/ 'lev' /), 'A','1/m3','Number Concentation so4 (in) to ice_nucleation')
-      call addfld ('INnbc',    (/ 'lev' /), 'A','1/m3','Number Concentation bc (in) to ice_nucleation')
+      call addfld ('INnbc',    (/ 'lev' /), 'A','1/m3','Number Concentation bc  (in) to ice_nucleation')
       call addfld ('INndust',  (/ 'lev' /), 'A','1/m3','Number Concentation dust (in) ice_nucleation')
-      call addfld ('INondust',  (/ 'lev' /), 'A','1/m3','Number Concentation dust (out) from ice_nucleation')  
+      call addfld ('INondust',  (/ 'lev' /), 'A','1/m3','Number Concentation dust (out) from ice_nucleation')
       call addfld ('INhet',    (/ 'lev' /), 'A','1/m3', &
                 'contribution for in-cloud ice number density increase by het nucleation in ice cloud')
       call addfld ('INhom',    (/ 'lev' /), 'A','1/m3', &
@@ -542,16 +547,16 @@ subroutine nucleate_ice_oslo_calc( &
               end if
             else
             
-            ! This maintains backwards compatibility with the previous version.
-            if (pmid(i,k) <= 12500._r8 .and. pmid(i,k) > 100._r8 .and. abs(state%lat(i)) >= 60._r8 * pi / 180._r8) then
-               ramp = 1._r8 - min(1._r8, max(0._r8, (pmid(i,k) - 10000._r8) / 2500._r8))
+              ! This maintains backwards compatibility with the previous version.
+              if (pmid(i,k) <= 12500._r8 .and. pmid(i,k) > 100._r8 .and. abs(state%lat(i)) >= 60._r8 * pi / 180._r8) then
+                 ramp = 1._r8 - min(1._r8, max(0._r8, (pmid(i,k) - 10000._r8) / 2500._r8))
 
-               if (oso4_num > 0._r8) then
-                  dso4_num = (max(oso4_num, ramp * nucleate_ice_strat * so4_num) - oso4_num) * 1e6_r8 / rho(i,k)
-                  naai(i,k) = naai(i,k) + dso4_num
-                  nihf(i,k) = nihf(i,k) + dso4_num
-               end if
-            end if
+                 if (oso4_num > 0._r8) then
+                    dso4_num = (max(oso4_num, ramp * nucleate_ice_strat * so4_num) - oso4_num) * 1e6_r8 / rho(i,k)
+                    naai(i,k) = naai(i,k) + dso4_num
+                    nihf(i,k) = nihf(i,k) + dso4_num
+                 end if
+              end if
             end if
 
             naai_hom(i,k) = nihf(i,k)

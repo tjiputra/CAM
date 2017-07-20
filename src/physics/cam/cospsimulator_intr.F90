@@ -1384,7 +1384,7 @@ endif
    cld_idx = pbuf_get_index('CLD')
    concld_idx = pbuf_get_index('CONCLD')
 
-   if( cam_physpkg_is('cam5') .or. cam_physpkg_is('cam5.4') ) then
+   if( cam_physpkg_is('cam5') .or. cam_physpkg_is('cam6') ) then
       lsreffrain_idx = pbuf_get_index('LS_REFFRAIN')
       lsreffsnow_idx = pbuf_get_index('LS_REFFSNOW')
       cvreffliq_idx  = pbuf_get_index('CV_REFFLIQ')
@@ -2142,7 +2142,7 @@ end if
    call pbuf_get_field(pbuf, rei_idx, rei)
 
 !added some more sizes to physics buffer in stratiform.F90 for COSP inputs
-   if( cam_physpkg_is('cam5') .or. cam_physpkg_is('cam5.4') ) then
+   if( cam_physpkg_is('cam5') .or. cam_physpkg_is('cam6') ) then
      call pbuf_get_field(pbuf, lsreffrain_idx, ls_reffrain  )
      call pbuf_get_field(pbuf, lsreffsnow_idx, ls_reffsnow  )
      call pbuf_get_field(pbuf, cvreffliq_idx,  cv_reffliq   )
@@ -2160,7 +2160,7 @@ end if
       !!! get from pbuf in convect_shallow.F90
       call pbuf_get_field(pbuf, shcldliq_idx, sh_cldliq  )
       call pbuf_get_field(pbuf, shcldice_idx, sh_cldice  )
-   elseif( cam_physpkg_is('cam5') .or. cam_physpkg_is('cam5.4') ) then
+   elseif( cam_physpkg_is('cam5') .or. cam_physpkg_is('cam6') ) then
       !!! get from pbuf in stratiform.F90
       call pbuf_get_field(pbuf, shcldliq1_idx, sh_cldliq  )
       call pbuf_get_field(pbuf, shcldice1_idx, sh_cldice  )
@@ -2374,7 +2374,7 @@ end if
 
    end if  !!if cam4/cam3
 
-   if( cam_physpkg_is('cam5') .or. cam_physpkg_is('cam5.4') ) then
+   if( cam_physpkg_is('cam5') .or. cam_physpkg_is('cam6') ) then
       use_precipitation_fluxes = .true.      !!! consistent with cam4 implementation.
 
       ! add together deep and shallow convection precipitation fluxes, recall *_flxprc variables are rain+snow
@@ -2501,7 +2501,7 @@ end if
           end do
        end if
 
-       if( cam_physpkg_is('cam5') .or. cam_physpkg_is('cam5.4') ) then
+       if( cam_physpkg_is('cam5') .or. cam_physpkg_is('cam6') ) then
             cld_swtau(1:ncol,1:pver) = cld_swtau_in(1:ncol,1:pver)
        end if
 
@@ -2526,7 +2526,7 @@ end if
        dem_s(1:ncol,1:pver) = emis(1:ncol,1:pver)               !  10.5 micron longwave emissivity of stratiform (in-cloud)
        dem_c(1:ncol,1:pver) = emis(1:ncol,1:pver)               !  10.5 micron longwave emissivity of convective (in-cloud)
 ! cam4 physics seg faults if this conditional is not used
-       if( cam_physpkg_is('cam5') .or. cam_physpkg_is('cam5.4') ) then
+       if( cam_physpkg_is('cam5') .or. cam_physpkg_is('cam6') ) then
            dem_s_snow(1:ncol,1:pver) = snow_emis_in(1:ncol,1:pver)      !  10.5 micron grid-box mean optical depth of stratiform snow
            dtau_s_snow(1:ncol,1:pver) = snow_tau_in(1:ncol,1:pver)      ! 0.67 micron grid-box mean optical depth of stratiform snow
            !! loop to check values of dem_s_snow

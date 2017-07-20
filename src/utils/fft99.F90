@@ -306,8 +306,6 @@
       DO 20 L=1,LOT
       I=IBASE
       J=JBASE
-!cdir nodep
-!DIR$ CONCURRENT
       DO 10 M=1,N
       WORK(J)=A(I)
       I=I+INC
@@ -357,8 +355,6 @@
       DO 100 L=1,LOT
       I=IBASE
       J=JBASE
-!cdir nodep
-!DIR$ CONCURRENT
       DO 90 M=1,N
       A(J)=WORK(I)
       I=I+1
@@ -372,8 +368,6 @@
   110 CONTINUE
       IA=1
       IB=N*INC+1
-!cdir nodep
-!DIR$ CONCURRENT
       DO 120 L=1,LOT
       A(IA)=A(IB)
       A(IB+INC)=A(IA+INC)
@@ -426,8 +420,6 @@
       IB=N*INC+1
       JA=1
       JB=2
-!cdir nodep
-!DIR$ CONCURRENT
       DO 10 L=1,LOT
       WORK(JA)=A(IA)+A(IB)
       WORK(JB)=A(IA)-A(IB)
@@ -450,8 +442,6 @@
       JB=JBBASE
       C=TRIGS(N+K)
       S=TRIGS(N+K+1)
-!cdir nodep
-!DIR$ CONCURRENT
       DO 20 L=1,LOT
       WORK(JA)=(A(IA)+A(IB))- &
           (S*(A(IA)-A(IB))+C*(A(IA+INC)+A(IB+INC)))
@@ -476,8 +466,6 @@
 !     WAVENUMBER N/4 (IF IT EXISTS)
       IA=IABASE
       JA=JABASE
-!cdir nodep
-!DIR$ CONCURRENT
       DO 40 L=1,LOT
       WORK(JA)=2.0_r8*A(IA)
       WORK(JA+1)=-2.0_r8*A(IA+INC)
@@ -524,8 +512,6 @@
       IB=2
       JA=1
       JB=N*INC+1
-!cdir nodep
-!DIR$ CONCURRENT
       DO 10 L=1,LOT
       A(JA)=SCALE*(WORK(IA)+WORK(IB))
       A(JB)=SCALE*(WORK(IA)-WORK(IB))
@@ -551,8 +537,6 @@
       JB=JBBASE
       C=TRIGS(N+K)
       S=TRIGS(N+K+1)
-!cdir nodep
-!DIR$ CONCURRENT
       DO 20 L=1,LOT
       A(JA)=SCALE*((WORK(IA)+WORK(IB)) &
          +(C*(WORK(IA+1)+WORK(IB+1))+S*(WORK(IA)-WORK(IB))))
@@ -578,8 +562,6 @@
       IA=IABASE
       JA=JABASE
       SCALE=2.0_r8*SCALE
-!cdir nodep
-!DIR$ CONCURRENT
       DO 40 L=1,LOT
       A(JA)=SCALE*WORK(IA)
       A(JA+INC)=-SCALE*WORK(IA+1)
@@ -669,8 +651,6 @@
       DO 20 L=1,LOT
       I=IBASE
       J=JBASE
-!cdir nodep
-!DIR$ CONCURRENT
       DO 10 M=1,N
       WORK(J)=A(I)
       I=I+INC
@@ -720,8 +700,6 @@
       DO 100 L=1,LOT
       I=IBASE
       J=JBASE
-!cdir nodep
-!DIR$ CONCURRENT
       DO 90 M=1,N
       A(J)=WORK(I)
       I=I+1
@@ -734,8 +712,6 @@
 !     FILL IN ZEROS AT END
   110 CONTINUE
       IB=N*INC+1
-!cdir nodep
-!DIR$ CONCURRENT
       DO 120 L=1,LOT
       A(IB)=0.0_r8
       A(IB+INC)=0.0_r8
@@ -997,8 +973,6 @@
       DO 20 L=1,LA
       I=IBASE
       J=JBASE
-!cdir nodep
-!DIR$ CONCURRENT
       DO 15 IJK=1,LOT
       C(JA+J)=A(IA+I)+A(IB+I)
       D(JA+J)=B(IA+I)+B(IB+I)
@@ -1020,8 +994,6 @@
       DO 30 L=1,LA
       I=IBASE
       J=JBASE
-!cdir nodep
-!DIR$ CONCURRENT
       DO 25 IJK=1,LOT
       C(JA+J)=A(IA+I)+A(IB+I)
       D(JA+J)=B(IA+I)+B(IB+I)
@@ -1048,8 +1020,6 @@
       DO 60 L=1,LA
       I=IBASE
       J=JBASE
-!cdir nodep
-!DIR$ CONCURRENT
       DO 55 IJK=1,LOT
       C(JA+J)=A(IA+I)+(A(IB+I)+A(IC+I))
       D(JA+J)=B(IA+I)+(B(IB+I)+B(IC+I))
@@ -1076,8 +1046,6 @@
       DO 70 L=1,LA
       I=IBASE
       J=JBASE
-!cdir nodep
-!DIR$ CONCURRENT
       DO 65 IJK=1,LOT
       C(JA+J)=A(IA+I)+(A(IB+I)+A(IC+I))
       D(JA+J)=B(IA+I)+(B(IB+I)+B(IC+I))
@@ -1116,8 +1084,6 @@
       DO 100 L=1,LA
       I=IBASE
       J=JBASE
-!cdir nodep
-!DIR$ CONCURRENT
       DO 95 IJK=1,LOT
       C(JA+J)=(A(IA+I)+A(IC+I))+(A(IB+I)+A(ID+I))
       C(JC+J)=(A(IA+I)+A(IC+I))-(A(IB+I)+A(ID+I))
@@ -1149,8 +1115,6 @@
       DO 110 L=1,LA
       I=IBASE
       J=JBASE
-!cdir nodep
-!DIR$ CONCURRENT
       DO 105 IJK=1,LOT
       C(JA+J)=(A(IA+I)+A(IC+I))+(A(IB+I)+A(ID+I))
       D(JA+J)=(B(IA+I)+B(IC+I))+(B(IB+I)+B(ID+I))
@@ -1197,8 +1161,6 @@
       DO 140 L=1,LA
       I=IBASE
       J=JBASE
-!cdir nodep
-!DIR$ CONCURRENT
       DO 135 IJK=1,LOT
       C(JA+J)=A(IA+I)+(A(IB+I)+A(IE+I))+(A(IC+I)+A(ID+I))
       D(JA+J)=B(IA+I)+(B(IB+I)+B(IE+I))+(B(IC+I)+B(ID+I))
@@ -1243,8 +1205,6 @@
       DO 150 L=1,LA
       I=IBASE
       J=JBASE
-!cdir nodep
-!DIR$ CONCURRENT
       DO 145 IJK=1,LOT
       C(JA+J)=A(IA+I)+(A(IB+I)+A(IE+I))+(A(IC+I)+A(ID+I))
       D(JA+J)=B(IA+I)+(B(IB+I)+B(IE+I))+(B(IC+I)+B(ID+I))

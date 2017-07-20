@@ -12,6 +12,9 @@
 <orb_mvelp                >0.</orb_mvelp>
 <orb_mode>fixed_parameters</orb_mode>
 
+<!-- turn off volcanos   -->
+<prescribed_strataero_feedback> false </prescribed_strataero_feedback>
+
 <!-- APE ghg -->
 <co2vmr                   >348.0e-6</co2vmr>
 <ch4vmr                   >1650.0e-9</ch4vmr>

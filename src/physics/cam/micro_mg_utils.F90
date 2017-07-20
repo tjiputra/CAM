@@ -792,8 +792,6 @@ subroutine sb2001v2_liq_autoconversion(pgam,qc,nc,qr,rho,relvar,au,nprc,nprc1,mg
          (rho(i)*qc(i)/1000._r8)**4._r8/(rho(i)*nc(i)/1.e6_r8)**2._r8* &
          (1._r8+dum1/(1._r8-dum)**2)*1000._r8 / rho(i)
 
-       au(i) = pra_coef * au(i)
-
        nprc1(i) = au(i)*2._r8/2.6e-7_r8*1000._r8
        nprc(i) = au(i)/droplet_mass_40um
      else
@@ -832,19 +830,17 @@ subroutine sb2001v2_accre_cld_water_rain(qc,nc,qr,rho,relvar,pra,npra,mgncol)
   real(r8), parameter :: kc = 9.44e9_r8
   real(r8), parameter :: kr = 5.78e3_r8
 
-  real(r8) :: dum, dum1, pra_coef
+  real(r8) :: dum, dum1
   integer :: i
 
   ! accretion
 
   do i =1,mgncol
 
-    pra_coef = var_coef(relvar(i), 1.15_r8)
-
     if (qc(i) > qsmall) then
       dum = 1._r8-qc(i)/(qc(i)+qr(i))
       dum1 = (dum/(dum+5.e-4_r8))**4._r8
-      pra(i) = pra_coef*kr*rho(i)*0.001_r8*qc(i)*qr(i)*dum1
+      pra(i) = kr*rho(i)*0.001_r8*qc(i)*qr(i)*dum1
       npra(i) = pra(i)*rho(i)*0.001_r8*(nc(i)*rho(i)*1.e-6_r8)/ &
            (qc(i)*rho(i)*0.001_r8)*1.e6_r8 / rho(i)
     else
@@ -1471,6 +1467,7 @@ subroutine evaporate_sublimate_precip(t, rho, dv, mu, sc, q, qvl, qvi, &
 
   integer :: i
 
+  am_evp_st = 0._r8
   ! set temporary cloud fraction to zero if cloud water + ice is very small
   ! this will ensure that evaporation/sublimation of precip occurs over
   ! entire grid cell, since min cloud fraction is specified otherwise

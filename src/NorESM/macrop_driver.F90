@@ -19,9 +19,10 @@
   use physics_buffer,    only: physics_buffer_desc, pbuf_set_field, pbuf_get_field, pbuf_old_tim_idx
   use time_manager,      only: is_first_step
   use cldwat2m_macro,    only: ini_macro
-  use perf_mod,      only: t_startf, t_stopf
-  use cam_logfile,   only: iulog
+  use perf_mod,          only: t_startf, t_stopf
+  use cam_logfile,       only: iulog
   use cam_abortutils,    only: endrun
+  use zm_conv_intr,      only: zmconv_microp
 
   implicit none
   private
@@ -54,7 +55,7 @@
 
 
   character(len=16) :: shallow_scheme
-  logical            :: use_shfrc                       ! Local copy of flag from convect_shallow_use_shfrc
+  logical           :: use_shfrc                       ! Local copy of flag from convect_shallow_use_shfrc
 
   integer :: &
     ixcldliq,     &! cloud liquid amount index
@@ -83,8 +84,15 @@
     concld_idx,   &! concld index in physics buffer
     fice_idx,     &  
     cmeliq_idx,   &  
-    shfrc_idx 
-    
+    shfrc_idx
+
+  integer :: &
+    dlfzm_idx  = -1,    & ! ZM detrained convective cloud water mixing ratio.
+    difzm_idx  = -1,    & ! ZM detrained convective cloud ice mixing ratio.
+    dnlfzm_idx = -1,    & ! ZM detrained convective cloud water num concen.
+    dnifzm_idx = -1       ! ZM detrained convective cloud ice num concen.
+
+
   integer :: &
     tke_idx = -1,       &! tke defined at the model interfaces
     qtl_flx_idx = -1,   &! overbar(w'qtl' where qtl = qv + ql) from the PBL scheme
@@ -106,9 +114,9 @@
     character(len=*), intent(in) :: nlfile  ! filepath for file containing namelist input
 
    ! Namelist variables
-   logical  :: macro_park_do_cldice  = .true.   !   do_cldice = .true., park macrophysics is prognosing cldice
-   logical  :: macro_park_do_cldliq  = .true.   !   do_cldliq = .true., park macrophysics is prognosing cldliq
-   logical  :: macro_park_do_detrain = .true.   !   do_detrain = .true., park macrophysics is detraining ice into stratiform
+   logical  :: macro_park_do_cldice  = .true.   ! do_cldice = .true., park macrophysics is prognosing cldice
+   logical  :: macro_park_do_cldliq  = .true.   ! do_cldliq = .true., park macrophysics is prognosing cldliq
+   logical  :: macro_park_do_detrain = .true.   ! do_detrain = .true., park macrophysics is detraining ice into stratiform
 
    ! Local variables
    integer :: unitn, ierr
@@ -140,9 +148,9 @@
 
 #ifdef SPMD
    ! Broadcast namelist variables
-   call mpibcast(do_cldice,         1, mpilog, 0, mpicom)
-   call mpibcast(do_cldliq,         1, mpilog, 0, mpicom)
-   call mpibcast(do_detrain,        1, mpilog, 0, mpicom)
+   call mpibcast(do_cldice,             1, mpilog, 0, mpicom)
+   call mpibcast(do_cldliq,             1, mpilog, 0, mpicom)
+   call mpibcast(do_detrain,            1, mpilog, 0, mpicom)
 #endif
 
 end subroutine macrop_driver_readnl
@@ -209,6 +217,7 @@ end subroutine macrop_driver_readnl
                                                  ! liquid budgets.
     integer              :: history_budget_histfile_num ! output history file number for budget fields
     integer :: istat
+
     character(len=*), parameter :: subname = 'macrop_driver_init'
     !-----------------------------------------------------------------------
 
@@ -217,7 +226,7 @@ end subroutine macrop_driver_readnl
     call ini_macro(rhminl_opt, rhmini_opt)
 
     call phys_getopts(history_aerosol_out              = history_aerosol      , &
-                       history_budget_out         = history_budget       , &
+                      history_budget_out               = history_budget       , &
                       history_budget_histfile_num_out  = history_budget_histfile_num )
 
   ! Find out whether shfrc from convect_shallow will be used in cldfrc
@@ -335,6 +344,14 @@ end subroutine macrop_driver_readnl
     CC_qlst_idx = pbuf_get_index('CC_qlst')
     cmfmc_sh_idx = pbuf_get_index('CMFMC_SH')
 
+    if (zmconv_microp) then
+       dlfzm_idx = pbuf_get_index('DLFZM')
+       difzm_idx = pbuf_get_index('DIFZM')
+       dnlfzm_idx = pbuf_get_index('DNLFZM')
+       dnifzm_idx = pbuf_get_index('DNIFZM')
+    end if
+
+
     if (rhminl_opt > 0 .or. rhmini_opt > 0) then
        cmfr_det_idx = pbuf_get_index('cmfr_det', istat)
        if (istat < 0) call endrun(subname//': macrop option requires cmfr_det in pbuf')
@@ -370,9 +387,11 @@ end subroutine macrop_driver_readnl
        call pbuf_set_field(pbuf2d, qlst_idx,   0._r8)
        call pbuf_set_field(pbuf2d, nlwat_idx,  0._r8)
        call pbuf_set_field(pbuf2d, niwat_idx,  0._r8)
-       call pbuf_set_field(pbuf2d, fice_idx,   0._r8)
-       call pbuf_set_field(pbuf2d, cmeliq_idx, 0._r8)
     end if
+
+    ! the following are physpkg, so they need to be init every time
+    call pbuf_set_field(pbuf2d, fice_idx,   0._r8)
+    call pbuf_set_field(pbuf2d, cmeliq_idx, 0._r8)
 
   end subroutine macrop_driver_init
 
@@ -387,7 +406,7 @@ end subroutine macrop_driver_readnl
              dlf, dlf2, cmfmc, ts,          &
              sst, zdu,       &
              pbuf, &
-	     det_s, det_ice)
+             det_s, det_ice)
 
   !-------------------------------------------------------- !  
   !                                                         ! 
@@ -489,6 +508,12 @@ end subroutine macrop_driver_readnl
   ! Convective cloud to the physics buffer for purposes of ql contrib. to radn.
 
   real(r8), pointer, dimension(:,:) :: fice_ql      ! Cloud ice/water partitioning ratio.
+
+  ! ZM microphysics
+  real(r8), pointer :: dlfzm(:,:)  ! ZM detrained convective cloud water mixing ratio.
+  real(r8), pointer :: difzm(:,:)  ! ZM detrained convective cloud ice mixing ratio.
+  real(r8), pointer :: dnlfzm(:,:) ! ZM detrained convective cloud water num concen.
+  real(r8), pointer :: dnifzm(:,:) ! ZM detrained convective cloud ice num concen.
 
   real(r8) :: latsub
 
@@ -598,10 +623,10 @@ end subroutine macrop_driver_readnl
   real(r8)  dlf_ni(pcols,pver)
 
   ! Local variables for CFMIP calculations
-  real(r8) :: mr_lsliq(pcols,pver)			! mixing_ratio_large_scale_cloud_liquid (kg/kg)
-  real(r8) :: mr_lsice(pcols,pver)			! mixing_ratio_large_scale_cloud_ice (kg/kg)
-  real(r8) :: mr_ccliq(pcols,pver)			! mixing_ratio_convective_cloud_liquid (kg/kg)
-  real(r8) :: mr_ccice(pcols,pver)			! mixing_ratio_convective_cloud_ice (kg/kg)
+  real(r8) :: mr_lsliq(pcols,pver)  ! mixing_ratio_large_scale_cloud_liquid (kg/kg)
+  real(r8) :: mr_lsice(pcols,pver)  ! mixing_ratio_large_scale_cloud_ice (kg/kg)
+  real(r8) :: mr_ccliq(pcols,pver)  ! mixing_ratio_convective_cloud_liquid (kg/kg)
+  real(r8) :: mr_ccice(pcols,pver)  ! mixing_ratio_convective_cloud_ice (kg/kg)
 
   ! CloudSat equivalent ice mass mixing ratio (kg/kg)
   real(r8) :: cldsice(pcols,pver)
@@ -689,6 +714,13 @@ end subroutine macrop_driver_readnl
      ! This is the key procesure generating upper-level cirrus clouds.
      ! The unit of dlf : [ kg/kg/s ]
 
+   if (zmconv_microp) then
+      call pbuf_get_field(pbuf, dlfzm_idx, dlfzm)
+      call pbuf_get_field(pbuf, difzm_idx, difzm)
+      call pbuf_get_field(pbuf, dnlfzm_idx, dnlfzm)
+      call pbuf_get_field(pbuf, dnifzm_idx, dnifzm)
+   end if
+
    det_s(:)   = 0._r8
    det_ice(:) = 0._r8
 
@@ -712,37 +744,50 @@ end subroutine macrop_driver_readnl
      ! If detrainment was done elsewhere, still update the variables used for output
      ! assuming that the temperature split between liquid and ice is the same as assumed
      ! here.
-     if (do_detrain) then
-      ptend_loc%q(i,k,ixcldliq) = dlf(i,k) * ( 1._r8 - dum1 )
-      ptend_loc%q(i,k,ixcldice) = dlf(i,k) * dum1
-    ! dum2                      = dlf(i,k) * ( 1._r8 - dum1 )
-      ptend_loc%q(i,k,ixnumliq) = 3._r8 * ( max(0._r8, ( dlf(i,k) - dlf2(i,k) )) * ( 1._r8 - dum1 ) ) / &
-           (4._r8*3.14_r8* 8.e-6_r8**3*997._r8) + & ! Deep    Convection
-           3._r8 * (                         dlf2(i,k)    * ( 1._r8 - dum1 ) ) / &
-           (4._r8*3.14_r8*10.e-6_r8**3*997._r8)     ! Shallow Convection 
-    ! dum2                      = dlf(i,k) * dum1
-      ptend_loc%q(i,k,ixnumice) = 3._r8 * ( max(0._r8, ( dlf(i,k) - dlf2(i,k) )) *  dum1 ) / &
-           (4._r8*3.14_r8*25.e-6_r8**3*500._r8) + & ! Deep    Convection
-           3._r8 * (                         dlf2(i,k)    *  dum1 ) / &
-           (4._r8*3.14_r8*50.e-6_r8**3*500._r8)     ! Shallow Convection
-      ptend_loc%s(i,k)          = dlf(i,k) * dum1 * latice
-     else 
-        ptend_loc%q(i,k,ixcldliq) = 0._r8
-        ptend_loc%q(i,k,ixcldice) = 0._r8
-        ptend_loc%q(i,k,ixnumliq) = 0._r8
-        ptend_loc%q(i,k,ixnumice) = 0._r8
-        ptend_loc%s(i,k)          = 0._r8
-     end if
+     if (zmconv_microp) then
+         ptend_loc%q(i,k,ixcldliq) = dlfzm(i,k) + dlf2(i,k) * ( 1._r8 - dum1 )
+         ptend_loc%q(i,k,ixcldice) = difzm(i,k) + dlf2(i,k) * dum1
+
+         ptend_loc%q(i,k,ixnumliq) = dnlfzm(i,k) + 3._r8 * ( dlf2(i,k) * ( 1._r8 - dum1 ) )   &
+                                                   / (4._r8*3.14_r8*10.e-6_r8**3*997._r8)      ! Shallow Convection
+         ptend_loc%q(i,k,ixnumice) = dnifzm(i,k) + 3._r8 * ( dlf2(i,k) * dum1 ) &
+                                                   / (4._r8*3.14_r8*50.e-6_r8**3*500._r8)      ! Shallow Convection
+         ptend_loc%s(i,k)          = dlf2(i,k) * dum1 * latice
+
+     else
+       if (do_detrain) then
+        ptend_loc%q(i,k,ixcldliq) = dlf(i,k) * ( 1._r8 - dum1 )
+        ptend_loc%q(i,k,ixcldice) = dlf(i,k) * dum1
+      ! dum2                      = dlf(i,k) * ( 1._r8 - dum1 )
+        ptend_loc%q(i,k,ixnumliq) = 3._r8 * ( max(0._r8, ( dlf(i,k) - dlf2(i,k) )) * ( 1._r8 - dum1 ) ) / &
+             (4._r8*3.14_r8* 8.e-6_r8**3*997._r8) + & ! Deep    Convection
+             3._r8 * (                         dlf2(i,k)    * ( 1._r8 - dum1 ) ) / &
+             (4._r8*3.14_r8*10.e-6_r8**3*997._r8)     ! Shallow Convection 
+      ! dum2                      = dlf(i,k) * dum1
+        ptend_loc%q(i,k,ixnumice) = 3._r8 * ( max(0._r8, ( dlf(i,k) - dlf2(i,k) )) *  dum1 ) / &
+             (4._r8*3.14_r8*25.e-6_r8**3*500._r8) + & ! Deep    Convection
+             3._r8 * (                         dlf2(i,k)    *  dum1 ) / &
+             (4._r8*3.14_r8*50.e-6_r8**3*500._r8)     ! Shallow Convection
+        ptend_loc%s(i,k)          = dlf(i,k) * dum1 * latice
+       else 
+          ptend_loc%q(i,k,ixcldliq) = 0._r8
+          ptend_loc%q(i,k,ixcldice) = 0._r8
+          ptend_loc%q(i,k,ixnumliq) = 0._r8
+          ptend_loc%q(i,k,ixnumice) = 0._r8
+          ptend_loc%s(i,k)          = 0._r8
+       end if
     
 
-    ! Only rliq is saved from deep convection, which is the reserved liquid.  We need to keep
-    !   track of the integrals of ice and static energy that is effected from conversion to ice
-    !   so that the energy checker doesn't complain.	
-      det_s(i)                  = det_s(i) + ptend_loc%s(i,k)*state_loc%pdel(i,k)/gravit
-      det_ice(i)                = det_ice(i) - ptend_loc%q(i,k,ixcldice)*state_loc%pdel(i,k)/gravit      
+     end if    
 
-    ! Targetted detrainment of convective liquid water either directly into the
-    ! existing liquid stratus or into the environment. 
+     ! Only rliq is saved from deep convection, which is the reserved liquid.  We need to keep
+     !   track of the integrals of ice and static energy that is effected from conversion to ice
+     !   so that the energy checker doesn't complain.
+       det_s(i)                  = det_s(i) + ptend_loc%s(i,k)*state_loc%pdel(i,k)/gravit
+       det_ice(i)                = det_ice(i) - ptend_loc%q(i,k,ixcldice)*state_loc%pdel(i,k)/gravit      
+
+     ! Targetted detrainment of convective liquid water either directly into the
+     ! existing liquid stratus or into the environment. 
       if( cu_det_st ) then
           dlf_T(i,k)  = ptend_loc%s(i,k)/cpair
           dlf_qv(i,k) = 0._r8
@@ -762,11 +807,18 @@ end subroutine macrop_driver_readnl
           dpdlft  (i,k)             = 0._r8
           shdlft  (i,k)             = 0._r8
        else
-          dpdlfliq(i,k) = ( dlf(i,k) - dlf2(i,k) ) * ( 1._r8 - dum1 )
-          dpdlfice(i,k) = ( dlf(i,k) - dlf2(i,k) ) * ( dum1 )
+          if (zmconv_microp) then
+             dpdlfliq(i,k) =  dlfzm(i,k)
+             dpdlfice(i,k) =  difzm(i,k)
+             dpdlft  (i,k) = 0._r8
+          else
+             dpdlfliq(i,k) = ( dlf(i,k) - dlf2(i,k) ) * ( 1._r8 - dum1 )
+             dpdlfice(i,k) = ( dlf(i,k) - dlf2(i,k) ) * ( dum1 )
+             dpdlft  (i,k) = ( dlf(i,k) - dlf2(i,k) ) * dum1 * latice/cpair
+          end if
+
           shdlfliq(i,k) = dlf2(i,k) * ( 1._r8 - dum1 )
           shdlfice(i,k) = dlf2(i,k) * ( dum1 )
-          dpdlft  (i,k) = ( dlf(i,k) - dlf2(i,k) ) * dum1 * latice/cpair
           shdlft  (i,k) = dlf2(i,k) * dum1 * latice/cpair
 !AL
           dpdlfnc(i,k) = 3._r8 * ( max(0._r8, ( dlf(i,k) - dlf2(i,k) )) * ( 1._r8 - dum1 ) ) / (4._r8*3.14_r8* 8.e-6_r8**3*997._r8)     ! Deep    Convection liq
@@ -1096,6 +1148,7 @@ end subroutine macrop_driver_readnl
    call physics_state_dealloc(state_loc)
 
 end subroutine macrop_driver_tend
+
 
 ! Saturation adjustment for liquid
 !

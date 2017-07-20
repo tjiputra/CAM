@@ -154,7 +154,7 @@ contains
   subroutine sox_cldaero_update( &
        ncol, lchnk, loffset, dtime, mbar, pdel, press, tfld, cldnum, cldfrc, cfact, xlwc, &
        delso4_hprxn, xh2so4, xso4, xso4_init, nh3g, hno3g, xnh3, xhno3, xnh4c,  xno3c, xmsa, xso2, xh2o2, qcw, qin, &
-       aqso4, aqh2so4, aqso4_h2o2, aqso4_o3 )
+       aqso4, aqh2so4, aqso4_h2o2, aqso4_o3, aqso4_h2o2_3d, aqso4_o3_3d)
 
     ! args 
 
@@ -195,6 +195,9 @@ contains
     real(r8), intent(out) :: aqh2so4(:,:)                 ! aqueous phase chemistry
     real(r8), intent(out) :: aqso4_h2o2(:)                ! SO4 aqueous phase chemistry due to H2O2 (kg/m2)
     real(r8), intent(out) :: aqso4_o3(:)                  ! SO4 aqueous phase chemistry due to O3 (kg/m2)
+    real(r8), intent(out), optional :: aqso4_h2o2_3d(:,:)                ! SO4 aqueous phase chemistry due to H2O2 (kg/m2)
+    real(r8), intent(out), optional :: aqso4_o3_3d(:,:)                  ! SO4 aqueous phase chemistry due to O3 (kg/m2)
+
 
     ! local vars ...
 
@@ -475,6 +478,16 @@ contains
        enddo
     enddo
 
+    if (present(aqso4_h2o2_3d)) then 
+       aqso4_h2o2_3d(:,:) = 0._r8
+       do k=1,pver
+          do i=1,ncol
+             aqso4_h2o2_3d(i,k)=dqdt_aqhprxn(i,k)*specmw_so4_amode/mbar(i,k) &
+                                *pdel(i,k)/gravit ! kg SO4 /m2/s
+          enddo
+       enddo
+    end if
+
     aqso4_o3(:)=0._r8
     do k=1,pver
        do i=1,ncol
@@ -482,6 +495,16 @@ contains
                   *pdel(i,k)/gravit ! kg SO4 /m2/s
        enddo
     enddo
+
+    if (present(aqso4_o3_3d)) then
+       aqso4_o3_3d(:,:)=0._r8
+       do k=1,pver
+          do i=1,ncol
+             aqso4_o3_3d(i,k)=dqdt_aqo3rxn(i,k)*specmw_so4_amode/mbar(i,k) &
+                              *pdel(i,k)/gravit ! kg SO4 /m2/s
+          enddo
+       enddo
+    end if
 
   end subroutine sox_cldaero_update
 

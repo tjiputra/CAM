@@ -35,7 +35,7 @@ module dyn_comp
 !   WS  05.09.20:  Renamed dyn_comp
 !   WS  05.11.10:  Now using dyn_import/export_t containers
 !   WS  06.03.01:  Removed tracertrans-related variables
-!   WS  06.04.13:  dyn_state moved here from prognostics (temporary?)
+!   WS  06.04.13:  dyn_state moved here from prognostics
 !   CC  07.01.29:  Corrected calculation of OMGA
 !   AM  07.10.31:  Supports overlap of trac2d and cd_core subcycles
 !----------------------------------------------------------------------
@@ -43,7 +43,7 @@ module dyn_comp
 use shr_kind_mod,       only: r8=>shr_kind_r8
 use spmd_utils,         only: masterproc, iam
 
-use pmgrid,             only: plon, plat, plev
+use pmgrid,             only: plon, plat
 use constituents,       only: cnst_name, cnst_read_iv, qmin
 
 use time_manager,       only: get_step_size
@@ -52,7 +52,7 @@ use dynamics_vars,      only: t_fvdycore_grid,            &
                               t_fvdycore_state, t_fvdycore_constants
 use dyn_internal_state, only: get_dyn_state, get_dyn_state_grid
 
-use dyn_grid,           only: get_block_gcol_d, get_horiz_grid_dim_d
+use dyn_grid,           only: get_horiz_grid_dim_d
 use spmd_dyn,           only: spmd_readnl
 
 use cam_control_mod,    only: initial_run, ideal_phys, aqua_planet, moist_physics
@@ -60,7 +60,6 @@ use phys_control,       only: phys_setopts
 
 use cam_initfiles,      only: initial_file_get_id, topo_file_get_id, pertlim
 use cam_pio_utils,      only: clean_iodesc_list
-use cam_history_support,only: fillvalue
 use ncdio_atm,          only: infld
 use pio,                only: file_desc_t, pio_inq_varid, pio_get_att
 
@@ -70,6 +69,8 @@ use cam_logfile,        only: iulog
 use cam_abortutils,     only: endrun
 
 use pio,                only: file_desc_t
+use par_vecsum_mod,     only: par_vecsum
+use te_map_mod,         only: te_map
 
 implicit none
 private
@@ -120,6 +121,11 @@ type dyn_export_t
      real(r8), dimension(:,:,:),   pointer :: omga   ! Vertical velocity
      real(r8), dimension(:,:,:),   pointer :: mfx    ! Mass flux in X
      real(r8), dimension(:,:,:),   pointer :: mfy    ! Mass flux in Y
+     real(r8), dimension(:,:,:),   pointer :: du3s   ! U-wind tend. from dycore (staggered)
+     real(r8), dimension(:,:,:),   pointer :: dv3s   ! V-wind tend. from dycore (staggered)
+     real(r8), dimension(:,:,:),   pointer :: dua3s  ! U-wind tend. from advection (stagg)
+     real(r8), dimension(:,:,:),   pointer :: dva3s  ! V-wind tend. from advection (stagg)
+     real(r8), dimension(:,:,:),   pointer :: duf3s  ! U-wind tend. from fixer (staggered)
 end type dyn_export_t
 
 ! The FV core is always called in its "full physics" mode.  We don't want
@@ -171,6 +177,7 @@ subroutine dyn_readnl(nlfilename)
    integer :: fv_div24del2flag = 2     ! 2 for 2nd order div damping, 4 for 4th order div damping,
                                        ! 42 for 4th order div damping plus 2nd order velocity damping
    real(r8):: fv_del2coef    = 3.e5_r8 ! strength of 2nd order velocity damping
+   logical :: fv_high_altitude = .false. ! switch to apply variables appropriate for high-altitude physics
 
    logical :: fv_am_correction = .false. ! apply correction for angular momentum (AM)
                                             ! conservation in SW eqns
@@ -181,7 +188,7 @@ subroutine dyn_readnl(nlfilename)
    namelist /dyn_fv_inparm/ fv_nsplit, fv_nspltrac, fv_nspltvrm, fv_iord, fv_jord, &
                             fv_kord, fv_conserve, fv_filtcw, fv_fft_flt,           &
                             fv_div24del2flag, fv_del2coef, fv_am_correction,    &
-                            fv_am_fixer, fv_am_fix_lbl, fv_am_diag
+                            fv_am_fixer, fv_am_fix_lbl, fv_am_diag, fv_high_altitude
 
    type(t_fvdycore_state), pointer :: dyn_state
 
@@ -258,8 +265,13 @@ subroutine dyn_readnl(nlfilename)
    call mpi_bcast(fv_am_diag, 1, mpi_logical, mstrid, mpicom, ierr)
    if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: fv_am_diag")
 
+   call mpi_bcast(fv_high_altitude, 1, mpi_logical, mstrid, mpicom, ierr)
+   if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: fv_high_altitude")
+
    ! Store namelist settings in fv state object
    dyn_state => get_dyn_state()
+
+   dyn_state%grid%high_alt = fv_high_altitude
 
    ! Calculate nsplit if it was specified as 0
    if ( fv_nsplit <= 0 ) then
@@ -333,7 +345,7 @@ subroutine dyn_readnl(nlfilename)
       write(iulog,*)'  Angular momentum (AM) correction (fv_am_correction) = ', fv_am_correction
       write(iulog,*)'  Apply AM fixer (fv_am_fixer)                        = ', fv_am_fixer
       write(iulog,*)'  Level by level AM fixer (fv_am_fix_lbl)             = ', fv_am_fix_lbl
-      write(iulog,*)'  Print AM diagnostics to log file (fv_am_diag)       = ', fv_am_diag
+      write(iulog,*)'  Enable AM diagnostics (fv_am_diag)                  = ', fv_am_diag
       write(iulog,*)'  '
    end if
 
@@ -432,6 +444,7 @@ subroutine dyn_init(dyn_in, dyn_out)
    use metdata,         only: metdata_dyn_init
 #endif
    use ctem,            only: ctem_init
+   use diag_module,     only: fv_diag_init
 
    ! arguments:
    type (dyn_import_t),     intent(out) :: dyn_in
@@ -460,6 +473,12 @@ subroutine dyn_init(dyn_in, dyn_out)
    grid      => dyn_state%grid
    constants => dyn_state%constants
 
+   if (grid%high_alt) then
+      grid%ntotq = grid%ntotq + 1 ! advect Kappa
+      grid%kthi = grid%kthi + 1
+      grid%kthia(:) = grid%kthia(:) + 1
+   endif
+
    ! Set constants
    constants%pi    = pi
    constants%omega = omega
@@ -473,7 +492,6 @@ subroutine dyn_init(dyn_in, dyn_out)
    dyn_state%dt        = dt         ! Should this be part of state??
 
    dyn_state%check_dt  = 21600.0_r8 ! Check max and min every 6 hours.
-   dyn_state%te_method = 0
 
    ! Create the dynamics import and export state objects
    ifirstxy = grid%ifirstxy
@@ -492,8 +510,9 @@ subroutine dyn_init(dyn_in, dyn_out)
             dyn_in%pk(    ifirstxy:ilastxy,jfirstxy:jlastxy,km+1),     &
             dyn_in%pkz(   ifirstxy:ilastxy,jfirstxy:jlastxy,km),       &
             dyn_in%delp(  ifirstxy:ilastxy,jfirstxy:jlastxy,km),       &
-            dyn_in%tracer(ifirstxy:ilastxy,jfirstxy:jlastxy,km,pcnst), &
+            dyn_in%tracer(ifirstxy:ilastxy,jfirstxy:jlastxy,km, grid%ntotq ), &
             stat=ierr)
+
    if ( ierr /= 0 ) then
       write(iulog,*) sub//': ERROR: allocating components of dyn_in.  ierr=', ierr
       call endrun(sub//': ERROR: allocating components of dyn_in')
@@ -525,14 +544,43 @@ subroutine dyn_init(dyn_in, dyn_out)
    dyn_out%tracer => dyn_in%tracer
 
    ! And several more which are not in the import container
-   allocate(dyn_out%peln(ifirstxy:ilastxy,km+1,jfirstxy:jlastxy), &
-            dyn_out%omga(ifirstxy:ilastxy,km,jfirstxy:jlastxy),   &
-            dyn_out%mfx( ifirstxy:ilastxy,jfirstxy:jlastxy,km),   &
-            dyn_out%mfy( ifirstxy:ilastxy,jfirstxy:jlastxy,km),   &
+   allocate(dyn_out%peln (ifirstxy:ilastxy,km+1,jfirstxy:jlastxy),&
+            dyn_out%omga (ifirstxy:ilastxy,km,jfirstxy:jlastxy),  &
+            dyn_out%mfx  (ifirstxy:ilastxy,jfirstxy:jlastxy,km),  &
+            dyn_out%mfy  (ifirstxy:ilastxy,jfirstxy:jlastxy,km),  &
             stat=ierr)
    if ( ierr /= 0 ) then
       write(iulog,*) sub//': ERROR: allocating components of dyn_out.  ierr=', ierr
       call endrun(sub//': ERROR: allocating components of dyn_out')
+   end if
+
+   if (dyn_state%am_fixer .or. dyn_state%am_diag) then
+
+      allocate( &
+         dyn_out%duf3s(ifirstxy:ilastxy,jfirstxy:jlastxy,km),  &
+         stat=ierr)
+      if ( ierr /= 0 ) then
+         write(iulog,*) sub//': ERROR: allocating duf3s components of dyn_out.  ierr=', ierr
+         call endrun(sub//': ERROR: allocating duf3s components of dyn_out')
+      end if
+      dyn_out%duf3s= inf
+   end if
+
+   if (dyn_state%am_diag) then
+      allocate( &
+         dyn_out%du3s (ifirstxy:ilastxy,jfirstxy:jlastxy,km),  &
+         dyn_out%dv3s (ifirstxy:ilastxy,jfirstxy:jlastxy,km),  &
+         dyn_out%dua3s(ifirstxy:ilastxy,jfirstxy:jlastxy,km),  &
+         dyn_out%dva3s(ifirstxy:ilastxy,jfirstxy:jlastxy,km),  &
+         stat=ierr)
+      if ( ierr /= 0 ) then
+         write(iulog,*) sub//': ERROR: allocating du3s components of dyn_out.  ierr=', ierr
+         call endrun(sub//': ERROR: allocating du3s components of dyn_out')
+      end if
+      dyn_out%du3s = inf
+      dyn_out%dv3s = inf
+      dyn_out%dua3s= inf
+      dyn_out%dva3s= inf
    end if
 
    dyn_out%peln = inf
@@ -546,6 +594,9 @@ subroutine dyn_init(dyn_in, dyn_out)
 
    ! Setup circulation diagnostics
    call ctem_init()
+
+   ! Diagnostics for AM
+   if (dyn_state%am_diag) call fv_diag_init()
 
    if (initial_run) then
 
@@ -590,8 +641,6 @@ subroutine dyn_init(dyn_in, dyn_out)
                                                    gridname='fv_u_stagger')
    call addfld('FV_S',     (/ 'lev' /), 'A','m/s2','Meridional wind forcing term on staggered grid', &
                                                    gridname='fv_v_stagger')
-   call addfld('UTEND',    (/ 'lev' /), 'A','m/s2','U tendency',                      gridname='fv_centers')
-   call addfld('VTEND',    (/ 'lev' /), 'A','m/s2','V tendency',                      gridname='fv_centers')
    call addfld('TTEND',    (/ 'lev' /), 'A','K/s','Total T tendency (all processes)', gridname='fv_centers')
    call addfld('LPSTEN',   horiz_only,  'A','Pa/s','Surface pressure tendency',       gridname='fv_centers')
    call addfld('VAT',      (/ 'lev' /), 'A','K/s','Vertical advective tendency of T', gridname='fv_centers')
@@ -721,6 +770,8 @@ subroutine dyn_run(ptop, ndt, te0, dyn_state, dyn_in, dyn_out, rc)
    !   WS  05.06.11:  Inserted into FVCAM_GridCompMod
    !   WS  06.03.03:  Added dyn_state as argument (for reentrancy)
    !   WS  06.06.28:  Using new version of benergy
+   !   TT  16.12.11:  AM conservation options 
+   !   TT  17.30.01:  dynamic wind increments diagnostic
    !-----------------------------------------------------------------------
 
 
@@ -729,15 +780,17 @@ subroutine dyn_run(ptop, ndt, te0, dyn_state, dyn_in, dyn_out, rc)
 #if defined( SPMD )
    use mpishorthand,   only: mpir8
    use mod_comm,       only: mp_sendirr, mp_recvirr, mp_send4d_ns, &
+                             mp_send3d, mp_recv3d, &
                              mp_recv4d_ns, mp_sendtrirr, mp_recvtrirr
 #endif
 #if ( defined OFFLINE_DYN )
-   use metdata,     only: get_met_fields, advance_met, get_us_vs, met_fix_mass, met_rlx
-   use pfixer,      only: adjust_press
+   use metdata, only: get_met_fields, advance_met, get_us_vs, met_rlx
+   use pfixer,  only: adjust_press
 #endif
+   use metdata, only: met_fix_mass
 
    use shr_reprosum_mod, only: shr_reprosum_calc
-   use angular_momentum, only: am_calc
+   use physconst,        only: physconst_calc_kappav
 
 #if defined( SPMD )
 #include "mpif.h"
@@ -784,10 +837,15 @@ subroutine dyn_run(ptop, ndt, te0, dyn_state, dyn_in, dyn_out, rc)
    real(r8), pointer :: pkzxy(:,:,:)  ! finite-volume mean of pk
 
    ! Export state only variables
-   real(r8), pointer :: pelnxy(:,:,:) ! Natural logarithm of pe
-   real(r8), pointer :: omgaxy(:,:,:) ! vertical pressure velocity (pa/sec)
-   real(r8), pointer :: mfxxy(:,:,:)  ! mass flux in X (Pa m^\2 / s)
-   real(r8), pointer :: mfyxy(:,:,:)  ! mass flux in Y (Pa m^\2 / s)
+   real(r8), pointer :: pelnxy(:,:,:)   ! Natural logarithm of pe
+   real(r8), pointer :: omgaxy(:,:,:)   ! vertical pressure velocity (pa/sec)
+   real(r8), pointer :: mfxxy(:,:,:)    ! mass flux in X (Pa m^\2 / s)
+   real(r8), pointer :: mfyxy(:,:,:)    ! mass flux in Y (Pa m^\2 / s)
+   real(r8), pointer :: duxy(:,:,:)     ! u tot. tend. from dycore, staggered grid
+   real(r8), pointer :: dvxy(:,:,:)     ! v tot. tend. from dycore, staggered grid
+   real(r8), pointer :: ucxy(:,:,:)     ! u tend. from advection only, staggd grid
+   real(r8), pointer :: vcxy(:,:,:)     ! v tend. from advection only, staggd grid
+   real(r8), pointer :: dufix_xy(:,:,:) ! u tend. from AM fixer, staggered grid
 
    ! Other pointers (for convenience)
    type (T_FVDYCORE_GRID)      , pointer :: GRID      ! For convenience
@@ -841,9 +899,6 @@ subroutine dyn_run(ptop, ndt, te0, dyn_state, dyn_in, dyn_out, rc)
                                    ! recommendation: jord=4
    integer :: kord      ! parameter controlling monotonicity in mapping
                                    ! recommendation: kord=4
-   integer :: te_method ! parameter controlling total energy mapping
-                                   ! recommendation: te_method=0 (PPM)
-                                   ! GEOS5 uses te_method=1 (Cubic Interp.)
    integer :: icd       ! X algorithm order on C-grid
    integer :: jcd       ! Y algorithm order on C-grid
    integer :: ng_d      ! Ghosting width on D-grid
@@ -954,10 +1009,24 @@ subroutine dyn_run(ptop, ndt, te0, dyn_state, dyn_in, dyn_out, rc)
    real(r8) :: pexy_om(dyn_state%grid%ifirstxy:dyn_state%grid%ilastxy,dyn_state%grid%km+1, &
                        dyn_state%grid%jfirstxy:dyn_state%grid%jlastxy)
 
+   ! Non-constant air properties for high top models (waccmx).
+   real(r8) :: cap3vi(dyn_state%grid%ifirstxy:dyn_state%grid%ilastxy,&
+                      dyn_state%grid%jfirstxy:dyn_state%grid%jlastxy,dyn_state%grid%km+1)
+   real(r8) :: cp3vc (dyn_state%grid%im,dyn_state%grid%jfirst:dyn_state%grid%jlast,&
+                      dyn_state%grid%kfirst:dyn_state%grid%klast)         !C_p on yz
+   real(r8) :: cap3vc(dyn_state%grid%im,dyn_state%grid%jfirst:dyn_state%grid%jlast,&
+                      dyn_state%grid%kfirst:dyn_state%grid%klast)        !cappa on yz
+
+   real(r8), dimension(dyn_state%grid%ifirstxy:dyn_state%grid%ilastxy,&
+                       dyn_state%grid%jfirstxy:dyn_state%grid%jlastxy,dyn_state%grid%km) :: &
+             cp3v,cap3v
+   logical :: high_alt
+
    ! angular momentum (AM) conservation
    logical  :: am_correction         ! apply AM correction?
    logical  :: am_fixer              ! apply AM fixer?
    logical  :: am_fix_lbl            ! apply fixer separately on each shallow-water layer?
+   logical  :: am_fix_taper=.false.  ! def. no tapering; modified if global fixer applied or high_order_top=.false.
    real(r8) :: tmpsum(1,2)
    real(r8) :: tmpresult(2)
    real(r8) :: am0, am1, me0
@@ -967,12 +1036,37 @@ subroutine dyn_run(ptop, ndt, te0, dyn_state, dyn_in, dyn_out, rc)
    real(r8) :: dons(dyn_state%grid%km), &                  ! sums over j
                dods(dyn_state%grid%km)
 
-   ! AM diagnostic check 
-   logical  :: am_diag                  ! calc angular momentum diagnostic, write to logfile
-   logical  :: not_first_call = .false. ! initialise logic to skip check on first time-step 
+   real(r8), allocatable :: zpkck(:,:)
+   real(r8) :: avgpk(dyn_state%grid%km)
+   real(r8) :: taper(dyn_state%grid%km)
+   real(r8) :: ptapk, xdlt2
+   real(r8), parameter :: ptap =9000._r8
+   real(r8), parameter :: dptap=1000._r8
+   real(r8), parameter :: tiny=.1e-10_r8
+
+   ! AM diagnostics
+   logical  :: am_diag                  ! enable angular momentum diagnostic output
+   logical  :: am_fix_out
+   integer  :: kmtp                     ! range of levels (1:kmtp) where order is reduced
    real(r8) :: ame(dyn_state%grid%jm)
    real(r8) :: zpe(dyn_state%grid%jfirstxy:dyn_state%grid%jlastxy)
+   real(r8) :: tmp 
+   real(r8) :: du_fix_g 
+   real(r8) :: du_fix(dyn_state%grid%km)
+   real(r8) :: du_fix_s(dyn_state%grid%km)
+   real(r8), allocatable :: du_fix_i(:,:,:)
+   real(r8), allocatable :: du_k    (:,:)
+   real(r8), allocatable :: du_north(:,:)
+   real(r8), allocatable :: uc_s(:,:,:),vc_s(:,:,:)  ! workspace (accumulated uc,vc)
+   real(r8), allocatable :: uc_i(:,:,:),vc_i(:,:,:)  ! workspace (transposed uc_s,vc_s)
+
+
+   ! NOTE -- model behaviour with high_order_top=true is still under validation and may require
+   !         some other form of enhanced damping in the top layer
+   logical, parameter :: high_order_top=.false.
+
    !--------------------------------------------------------------------------------------
+   kmtp=dyn_state%grid%km/8
 
    rc       =  DYN_RUN_FAILURE      ! Set initially to fail
 
@@ -992,6 +1086,11 @@ subroutine dyn_run(ptop, ndt, te0, dyn_state, dyn_in, dyn_out, rc)
    omgaxy   => dyn_out%omga
    mfxxy    => dyn_out%mfx
    mfyxy    => dyn_out%mfy
+   duxy     => dyn_out%du3s
+   dvxy     => dyn_out%dv3s
+   ucxy     => dyn_out%dua3s
+   vcxy     => dyn_out%dva3s
+   dufix_xy => dyn_out%duf3s
 
    grid => dyn_state%grid    ! For convenience
    constants => DYN_STATE%CONSTANTS
@@ -1007,9 +1106,9 @@ subroutine dyn_run(ptop, ndt, te0, dyn_state, dyn_in, dyn_out, rc)
    div24del2flag = dyn_state%div24del2flag
    del2coef      = dyn_state%del2coef
    filtcw        = dyn_state%filtcw
+   high_alt      = grid%high_alt
 
    consv      = dyn_state%consv
-   te_method  = dyn_state%te_method
    am_correction = dyn_state%am_correction
    am_fixer   = dyn_state%am_fixer
    am_fix_lbl = dyn_state%am_fix_lbl
@@ -1074,6 +1173,13 @@ subroutine dyn_run(ptop, ndt, te0, dyn_state, dyn_in, dyn_out, rc)
    ! ntg0 is upper bound on number of needed tags beyond tracer tags for ct_overlap and trac_decomp
    ntg0 = 10
 
+   ! set am_fix tapering parameters
+   if (am_fixer.and..not.am_fix_lbl) then
+      am_fix_taper = .true.   ! always apply tapering with global fixer
+      ptapk        = ptap**constants%cappa
+      xdlt2        = 2._r8/(log((ptap+.5_r8*dptap)/(ptap-.5_r8*dptap))*constants%cappa)
+   end if
+
 #if ( defined OFFLINE_DYN )
 
    ! advance the meteorology data
@@ -1083,9 +1189,19 @@ subroutine dyn_run(ptop, ndt, te0, dyn_state, dyn_in, dyn_out, rc)
    call get_us_vs( grid, u, v )
 #endif
 
+   if (high_alt) then
+      call physconst_calc_kappav(ifirstxy,ilastxy,jfirstxy,jlastxy,1,km, grid%ntotq, tracer, cap3v, cpv=cp3v )
+   else
+      cp3v  = cp
+      cp3vc = cp
+      cap3v = cappa
+      cap3vi= cappa
+      cap3vc= cappa
+   endif
+
    if ( km > 1 ) then         ! not shallow water equations
 
-      if (consv .or. (am_diag .and. not_first_call)) then
+      if (consv) then
 
          if (grid%iam .lt. grid%npes_xy) then
 
@@ -1123,22 +1239,6 @@ subroutine dyn_run(ptop, ndt, te0, dyn_state, dyn_in, dyn_out, rc)
 
                call t_stopf('benergy')
             end if
-
-            if (am_diag .and. not_first_call) then
-               ! add appropriate linear fraction of source term before update
-               nsplit = (n2+nv   -1) / nv
-               nsplit = (ns+nsplit*nv-1) / (nsplit*nv)
-               dt     = ndt / real(nsplit*n2*nv,r8)
-               dt     = -0.5_r8*(ndt-dt) ! '-' because this (am0) will be subtracted
-
-               call t_startf ('am_calc')
-
-               call am_calc(constants, grid, dt, uxy, delpxy, &
-                            pexy, pelnxy, phisxy, zvir, cp,   &
-                            rair, ame, am0)
-
-               call t_stopf('am_calc')
-            endif
 
          end if
       end if
@@ -1233,6 +1333,25 @@ subroutine dyn_run(ptop, ndt, te0, dyn_state, dyn_in, dyn_out, rc)
    allocate (ctstats(MPI_STATUS_SIZE,ntotq+ntg0,trac_decomp))
 #endif
 
+   ! Allocate the variables used in tapering
+   if (am_fix_taper) then
+      allocate(zpkck(dyn_state%grid%jm,dyn_state%grid%km))
+   end if
+
+   ! Allocate fields required for dycore diagnostic
+   if (am_fixer .or. am_diag) then
+      allocate(du_fix_i(ifirstxy:ilastxy,jfirstxy:jlastxy,km))
+      allocate(du_k    (ifirstxy:ilastxy,jfirstxy:jlastxy+1))
+      allocate(du_north(ifirstxy:ilastxy,km))
+      allocate(uc_s(im,jfirst-ng_d:jlast+ng_s,kfirst:klast) )
+      allocate(vc_s(im,jfirst-ng_s:jlast+ng_d,kfirst:klast) )
+      allocate(uc_i(ifirstxy:ilastxy,jfirstxy:jlastxy,km))
+      allocate(vc_i(ifirstxy:ilastxy,jfirstxy:jlastxy,km))
+      du_fix_i(:,:,:) = 0._r8
+      uc_s (:,:,:)  = 0._r8
+      vc_s (:,:,:)  = 0._r8
+   end if
+
    ! Compute i.d.'s of remote processes for ct_overlap or trac_decomp
    naux = 0
    if ((ct_overlap .gt. 0 .and. kaux .lt. 2) .or.      &
@@ -1317,8 +1436,34 @@ subroutine dyn_run(ptop, ndt, te0, dyn_state, dyn_in, dyn_out, rc)
    ! On the last iteration, convt_local is set to convt
    convt_local = .false.
 
-   ! Begin vertical re-mapping sub-cycle loop
+   ! initialise global non-conservation integrals
+   am1=0._r8
+   me0=1._r8
 
+   if (am_fixer.or.am_diag) then
+      du_fix_g        = 0._r8
+      du_fix(:)       = 0._r8
+      du_fix_s(:)     = 0._r8
+      dufix_xy(:,:,:) = 0._r8
+   end if
+
+   if (am_diag) then
+      ucxy = 0._r8
+      vcxy = 0._r8
+
+!$omp parallel do private(i,j,k)
+      ! store old winds to get total increments
+      do k = 1, km
+         do j = jfirstxy, jlastxy
+            do i = ifirstxy, ilastxy
+               duxy(i,j,k)=uxy(i,j,k)
+               dvxy(i,j,k)=vxy(i,j,k)
+            enddo
+         enddo
+      enddo
+   end if
+
+   ! Begin vertical re-mapping sub-cycle loop
    do iv = 1, nv
 
       if (iv == nv) convt_local = convt
@@ -1439,6 +1584,20 @@ subroutine dyn_run(ptop, ndt, te0, dyn_state, dyn_in, dyn_out, rc)
             call mp_recvirr( grid%commxy, grid%ptxy_to_pt%SendDesc,                      &
                              grid%ptxy_to_pt%RecvDesc, ptxy, pt,                         &
                              modc=grid%modc_dynrun )
+            if (high_alt) then
+               call mp_sendirr( grid%commxy, grid%ijk_xy_to_yz%SendDesc,                    &
+                                grid%ijk_xy_to_yz%RecvDesc, cp3v, cp3vc,                    &
+                                modc=grid%modc_dynrun )
+               call mp_recvirr( grid%commxy, grid%ijk_xy_to_yz%SendDesc,                    &
+                                grid%ijk_xy_to_yz%RecvDesc, cp3v, cp3vc,                    &
+                                modc=grid%modc_dynrun )
+               call mp_sendirr( grid%commxy, grid%ijk_xy_to_yz%SendDesc,                    &
+                                grid%ijk_xy_to_yz%RecvDesc, cap3v, cap3vc,                  &
+                                modc=grid%modc_dynrun )
+               call mp_recvirr( grid%commxy, grid%ijk_xy_to_yz%SendDesc,                    &
+                                grid%ijk_xy_to_yz%RecvDesc, cap3v, cap3vc,                  &
+                                modc=grid%modc_dynrun )
+            endif
 
             if (modc_tracers .eq. 0) then
                do mq = 1, ntotq
@@ -1517,6 +1676,17 @@ subroutine dyn_run(ptop, ndt, te0, dyn_state, dyn_in, dyn_out, rc)
                   end do
                end do
             end do
+            if (high_alt) then
+!$omp parallel do private(i,j,k)
+               do k = 1, km
+                  do j = jfirst, jlast
+                     do i = 1, im
+                        cp3vc(i,j,k) = cp3v(i,j,k)
+                        cap3vc(i,j,k) = cap3v(i,j,k)
+                     end do
+                  end do
+               end do
+            endif
 
             do mq = 1, ntotq
 
@@ -1554,6 +1724,12 @@ subroutine dyn_run(ptop, ndt, te0, dyn_state, dyn_in, dyn_out, rc)
       call t_stopf  ('xy_to_yz')
 
       omgaxy(:,:,:) = 0._r8
+
+      if (am_fixer .or. am_diag) then 
+         du_fix_s (:)  = 0._r8
+         uc_s (:,:,:)  = 0._r8
+         vc_s (:,:,:)  = 0._r8
+      endif
 
       ! Begin tracer sub-cycle loop
       do n = 1, n2
@@ -1654,10 +1830,12 @@ subroutine dyn_run(ptop, ndt, te0, dyn_state, dyn_in, dyn_out, rc)
             call t_barrierf('sync_cd_core', grid%commdyn)
             call t_startf ('cd_core')
 
-            if (grid%iam .lt. grid%npes_xy) then
+            if (grid%iam .lt. grid%npes_yz) then
+               am_fix_out = am_fixer .or. am_diag
                call cd_core(grid,   nx,     u,   v,   pt,                    &
                             delp,   pe,     pk,  nsplit,  dt,                &
-                            ptop,   umax,   pi, ae,  cp,  cappa,             &
+                            ptop,   umax,   pi, ae,                          &
+                            cp3vc,  cap3vc, cp3v, cap3v,                     &
                             icd,    jcd, iord, jord,   ipe,                  &
                             div24del2flag, del2coef,                         &
                             om,     phis,     cx  ,  cy, mfx, mfy,           &
@@ -1668,7 +1846,8 @@ subroutine dyn_run(ptop, ndt, te0, dyn_state, dyn_in, dyn_out, rc)
                             naux, ncx, ncy, nmfx, nmfy, iremotea,            &
                             cxtaga, cytaga, mfxtaga, mfytaga, cdcreqs(1,1),  &
                             cdcreqs(1,2), cdcreqs(1,3), cdcreqs(1,4),        &
-                            am_correction, am_fixer, dod, don)
+                            kmtp, &
+                            am_correction, am_fix_out, dod, don ,high_order_top)
 
                ctreqs(2,:) = cdcreqs(:,1)
                ctreqs(3,:) = cdcreqs(:,2)
@@ -1679,56 +1858,124 @@ subroutine dyn_run(ptop, ndt, te0, dyn_state, dyn_in, dyn_out, rc)
             call t_stopf  ('cd_core')
 
             ! AM fixer
-            if (am_fixer) then
+            if (am_fixer.or.am_diag) then
 
                call t_barrierf('sync_lfix', grid%commdyn)
                call t_startf ('lfix')
                if (grid%iam .lt. grid%npes_yz) then
 
-                  ! level-by-level fix
+                  ! option for pressure tapering on AM fixer
+                  if (am_fix_taper) then
+                     zpkck(:,:)=0._r8
+!$omp parallel do private(j, k)
+                     do k=kfirst,klast
+                        do j = jfirst, jlast
+                           zpkck(j,k)=0.25_r8*sum(pkc(:,j,k))*grid%cose(j)
+                        enddo
+                     enddo
+                     do k=kfirst,klast
+                        call par_vecsum(jm, jfirst, jlast, zpkck(1:jm,k), me0, grid%comm_y, grid%npr_y)
+                        avgpk(k)=me0/im/sum(grid%cose)
+                        taper(k)=.5_r8*(1._r8+(1._r8-(ptapk/avgpk(k))**xdlt2)/(1._r8+(ptapk/avgpk(k))**xdlt2))
+                     enddo
+                  else 
+                     do k=kfirst,klast
+                        taper(k)=1._r8
+                     enddo
+                  endif
+
+                  ! always exclude fixer at top levels if top is not high order
+                  if (.not.high_order_top) then 
+                     taper(1:kmtp)=0._r8 
+                  endif
+
+                  do k = kfirst, klast
+                     call par_vecsum(jm, jfirst, jlast, don(1:jm,k), am1, grid%comm_y, grid%npr_y)
+                     dons(k) = am1
+                  end do
+
+                  do k = kfirst, klast
+                     call par_vecsum(jm, jfirst, jlast, dod(1:jm,k), me0, grid%comm_y, grid%npr_y)
+                     dods(k) = me0
+                  end do
+
                   if (am_fix_lbl) then 
-
-                     do k = kfirst, klast
-                        call par_vecsum(jm, jfirst, jlast, don(1:jm,k), am1, grid%comm_y, grid%npr_y)
-                        dons(k) = am1
-                     end do
-
-                     do k = kfirst, klast
-                        call par_vecsum(jm, jfirst, jlast, dod(1:jm,k), me0, grid%comm_y, grid%npr_y)
-                        dods(k) = me0
-                     end do
-                     
 !$omp parallel do private(i, j, k)
                      do k = kfirst, klast
                         do j = jfirst, jlast
                            do i = 1, im
-                              u(i,j,k) = u(i,j,k) - dons(k)/dods(k)*grid%cose(j)
+                              u(i,j,k) = u(i,j,k) - dons(k)/dods(k)*grid%cose(j) * taper(k)
                            end do
                         end do
                      end do
+                  endif
 
-                  else     ! global fix
+                  ! diagnose du_fix
+                  if (am_fix_lbl) then ! output applied increment (tapered)
+!$omp parallel do private(k)
+                     do k = kfirst, klast
+                        du_fix_s(k)=du_fix_s(k)-dons(k)/dods(k)*taper(k)
+                     end do
+                  elseif(am_diag) then ! output diagnosed increment (not tapered)
+!$omp parallel do private(k)
+                     do k = kfirst, klast
+                        du_fix_s(k)=du_fix_s(k)-dons(k)/dods(k)
+                     end do
+                  endif
 
-                     tmpsum(1,1) = SUM(don)
-                     tmpsum(1,2) = SUM(dod)
-                     call shr_reprosum_calc(tmpsum, tmpresult, 1, 1, 2, commid=grid%commyz)
-                     am1 = tmpresult(1)
-                     me0 = tmpresult(2)
+!$omp parallel do private(j, k)
+                  do k=kfirst,klast
+                     do j = jfirst, jlast
+                        don(j,k)=don(j,k)*taper(k)
+                        dod(j,k)=dod(j,k)*taper(k)
+                     enddo
+                  enddo
+                  tmpsum(1,1) = SUM(don)
+                  tmpsum(1,2) = SUM(dod)
+                  call shr_reprosum_calc(tmpsum, tmpresult, 1, 1, 2, commid=grid%commyz)
+                  am1 = tmpresult(1)
+                  me0 = max(tmpresult(2),tiny)
+
+                  if (am_fixer.and.(.not.am_fix_lbl)) then
 !$omp parallel do private(i, j, k)
                      do k = kfirst, klast
                         do j = jfirst, jlast
                            do i = 1, im
-                              u(i,j,k) = u(i,j,k) - am1/me0*grid%cose(j)
+                              u(i,j,k) = u(i,j,k) - am1/me0*grid%cose(j) *taper(k)
                            end do
                         end do
                      end do
 
-                  end if  ! (am_fix_lbl)
+!$omp parallel do private(k)
+                     do k = kfirst, klast
+                        du_fix_s(k)=du_fix_s(k)-am1/me0*taper(k) 
+                     end do
+                  end if  ! (am_fix_lbl) 
 
+                  du_fix_g =du_fix_g -am1/me0
+                  if (masterproc) then 
+                     if ((it == nsplit) .and. (n == n2) .and. (iv == nv)) then
+                        write(iulog,'(1x,a21,1x,1x,e25.17)') "AM GLOBAL FIXER: ", du_fix_g 
+                     endif
+                  endif
+                  ! the following call is blocking, but probably cheaper than 3D transposition for du_fix
+                  if ((it == nsplit) .and. (n == n2)) then 
+                     call par_vecsum(km, kfirst, klast, du_fix_s, tmp, grid%comm_z, grid%npr_z, return_sum_in=.true.) 
+                  endif
                end if     ! (grid%iam .lt. grid%npes_yz)
                call t_stopf  ('lfix')
 
-            end if    ! (am_fixer)
+!$omp parallel do private(i,j,k)
+               do k=kfirst,klast
+                  do j = jfirst, jlast
+                     do i=1,im
+                        uc_s(i,j,k)=uc_s(i,j,k)+uc(i,j,k)
+                        vc_s(i,j,k)=vc_s(i,j,k)+vc(i,j,k)
+                     enddo
+                  enddo
+               enddo
+
+            end if    ! (am_fixer.or.am_diag)
 
             if ((it == nsplit) .and. (n == n2) .and. (iv == nv)) then
 !$omp  parallel do     &
@@ -1772,12 +2019,24 @@ subroutine dyn_run(ptop, ndt, te0, dyn_state, dyn_in, dyn_out, rc)
                ! adjust mass fluxes and edge pressures to be consistent with observed PS 
                call adjust_press(grid, ps_mod, ps_obs, mfx, mfy, pexy)
 
+               if (high_alt) then
+!$omp parallel do private(i,j,k)
+                  do k=2,km
+                     do j=jfirstxy,jlastxy
+                        do i=ifirstxy,ilastxy
+                           cap3vi(i,j,k) = 0.5_r8*(cap3v(i,j,k-1)+cap3v(i,j,k))
+                        enddo
+                     enddo
+                  enddo
+                  cap3vi(:,:,1) = 1.5_r8 * cap3v(:,:,1) - 0.5_r8 * cap3v(:,:,2)
+                  cap3vi(:,:,km+1) = 1.5_r8 * cap3v(:,:,km) - 0.5_r8 * cap3v(:,:,km-1)
+              endif
 !$omp parallel do private(i,j,k)
                ! make pkxy consistent with the adjusted pexy
                do i = ifirstxy, ilastxy
                   do j = jfirstxy, jlastxy
                      do k = 1, km+1
-                        pkxy(i,j,k) = pexy(i,k,j)**cappa
+                        pkxy(i,j,k) = pexy(i,k,j)**cap3vi(i,j,k)
                      end do
                   end do
                end do
@@ -1859,7 +2118,7 @@ subroutine dyn_run(ptop, ndt, te0, dyn_state, dyn_in, dyn_out, rc)
                   do k = kfirst, klast
                      do j = jfirst, jlast
                         do i = 1, im
-                           mfxxy(i,j,k) = mfy(i,j,k)*(grid%dl*ae*grid%cosp(j))*(ae*grid%dp)/(ndt*grid%cose(j)) ! Pa m^2 / s
+                           mfxxy(i,j,k) = mfx(i,j,k)*(grid%dl*ae*grid%cosp(j))*(ae*grid%dp)/(ndt*grid%cose(j)) ! Pa m^2 / s
                            mfyxy(i,j,k) = mfy(i,j,k)*(grid%dl*ae*grid%cosp(j))*(ae*grid%dp)/(ndt*grid%cose(j)) ! Pa m^2 / s
                         end do
                      end do
@@ -2018,7 +2277,19 @@ subroutine dyn_run(ptop, ndt, te0, dyn_state, dyn_in, dyn_out, rc)
             c_dotrac = ct_overlap .gt. 0 .and.    &                       
                       ((n .lt. n2 .and. kaux .eq. 1) .or. (n .eq. n2 .and. kaux .eq. 0))
             t_dotrac = ct_overlap .eq. 0 .and. kaux .lt. trac_decomp
-
+            high_alt1: if (high_alt) then
+               !
+               ! phl: overwrite last tracer with kappa
+               !
+               !$omp parallel do private(i,j,k)
+               do k=grid%kfirst,grid%klast
+                  do j=grid%jfirst,grid%jlast
+                     do i=1,grid%im
+                        q_internal(i,j,k,ntotq) = cap3vc(i,j,k)
+                     end do
+                  end do
+               end do
+            endif high_alt1
             if (c_dotrac .or. t_dotrac) then
                call trac2d( grid, dp0(:,jfirst:jlast,:),    q_internal,         &  
                            cx,    cy,     mfx,    mfy,    iord,   jord,        &
@@ -2067,11 +2338,9 @@ subroutine dyn_run(ptop, ndt, te0, dyn_state, dyn_in, dyn_out, rc)
 
             call t_stopf('trac2d')
 
-#if ( defined OFFLINE_DYN )
-            if (met_fix_mass) then
+            trans_pexy: if (met_fix_mass .or. high_alt) then
 
                if (grid%twod_decomp .eq. 1) then
-
 #if defined( SPMD )
                   call mp_sendirr( grid%commxy, grid%pexy_to_pe%SendDesc,                    &
                                   grid%pexy_to_pe%RecvDesc, pexy, pe,                       &
@@ -2080,7 +2349,6 @@ subroutine dyn_run(ptop, ndt, te0, dyn_state, dyn_in, dyn_out, rc)
                                   grid%pexy_to_pe%RecvDesc, pexy, pe,                       &
                                   modc=grid%modc_dynrun )
 #endif
-
                else
 !$omp parallel do private(i,j,k)
                   do j = jfirst, jlast
@@ -2090,18 +2358,42 @@ subroutine dyn_run(ptop, ndt, te0, dyn_state, dyn_in, dyn_out, rc)
                         end do
                      end do
                   end do
-
                end if
 
+#if ( defined OFFLINE_DYN )
                do j = jfirst,jlast
-
                   if (klast .eq. km) ps_mod(:,j) = pe(:,km+1,j)
-
                end do
-
-            end if
 #endif
+            end if trans_pexy
 
+            high_alt2: if (high_alt) then
+               
+               !+hi-waccm: perform potential temperature correction:
+               !           1. Update kappa according to new major species
+               !           2. calculate the difference between kappa from step 1 and kappa from advection
+               !           3. calculate ln(p0/p) from the most recent p
+               !           4. update pt, then transpose to ptxy.
+
+               ! Since rairv is not defined on yz decomp, can retrieve it using cp3vc and cap3vc when needed
+               ! Also will check if mbarv is needed somewhere in dynamics.
+               ! These updates of cp3vc, cap3vc etc are currently not passed back to physics.
+               ! This update is put here, after the transpose of pexy to pe, since we need pe (on yz decomp).
+
+               call physconst_calc_kappav(1,im,jfirst,jlast,kfirst,klast, grid%ntotq, q_internal, cap3vc )
+
+!$omp parallel do private(i,j,k)
+               do k = kfirst,klast
+                  do j = jfirst,jlast
+                     do i = 1,im
+                        pt(i,j,k) = pt(i,j,k) * (1._r8 - &
+                             .5_r8*(log(pe(i,k,j))+log(pe(i,k+1,j))) * &
+                             (cap3vc(i,j,k)-q_internal(i,j,k,ntotq)))
+                     enddo
+                  enddo
+               enddo
+
+            endif high_alt2
          end if  !          if (ntotq .ne. 0) then
 
       end do !   do n=1, n2 - tracer sub-cycle loop
@@ -2157,6 +2449,26 @@ subroutine dyn_run(ptop, ndt, te0, dyn_state, dyn_in, dyn_out, rc)
                              grid%v_to_vxy%RecvDesc, v, vxy,                            &
                              modc=grid%modc_dynrun )
 
+
+            if (am_fixer.or.am_diag) then
+
+               ! Transpose uc_s
+               call mp_sendirr( grid%commxy, grid%u_to_uxy%SendDesc,                       &
+                                grid%u_to_uxy%RecvDesc, uc_s, uc_i,                        &
+                                modc=grid%modc_dynrun )
+               call mp_recvirr( grid%commxy, grid%u_to_uxy%SendDesc,                       &
+                                grid%u_to_uxy%RecvDesc, uc_s, uc_i,                        &
+                                modc=grid%modc_dynrun )
+
+               ! Transpose vc_s
+               call mp_sendirr( grid%commxy, grid%v_to_vxy%SendDesc,                       &
+                                grid%v_to_vxy%RecvDesc, vc_s, vc_i,                        &
+                                modc=grid%modc_dynrun )
+               call mp_recvirr( grid%commxy, grid%v_to_vxy%SendDesc,                       &
+                                grid%v_to_vxy%RecvDesc, vc_s, vc_i,                        &
+                                modc=grid%modc_dynrun )
+            end if
+
             call t_stopf  ('yz_to_xy_psuv')
 
             call t_startf ('yz_to_xy_q')
@@ -2194,6 +2506,20 @@ subroutine dyn_run(ptop, ndt, te0, dyn_state, dyn_in, dyn_out, rc)
             end if
 
             call t_stopf  ('yz_to_xy_q')
+
+            if (high_alt) then
+               ! Transpose pt (because pt correction is done after cd_core)
+
+               call t_startf ('yz_to_xy_pt')
+               call mp_sendirr( grid%commxy, grid%pt_to_ptxy%SendDesc,                    &
+                    grid%pt_to_ptxy%RecvDesc, pt, ptxy,                 &
+                    modc=grid%modc_dynrun )
+               call mp_recvirr( grid%commxy, grid%pt_to_ptxy%SendDesc,                    &
+                    grid%pt_to_ptxy%RecvDesc, pt, ptxy,                 &
+                    modc=grid%modc_dynrun )
+               call t_stopf ('yz_to_xy_pt')
+            endif
+
 #endif
 
          else
@@ -2215,6 +2541,29 @@ subroutine dyn_run(ptop, ndt, te0, dyn_state, dyn_in, dyn_out, rc)
                   end do
                end do
             end do
+
+            if (am_fixer.or.am_diag) then
+!$omp parallel do private(i,j,k)
+               do k = kfirst, klast
+                  do j = jfirst, jlast
+                     do i = 1, im
+                        uc_i(i,j,k)= uc_s(i,j,k)
+                        vc_i(i,j,k)= vc_s(i,j,k)
+                     end do
+                  end do
+               end do
+            end if
+
+            if (high_alt) then
+!$omp parallel do private(i,j,k)
+               do k = kfirst, klast
+                  do j = jfirst, jlast
+                     do i = 1, im
+                        ptxy(i,j,k) = pt(i,j,k)
+                     end do
+                  end do
+               end do
+            end if
 
             call t_stopf  ('yz_to_xy_psuv')
 
@@ -2253,12 +2602,37 @@ subroutine dyn_run(ptop, ndt, te0, dyn_state, dyn_in, dyn_out, rc)
          call t_startf ('te_map')
 
          if (grid%iam .lt. grid%npes_xy) then
+
             call te_map(grid,     consv,   convt_local, psxy, omgaxy,       &
                         pexy,     delpxy,  pkzxy,  pkxy,   ndt,             &
                         nx,       uxy,     vxy,    ptxy,   dyn_out%tracer,  & 
-                        phisxy,   cp,      cappa,  kord,   pelnxy,          &
+                        phisxy,   cp3v,    cap3v,  kord,   pelnxy,          &
                         te0,      tempxy,  dp0xy,  mfxxy,  mfyxy,           &
-                        te_method, am_correction)
+                        uc_i,     vc_i,  du_fix_s, du_fix_i,                &
+                        am_correction, (am_fixer.or.am_diag) ) 
+
+            if (am_diag) then
+!$omp parallel do private(i,j,k)
+                do j=jfirstxy,jlastxy
+                  do k=1,km
+                     do i=ifirstxy,ilastxy
+                        ucxy(i,j,k)=ucxy(i,j,k)+uc_i(i,j,k)
+                        vcxy(i,j,k)=vcxy(i,j,k)+vc_i(i,j,k)
+                     enddo
+                  enddo
+               enddo
+            end if
+
+            if (am_fixer .or. am_diag) then
+!$omp parallel do private(i,j,k)
+               do j=jfirstxy,jlastxy
+                  do k=1,km
+                     do i=ifirstxy,ilastxy
+                        dufix_xy(i,j,k)=dufix_xy(i,j,k)+du_fix_i(i,j,k)*grid%cose(j)
+                     enddo
+                  enddo
+               enddo
+            endif
 
             if ( .not. convt_local ) then
 !$omp parallel do private(i,j,k)
@@ -2283,37 +2657,18 @@ subroutine dyn_run(ptop, ndt, te0, dyn_state, dyn_in, dyn_out, rc)
 
    end do  !    do iv = 1, nv - vertical re-mapping sub-cycle loop
 
-   ! second call to bam for AM conservation diagnostic
-   if ( km > 1 ) then    ! not shallow water equations
-
-      if (am_diag .and. not_first_call) then
-
-         if (grid%iam .lt. grid%npes_xy) then
-
-            dt = 0.5_r8*(ndt+dt) ! add rest of source term from updated quantities
-            call am_calc(constants, grid, dt, uxy, delpxy, &
-                         pexy, pelnxy, phisxy, zvir, cp,   &
-                         rair, ame, am1)
-
-            call par_xsum(grid, psxy - grid%ptop, jlastxy-jfirstxy+1, zpe ) !axial MoI 
-
-            ame(:) = 0._r8
-            do j = max(2,jfirstxy), min(jm-1,jlastxy)
-               ame(j) = zpe(j)*0.5_r8*(grid%cose(j)**3 + grid%cose(j+1)**3) ! solid-body
+   ! get total wind increments from dynamics timestep
+   if (am_diag) then
+!$omp parallel do private(i,j,k)
+      do k = 1, km
+         do j = jfirstxy, jlastxy
+            do i = ifirstxy, ilastxy
+               duxy(i,j,k) = uxy(i,j,k) - duxy(i,j,k)
+               dvxy(i,j,k) = vxy(i,j,k) - dvxy(i,j,k)
             enddo
-
-            call par_vecsum(jm, jfirstxy, jlastxy, ame, me0, grid%commxy_y, grid%nprxy_y)
-
-            if (masterproc) then
-               write(iulog,'(1x,a21,1x,4(1x,e25.17))') "AM: Li, Lf, MoI, dOma", am0, am1, me0, &
-                                                       (am1-am0)/me0
-            endif
-
-         endif
-      else
-         not_first_call = .true. ! call AM conservation diagnostic after first time-step
-      endif
-   endif
+         enddo
+      enddo
+   end if
 
    call t_startf ('dyn_run_dealloc')
 
@@ -2354,6 +2709,19 @@ subroutine dyn_run(ptop, ndt, te0, dyn_state, dyn_in, dyn_out, rc)
    deallocate( u_tmp )
    deallocate( v_tmp )
 #endif
+   
+   if (am_fix_taper) then
+      deallocate(zpkck)
+   end if
+   if (am_fixer.or.am_diag) then
+      deallocate(du_fix_i)
+      deallocate(du_k)
+      deallocate(du_north)
+      deallocate(uc_s)
+      deallocate(vc_s)
+      deallocate(uc_i)
+      deallocate(vc_i)
+   end if
 
    call t_stopf  ('dyn_run_dealloc')
 
@@ -2400,7 +2768,7 @@ subroutine dyn_final(restart_file, dyn_state, dyn_in, dyn_out)
       if ( associated(dyn_in%pkz) )  deallocate( dyn_in%pkz )
       if ( associated(dyn_in%delp) ) deallocate( dyn_in%delp )
       if ( associated(dyn_in%tracer) ) deallocate( dyn_in%tracer)
-      
+
       if ( associated(dyn_out%ps) )   nullify( dyn_out%ps )
       if ( associated(dyn_out%u3s) )  nullify( dyn_out%u3s )
       if ( associated(dyn_out%v3s) )  nullify( dyn_out%v3s )
@@ -2410,7 +2778,7 @@ subroutine dyn_final(restart_file, dyn_state, dyn_in, dyn_out)
       if ( associated(dyn_out%pk) )   nullify( dyn_out%pk )
       if ( associated(dyn_out%pkz) )  nullify( dyn_out%pkz )
       if ( associated(dyn_out%delp) ) nullify( dyn_out%delp )
-      if ( associated(dyn_out%tracer) )   nullify( dyn_out%tracer )
+      if ( associated(dyn_out%tracer) ) nullify( dyn_out%tracer )
 
       if ( associated(dyn_out%omga) ) deallocate( dyn_out%omga )
       if ( associated(dyn_out%peln) ) deallocate( dyn_out%peln )
@@ -2431,6 +2799,7 @@ subroutine read_inidat(dyn_in)
   use physconst,       only: pi
   use dyn_grid,        only: get_horiz_grid_dim_d
   use commap,          only: clat, clon, clat_staggered, londeg_st
+  use constituents,    only: pcnst
 
   ! Read initial dataset
 
@@ -2539,7 +2908,6 @@ subroutine read_inidat(dyn_in)
     !-----------
 
     fieldname = 'US'
-    dyn_in%u3s = fillvalue
     call infld(fieldname, fh_ini, 'lon', 'slat', 'lev',  ifirstxy, ilastxy, jfirstxy, jlastxy, &
          1, km, dyn_in%u3s, readvar, gridname='fv_u_stagger')
     if (.not. readvar) call endrun(sub//': ERROR: US not found')
@@ -2555,7 +2923,7 @@ subroutine read_inidat(dyn_in)
     if (.not. readvar) call endrun(sub//': ERROR: T not found')
 
     ! Constituents (read and process one at a time)
-    do m = 1, ntotq
+    do m = 1, pcnst
       readvar   = .false.
       fieldname = cnst_name(m)
       if (cnst_read_iv(m)) then
@@ -2564,6 +2932,11 @@ subroutine read_inidat(dyn_in)
       end if
       call process_inidat(fh_ini, grid, dyn_in, 'CONSTS', m_cnst=m)
     end do
+  end if
+
+  ! Set u3s(:,1,:) to zero as it is used in interpolation routines
+  if (jfirstxy == 1) then
+    dyn_in%u3s(ifirstxy:ilastxy,jfirstxy,1:km) = 0.0_r8
   end if
 
   ! These always happen
@@ -2778,6 +3151,5 @@ subroutine process_inidat(fh_ini, grid, dyn_in, fieldname, m_cnst)
 
 end subroutine process_inidat
 
-!=========================================================================================
 
 end module dyn_comp

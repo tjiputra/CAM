@@ -51,7 +51,7 @@ contains
 
     use constituents, only : cnst_get_ind
     
-    use physics_buffer, only : pbuf_get_index, pbuf_set_field, physics_buffer_desc
+    use physics_buffer, only : pbuf_get_index
     use ppgrid,       only : pver
     use cam_history,  only : addfld
 

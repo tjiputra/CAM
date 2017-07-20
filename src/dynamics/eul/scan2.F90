@@ -14,6 +14,7 @@ module scan2
    use shr_kind_mod, only: r8 => shr_kind_r8
    use pmgrid,       only: plat, plev, plon, beglat, endlat, plevp
    use constituents, only: pcnst
+   use scmforecast,  only: forecast
    use perf_mod
 !-----------------------------------------------------------------------
    implicit none
@@ -68,7 +69,7 @@ subroutine scan2run (ztodt, cwava, etamid,t2      ,fu      ,fv    )
    use mpishorthand, only: mpicom, mpir8
 #endif
    use physconst,    only: cpair
-   use scamMod,      only: fixmascam,alphacam,betacam,use_iop, single_column
+   use scamMod,      only: fixmascam,alphacam,betacam, single_column, scm_cambfb_mode
    use pspect,       only: pnmax
    use tfilt_massfix, only: tfilt_massfixrun
    use massfix,      only: hw1,hw2,hw3,alpha
@@ -278,37 +279,6 @@ subroutine scan2run (ztodt, cwava, etamid,t2      ,fu      ,fv    )
    call t_stopf('realloc5')
 #endif
 
-else
-
-  do lat=beglat,endlat
-      j = lat
-      irow = lat
-      if (lat > plat/2) irow = plat - lat + 1
-      call forecast(lat, ps(1,lat,n3m1), ps(1,lat,n3m2), ps(1,lat,n3), &
-                      u3(1,1,j,n3),u3(1,1,j,n3m1), u3(1,1,j,n3m2), &
-		      v3(1,1,j,n3), v3(1,1,j,n3m1), v3(1,1,j,n3m2), &
-		      t3(1,1,j,n3),t3(1,1,j,n3m1), t3(1,1,j,n3m2), &
-                      q3(1,1,1,j,n3), q3(1,1,1,j,n3m1), q3(1,1,1,j,n3m2), &
-	   	      ztodt, t2(1,1,lat), &
-		      fu(1,1,lat), fv(1,1,lat), qfcst(1,1,1,lat), etamid,cwava(lat), &
-                      qminus(1,1,1,j), hw2al(1,lat), hw2bl(1,lat), &
-                      hw3al(1,lat), hw3bl(1,lat), hwxal(1,1,lat), &
-                      hwxbl(1,1,lat), &
-                      plon) 
-
-   end do
-
-!
-! Initialize fixer variables for routines not called in scam version of
-! model
-!
-	engy2alat=0._r8
-	engy2blat=0._r8
-	difftalat=0._r8
-	difftblat=0._r8
-        engy2b=0._r8
-
-endif ! if not SCAM
 !
 ! Accumulate and normalize global integrals for mass fixer (dry mass of
 ! atmosphere is held constant).
@@ -414,24 +384,49 @@ endif ! if not SCAM
 
    call t_stopf ('scan2_single')
 
-   call t_startf ('tfilt_massfix')
 
-   if (single_column) then
+else
+
+  do lat=beglat,endlat
+      j = lat
+      irow = lat
+      if (lat > plat/2) irow = plat - lat + 1
+      call forecast( lat             , plon             , ztodt            ,                   &
+                     ps(1,lat,n3m1)  , ps(1,lat,n3m2)   , ps(1,lat,n3)     ,                   &
+                     u3(1,1,j,n3)    , u3(1,1,j,n3m1)   , u3(1,1,j,n3m2)   ,                   &
+                     v3(1,1,j,n3)    , v3(1,1,j,n3m1)   , v3(1,1,j,n3m2)   ,                   &
+                     t3(1,1,j,n3)    , t3(1,1,j,n3m1)   , t3(1,1,j,n3m2)   ,                   &
+                     q3(1,1,1,j,n3)  , q3(1,1,1,j,n3m1) , q3(1,1,1,j,n3m2) ,                   &
+                     t2(1,1,lat)     , fu(1,1,lat)      , fv(1,1,lat)      ,                   &
+                     qminus(1,1,1,j) , qfcst(1,1,1,lat) )
+   end do
+!
+! Initialize fixer variables for routines not called in scam version of
+! model
+!
+   engy2alat=0._r8
+   engy2blat=0._r8
+   difftalat=0._r8
+   difftblat=0._r8
+   engy2b=0._r8
+   
 !
 ! read in fixer for scam
 !
-      if ( use_iop ) then
-         fixmas=fixmascam
-         beta=betacam
-         do m = 1, pcnst
-            alpha(m)=alphacam(m)
-         end do
-      else
-         fixmas=1._r8
-         beta=0._r8
-         alpha(:)=0._r8
-      end if
+   if ( scm_cambfb_mode ) then
+      fixmas=fixmascam
+      beta=betacam
+      do m = 1, pcnst
+         alpha(m)=alphacam(m)
+      end do
+   else
+      fixmas=1._r8
+      beta=0._r8
+      alpha(:)=0._r8
    endif
+endif ! if not SCAM
+
+call t_startf ('tfilt_massfix')
 
 #ifdef OUTER_OMP
 !$OMP PARALLEL DO PRIVATE (LAT)

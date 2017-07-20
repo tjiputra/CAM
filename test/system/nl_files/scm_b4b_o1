@@ -9,4 +9,6 @@
  scmlat= -20.
  iopfile = '../camrun.cam.h1.0000-09-01-00000.nc'
  inithist_all = .true.
+ scm_cambfb_mode                = .true.
+ scm_use_obs_uv         = .true.
 /

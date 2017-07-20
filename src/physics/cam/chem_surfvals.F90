@@ -187,12 +187,15 @@ subroutine chem_surfvals_init()
 ! 
 !-----------------------------------------------------------------------
 
-   use infnan,  only : posinf, assignment(=)
-   use mo_flbc, only : flbc_inti
+   use infnan,       only: posinf, assignment(=)
+   use mo_flbc,      only: flbc_inti
+   use phys_control, only: use_simple_phys
 
    !---------------------------Local variables-----------------------------
    integer :: yr, mon, day, ncsec
    !-----------------------------------------------------------------------
+
+   if (use_simple_phys) return
 
    if (scenario_ghg == 'FIXED') then
       doRamp_ghg = .false.

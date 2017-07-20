@@ -15,6 +15,7 @@ use pio,              only: file_desc_t, pio_global, pio_enddef, &
 
 use cam_logfile,      only: iulog
 use cam_abortutils,   only: endrun
+use ionosphere_interface, only: ionosphere_init_restart, ionosphere_write_restart, ionosphere_read_restart
 
 implicit none
 private
@@ -57,6 +58,7 @@ subroutine cam_read_restart(cam_in, cam_out, dyn_in, dyn_out, pbuf2d, &
    fh_ini => initial_file_get_id()
 
    call read_restart_dynamics(fh_ini, dyn_in, dyn_out)   
+   call ionosphere_read_restart(fh_ini)
 
    call hub2atm_alloc(cam_in)
    call atm2hub_alloc(cam_out)
@@ -114,6 +116,7 @@ subroutine cam_write_restart(cam_in, cam_out, dyn_out, pbuf2d, &
    call cam_pio_createfile(fh, trim(fname), 0)
 
    call init_restart_dynamics(fh, dyn_out)
+   call ionosphere_init_restart(fh)
    call init_restart_physics(fh, pbuf2d)
    call init_restart_history(fh)
 
@@ -126,6 +129,7 @@ subroutine cam_write_restart(cam_in, cam_out, dyn_out, pbuf2d, &
    !-----------------------------------------------------------------------
 
    call write_restart_dynamics(fh, dyn_out)
+   call ionosphere_write_restart(fh)
    call write_restart_physics(fh, cam_in, cam_out, pbuf2d)
 
    if (present(yr_spec).and.present(mon_spec).and.&

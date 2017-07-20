@@ -491,8 +491,8 @@ end subroutine aero_model_init
     integer :: beglev(ncol)
     integer :: endlev(ncol)
 
-    strato_sad = 0._r8
     reff_strat = 0.1e-6_r8
+    strato_sad = 0._r8
     !do nothing
     return
 

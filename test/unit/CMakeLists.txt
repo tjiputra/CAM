@@ -1,18 +1,22 @@
 cmake_minimum_required(VERSION 2.8)
-project(CAM_tests Fortran C)
 
 # Unit test boilerplate.
-list(APPEND CMAKE_MODULE_PATH ${CESM_CMAKE_MODULE_DIRECTORY})
-include(CESM_utils)
+list(APPEND CMAKE_MODULE_PATH ${CIME_CMAKE_MODULE_DIRECTORY})
+include(CIME_initial_setup)
+
+project(CAM_tests Fortran C)
+
+# More unit test boilerplate.
+include(CIME_utils)
 
 # Useful paths.
 set(CAMROOT ../../)
 set(CESMROOT ${CAMROOT}../../)
-set(SHAREROOT ${CESMROOT}/cime/share/csm_share)
+set(SHAREROOT ${CESMROOT}/cime/src/share)
 
 # Add share code to source list.
-include_directories(${SHAREROOT}/include ${SHAREROOT}/shr)
-add_subdirectory(${SHAREROOT}/shr csm_share)
+include_directories(${SHAREROOT}/include ${SHAREROOT}/util)
+add_subdirectory(${SHAREROOT}/util csm_share)
 
 # CAM physics.
 add_subdirectory(${CAMROOT}src/physics/cam physics_cam)

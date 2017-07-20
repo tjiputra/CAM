@@ -641,11 +641,6 @@ subroutine radcswmx(lchnk   ,ncol    ,                         &
    real(r8), dimension(nswbands) :: Ttdir
    real(r8), dimension(nswbands) :: Ttdif
    real(r8), dimension(nswbands) :: Texplay
-!cdir vreg(Trdir)
-!cdir vreg(Trdif)
-!cdir vreg(Ttdir)
-!cdir vreg(Ttdif)
-!cdir vreg(Texplay)
 ! 
 ! 
 ! Radiative Properties:
@@ -837,7 +832,6 @@ subroutine radcswmx(lchnk   ,ncol    ,                         &
 
    do k=1,pver
 
-!cdir nodep
       do i=1,Nday
 
          pdel      = pflx(i,k+1) - pflx(i,k)
@@ -870,7 +864,6 @@ subroutine radcswmx(lchnk   ,ncol    ,                         &
       utco2(i) = 0.0_r8
       uto2(i)  = 0.0_r8
 
-!cdir expand=pver
       do k=1,pver
          uth2o(i) = uth2o(i) + uh2o(i,k)
          uto3(i)  = uto3(i)  + uo3(i,k)
@@ -1139,7 +1132,6 @@ subroutine radcswmx(lchnk   ,ncol    ,                         &
 ! 
          npasses = 0
          do
-!cdir novector
             do irgn = 0, nmxrgn(i)
                kx2(irgn) = 0
             end do
@@ -1156,7 +1148,6 @@ subroutine radcswmx(lchnk   ,ncol    ,                         &
                   k1 = kx2(irgn-1)+1
                   kx1(irgn) = k1
                   kx2(irgn) = k1-1
-!cdir novector
                   do k2 = pver, k1, -1
                      if (pmid(i,k2) <= pmxrgn(i,irgn)) then
                         kx2(irgn) = k2
@@ -1187,7 +1178,6 @@ subroutine radcswmx(lchnk   ,ncol    ,                         &
                         end if
                      end do
                   else
-!cdir novector
                      do k = k1,k2
                         if (cld(i,k) >= cldmin) then
                            nxs = nxs+1
@@ -1221,7 +1211,6 @@ subroutine radcswmx(lchnk   ,ncol    ,                         &
 ! 
 ! Construct wstr, cstr, nstr for this region
 ! 
-!cdir novector
                   cstr(k1:k2,1:nxs+1) = 0
                   mstr = 1
                   cld0 = 0.0_r8
@@ -1231,7 +1220,6 @@ subroutine radcswmx(lchnk   ,ncol    ,                         &
                         cld0 = asort(l)
                         mstr = mstr + 1
                      endif
-!cdir novector
                      cstr(ksort(l),mstr:nxs+1) = 1
                   end do
                   nstr(mrgn) = mstr
@@ -1248,7 +1236,6 @@ subroutine radcswmx(lchnk   ,ncol    ,                         &
 ! 
 ! Finish construction of cstr for additional top layer
 ! 
-!cdir novector
             cstr(0,1:nstr(1)) = 0
 ! 
 ! INDEX COMPUTATIONS FOR STEP 2-3
@@ -1272,14 +1259,12 @@ subroutine radcswmx(lchnk   ,ncol    ,                         &
 ! 
 ! Construction of totwgt, wgtv, ccon, nconfig
 ! 
-!cdir novector
             istr(1: nrgn) = 1
             nconfig(i) = 0
             totwgt(i) = 0.0_r8
             new_term = .true.
             do iconfig = 1, nconfigm
                xwgt = 1.0_r8
-!cdir novector
                do mrgn = 1,  nrgn
                   xwgt = xwgt * wstr(istr(mrgn),mrgn)
                end do
@@ -1304,9 +1289,7 @@ subroutine radcswmx(lchnk   ,ncol    ,                         &
                   if (new_term) then
                      wgtv(j) = xwgt
                      totwgt(i) = totwgt(i) + xwgt
-!cdir novector
                      do mrgn = 1, nrgn
-!cdir novector
                         ccon(j,kx1(mrgn):kx2(mrgn),i) = cstr(kx1(mrgn):kx2(mrgn),istr(mrgn))
                      end do
                   endif
@@ -1353,13 +1336,11 @@ subroutine radcswmx(lchnk   ,ncol    ,                         &
             km1 = k-1
             nuniq = 0
             istrtd(1,k,i) = 1
-!cdir novector
             do l0 = 1, nuniqd(km1,i)
                is0 = istrtd(l0,km1,i)
                is1 = istrtd(l0+1,km1,i)-1
                n0 = 0
                n1 = 0
-!cdir novector
                do isn = is0, is1
                   j = icond(isn,km1,i)
                   if (ccon(j,k,i) == 0) then
@@ -1373,13 +1354,11 @@ subroutine radcswmx(lchnk   ,ncol    ,                         &
                if (n0 > 0) then
                   nuniq = nuniq + 1
                   istrtd(nuniq+1,k,i) = istrtd(nuniq,k,i)+n0
-!cdir novector
                   icond(istrtd(nuniq,k,i):istrtd(nuniq+1,k,i)-1,k,i) =  ptr0(1:n0)
                endif
                if (n1 > 0) then
                   nuniq = nuniq + 1
                   istrtd(nuniq+1,k,i) = istrtd(nuniq,k,i)+n1
-!cdir novector
                   icond(istrtd(nuniq,k,i):istrtd(nuniq+1,k,i)-1,k,i) =  ptr1(1:n1)
                endif
             end do
@@ -1403,13 +1382,11 @@ subroutine radcswmx(lchnk   ,ncol    ,                         &
             kp1 = k+1
             nuniq = 0
             istrtu(1,k,i) = 1
-!cdir novector
             do l0 = 1, nuniqu(kp1,i)
                is0 = istrtu(l0,kp1,i)
                is1 = istrtu(l0+1,kp1,i)-1
                n0 = 0
                n1 = 0
-!cdir novector
                do isn = is0, is1
                   j = iconu(isn,kp1,i)
                   if (ccon(j,k,i) == 0) then
@@ -1423,13 +1400,11 @@ subroutine radcswmx(lchnk   ,ncol    ,                         &
                if (n0 > 0) then
                   nuniq = nuniq + 1
                   istrtu(nuniq+1,k,i) = istrtu(nuniq,k,i)+n0
-!cdir novector
                   iconu(istrtu(nuniq,k,i):istrtu(nuniq+1,k,i)-1,k,i) =  ptr0(1:n0)
                endif
                if (n1 > 0) then
                   nuniq = nuniq + 1
                   istrtu(nuniq+1,k,i) = istrtu(nuniq,k,i)+n1
-!cdir novector
                   iconu(istrtu(nuniq,k,i):istrtu(nuniq+1,k,i)-1,k,i) = ptr1(1:n1)
                endif
             end do
@@ -1442,13 +1417,10 @@ subroutine radcswmx(lchnk   ,ncol    ,                         &
          nuniq = nuniqu(k1+1,i)
          do k = k1,0,-1
             nuniqu(k,i) = nuniq
-!cdir novector
             iconu(1:nuniq,k,i) = iconu(1:nuniq,k1+1,i)
-!cdir novector
             istrtu(1:nuniq+1,k,i) = istrtu(1:nuniq+1,k1+1,i)
          end do
 
-!cdir novector
          v_wgtv(1:nconfig(i),i) = wgtv(1:nconfig(i))
 
 ! 
@@ -1515,7 +1487,6 @@ subroutine radcswmx(lchnk   ,ncol    ,                         &
          do i = 1, Nday
             do k = 1, pverp
                km1 = k - 1
-!cdir nodep
                do l0 = 1, nuniqd(km1,i)
                   is0 = istrtd(l0,km1,i)
                   is1 = istrtd(l0+1,km1,i)-1
@@ -1697,11 +1668,9 @@ subroutine radcswmx(lchnk   ,ncol    ,                         &
             fluxdn = 0.0_r8
 
             do i = 1, Nday
-!cdir novector
             do iconfig = 1, nconfig(i)
                xwgt = v_wgtv(iconfig,i)
 
-!cdir collapse
                do k = 0, pverp
                   do ns = 1, nswbands
                   xexpt = exptdn(ns,k,iconfig,i)
@@ -1825,7 +1794,6 @@ subroutine radcswmx(lchnk   ,ncol    ,                         &
             rupdifc(1:Nday,pverp) = albdif(1:Nday,ns)
 
 
-!cdir expand=pverp
             do k = 1, pverp
             do i=1,Nday
                km1 = k - 1
@@ -1929,7 +1897,6 @@ subroutine radcswmx(lchnk   ,ncol    ,                         &
 ! 
 ! Compute solar heating rate (J/kg/s)
 ! 
-!cdir expand=pver
          do k=1,pver
             qrs(i,k) = -1.E-4_r8*gravit*totfld(i,k)/(pint(i,k) - pint(i,k+1))
             qrsc(i,k) = -1.E-4_r8*gravit*totfldc(i,k)/(pint(i,k) - pint(i,k+1))

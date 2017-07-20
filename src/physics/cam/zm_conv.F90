@@ -1,4 +1,3 @@
-
 module zm_conv
 
 !---------------------------------------------------------------------------------
@@ -21,6 +20,7 @@ module zm_conv
                              cpwv, cpliq, rh2o
   use cam_abortutils,  only: endrun
   use cam_logfile,     only: iulog
+  use zm_microphysics, only: zm_mphy, zm_aero_t, zm_conv_t
 
   implicit none
 
@@ -58,9 +58,11 @@ module zm_conv
    real(r8) :: momcu
    real(r8) :: momcd
 
+   logical :: zmconv_microp
+
    logical :: no_deep_pbl ! default = .false.
                           ! no_deep_pbl = .true. eliminates deep convection entirely within PBL 
-   
+
 
 !moved from moistconvection.F90
    real(r8) :: rgrav       ! reciprocal of grav
@@ -76,7 +78,8 @@ contains
 
 
 subroutine zm_convi(limcnv_in, zmconv_c0_lnd, zmconv_c0_ocn, zmconv_ke, zmconv_ke_lnd, &
-                    zmconv_momcu, zmconv_momcd, zmconv_num_cin, zmconv_org, no_deep_pbl_in)
+                    zmconv_momcu, zmconv_momcd, zmconv_num_cin, zmconv_org, &
+                    zmconv_microp_in, no_deep_pbl_in)
 
    use dycore,       only: get_resolution
 
@@ -90,6 +93,7 @@ subroutine zm_convi(limcnv_in, zmconv_c0_lnd, zmconv_c0_ocn, zmconv_ke, zmconv_k
    real(r8),intent(in)           :: zmconv_momcu
    real(r8),intent(in)           :: zmconv_momcd
    logical                       :: zmconv_org
+   logical, intent(in)           :: zmconv_microp_in
    logical, intent(in), optional :: no_deep_pbl_in  ! no_deep_pbl = .true. eliminates ZM convection entirely within PBL 
 
    ! local variables
@@ -114,6 +118,8 @@ subroutine zm_convi(limcnv_in, zmconv_c0_lnd, zmconv_c0_ocn, zmconv_ke, zmconv_k
    zm_org  = zmconv_org
    momcu   = zmconv_momcu
    momcd   = zmconv_momcd
+
+   zmconv_microp = zmconv_microp_in
 
    if ( present(no_deep_pbl_in) )  then
       no_deep_pbl = no_deep_pbl_in
@@ -150,7 +156,9 @@ subroutine zm_convr(lchnk   ,ncol    , &
                     mu      ,md      ,du      ,eu      ,ed      , &
                     dp      ,dsubcld ,jt      ,maxg    ,ideep   , &
                     ql      ,rliq    ,landfrac,                   &
-                    org     ,orgt    , org2d)
+                    org     ,orgt    ,org2d   ,  &
+                    dif     ,dnlf    ,dnif    ,conv    , &
+                    aero    , rice)
 !----------------------------------------------------------------------- 
 ! 
 ! Purpose: 
@@ -283,6 +291,11 @@ subroutine zm_convr(lchnk   ,ncol    , &
    real(r8), intent(in) :: tpert(pcols)
    real(r8), intent(in) :: landfrac(pcols) ! RBN Landfrac
 
+   type(zm_conv_t), intent(inout) :: conv         
+   type(zm_aero_t), intent(inout) :: aero         ! aerosol object. intent(inout) because the
+                                                  ! gathered arrays are set here
+                                                  ! before passing object
+                                                  ! to microphysics
 ! output arguments
 !
    real(r8), intent(out) :: qtnd(pcols,pver)           ! specific humidity tendency (kg/kg/s)
@@ -294,6 +307,10 @@ subroutine zm_convr(lchnk   ,ncol    , &
    real(r8), intent(out) :: cape(pcols)        ! w  convective available potential energy.
    real(r8), intent(out) :: zdu(pcols,pver)
    real(r8), intent(out) :: rprd(pcols,pver)     ! rain production rate
+   real(r8), intent(out) :: dif(pcols,pver)        ! detrained convective cloud ice mixing ratio.
+   real(r8), intent(out) :: dnlf(pcols,pver)       ! detrained convective cloud water num concen.
+   real(r8), intent(out) :: dnif(pcols,pver)       ! detrained convective cloud ice num concen.
+
 ! move these vars from local storage to output so that convective
 ! transports can be done in outside of conv_cam.
    real(r8), intent(out) :: mu(pcols,pver)
@@ -307,7 +324,11 @@ subroutine zm_convr(lchnk   ,ncol    , &
    real(r8), intent(out) :: jcbot(pcols)  ! o row of base of cloud indices passed out.
    real(r8), intent(out) :: prec(pcols)
    real(r8), intent(out) :: rliq(pcols) ! reserved liquid (not yet in cldliq) for energy integrals
+   real(r8), intent(out) :: rice(pcols) ! reserved ice (not yet in cldce) for energy integrals
+
    integer,  intent(out) :: ideep(pcols)  ! column indices of gathered points
+
+   type(zm_conv_t) :: loc_conv         
 
    real(r8), pointer :: org(:,:)     ! Only used if zm_org is true
    real(r8), pointer :: orgt(:,:)   ! Only used if zm_org is true
@@ -317,6 +338,7 @@ subroutine zm_convr(lchnk   ,ncol    , &
    real(r8) dlg(pcols,pver)    ! gathrd version of the detraining cld h2o tend
    real(r8) pflxg(pcols,pverp) ! gather precip flux at each level
    real(r8) cug(pcols,pver)    ! gathered condensation rate
+
    real(r8) evpg(pcols,pver)   ! gathered evap rate of rain in downdraft
    real(r8) orgavg(pcols)
    real(r8) dptot(pcols)
@@ -398,7 +420,14 @@ subroutine zm_convr(lchnk   ,ncol    , &
 !      real(r8) ud(pcols,pver)
 !      real(r8) vd(pcols,pver)
 
-   real(r8) mb(pcols)                  ! wg cloud base mass flux.
+
+
+
+
+
+
+   real(r8) qldeg(pcols,pver)        ! cloud liquid water mixing ratio for detrainment (kg/kg)
+   real(r8) mb(pcols)                ! wg cloud base mass flux.
 
    integer jlcl(pcols)
    integer j0(pcols)                 ! wg detrainment initiation level index.
@@ -408,10 +437,17 @@ subroutine zm_convr(lchnk   ,ncol    , &
 
    integer i
    integer ii
-   integer k
+   integer k, kk, l, m
+
    integer msg                      !  ic number of missing moisture levels at the top of model.
    real(r8) qdifr
    real(r8) sdifr
+
+   real(r8), parameter :: dcon  = 25.e-6_r8
+   real(r8), parameter :: mucon = 5.3_r8
+   real(r8) negadq
+   logical doliq
+
 
 !
 !--------------------------Data statements------------------------------
@@ -433,6 +469,65 @@ subroutine zm_convr(lchnk   ,ncol    , &
    heat(:,:) = 0._r8
    mcon(:,:) = 0._r8
    rliq(:ncol)   = 0._r8
+   rice(:ncol)   = 0._r8
+
+   if (zmconv_microp) then
+     allocate( &
+        loc_conv%frz(pcols,pver), &
+        loc_conv%sprd(pcols,pver), &
+        loc_conv%wu(pcols,pver), &
+        loc_conv%qi(pcols,pver), &
+        loc_conv%qliq(pcols,pver), &
+        loc_conv%qice(pcols,pver), &
+        loc_conv%qrain(pcols,pver), &
+        loc_conv%qsnow(pcols,pver), &
+        loc_conv%di(pcols,pver), &
+        loc_conv%dnl(pcols,pver), &
+        loc_conv%dni(pcols,pver), &
+        loc_conv%qnl(pcols,pver), &
+        loc_conv%qni(pcols,pver), &
+        loc_conv%qnr(pcols,pver), &
+        loc_conv%qns(pcols,pver), &
+        loc_conv%qide(pcols,pver), &
+        loc_conv%qncde(pcols,pver), &
+        loc_conv%qnide(pcols,pver), &
+        loc_conv%autolm(pcols,pver), &
+        loc_conv%accrlm(pcols,pver), &
+        loc_conv%bergnm(pcols,pver), &
+        loc_conv%fhtimm(pcols,pver), &
+        loc_conv%fhtctm(pcols,pver), &
+        loc_conv%fhmlm(pcols,pver), &
+        loc_conv%hmpim(pcols,pver), &
+        loc_conv%accslm(pcols,pver), &
+        loc_conv%dlfm(pcols,pver), &
+        loc_conv%cmel(pcols,pver), &
+        loc_conv%autoln(pcols,pver), &
+        loc_conv%accrln(pcols,pver), &
+        loc_conv%bergnn(pcols,pver), &
+        loc_conv%fhtimn(pcols,pver), &
+        loc_conv%fhtctn(pcols,pver), &
+        loc_conv%fhmln(pcols,pver), &
+        loc_conv%accsln(pcols,pver), &
+        loc_conv%activn(pcols,pver), &
+        loc_conv%dlfn(pcols,pver), &
+        loc_conv%autoim(pcols,pver), &
+        loc_conv%accsim(pcols,pver), &
+        loc_conv%difm(pcols,pver), &
+        loc_conv%cmei(pcols,pver), &
+        loc_conv%nuclin(pcols,pver), &
+        loc_conv%autoin(pcols,pver), &
+        loc_conv%accsin(pcols,pver), &
+        loc_conv%hmpin(pcols,pver), &
+        loc_conv%difn(pcols,pver), &
+        loc_conv%trspcm(pcols,pver), &
+        loc_conv%trspcn(pcols,pver), &
+        loc_conv%trspim(pcols,pver), &
+        loc_conv%trspin(pcols,pver), &
+        loc_conv%lambdadpcu(pcols,pver), &
+        loc_conv%mudpcu(pcols,pver), &
+        loc_conv%dcape(pcols) )
+   end if
+
 !
 ! initialize convective tendencies
 !
@@ -452,8 +547,134 @@ subroutine zm_convr(lchnk   ,ncol    , &
          qlg(i,k)   = 0._r8
          dlf(i,k)   = 0._r8
          dlg(i,k)   = 0._r8
+         qldeg(i,k) = 0._r8
+
+         dif(i,k)   = 0._r8
+         dnlf(i,k)  = 0._r8
+         dnif(i,k)  = 0._r8
+
       end do
    end do
+
+   if (zmconv_microp) then
+      do k = 1,pver
+         do i = 1,ncol
+            loc_conv%qliq(i,k) = 0._r8
+            loc_conv%qice(i,k) = 0._r8
+            loc_conv%di(i,k)   = 0._r8
+            loc_conv%qrain(i,k)= 0._r8
+            loc_conv%qsnow(i,k)= 0._r8
+            loc_conv%dnl(i,k)  = 0._r8
+            loc_conv%dni(i,k)  = 0._r8
+            loc_conv%wu(i,k)   = 0._r8
+            loc_conv%qnl(i,k)  = 0._r8
+            loc_conv%qni(i,k)  = 0._r8
+            loc_conv%qnr(i,k)  = 0._r8
+            loc_conv%qns(i,k)  = 0._r8
+            loc_conv%frz(i,k)  = 0._r8
+            loc_conv%sprd(i,k) = 0._r8
+            loc_conv%qide(i,k)  = 0._r8
+            loc_conv%qncde(i,k) = 0._r8
+            loc_conv%qnide(i,k) = 0._r8
+
+            loc_conv%autolm(i,k) = 0._r8
+            loc_conv%accrlm(i,k) = 0._r8
+            loc_conv%bergnm(i,k) = 0._r8
+            loc_conv%fhtimm(i,k) = 0._r8
+            loc_conv%fhtctm(i,k) = 0._r8
+            loc_conv%fhmlm (i,k) = 0._r8
+            loc_conv%hmpim (i,k) = 0._r8
+            loc_conv%accslm(i,k) = 0._r8
+            loc_conv%dlfm  (i,k) = 0._r8
+
+            loc_conv%autoln(i,k) = 0._r8
+            loc_conv%accrln(i,k) = 0._r8
+            loc_conv%bergnn(i,k) = 0._r8
+            loc_conv%fhtimn(i,k) = 0._r8
+            loc_conv%fhtctn(i,k) = 0._r8
+            loc_conv%fhmln (i,k) = 0._r8
+            loc_conv%accsln(i,k) = 0._r8
+            loc_conv%activn(i,k) = 0._r8
+            loc_conv%dlfn  (i,k) = 0._r8
+            loc_conv%cmel  (i,k) = 0._r8
+
+            loc_conv%autoim(i,k) = 0._r8
+            loc_conv%accsim(i,k) = 0._r8
+            loc_conv%difm  (i,k) = 0._r8
+            loc_conv%cmei  (i,k) = 0._r8
+
+            loc_conv%nuclin(i,k) = 0._r8
+            loc_conv%autoin(i,k) = 0._r8
+            loc_conv%accsin(i,k) = 0._r8
+            loc_conv%hmpin (i,k) = 0._r8
+            loc_conv%difn  (i,k) = 0._r8
+
+            loc_conv%trspcm(i,k) = 0._r8
+            loc_conv%trspcn(i,k) = 0._r8
+            loc_conv%trspim(i,k) = 0._r8
+            loc_conv%trspin(i,k) = 0._r8
+
+            conv%qi(i,k)    = 0._r8
+            conv%frz(i,k)   = 0._r8
+            conv%sprd(i,k)  = 0._r8
+            conv%qi(i,k)    = 0._r8
+            conv%qliq(i,k)  = 0._r8
+            conv%qice(i,k)  = 0._r8
+            conv%qnl(i,k)  = 0._r8
+            conv%qni(i,k)  = 0._r8
+            conv%qnr(i,k)  = 0._r8
+            conv%qns(i,k)  = 0._r8
+            conv%qrain(i,k) = 0._r8
+            conv%qsnow(i,k) = 0._r8
+            conv%wu(i,k)    = 0._r8
+
+            conv%autolm(i,k) = 0._r8
+            conv%accrlm(i,k) = 0._r8
+            conv%bergnm(i,k) = 0._r8
+            conv%fhtimm(i,k) = 0._r8
+            conv%fhtctm(i,k) = 0._r8
+            conv%fhmlm (i,k) = 0._r8
+            conv%hmpim (i,k) = 0._r8
+            conv%accslm(i,k) = 0._r8
+            conv%dlfm  (i,k) = 0._r8
+
+            conv%autoln(i,k) = 0._r8
+            conv%accrln(i,k) = 0._r8
+            conv%bergnn(i,k) = 0._r8
+            conv%fhtimn(i,k) = 0._r8
+            conv%fhtctn(i,k) = 0._r8
+            conv%fhmln (i,k) = 0._r8
+            conv%accsln(i,k) = 0._r8
+            conv%activn(i,k) = 0._r8
+            conv%dlfn  (i,k) = 0._r8
+            conv%cmel  (i,k) = 0._r8
+
+            conv%autoim(i,k) = 0._r8
+            conv%accsim(i,k) = 0._r8
+            conv%difm  (i,k) = 0._r8
+            conv%cmei  (i,k) = 0._r8
+
+            conv%nuclin(i,k) = 0._r8
+            conv%autoin(i,k) = 0._r8
+            conv%accsin(i,k) = 0._r8
+            conv%hmpin (i,k) = 0._r8
+            conv%difn  (i,k) = 0._r8
+
+            conv%trspcm(i,k) = 0._r8
+            conv%trspcn(i,k) = 0._r8
+            conv%trspim(i,k) = 0._r8
+            conv%trspin(i,k) = 0._r8
+
+         end do
+      end do
+
+      conv%lambdadpcu  = (mucon + 1._r8)/dcon
+      conv%mudpcu      = mucon
+      loc_conv%lambdadpcu = conv%lambdadpcu
+      loc_conv%mudpcu     = conv%mudpcu
+
+   end if
+
    do i = 1,ncol
       pflx(i,pverp) = 0
       pflxg(i,pverp) = 0
@@ -463,10 +684,18 @@ subroutine zm_convr(lchnk   ,ncol    , &
       pblt(i) = pver
       dsubcld(i) = 0._r8
 
+
       jctop(i) = pver
       jcbot(i) = 1
 
    end do
+
+   if (zmconv_microp) then
+      do i = 1,ncol
+         conv%dcape(i) = 0._r8
+         loc_conv%dcape(i)     = 0._r8
+      end do
+   end if
 
   if (zm_org) then
 ! compute vertical average here
@@ -599,6 +828,44 @@ subroutine zm_convr(lchnk   ,ncol    , &
          vg(i,k) = 0._r8
       end do
    end do
+
+   if (zmconv_microp) then
+
+      if (aero%scheme == 'modal') then
+
+         do m = 1, aero%nmodes
+
+            do k = 1,pver
+               do i = 1,lengath
+                  aero%numg_a(i,k,m) = aero%num_a(m)%val(ideep(i),k)
+                  aero%dgnumg(i,k,m) = aero%dgnum(m)%val(ideep(i),k)
+               end do
+            end do
+
+            do l = 1, aero%nspec(m)
+               do k = 1,pver
+                  do i = 1,lengath
+                     aero%mmrg_a(i,k,l,m) = aero%mmr_a(l,m)%val(ideep(i),k)
+                  end do
+               end do
+            end do
+
+         end do
+
+      else if (aero%scheme == 'bulk') then
+
+         do m = 1, aero%nbulk
+            do k = 1,pver
+               do i = 1,lengath
+                  aero%mmrg_bulk(i,k,m) = aero%mmr_bulk(m)%val(ideep(i),k)
+               end do
+            end do
+         end do
+
+      end if
+
+   end if
+
 !
    do i = 1,lengath
       zfg(i,pver+1) = zf(ideep(i),pver+1)
@@ -661,7 +928,15 @@ subroutine zm_convr(lchnk   ,ncol    , &
                cmeg    ,maxg    ,lelg    ,jt      ,jlcl    , &
                maxg    ,j0      ,jd      ,rl      ,lengath , &
                rgas    ,grav    ,cpres   ,msg     , &
-               pflxg   ,evpg    ,cug     ,rprdg   ,limcnv  ,landfracg)
+               pflxg   ,evpg    ,cug     ,rprdg   ,limcnv  ,landfracg , &
+               qldeg   ,aero    ,loc_conv,qhat    )
+
+   if (zmconv_microp) then
+      do i = 1,lengath
+         capeg(i) = capeg(i)+ loc_conv%dcape(i)
+      end do
+   end if
+
 !
 ! convert detrainment from units of "1/m" to "1/mb".
 !
@@ -677,6 +952,15 @@ subroutine zm_convr(lchnk   ,ncol    , &
          evpg (i,k) = evpg (i,k)* (zfg(i,k)-zfg(i,k+1))/dp(i,k)
       end do
    end do
+
+   if (zmconv_microp) then
+      do k = msg + 1,pver
+         do i = 1,lengath
+            loc_conv%sprd(i,k) = loc_conv%sprd(i,k)* (zfg(i,k)-zfg(i,k+1))/dp(i,k)
+            loc_conv%frz (i,k) = loc_conv%frz (i,k)* (zfg(i,k)-zfg(i,k+1))/dp(i,k)
+         end do
+      end do
+   end if
 
    call closure(lchnk   , &
                 qg      ,tg      ,pg      ,zg      ,sg      , &
@@ -715,6 +999,15 @@ subroutine zm_convr(lchnk   ,ncol    , &
       end do
    end if
 
+   if (zmconv_microp) then
+      do k=msg+1,pver
+         do i=1,lengath
+            loc_conv%sprd(i,k)  = loc_conv%sprd(i,k)*mb(i)
+            loc_conv%frz (i,k)  = loc_conv%frz (i,k)*mb(i)
+         end do
+      end do
+   end if
+
    do k=msg+1,pver
       do i=1,lengath
          mu   (i,k)  = mu   (i,k)*mb(i)
@@ -728,6 +1021,57 @@ subroutine zm_convr(lchnk   ,ncol    , &
          cug  (i,k)  = cug  (i,k)*mb(i)
          evpg (i,k)  = evpg (i,k)*mb(i)
          pflxg(i,k+1)= pflxg(i,k+1)*mb(i)*100._r8/grav
+
+
+         if ( zmconv_microp .and. mb(i).eq.0._r8) then
+            qlg (i,k) = 0._r8
+            loc_conv%qliq (i,k) = 0._r8
+            loc_conv%qice (i,k) = 0._r8
+            loc_conv%qrain(i,k) = 0._r8
+            loc_conv%qsnow(i,k) = 0._r8
+            loc_conv%wu(i,k) = 0._r8
+            loc_conv%qnl (i,k) = 0._r8
+            loc_conv%qni (i,k) = 0._r8
+            loc_conv%qnr (i,k) = 0._r8
+            loc_conv%qns (i,k) = 0._r8
+
+            loc_conv%autolm(i,k) = 0._r8
+            loc_conv%accrlm(i,k) = 0._r8
+            loc_conv%bergnm(i,k) = 0._r8
+            loc_conv%fhtimm(i,k) = 0._r8
+            loc_conv%fhtctm(i,k) = 0._r8
+            loc_conv%fhmlm (i,k) = 0._r8
+            loc_conv%hmpim (i,k) = 0._r8
+            loc_conv%accslm(i,k) = 0._r8
+            loc_conv%dlfm  (i,k) = 0._r8
+
+            loc_conv%autoln(i,k) = 0._r8
+            loc_conv%accrln(i,k) = 0._r8
+            loc_conv%bergnn(i,k) = 0._r8
+            loc_conv%fhtimn(i,k) = 0._r8
+            loc_conv%fhtctn(i,k) = 0._r8
+            loc_conv%fhmln (i,k) = 0._r8
+            loc_conv%accsln(i,k) = 0._r8
+            loc_conv%activn(i,k) = 0._r8
+            loc_conv%dlfn  (i,k) = 0._r8
+            loc_conv%cmel  (i,k) = 0._r8
+
+            loc_conv%autoim(i,k) = 0._r8
+            loc_conv%accsim(i,k) = 0._r8
+            loc_conv%difm  (i,k) = 0._r8
+            loc_conv%cmei  (i,k) = 0._r8
+
+            loc_conv%nuclin(i,k) = 0._r8
+            loc_conv%autoin(i,k) = 0._r8
+            loc_conv%accsin(i,k) = 0._r8
+            loc_conv%hmpin (i,k) = 0._r8
+            loc_conv%difn  (i,k) = 0._r8
+
+            loc_conv%trspcm(i,k) = 0._r8
+            loc_conv%trspcn(i,k) = 0._r8
+            loc_conv%trspim(i,k) = 0._r8
+            loc_conv%trspin(i,k) = 0._r8
+         end if
       end do
    end do
 !
@@ -736,16 +1080,111 @@ subroutine zm_convr(lchnk   ,ncol    , &
    call q1q2_pjr(lchnk   , &
                  dqdt    ,dsdt    ,qg      ,qs      ,qu      , &
                  su      ,du      ,qhat    ,shat    ,dp      , &
-                 mu      ,md      ,sd      ,qd      ,qlg     , &
+                 mu      ,md      ,sd      ,qd      ,qldeg   , &
                  dsubcld ,jt      ,maxg    ,1       ,lengath , &
                  cpres   ,rl      ,msg     ,          &
-                 dlg     ,evpg    ,cug     )
+                 dlg     ,evpg    ,cug     , &
+                 loc_conv     )
 !
 ! gather back temperature and mixing ratio.
 !
 
+   if (zmconv_microp) then
+      do k = msg + 1,pver
+         do i = 1,lengath
+            if (dqdt(i,k)*2._r8*delt+qg(i,k)<0._r8) then
+               negadq = (dqdt(i,k)+0.5_r8*qg(i,k)/delt)/0.9999_r8
+               dqdt(i,k) = dqdt(i,k)-negadq
+
+               do kk=k,jt(i),-1
+                 if (negadq<0._r8) then
+                    if (rprdg(i,kk)> -negadq*dp(i,k)/dp(i,kk)) then
+                       dsdt(i,k) = dsdt(i,k) + negadq*rl/cpres
+                       if (rprdg(i,kk)>loc_conv%sprd(i,kk)) then
+                          if(rprdg(i,kk)-loc_conv%sprd(i,kk)<-negadq*dp(i,k)/dp(i,kk)) then
+                            dsdt(i,k) = dsdt(i,k) + (negadq+ (rprdg(i,kk)-loc_conv%sprd(i,kk))*dp(i,kk)/dp(i,k))*latice/cpres
+                            loc_conv%sprd(i,kk) = negadq*dp(i,k)/dp(i,kk)+rprdg(i,kk)
+                          end if
+                       else
+                          loc_conv%sprd(i,kk) = loc_conv%sprd(i,kk)+negadq*dp(i,k)/dp(i,kk)
+                          dsdt(i,k) = dsdt(i,k) + negadq*latice/cpres
+                       end if
+                       rprdg(i,kk) = rprdg(i,kk)+negadq*dp(i,k)/dp(i,kk)
+                       negadq = 0._r8
+                    else
+                       negadq = rprdg(i,kk)*dp(i,kk)/dp(i,k)+negadq
+                       dsdt(i,k) = dsdt(i,k) - rprdg(i,kk)*rl/cpres*dp(i,kk)/dp(i,k)
+                       if (rprdg(i,kk)>loc_conv%sprd(i,kk)) then
+                          dsdt(i,k) = dsdt(i,k) - loc_conv%sprd(i,kk)*latice/cpres*dp(i,kk)/dp(i,k)
+                          loc_conv%sprd(i,kk) = 0._r8
+                       else
+                          dsdt(i,k) = dsdt(i,k) -rprdg(i,kk)*latice/cpres*dp(i,kk)/dp(i,k)
+                          loc_conv%sprd(i,kk)= loc_conv%sprd(i,kk)- rprdg(i,kk)
+                       end if
+                       rprdg(i,kk) = 0._r8
+                    end if
+
+                    if (dlg(i,kk)>loc_conv%di(i,kk)) then
+                       doliq= .true.
+                    else
+                       doliq= .false.
+                    end if
+
+                    if (negadq<0._r8) then
+                      if (doliq) then
+                        if (dlg(i,kk)> -negadq*dp(i,k)/dp(i,kk)) then
+                           dsdt(i,k) = dsdt(i,k) + negadq*rl/cpres
+                           loc_conv%dnl(i,kk) = loc_conv%dnl(i,kk)*(1._r8+negadq*dp(i,k)/dp(i,kk)/dlg(i,kk))
+                           dlg(i,kk)  = dlg(i,kk)+negadq*dp(i,k)/dp(i,kk)
+                           negadq = 0._r8
+                        else
+                           negadq = negadq + dlg(i,kk)*dp(i,kk)/dp(i,k)
+                           dsdt(i,k) = dsdt(i,k) - dlg(i,kk)*dp(i,kk)/dp(i,k)*rl/cpres
+                           dlg(i,kk) = 0._r8
+                           loc_conv%dnl(i,kk) = 0._r8
+                        end if
+                      else
+                        if (loc_conv%di(i,kk)> -negadq*dp(i,k)/dp(i,kk)) then
+                          dsdt(i,k) = dsdt(i,k) + negadq*(rl+latice)/cpres
+                          loc_conv%dni(i,kk) = loc_conv%dni(i,kk)*(1._r8+negadq*dp(i,k)/dp(i,kk)/loc_conv%di(i,kk))
+                          loc_conv%di(i,kk)  = loc_conv%di(i,kk)+negadq*dp(i,k)/dp(i,kk)
+                          negadq = 0._r8
+                        else
+                          negadq = negadq + loc_conv%di(i,kk)*dp(i,kk)/dp(i,k)
+                          dsdt(i,k) = dsdt(i,k) - loc_conv%di(i,kk)*dp(i,kk)/dp(i,k)*(rl+latice)/cpres
+                          loc_conv%di(i,kk) = 0._r8
+                          loc_conv%dni(i,kk) = 0._r8
+                        end if
+                        doliq= .false.
+                      end if
+                    end if
+                    if (negadq<0._r8 .and. doliq ) then
+                      if (dlg(i,kk)> -negadq*dp(i,k)/dp(i,kk)) then
+                         dsdt(i,k) = dsdt(i,k) + negadq*rl/cpres
+                         loc_conv%dnl(i,kk) = loc_conv%dnl(i,kk)*(1._r8+negadq*dp(i,k)/dp(i,kk)/dlg(i,kk))
+                         dlg(i,kk)  = dlg(i,kk)+negadq*dp(i,k)/dp(i,kk)
+                         negadq = 0._r8
+                      else
+                         negadq = negadq + dlg(i,kk)*dp(i,kk)/dp(i,k)
+                         dsdt(i,k) = dsdt(i,k) - dlg(i,kk)*dp(i,kk)/dp(i,k)*rl/cpres
+                         dlg(i,kk) = 0._r8
+                         loc_conv%dnl(i,kk) = 0._r8
+                      end if
+                    end if
+
+                 end if
+               end do
+
+               if (negadq<0._r8) then
+                  dqdt(i,k) = dqdt(i,k) + negadq
+               end if
+
+             end if
+         end do
+      end do
+   end if
+
    do k = msg + 1,pver
-!DIR$ CONCURRENT
       do i = 1,lengath
 !
 ! q is updated to compute net precip.
@@ -762,20 +1201,126 @@ subroutine zm_convr(lchnk   ,ncol    , &
          ql  (ideep(i),k) = qlg  (i,k)
       end do
    end do
+
+   if (zmconv_microp) then
+     do k = msg + 1,pver
+       do i = 1,lengath
+         dif (ideep(i),k) = loc_conv%di  (i,k)
+         dnlf(ideep(i),k) = loc_conv%dnl (i,k)
+         dnif(ideep(i),k) = loc_conv%dni (i,k)
+
+         conv%qi (ideep(i),k)  = loc_conv%qice(i,k)
+         conv%frz(ideep(i),k)  = loc_conv%frz(i,k)*latice/cpres
+         conv%sprd(ideep(i),k) = loc_conv%sprd(i,k)
+         conv%wu  (ideep(i),k) = loc_conv%wu  (i,k)
+         conv%qliq(ideep(i),k) = loc_conv%qliq (i,k)
+         conv%qice(ideep(i),k) = loc_conv%qice (i,k)
+         conv%qrain(ideep(i),k) = loc_conv%qrain (i,k)
+         conv%qsnow(ideep(i),k) = loc_conv%qsnow (i,k)
+         conv%qnl(ideep(i),k)  = loc_conv%qnl(i,k)
+         conv%qni(ideep(i),k)  = loc_conv%qni(i,k)
+         conv%qnr(ideep(i),k)  = loc_conv%qnr(i,k)
+         conv%qns(ideep(i),k)  = loc_conv%qns(i,k)
+
+         conv%autolm(ideep(i),k) = loc_conv%autolm(i,k)
+         conv%accrlm(ideep(i),k) = loc_conv%accrlm(i,k)
+         conv%bergnm(ideep(i),k) = loc_conv%bergnm(i,k)
+         conv%fhtimm(ideep(i),k) = loc_conv%fhtimm(i,k)
+         conv%fhtctm(ideep(i),k) = loc_conv%fhtctm(i,k)
+         conv%fhmlm (ideep(i),k) = loc_conv%fhmlm (i,k)
+         conv%hmpim (ideep(i),k) = loc_conv%hmpim (i,k)
+         conv%accslm(ideep(i),k) = loc_conv%accslm(i,k)
+         conv%dlfm  (ideep(i),k) = loc_conv%dlfm  (i,k)
+
+         conv%autoln(ideep(i),k) = loc_conv%autoln(i,k)
+         conv%accrln(ideep(i),k) = loc_conv%accrln(i,k)
+         conv%bergnn(ideep(i),k) = loc_conv%bergnn(i,k)
+         conv%fhtimn(ideep(i),k) = loc_conv%fhtimn(i,k)
+         conv%fhtctn(ideep(i),k) = loc_conv%fhtctn(i,k)
+         conv%fhmln (ideep(i),k) = loc_conv%fhmln (i,k)
+         conv%accsln(ideep(i),k) = loc_conv%accsln(i,k)
+         conv%activn(ideep(i),k) = loc_conv%activn(i,k)
+         conv%dlfn  (ideep(i),k) = loc_conv%dlfn  (i,k)
+         conv%cmel  (ideep(i),k) = loc_conv%cmel  (i,k)
+
+         conv%autoim(ideep(i),k) = loc_conv%autoim(i,k)
+         conv%accsim(ideep(i),k) = loc_conv%accsim(i,k)
+         conv%difm  (ideep(i),k) = loc_conv%difm  (i,k)
+         conv%cmei  (ideep(i),k) = loc_conv%cmei  (i,k)
+
+         conv%nuclin(ideep(i),k) = loc_conv%nuclin(i,k)
+         conv%autoin(ideep(i),k) = loc_conv%autoin(i,k)
+         conv%accsin(ideep(i),k) = loc_conv%accsin(i,k)
+         conv%hmpin (ideep(i),k) = loc_conv%hmpin (i,k)
+         conv%difn  (ideep(i),k) = loc_conv%difn  (i,k)
+
+         conv%trspcm(ideep(i),k) = loc_conv%trspcm(i,k)
+         conv%trspcn(ideep(i),k) = loc_conv%trspcn(i,k)
+         conv%trspim(ideep(i),k) = loc_conv%trspim(i,k)
+         conv%trspin(ideep(i),k) = loc_conv%trspin(i,k)
+         conv%lambdadpcu(ideep(i),k) = loc_conv%lambdadpcu(i,k)
+         conv%mudpcu(ideep(i),k)     = loc_conv%mudpcu(i,k)
+
+       end do
+     end do
+
+     do k = msg + 1,pver
+       do i = 1,ncol
+
+         !convert it from units of "kg/kg" to "g/m3"
+
+         if(k.lt.pver) then
+            conv%qice (i,k) = 0.5_r8*(conv%qice(i,k)+conv%qice(i,k+1))
+            conv%qliq (i,k) = 0.5_r8*(conv%qliq(i,k)+conv%qliq(i,k+1))
+            conv%qrain (i,k) = 0.5_r8*(conv%qrain(i,k)+conv%qrain(i,k+1))
+            conv%qsnow (i,k) = 0.5_r8*(conv%qsnow(i,k)+conv%qsnow(i,k+1))
+            conv%qni (i,k) = 0.5_r8*(conv%qni(i,k)+conv%qni(i,k+1))
+            conv%qnl (i,k) = 0.5_r8*(conv%qnl(i,k)+conv%qnl(i,k+1))
+            conv%qnr (i,k) = 0.5_r8*(conv%qnr(i,k)+conv%qnr(i,k+1))
+            conv%qns (i,k) = 0.5_r8*(conv%qns(i,k)+conv%qns(i,k+1))
+            conv%wu(i,k)   = 0.5_r8*(conv%wu(i,k)+conv%wu(i,k+1))
+         end if
+
+         if (t(i,k).gt. 273.15_r8 .and. t(i,k-1).le.273.15_r8) then
+             conv%qice (i,k-1) = conv%qice (i,k-1) + conv%qice (i,k)
+             conv%qice (i,k) = 0._r8
+             conv%qni (i,k-1) = conv%qni (i,k-1) + conv%qni (i,k)
+             conv%qni (i,k) = 0._r8
+             conv%qsnow (i,k-1) = conv%qsnow (i,k-1) + conv%qsnow (i,k)
+             conv%qsnow (i,k) = 0._r8
+             conv%qns (i,k-1) = conv%qns (i,k-1) + conv%qns (i,k)
+             conv%qns (i,k) = 0._r8
+         end if
+
+         conv%qice (i,k) = conv%qice(i,k) * pap(i,k)/t(i,k)/rgas *1000._r8
+         conv%qliq (i,k) = conv%qliq(i,k) * pap(i,k)/t(i,k)/rgas *1000._r8
+         conv%qrain (i,k) = conv%qrain(i,k) * pap(i,k)/t(i,k)/rgas *1000._r8
+         conv%qsnow (i,k) = conv%qsnow(i,k) * pap(i,k)/t(i,k)/rgas *1000._r8
+         conv%qni (i,k) = conv%qni(i,k) * pap(i,k)/t(i,k)/rgas
+         conv%qnl (i,k) = conv%qnl(i,k) * pap(i,k)/t(i,k)/rgas
+         conv%qnr (i,k) = conv%qnr(i,k) * pap(i,k)/t(i,k)/rgas
+         conv%qns (i,k) = conv%qns(i,k) * pap(i,k)/t(i,k)/rgas
+       end do
+     end do
+   end if
+
 !
-!DIR$ CONCURRENT
    do i = 1,lengath
       jctop(ideep(i)) = jt(i)
-!++bee
       jcbot(ideep(i)) = maxg(i)
-!--bee
       pflx(ideep(i),pverp) = pflxg(i,pverp)
    end do
+     
+   if (zmconv_microp) then
+      do i = 1,lengath
+         conv%dcape(ideep(i)) =  loc_conv%dcape(i)
+      end do
+   end if
 
 ! Compute precip by integrating change in water vapor minus detrained cloud water
    do k = pver,msg + 1,-1
       do i = 1,ncol
-         prec(i) = prec(i) - dpp(i,k)* (q(i,k)-qh(i,k)) - dpp(i,k)*dlf(i,k)*2*delt
+          prec(i) = prec(i) - dpp(i,k)* (q(i,k)-qh(i,k)) - dpp(i,k)*(dlf(i,k)+dif(i,k))*2._r8*delt
       end do
    end do
 
@@ -788,10 +1333,69 @@ subroutine zm_convr(lchnk   ,ncol    , &
 ! Treat rliq as flux out bottom, to be added back later.
    do k = 1, pver
       do i = 1, ncol
-         rliq(i) = rliq(i) + dlf(i,k)*dpp(i,k)/gravit
+          rliq(i) = rliq(i) + (dlf(i,k)+dif(i,k))*dpp(i,k)/gravit
+          rice(i) = rice(i) + dif(i,k)*dpp(i,k)/gravit
       end do
    end do
    rliq(:ncol) = rliq(:ncol) /1000._r8
+   rice(:ncol) = rice(:ncol) /1000._r8
+
+   if (zmconv_microp) then
+     deallocate( &
+        loc_conv%frz, &
+        loc_conv%sprd, &
+        loc_conv%wu, &
+        loc_conv%qi, &
+        loc_conv%qliq, &
+        loc_conv%qice, &
+        loc_conv%qrain, &
+        loc_conv%qsnow, &
+        loc_conv%di, &
+        loc_conv%dnl, &
+        loc_conv%dni, &
+        loc_conv%qnl, &
+        loc_conv%qni, &
+        loc_conv%qnr, &
+        loc_conv%qns, &
+        loc_conv%qide, &
+        loc_conv%qncde, &
+        loc_conv%qnide, &
+        loc_conv%autolm, &
+        loc_conv%accrlm, &
+        loc_conv%bergnm, &
+        loc_conv%fhtimm, &
+        loc_conv%fhtctm, &
+        loc_conv%fhmlm, &
+        loc_conv%hmpim, &
+        loc_conv%accslm, &
+        loc_conv%dlfm, &
+        loc_conv%cmel, &
+        loc_conv%autoln, &
+        loc_conv%accrln, &
+        loc_conv%bergnn, &
+        loc_conv%fhtimn, &
+        loc_conv%fhtctn, &
+        loc_conv%fhmln, &
+        loc_conv%accsln, &
+        loc_conv%activn, &
+        loc_conv%dlfn, &
+        loc_conv%autoim, &
+        loc_conv%accsim, &
+        loc_conv%difm, &
+        loc_conv%cmei, &
+        loc_conv%nuclin, &
+        loc_conv%autoin, &
+        loc_conv%accsin, &
+        loc_conv%hmpin, &
+        loc_conv%difn, &
+        loc_conv%trspcm, &
+        loc_conv%trspcn, &
+        loc_conv%trspim, &
+        loc_conv%trspin, &
+        loc_conv%lambdadpcu, &
+        loc_conv%mudpcu, &
+        loc_conv%dcape )
+   end if
 
    return
 end subroutine zm_convr
@@ -802,7 +1406,8 @@ subroutine zm_conv_evap(ncol,lchnk, &
      landfrac, &
      tend_s, tend_s_snwprd, tend_s_snwevmlt, tend_q, &
      prdprec, cldfrc, deltat,  &
-     prec, snow, ntprprd, ntsnprd, flxprec, flxsnow )
+     prec, snow, ntprprd, ntsnprd, flxprec, flxsnow, prdsnow)
+
 
 !-----------------------------------------------------------------------
 ! Compute tendencies due to evaporation of rain from ZM scheme
@@ -836,6 +1441,9 @@ subroutine zm_conv_evap(ncol,lchnk, &
 
     real(r8), intent(inout) :: prec(pcols)        ! Convective-scale preciptn rate
     real(r8), intent(out)   :: snow(pcols)        ! Convective-scale snowfall rate
+
+    real(r8), optional, intent(in), allocatable  :: prdsnow(:,:) ! snow production (kg/ks/s)
+
 !
 !---------------------------Local storage-------------------------------
 
@@ -859,11 +1467,23 @@ subroutine zm_conv_evap(ncol,lchnk, &
     real(r8) :: kemask
     real(r8) :: evplimit               ! temp variable for evaporation limits
     real(r8) :: rlat(pcols)
+    real(r8) :: dum
+    real(r8) :: omsm
 
     integer :: i,k                     ! longitude,level indices
+    logical :: old_snow
 
 
 !-----------------------------------------------------------------------
+
+    ! If prdsnow is passed in and allocated, then use it in the calculation, otherwise
+    ! use the old snow calculation
+    old_snow=.true.
+    if (present(prdsnow)) then
+       if (allocated(prdsnow)) then
+          old_snow=.false.
+       end if
+    end if
 
 ! convert input precip to kg/m2/s
     prec(:ncol) = prec(:ncol)*1000._r8
@@ -879,11 +1499,13 @@ subroutine zm_conv_evap(ncol,lchnk, &
     flxprec(:ncol,1) = 0._r8
     flxsnow(:ncol,1) = 0._r8
     evpvint(:ncol)   = 0._r8
+    omsm=0.9999_r8
 
     do k = 1, pver
        do i = 1, ncol
 
 ! Melt snow falling into layer, if necessary. 
+        if( old_snow ) then
           if (t(i,k) > tmelt) then
              flxsntm(i) = 0._r8
              snowmlt(i) = flxsnow(i,k) * gravit/ pdel(i,k)
@@ -891,6 +1513,26 @@ subroutine zm_conv_evap(ncol,lchnk, &
              flxsntm(i) = flxsnow(i,k)
              snowmlt(i) = 0._r8
           end if
+        else
+          ! make sure melting snow doesn't reduce temperature below threshold
+          if (t(i,k) > tmelt) then
+              dum = -latice/cpres*flxsnow(i,k)*gravit/pdel(i,k)*deltat
+              if (t(i,k) + dum .le. tmelt) then
+                dum = (t(i,k)-tmelt)*cpres/latice/deltat
+                dum = dum/(flxsnow(i,k)*gravit/pdel(i,k))
+                dum = max(0._r8,dum)
+                dum = min(1._r8,dum)
+              else
+                dum = 1._r8
+              end if
+              dum = dum*omsm
+              flxsntm(i) = flxsnow(i,k)*(1.0_r8-dum)
+              snowmlt(i) = dum*flxsnow(i,k)*gravit/ pdel(i,k)
+          else
+             flxsntm(i) = flxsnow(i,k)
+             snowmlt(i) = 0._r8
+          end if
+        end if
 
 ! relative humidity depression must be > 0 for evaporation
           evplimit = max(1._r8 - q(i,k)/qs(i,k), 0._r8)
@@ -922,6 +1564,11 @@ subroutine zm_conv_evap(ncol,lchnk, &
           evplimit   = min(evplimit, (prec(i) - evpvint(i)) * gravit / pdel(i,k))
 
           evpprec(i) = min(evplimit, evpprec(i))
+          if( .not.old_snow ) then
+            evpprec(i) = max(0._r8, evpprec(i))
+            evpprec(i) = evpprec(i)*omsm
+          end if
+
 
 ! evaporation of snow depends on snow fraction of total precipitation in the top after melting
           if (flxprec(i,k) > 0._r8) then
@@ -944,6 +1591,8 @@ subroutine zm_conv_evap(ncol,lchnk, &
 ! the small amount added to flxprec in the work1 expression has been increased from 
 ! 1e-36 to 8.64e-11 (1e-5 mm/day).  This causes the temperature based partitioning
 ! scheme to be used for small flxprec amounts.  This is to address error growth problems.
+
+      if( old_snow ) then
 #ifdef PERGRO
           work1 = min(max(0._r8,flxsnow(i,k)/(flxprec(i,k)+8.64e-11_r8)),1._r8)
 #else
@@ -959,6 +1608,11 @@ subroutine zm_conv_evap(ncol,lchnk, &
           ntsnprd(i,k) = prdprec(i,k)*work2 - evpsnow(i) - snowmlt(i)
           tend_s_snwprd  (i,k) = prdprec(i,k)*work2*latice
           tend_s_snwevmlt(i,k) = - ( evpsnow(i) + snowmlt(i) )*latice
+       else
+          ntsnprd(i,k) = prdsnow(i,k) - min(flxsnow(i,k)*gravit/pdel(i,k), evpsnow(i)+snowmlt(i))
+          tend_s_snwprd  (i,k) = prdsnow(i,k)*latice
+          tend_s_snwevmlt(i,k) = -min(flxsnow(i,k)*gravit/pdel(i,k), evpsnow(i)+snowmlt(i) )*latice
+       end if
 
 ! precipitation fluxes
           flxprec(i,k+1) = flxprec(i,k) + ntprprd(i,k) * pdel(i,k)/gravit
@@ -973,7 +1627,11 @@ subroutine zm_conv_evap(ncol,lchnk, &
 ! heating (cooling) and moistening due to evaporation 
 ! - latent heat of vaporization for precip production has already been accounted for
 ! - snow is contained in prec
-          tend_s(i,k)   =-evpprec(i)*latvap + ntsnprd(i,k)*latice
+          if( old_snow ) then
+             tend_s(i,k)   =-evpprec(i)*latvap + ntsnprd(i,k)*latice
+          else
+             tend_s(i,k)   =-evpprec(i)*latvap + tend_s_snwevmlt(i,k)
+          end if
           tend_q(i,k) = evpprec(i)
        end do
     end do
@@ -994,7 +1652,7 @@ subroutine convtran(lchnk   , &
                     doconvtran,q       ,ncnst   ,mu      ,md      , &
                     du      ,eu      ,ed      ,dp      ,dsubcld , &
                     jt      ,mx      ,ideep   ,il1g    ,il2g    , &
-                    nstep   ,fracis  ,dqdt    ,dpdry   )
+                    nstep   ,fracis  ,dqdt    ,dpdry   ,dt)
 !----------------------------------------------------------------------- 
 ! 
 ! Purpose: 
@@ -1040,6 +1698,7 @@ subroutine convtran(lchnk   , &
 
    real(r8), intent(in) :: dpdry(pcols,pver)       ! Delta pressure between interfaces
 
+   real(r8), intent(in) :: dt                      ! 2 delta t (model time increment)
 
 ! input/output
 
@@ -1079,6 +1738,9 @@ subroutine convtran(lchnk   , &
    real(r8) eutmp(pcols,pver)       ! Mass entraining from updraft
    real(r8) edtmp(pcols,pver)       ! Mass entraining from downdraft
    real(r8) dptmp(pcols,pver)    ! Delta pressure between interfaces
+   real(r8) total(pcols)
+   real(r8) negadt,qtmp
+
 !-----------------------------------------------------------------------
 !
    small = 1.e-36_r8
@@ -1235,7 +1897,6 @@ subroutine convtran(lchnk   , &
          end do
 ! %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 !
-!DIR$ NOINTERCHANGE
          do k = kbm,pver
             km1 = max(1,k-1)
             do i = il1g,il2g
@@ -1267,11 +1928,51 @@ subroutine convtran(lchnk   , &
             end do
          end do
 
+       if (zmconv_microp) then
+         do i = il1g,il2g
+           do k = jt(i),mx(i)
+             if (dcondt(i,k)*dt+const(i,k)<0._r8) then
+                negadt = dcondt(i,k)+const(i,k)/dt
+                dcondt(i,k) = -const(i,k)/dt
+                do kk= k+1, mx(i)
+                  if (negadt<0._r8 .and. dcondt(i,kk)*dt+const(i,kk)>0._r8 ) then
+                    qtmp = dcondt(i,kk)+negadt*dptmp(i,k)/dptmp(i,kk)
+                    if (qtmp*dt+const(i,kk)>0._r8) then
+                      dcondt(i,kk)= qtmp
+                      negadt=0._r8
+                    else
+                      negadt= negadt+(const(i,kk)/dt+dcondt(i,kk))*dptmp(i,kk)/dptmp(i,k)
+                      dcondt(i,kk)= -const(i,kk)/dt
+                    end if
+
+                  end if
+                end do
+                do kk= k-1, jt(i), -1
+                  if (negadt<0._r8 .and. dcondt(i,kk)*dt+const(i,kk)>0._r8 ) then
+                    qtmp = dcondt(i,kk)+negadt*dptmp(i,k)/dptmp(i,kk)
+                    if (qtmp*dt+const(i,kk)>0._r8) then
+                      dcondt(i,kk)= qtmp
+                      negadt=0._r8
+                    else
+                      negadt= negadt+(const(i,kk)/dt+dcondt(i,kk))*dptmp(i,kk)/dptmp(i,k)
+                      dcondt(i,kk)= -const(i,kk)/dt
+                    end if
+                  end if
+                end do
+
+                if (negadt<0._r8) then
+                   dcondt(i,k) = dcondt(i,k) + negadt
+                end if
+             end if
+           end do
+         end do
+       end if
+
+
 ! Initialize to zero everywhere, then scatter tendency back to full array
          dqdt(:,:,m) = 0._r8
          do k = 1,pver
             kp1 = min(pver,k+1)
-!DIR$ CONCURRENT
             do i = il1g,il2g
                dqdt(ideep(i),k,m) = dcondt(i,k)
             end do
@@ -1586,7 +2287,6 @@ subroutine momtran(lchnk, ncol, &
 
   ! dcont for bottom layer
           !
-          !DIR$ NOINTERCHANGE
           do k = kbm,pver
              km1 = max(1,k-1)
              do i = il1g,il2g
@@ -2003,7 +2703,9 @@ subroutine cldprp(lchnk   , &
                   cmeg    ,jb      ,lel     ,jt      ,jlcl    , &
                   mx      ,j0      ,jd      ,rl      ,il2g    , &
                   rd      ,grav    ,cp      ,msg     , &
-                  pflx    ,evp     ,cu      ,rprd    ,limcnv  ,landfrac)
+                  pflx    ,evp     ,cu      ,rprd    ,limcnv  ,landfrac, &
+                  qcde    ,aero    ,loc_conv,qhat  )
+
 !----------------------------------------------------------------------- 
 ! 
 ! Purpose: 
@@ -2056,6 +2758,9 @@ subroutine cldprp(lchnk   , &
    integer, intent(in) :: msg                    ! missing moisture vals (always 0)
    real(r8), intent(in) :: rl                    ! latent heat of vap
    real(r8), intent(in) :: shat(pcols,pver)      ! interface values of dry stat energy
+   real(r8), intent(in) :: qhat(pcols,pver)      ! wg grid slice of upper interface mixing ratio.
+   type(zm_aero_t), intent(in) :: aero           ! aerosol object
+
 !
 ! output
 !
@@ -2075,7 +2780,9 @@ subroutine cldprp(lchnk   , &
    real(r8), intent(out) :: qu(pcols,pver)       ! spec hum of updraft
    real(r8), intent(out) :: sd(pcols,pver)       ! normalized dry stat energy of downdraft
    real(r8), intent(out) :: su(pcols,pver)       ! normalized dry stat energy of updraft
+   real(r8), intent(out) :: qcde(pcols,pver)     ! cloud water mixing ratio for detrainment (kg/kg)
 
+   type(zm_conv_t) :: loc_conv         
 
    real(r8) rd                   ! gas constant for dry air
    real(r8) grav                 ! gravity
@@ -2129,6 +2836,19 @@ subroutine cldprp(lchnk   , &
    real(r8) small
    real(r8) mdt
 
+   real(r8) fice(pcols,pver)        ! ice fraction in precip production
+   real(r8) tug(pcols,pver)
+
+   real(r8) tvuo(pcols,pver)        ! updraft virtual T w/o freezing heating
+   real(r8) tvu(pcols,pver)         ! updraft virtual T with freezing heating
+   real(r8) totfrz(pcols)
+   real(r8) frz (pcols,pver)        ! rate of freezing
+   integer  jto(pcols)              ! updraft plume old top
+   integer  tmplel(pcols)
+
+   integer  iter, itnum
+   integer  m
+
    integer khighest
    integer klowest
    integer kount
@@ -2139,6 +2859,46 @@ subroutine cldprp(lchnk   , &
 !
 !------------------------------------------------------------------------------
 !
+   if (zmconv_microp) then
+      loc_conv%autolm(:il2g,:) = 0._r8
+      loc_conv%accrlm(:il2g,:) = 0._r8
+      loc_conv%bergnm(:il2g,:) = 0._r8
+      loc_conv%fhtimm(:il2g,:) = 0._r8
+      loc_conv%fhtctm(:il2g,:) = 0._r8
+      loc_conv%fhmlm (:il2g,:) = 0._r8
+      loc_conv%hmpim (:il2g,:) = 0._r8
+      loc_conv%accslm(:il2g,:) = 0._r8
+      loc_conv%dlfm  (:il2g,:) = 0._r8
+
+      loc_conv%autoln(:il2g,:) = 0._r8
+      loc_conv%accrln(:il2g,:) = 0._r8
+      loc_conv%bergnn(:il2g,:) = 0._r8
+      loc_conv%fhtimn(:il2g,:) = 0._r8
+      loc_conv%fhtctn(:il2g,:) = 0._r8
+      loc_conv%fhmln (:il2g,:) = 0._r8
+      loc_conv%accsln(:il2g,:) = 0._r8
+      loc_conv%activn(:il2g,:) = 0._r8
+      loc_conv%dlfn  (:il2g,:) = 0._r8
+
+      loc_conv%autoim(:il2g,:) = 0._r8
+      loc_conv%accsim(:il2g,:) = 0._r8
+      loc_conv%difm  (:il2g,:) = 0._r8
+
+      loc_conv%nuclin(:il2g,:) = 0._r8
+      loc_conv%autoin(:il2g,:) = 0._r8
+      loc_conv%accsin(:il2g,:) = 0._r8
+      loc_conv%hmpin (:il2g,:) = 0._r8
+      loc_conv%difn  (:il2g,:) = 0._r8
+
+      loc_conv%trspcm(:il2g,:) = 0._r8
+      loc_conv%trspcn(:il2g,:) = 0._r8
+      loc_conv%trspim(:il2g,:) = 0._r8
+      loc_conv%trspin(:il2g,:) = 0._r8
+
+      loc_conv%dcape (:il2g)   = 0._r8
+
+   end if
+
    do i = 1,il2g
       ftemp(i) = 0._r8
       expnum(i) = 0._r8
@@ -2183,19 +2943,49 @@ subroutine cldprp(lchnk   , &
          qu(i,k) = q(i,k)
          su(i,k) = s(i,k)
          call qsat_hPa(t(i,k), p(i,k), est(i), qst(i,k))
-!++bee
+
          if ( p(i,k)-est(i) <= 0._r8 ) then
             qst(i,k) = 1.0_r8
          end if
-!--bee
+
          gamma(i,k) = qst(i,k)*(1._r8 + qst(i,k)/eps1)*eps1*rl/(rd*t(i,k)**2)*rl/cp
          hmn(i,k) = cp*t(i,k) + grav*z(i,k) + rl*q(i,k)
          hsat(i,k) = cp*t(i,k) + grav*z(i,k) + rl*qst(i,k)
          hu(i,k) = hmn(i,k)
          hd(i,k) = hmn(i,k)
          rprd(i,k) = 0._r8
+ 
+         fice(i,k) = 0._r8
+         tug(i,k)  = 0._r8
+         qcde(i,k)   = 0._r8
+         tvuo(i,k) = (shat(i,k) - grav/cp*zf(i,k))*(1._r8 + 0.608_r8*qhat(i,k))
+         tvu(i,k) = tvuo(i,k)
+         frz(i,k)  = 0._r8
+
       end do
    end do
+   if (zmconv_microp) then
+      do k = 1,pver
+         do i = 1,il2g
+            loc_conv%sprd(i,k) = 0._r8
+            loc_conv%wu(i,k)   = 0._r8
+            loc_conv%cmel(i,k) = 0._r8
+            loc_conv%cmei(i,k) = 0._r8
+            loc_conv%qliq(i,k)   = 0._r8
+            loc_conv%qice(i,k)   = 0._r8
+            loc_conv%qnl(i,k)  = 0._r8
+            loc_conv%qni(i,k)  = 0._r8
+            loc_conv%qide(i,k)   = 0._r8
+            loc_conv%qncde(i,k)  = 0._r8
+            loc_conv%qnide(i,k)  = 0._r8
+            loc_conv%qnr(i,k)  = 0._r8
+            loc_conv%qns(i,k)  = 0._r8
+            loc_conv%qrain(i,k)= 0._r8
+            loc_conv%qsnow(i,k)= 0._r8
+            loc_conv%frz(i,k) = 0._r8
+         end do
+      end do
+   end if
 !
 !jr Set to zero things which make this routine blow up
 !
@@ -2370,91 +3160,325 @@ subroutine cldprp(lchnk   , &
          if (k < j0(i) .and. k >= jt(i)) eps(i,k) = f(i,k)
       end do
    end do
+
+   if (zmconv_microp) then
+      itnum = 2
+   else
+      itnum = 1
+   end if
+
+   do iter=1, itnum
+
+      if (zmconv_microp) then
+         do k = pver,msg + 1,-1
+           do i = 1,il2g
+              cu(i,k) = 0._r8
+              loc_conv%qliq(i,k) = 0._r8
+              loc_conv%qice(i,k) = 0._r8
+              ql(i,k) = 0._r8
+              loc_conv%frz(i,k) = 0._r8
+           end do
+         end do
+         do i = 1,il2g
+             totpcp(i) = 0._r8
+             hu(i,jb(i)) = hmn(i,jb(i)) + cp*tiedke_add
+         end do
+
+      end if
+
 !
 ! specify the updraft mass flux mu, entrainment eu, detrainment du
 ! and moist static energy hu.
 ! here and below mu, eu,du, md and ed are all normalized by mb
 !
-   do i = 1,il2g
-      if (eps0(i) > 0._r8) then
-         mu(i,jb(i)) = 1._r8
-         eu(i,jb(i)) = mu(i,jb(i))/dz(i,jb(i))
-      end if
-   end do
-   do k = pver,msg + 1,-1
       do i = 1,il2g
-         if (eps0(i) > 0._r8 .and. (k >= jt(i) .and. k < jb(i))) then
-            zuef(i) = zf(i,k) - zf(i,jb(i))
-            rmue(i) = (1._r8/eps0(i))* (exp(eps(i,k+1)*zuef(i))-1._r8)/zuef(i)
-            mu(i,k) = (1._r8/eps0(i))* (exp(eps(i,k  )*zuef(i))-1._r8)/zuef(i)
-            eu(i,k) = (rmue(i)-mu(i,k+1))/dz(i,k)
-            du(i,k) = (rmue(i)-mu(i,k))/dz(i,k)
+         if (eps0(i) > 0._r8) then
+            mu(i,jb(i)) = 1._r8
+            eu(i,jb(i)) = mu(i,jb(i))/dz(i,jb(i))
+         end if
+         if (zmconv_microp) then
+           tmplel(i) = lel(i)
+         else
+           tmplel(i) = jt(i)
          end if
       end do
-   end do
-!
-   khighest = pverp
-   klowest = 1
-   do i=1,il2g
-      khighest = min(khighest,lel(i))
-      klowest = max(klowest,jb(i))
-   end do
-   do k = klowest-1,khighest,-1
-      do i = 1,il2g
-         if (k <= jb(i)-1 .and. k >= lel(i) .and. eps0(i) > 0._r8) then
-            if (mu(i,k) < 0.02_r8) then
-               hu(i,k) = hmn(i,k)
-               mu(i,k) = 0._r8
-               eu(i,k) = 0._r8
-               du(i,k) = mu(i,k+1)/dz(i,k)
-            else
-               hu(i,k) = mu(i,k+1)/mu(i,k)*hu(i,k+1) + &
-                         dz(i,k)/mu(i,k)* (eu(i,k)*hmn(i,k)- du(i,k)*hsat(i,k))
+      do k = pver,msg + 1,-1
+         do i = 1,il2g
+            if (eps0(i) > 0._r8 .and. (k >= tmplel(i) .and. k < jb(i))) then
+               zuef(i) = zf(i,k) - zf(i,jb(i))
+               rmue(i) = (1._r8/eps0(i))* (exp(eps(i,k+1)*zuef(i))-1._r8)/zuef(i)
+               mu(i,k) = (1._r8/eps0(i))* (exp(eps(i,k  )*zuef(i))-1._r8)/zuef(i)
+               eu(i,k) = (rmue(i)-mu(i,k+1))/dz(i,k)
+               du(i,k) = (rmue(i)-mu(i,k))/dz(i,k)
             end if
-         end if
+         end do
       end do
-   end do
+ 
+      khighest = pverp
+      klowest = 1
+      do i=1,il2g
+         khighest = min(khighest,lel(i))
+         klowest = max(klowest,jb(i))
+      end do
+      do k = klowest-1,khighest,-1
+         do i = 1,il2g
+            if (k <= jb(i)-1 .and. k >= lel(i) .and. eps0(i) > 0._r8) then
+               if (mu(i,k) < 0.02_r8) then
+                  hu(i,k) = hmn(i,k)
+                  mu(i,k) = 0._r8
+                  eu(i,k) = 0._r8
+                  du(i,k) = mu(i,k+1)/dz(i,k)
+               else
+                  if (zmconv_microp) then
+                     hu(i,k) = (mu(i,k+1)*hu(i,k+1) + dz(i,k)*(eu(i,k)*hmn(i,k) +   &
+                                  latice*frz(i,k)))/(mu(i,k)+ dz(i,k)*du(i,k))
+                  else
+                     hu(i,k) = mu(i,k+1)/mu(i,k)*hu(i,k+1) + &
+                               dz(i,k)/mu(i,k)* (eu(i,k)*hmn(i,k)- du(i,k)*hsat(i,k))
+                  end if
+               end if
+            end if
+         end do
+      end do
 !
 ! reset cloud top index beginning from two layers above the
 ! cloud base (i.e. if cloud is only one layer thick, top is not reset
 !
-   do i=1,il2g
-      doit(i) = .true.
-   end do
-   do k=klowest-2,khighest-1,-1
       do i=1,il2g
-         if (doit(i) .and. k <= jb(i)-2 .and. k >= lel(i)-1) then
-            if (hu(i,k) <= hsthat(i,k) .and. hu(i,k+1) > hsthat(i,k+1) &
-               .and. mu(i,k) >= 0.02_r8) then
-               if (hu(i,k)-hsthat(i,k) < -2000._r8) then
+         doit(i) = .true.
+         totfrz(i)= 0._r8
+         do k = pver,msg + 1,-1
+            totfrz(i)= totfrz(i)+ frz(i,k)*dz(i,k)
+         end do
+      end do
+      do k=klowest-2,khighest-1,-1
+         do i=1,il2g
+            if (doit(i) .and. k <= jb(i)-2 .and. k >= lel(i)-1) then
+               if (hu(i,k) <= hsthat(i,k) .and. hu(i,k+1) > hsthat(i,k+1) &
+                  .and. mu(i,k) >= 0.02_r8) then
+                  if (hu(i,k)-hsthat(i,k) < -2000._r8) then
+                     jt(i) = k + 1
+                     doit(i) = .false.
+                  else
+                     jt(i) = k
+                     doit(i) = .false.
+                  end if
+               else if ( (hu(i,k) > hu(i,jb(i)) .and. totfrz(i)<=0._r8) .or. mu(i,k) < 0.02_r8) then
                   jt(i) = k + 1
                   doit(i) = .false.
-               else
-                  jt(i) = k
-                  doit(i) = .false.
                end if
-            else if (hu(i,k) > hu(i,jb(i)) .or. mu(i,k) < 0.02_r8) then
-               jt(i) = k + 1
-               doit(i) = .false.
             end if
-         end if
+         end do
       end do
-   end do
-   do k = pver,msg + 1,-1
+
+      if (iter == 1)  jto(:) = jt(:)
+
+      do k = pver,msg + 1,-1
+         do i = 1,il2g
+            if (k >= lel(i) .and. k <= jt(i) .and. eps0(i) > 0._r8) then
+               mu(i,k) = 0._r8
+               eu(i,k) = 0._r8
+               du(i,k) = 0._r8
+               hu(i,k) = hmn(i,k)
+            end if
+            if (k == jt(i) .and. eps0(i) > 0._r8) then
+               du(i,k) = mu(i,k+1)/dz(i,k)
+               eu(i,k) = 0._r8
+               mu(i,k) = 0._r8
+            end if
+         end do
+      end do
+ 
       do i = 1,il2g
-         if (k >= lel(i) .and. k <= jt(i) .and. eps0(i) > 0._r8) then
-            mu(i,k) = 0._r8
-            eu(i,k) = 0._r8
-            du(i,k) = 0._r8
-            hu(i,k) = hmn(i,k)
-         end if
-         if (k == jt(i) .and. eps0(i) > 0._r8) then
-            du(i,k) = mu(i,k+1)/dz(i,k)
-            eu(i,k) = 0._r8
-            mu(i,k) = 0._r8
-         end if
+         done(i) = .false.
       end do
-   end do
+      kount = 0
+      do k = pver,msg + 2,-1
+         do i = 1,il2g
+            if (k == jb(i) .and. eps0(i) > 0._r8) then
+               qu(i,k) = q(i,mx(i))
+               su(i,k) = (hu(i,k)-rl*qu(i,k))/cp
+            end if
+            if (( .not. done(i) .and. k > jt(i) .and. k < jb(i)) .and. eps0(i) > 0._r8) then
+               su(i,k) = mu(i,k+1)/mu(i,k)*su(i,k+1) + &
+                         dz(i,k)/mu(i,k)* (eu(i,k)-du(i,k))*s(i,k)
+               qu(i,k) = mu(i,k+1)/mu(i,k)*qu(i,k+1) + dz(i,k)/mu(i,k)* (eu(i,k)*q(i,k)- &
+                               du(i,k)*qst(i,k))
+               tu = su(i,k) - grav/cp*zf(i,k)
+               call qsat_hPa(tu, (p(i,k)+p(i,k-1))/2._r8, estu, qstu)
+               if (qu(i,k) >= qstu) then
+                  jlcl(i) = k
+                  kount = kount + 1
+                  done(i) = .true.
+               end if
+            end if
+         end do
+         if (kount >= il2g) goto 690
+      end do
+690   continue
+      do k = msg + 2,pver
+         do i = 1,il2g
+            if ((k > jt(i) .and. k <= jlcl(i)) .and. eps0(i) > 0._r8) then
+               su(i,k) = shat(i,k) + (hu(i,k)-hsthat(i,k))/(cp* (1._r8+gamhat(i,k)))
+               qu(i,k) = qsthat(i,k) + gamhat(i,k)*(hu(i,k)-hsthat(i,k))/ &
+                        (rl* (1._r8+gamhat(i,k)))
+            end if
+         end do
+      end do
+
+! compute condensation in updraft
+      if (zmconv_microp) then
+         tmplel(:il2g) = jlcl(:il2g)+1
+      else
+         tmplel(:il2g) = jb(:il2g)
+      end if
+
+      do k = pver,msg + 2,-1
+         do i = 1,il2g
+             if (k >= jt(i) .and. k < tmplel(i) .and. eps0(i) > 0._r8) then
+               if (zmconv_microp) then
+                  cu(i,k) = ((mu(i,k)*su(i,k)-mu(i,k+1)*su(i,k+1))/ &
+                         dz(i,k)- eu(i,k)*s(i,k)+du(i,k)*su(i,k))/(rl/cp)  &
+                          - latice*frz(i,k)/rl
+               else
+
+                  cu(i,k) = ((mu(i,k)*su(i,k)-mu(i,k+1)*su(i,k+1))/ &
+                         dz(i,k)- (eu(i,k)-du(i,k))*s(i,k))/(rl/cp)
+               end if
+               if (k == jt(i)) cu(i,k) = 0._r8
+               cu(i,k) = max(0._r8,cu(i,k))
+            end if
+         end do
+      end do
+
+
+      if (zmconv_microp) then
+   
+         tug(:il2g,:) = t(:il2g,:)
+         fice(:,:)    = 0._r8
+
+         do k = pver, msg+2, -1
+            do i = 1, il2g
+               tug(i,k) = su(i,k) - grav/cp*zf(i,k)
+            end do
+         end do
+
+         do k = 1, pver-1
+            do i = 1, il2g
+
+               if (tug(i,k+1) > 273.15_r8) then
+                  ! If warmer than tmax then water phase
+                  fice(i,k) = 0._r8
+
+               else if (tug(i,k+1) < 233.15_r8) then
+                  ! If colder than tmin then ice phase
+                  fice(i,k) = 1._r8
+
+               else
+                  ! Otherwise mixed phase, with ice fraction decreasing linearly
+                  ! from tmin to tmax
+                  fice(i,k) =(273.15_r8 - tug(i,k+1)) / 40._r8
+               end if
+            end do
+         end do
+
+         do k = 1, pver
+            do i = 1,il2g
+               loc_conv%cmei(i,k) = cu(i,k)* fice(i,k)
+               loc_conv%cmel(i,k) = cu(i,k) * (1._r8-fice(i,k))
+            end do
+         end do
+
+         call  zm_mphy(su,   qu,    mu,    du,   eu,    loc_conv%cmel,  loc_conv%cmei,   zf,    p, t,    q,         &
+                       eps0, jb,    jt,    jlcl, msg,   il2g,  grav,   cp,    rd, aero, gamhat,    &
+                       loc_conv%qliq,   loc_conv%qice,    loc_conv%qnl,   loc_conv%qni,  qcde,  loc_conv%qide, &
+                       loc_conv%qncde,  loc_conv%qnide, rprd, loc_conv%sprd, frz,       &
+                       loc_conv%wu,   loc_conv%qrain, loc_conv%qsnow, loc_conv%qnr,  loc_conv%qns,   &
+                       loc_conv%autolm, loc_conv%accrlm, loc_conv%bergnm, loc_conv%fhtimm, loc_conv%fhtctm,      &
+                       loc_conv%fhmlm,  loc_conv%hmpim,  loc_conv%accslm, loc_conv%dlfm,   loc_conv%autoln, &
+                       loc_conv%accrln, loc_conv%bergnn, loc_conv%fhtimn, loc_conv%fhtctn,       &
+                       loc_conv%fhmln,  loc_conv%accsln, loc_conv%activn, loc_conv%dlfn,   loc_conv%autoim, &
+                       loc_conv%accsim, loc_conv%difm, loc_conv%nuclin, loc_conv%autoin,       &
+                       loc_conv%accsin, loc_conv%hmpin,  loc_conv%difn,   loc_conv%trspcm, loc_conv%trspcn, &
+                       loc_conv%trspim, loc_conv%trspin, loc_conv%lambdadpcu, loc_conv%mudpcu  )
+
+
+         do k = pver,msg + 2,-1
+            do i = 1,il2g
+               ql(i,k) = loc_conv%qliq(i,k)+ loc_conv%qice(i,k)
+               loc_conv%frz(i,k) = frz(i,k)
+            end do
+         end do
+
+         do i = 1,il2g
+           if (iter == 2 .and. jt(i)> jto(i)) then
+             do k = jt(i), jto(i), -1
+                loc_conv%frz(i,k) = 0.0_r8
+                cu(i,k)=0.0_r8
+             end do
+           end if
+         end do
+
+
+         do k = pver,msg + 2,-1
+            do i = 1,il2g
+               if (k >= jt(i) .and. k < jb(i) .and. eps0(i) > 0._r8 .and. mu(i,k) >= 0.0_r8) then
+                  totpcp(i) = totpcp(i) + dz(i,k)*(cu(i,k)-du(i,k)*(qcde(i,k+1)+loc_conv%qide(i,k+1) ))
+               end if
+            end do
+         end do
+
+         do k = msg + 2,pver
+           do i = 1,il2g
+            if ((k > jt(i) .and. k <= jlcl(i)) .and. eps0(i) > 0._r8) then
+               if (iter == 1) tvuo(i,k)= (su(i,k) - grav/cp*zf(i,k))*(1._r8+0.608_r8*qu(i,k))
+               if (iter == 2 .and. k > max(jt(i),jto(i)) ) then
+                  tvu(i,k) = (su(i,k) - grav/cp*zf(i,k))*(1._r8 +0.608_r8*qu(i,k))
+                  loc_conv%dcape(i) = loc_conv%dcape(i)+ rd*(tvu(i,k)-tvuo(i,k))*log(p(i,k)/p(i,k-1))
+               end if
+            end if
+           end do
+         end do
+
+      else  ! no convective microphysics
+
+! compute condensed liquid, rain production rate
+! accumulate total precipitation (condensation - detrainment of liquid)
+! Note ql1 = ql(k) + rprd(k)*dz(k)/mu(k)
+! The differencing is somewhat strange (e.g. du(i,k)*ql(i,k+1)) but is
+! consistently applied.
+!    mu, ql are interface quantities
+!    cu, du, eu, rprd are midpoint quantites
+
+         do k = pver,msg + 2,-1
+            do i = 1,il2g
+               rprd(i,k) = 0._r8
+               if (k >= jt(i) .and. k < jb(i) .and. eps0(i) > 0._r8 .and. mu(i,k) >= 0.0_r8) then
+                  if (mu(i,k) > 0._r8) then
+                     ql1 = 1._r8/mu(i,k)* (mu(i,k+1)*ql(i,k+1)- &
+                           dz(i,k)*du(i,k)*ql(i,k+1)+dz(i,k)*cu(i,k))
+                     ql(i,k) = ql1/ (1._r8+dz(i,k)*c0mask(i))
+                  else
+                     ql(i,k) = 0._r8
+                  end if
+                  totpcp(i) = totpcp(i) + dz(i,k)*(cu(i,k)-du(i,k)*ql(i,k+1))
+                  rprd(i,k) = c0mask(i)*mu(i,k)*ql(i,k)
+                  qcde(i,k) = ql(i,k)
+
+                  if (zmconv_microp) then 
+                     loc_conv%qide(i,k) = 0._r8
+                     loc_conv%qncde(i,k) = 0._r8
+                     loc_conv%qnide(i,k) = 0._r8
+                     loc_conv%sprd(i,k) = 0._r8
+                  end if
+
+               end if
+            end do
+         end do
+!
+      end if  ! zmconv_microp
+
+   end do   !iter
 !
 ! specify downdraft properties (no downdrafts if jd.ge.jb).
 ! scale down downward mass flux profile so that net flux
@@ -2482,6 +3506,7 @@ subroutine cldprp(lchnk   , &
          end if
       end do
    end do
+
    do k = msg + 1,pver
       do i = 1,il2g
          if ((k >= jt(i) .and. k <= jb(i)) .and. eps0(i) > 0._r8 .and. jd(i) < jb(i)) then
@@ -2512,80 +3537,7 @@ subroutine cldprp(lchnk   , &
          end if
       end do
    end do
-!
-   do i = 1,il2g
-      done(i) = .false.
-   end do
-   kount = 0
-   do k = pver,msg + 2,-1
-      do i = 1,il2g
-         if (k == jb(i) .and. eps0(i) > 0._r8) then
-            qu(i,k) = q(i,mx(i))
-            su(i,k) = (hu(i,k)-rl*qu(i,k))/cp
-         end if
-         if (( .not. done(i) .and. k > jt(i) .and. k < jb(i)) .and. eps0(i) > 0._r8) then
-            su(i,k) = mu(i,k+1)/mu(i,k)*su(i,k+1) + &
-                      dz(i,k)/mu(i,k)* (eu(i,k)-du(i,k))*s(i,k)
-            qu(i,k) = mu(i,k+1)/mu(i,k)*qu(i,k+1) + dz(i,k)/mu(i,k)* (eu(i,k)*q(i,k)- &
-                            du(i,k)*qst(i,k))
-            tu = su(i,k) - grav/cp*zf(i,k)
-            call qsat_hPa(tu, (p(i,k)+p(i,k-1))/2._r8, estu, qstu)
-            if (qu(i,k) >= qstu) then
-               jlcl(i) = k
-               kount = kount + 1
-               done(i) = .true.
-            end if
-         end if
-      end do
-      if (kount >= il2g) goto 690
-   end do
-690 continue
-   do k = msg + 2,pver
-      do i = 1,il2g
-         if ((k > jt(i) .and. k <= jlcl(i)) .and. eps0(i) > 0._r8) then
-            su(i,k) = shat(i,k) + (hu(i,k)-hsthat(i,k))/(cp* (1._r8+gamhat(i,k)))
-            qu(i,k) = qsthat(i,k) + gamhat(i,k)*(hu(i,k)-hsthat(i,k))/ &
-                     (rl* (1._r8+gamhat(i,k)))
-         end if
-      end do
-   end do
 
-! compute condensation in updraft
-   do k = pver,msg + 2,-1
-      do i = 1,il2g
-         if (k >= jt(i) .and. k < jb(i) .and. eps0(i) > 0._r8) then
-            cu(i,k) = ((mu(i,k)*su(i,k)-mu(i,k+1)*su(i,k+1))/ &
-                      dz(i,k)- (eu(i,k)-du(i,k))*s(i,k))/(rl/cp)
-            if (k == jt(i)) cu(i,k) = 0._r8
-            cu(i,k) = max(0._r8,cu(i,k))
-         end if
-      end do
-   end do
-
-! compute condensed liquid, rain production rate
-! accumulate total precipitation (condensation - detrainment of liquid)
-! Note ql1 = ql(k) + rprd(k)*dz(k)/mu(k)
-! The differencing is somewhat strange (e.g. du(i,k)*ql(i,k+1)) but is
-! consistently applied.
-!    mu, ql are interface quantities
-!    cu, du, eu, rprd are midpoint quantites
-   do k = pver,msg + 2,-1
-      do i = 1,il2g
-         rprd(i,k) = 0._r8
-         if (k >= jt(i) .and. k < jb(i) .and. eps0(i) > 0._r8 .and. mu(i,k) >= 0.0_r8) then
-            if (mu(i,k) > 0._r8) then
-               ql1 = 1._r8/mu(i,k)* (mu(i,k+1)*ql(i,k+1)- &
-                     dz(i,k)*du(i,k)*ql(i,k+1)+dz(i,k)*cu(i,k))
-               ql(i,k) = ql1/ (1._r8+dz(i,k)*c0mask(i))
-            else
-               ql(i,k) = 0._r8
-            end if
-            totpcp(i) = totpcp(i) + dz(i,k)*(cu(i,k)-du(i,k)*ql(i,k+1))
-            rprd(i,k) = c0mask(i)*mu(i,k)*ql(i,k)
-         end if
-      end do
-   end do
-!
    do i = 1,il2g
       qd(i,jd(i)) = qds(i,jd(i))
       sd(i,jd(i)) = (hd(i,jd(i)) - rl*qd(i,jd(i)))/cp
@@ -2598,6 +3550,9 @@ subroutine cldprp(lchnk   , &
             evp(i,k) = -ed(i,k)*q(i,k) + (md(i,k)*qd(i,k)-md(i,k+1)*qd(i,k+1))/dz(i,k)
             evp(i,k) = max(evp(i,k),0._r8)
             mdt = min(md(i,k+1),-small)
+            if (zmconv_microp) then
+              evp(i,k) = min(evp(i,k),rprd(i,k))
+            end if
             sd(i,k+1) = ((rl/cp*evp(i,k)-ed(i,k)*s(i,k))*dz(i,k) + md(i,k)*sd(i,k))/mdt
             totevp(i) = totevp(i) - dz(i,k)*ed(i,k)*q(i,k)
          end if
@@ -2880,7 +3835,8 @@ subroutine q1q2_pjr(lchnk   , &
                     mu      ,md      ,sd      ,qd      ,ql      , &
                     dsubcld ,jt      ,mx      ,il1g    ,il2g    , &
                     cp      ,rl      ,msg     ,          &
-                    dl      ,evp     ,cu      )
+                    dl      ,evp     ,cu      ,          &
+                    loc_conv)
 
 
    implicit none
@@ -2925,6 +3881,9 @@ subroutine q1q2_pjr(lchnk   , &
 
    real(r8),intent(out) :: dqdt(pcols,pver),dsdt(pcols,pver)
    real(r8),intent(out) :: dl(pcols,pver)
+
+   type(zm_conv_t) :: loc_conv         
+
    integer kbm
    integer ktm
    integer jt(pcols)
@@ -2945,6 +3904,16 @@ subroutine q1q2_pjr(lchnk   , &
          dl(i,k) = 0._r8
       end do
    end do
+
+   if (zmconv_microp) then
+      do k = msg + 1,pver
+         do i = il1g,il2g
+            loc_conv%di(i,k) = 0._r8
+            loc_conv%dnl(i,k)  = 0._r8
+            loc_conv%dni(i,k)  = 0._r8
+         end do
+      end do
+   end if
 !
 ! find the highest level top and bottom levels of convection
 !
@@ -2967,6 +3936,8 @@ subroutine q1q2_pjr(lchnk   , &
                         -md(i,k)*   (sd(i,k)-shat(i,k)) &
                        )/dp(i,k)
 
+         if (zmconv_microp) dsdt(i,k) = dsdt(i,k) + latice/cp*loc_conv%frz(i,k)
+
          dqdt(i,k) = emc + &
                     (+mu(i,k+1)* (qu(i,k+1)-qhat(i,k+1)) &
                      -mu(i,k)*   (qu(i,k)-qhat(i,k)) &
@@ -2976,11 +3947,16 @@ subroutine q1q2_pjr(lchnk   , &
 
          dl(i,k) = du(i,k)*ql(i,k+1)
 
+         if (zmconv_microp) then
+           loc_conv%di(i,k) = du(i,k)*loc_conv%qide(i,k+1)
+           loc_conv%dnl(i,k)  = du(i,k)*loc_conv%qncde(i,k+1)
+           loc_conv%dni(i,k)  = du(i,k)*loc_conv%qnide(i,k+1)
+         end if
+
       end do
    end do
 
 !
-!DIR$ NOINTERCHANGE!
    do k = kbm,pver
       do i = il1g,il2g
          if (k == mx(i)) then

@@ -32,4 +32,5 @@
  collect_column_output = .false.,.false.,.true.,.true.
 
  inithist='ENDOFRUN'
+ eul_divdampn=1.
  /

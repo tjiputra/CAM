@@ -66,23 +66,6 @@ while read config_arg; do
     config_string="${config_string}${config_arg} "
 done < ${CAM_SCRIPTDIR}/config_files/${confile}
 
-## task and thread_flags needed so scam test (nospmd, nosmp) can get proper cice decomposition 
-if grep -ic nospmd ${CAM_SCRIPTDIR}/config_files/${confile} > /dev/null; then
-    task_flag=1
-    thrd_flag=1
-else
-    if grep -ic '\-smp' ${CAM_SCRIPTDIR}/config_files/${confile} > /dev/null; then
-        task_flag=$CAM_TASKS
-        thrd_flag=$CAM_THREADS
-        config_string="${config_string} -ntasks ${task_flag} -nthreads ${thrd_flag} "
-    else
-	task_flag=$(( $CAM_TASKS * $CAM_THREADS / ( $min_cpus_per_task * 2 ) ))
-        thrd_flag=2
-        config_string="${config_string} -ntasks ${task_flag} "
-    fi
-fi
-
-
 # chemistry preprocessor
 if [ $usrmech != $1 ];then
     config_string="${config_string} -usr_mech_infile ${CAM_SCRIPTDIR}/config_files/$usrmech -build_chem_proc"

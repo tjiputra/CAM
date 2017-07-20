@@ -377,10 +377,6 @@
               tracer(1:im,jfirst:jlast,kfirst:kend,iq)
 #endif
 
-#if !defined(INNER_OMP)
-!$omp parallel do default(shared)    &
-!$omp private(i, j, k, kq, fx, fy, a2)
-#endif
 #if (!defined USE_OMP) 
 !CSD$ PARALLEL DO PRIVATE (I, J, K, KQ, FX, FY, A2)
 #endif

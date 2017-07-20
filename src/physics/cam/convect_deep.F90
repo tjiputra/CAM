@@ -161,8 +161,8 @@ end subroutine convect_deep_init
 
 subroutine convect_deep_tend( &
      mcon    ,cme     ,          &
-     dlf     ,pflx    ,zdu      , &
-     rliq    , &
+     pflx    ,zdu      , &
+     rliq    ,rice     , &
      ztodt   , &
      state   ,ptend   ,landfrac ,pbuf)
 
@@ -187,12 +187,12 @@ subroutine convect_deep_tend( &
       
 
    real(r8), intent(out) :: mcon(pcols,pverp)  ! Convective mass flux--m sub c
-   real(r8), intent(out) :: dlf(pcols,pver)    ! scattrd version of the detraining cld h2o tend
    real(r8), intent(out) :: pflx(pcols,pverp)  ! scattered precip flux at each level
    real(r8), intent(out) :: cme(pcols,pver)    ! cmf condensation - evaporation
    real(r8), intent(out) :: zdu(pcols,pver)    ! detraining mass flux
 
    real(r8), intent(out) :: rliq(pcols) ! reserved liquid (not yet in cldliq) for energy integrals
+   real(r8), intent(out) :: rice(pcols) ! reserved ice (not yet in cldice) for energy integrals
 
    real(r8), pointer :: prec(:)   ! total precipitation
    real(r8), pointer :: snow(:)   ! snow from ZM convection 
@@ -224,11 +224,11 @@ subroutine convect_deep_tend( &
   case('off', 'UNICON', 'CLUBB_SGS') ! in UNICON case the run method is called from convect_shallow_tend
     zero = 0     
     mcon = 0
-    dlf = 0
     pflx = 0
     cme = 0
     zdu = 0
     rliq = 0
+    rice = 0
 
     call physics_ptend_init(ptend, state%psetcols, 'convect_deep')
 
@@ -259,8 +259,8 @@ subroutine convect_deep_tend( &
      call pbuf_get_field(pbuf, tpert_idx, tpert)
 
      call zm_conv_tend( pblh    ,mcon    ,cme     , &
-          tpert   ,dlf     ,pflx    ,zdu      , &
-          rliq    , &
+          tpert   ,pflx    ,zdu      , &
+          rliq    ,rice    , &
           ztodt   , &
           jctop, jcbot , &
           state   ,ptend   ,landfrac, pbuf)
@@ -275,7 +275,6 @@ subroutine convect_deep_tend( &
   end if
 
   call outfld( 'ICWMRDP ', ql  , pcols, state%lchnk )
-
 
 end subroutine convect_deep_tend
 !=========================================================================================

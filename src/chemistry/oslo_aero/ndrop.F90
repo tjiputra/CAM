@@ -637,8 +637,8 @@ subroutine dropmixnuc( &
    ! before. This doesn't seem like the best variable, since the cloud could
    ! have liquid condensate, but the part of it that is changing could be the
    ! ice portion; however, this is what was done before.
-   lcldo = cldo * cldliqf
-   lcldn = cldn * cldliqf
+   lcldo(:ncol,:)  = cldo(:ncol,:)  * cldliqf(:ncol,:)
+   lcldn(:ncol,:) = cldn(:ncol,:) * cldliqf(:ncol,:)
 
 
    arg = 1.0_r8
@@ -807,7 +807,6 @@ subroutine dropmixnuc( &
          zs(k) = 1._r8/(zm(i,k) - zm(i,k+1))
       end do
       zs(pver) = zs(pver-1)
-
 
       ! load number nucleated into qcld on cloud boundaries
 
@@ -1098,7 +1097,8 @@ subroutine dropmixnuc( &
                end do
             end do
          end if
-         ! growing cloud ......................................................
+
+         ! growing liquid cloud ......................................................
          !    treat the increase of cloud fraction from when cldn(i,k) > cldo(i,k)
          !    and also regenerate part of the cloud 
          cldo_tmp = cldn_tmp
@@ -1243,12 +1243,11 @@ subroutine dropmixnuc( &
 #endif
                enddo
             enddo
-
          endif  ! cldn_tmp-cldo_tmp > 0.01_r8
 
       enddo  ! grow_shrink_main_k_loop
       ! end of k-loop for growing/shrinking cloud calcs ......................
-   
+
       ! ......................................................................
       ! start of k-loop for calc of old cloud activation tendencies ..........
       !
@@ -1467,7 +1466,7 @@ subroutine dropmixnuc( &
             if (cldn(i,k) < 0.01_r8) then
                ! no ice cloud either
 
-            ! convert activated aerosol to interstitial in decaying cloud
+               ! convert activated aerosol to interstitial in decaying cloud
 
                do m = 1, ntot_amode
                   mm = mam_idx(m,0)
@@ -1485,7 +1484,6 @@ subroutine dropmixnuc( &
                      raercol_cw(k,mm,nsav) = 0._r8
                   end do
                end do
-
             end if
          end if
 
@@ -2277,7 +2275,7 @@ end subroutine explmix
 !===============================================================================
 
 subroutine activate_modal(wbar, sigw, wdiab, wminf, wmaxf, tair, rhoair,  &
-   na, nmode, volume, hygro, &
+   na, nmode, volume, hygro,  &
    fn, fm, fluxn, fluxm, flux_fullact, lnsigman )
 
    !      calculates number, surface, and mass fraction of aerosols activated as CCN
@@ -2344,7 +2342,7 @@ subroutine activate_modal(wbar, sigw, wdiab, wminf, wmaxf, tair, rhoair,  &
    real(r8) alpha
    real(r8) gamma
    real(r8) beta
-   real(r8) sqrtg(nmode)
+   real(r8) sqrtg
    real(r8) :: amcube(nmode) ! cube of dry mode radius (m)
    !++alfgr (ununsed) real(r8) :: smcrit(nmode) ! critical supersatuation for activation
    real(r8) :: lnsm(nmode) ! ln(smcrit)
@@ -2369,6 +2367,8 @@ subroutine activate_modal(wbar, sigw, wdiab, wminf, wmaxf, tair, rhoair,  &
    real(r8) xmincoeff,xcut,volcut,surfcut
    real(r8) z,z1,z2,wf1,wf2,zf1,zf2,gf1,gf2,gf
    real(r8) etafactor1,etafactor2(nmode),etafactor2max
+   real(r8) grow
+   character(len=*), parameter :: subname='activate_modal'
    integer m,n
    !      numerical integration parameters
    real(r8), parameter :: eps=0.3_r8,fmax=0.99_r8,sds=3._r8
@@ -2395,23 +2395,19 @@ subroutine activate_modal(wbar, sigw, wdiab, wminf, wmaxf, tair, rhoair,  &
    call qsat(tair, pres, es, qs)
    dqsdt=latvap/(rh2o*tair*tair)*qs
    alpha=gravit*(latvap/(cpair*rh2o*tair*tair)-1._r8/(rair*tair))
-   gamma=(1+latvap/cpair*dqsdt)/(rhoair*qs)
+   gamma=(1.0_r8+latvap/cpair*dqsdt)/(rhoair*qs)
    etafactor2max=1.e10_r8/(alpha*wmaxf)**1.5_r8 ! this should make eta big if na is very small.
 
+   grow  = 1._r8/(rhoh2o/(diff0*rhoair*qs)  &
+           + latvap*rhoh2o/(conduct0*tair)*(latvap/(rh2o*tair) - 1._r8))
+   sqrtg = sqrt(grow)
+   beta  = 2._r8*pi*rhoh2o*grow*gamma
+
    do m=1,nmode
+
       if(volume(m).gt.1.e-39_r8.and.na(m).gt.1.e-39_r8)then
          !            number mode radius (m)
          !           write(iulog,*)'alogsig,volc,na=',alogsig(m),volc(m),na(m)
-         !           growth coefficent Abdul-Razzak & Ghan 1998 eqn 16
-         !           should depend on mean radius of mode to account for gas kinetic effects
-         !           see Fountoukis and Nenes, JGR2005 and Meskhidze et al., JGR2006
-         !           for approriate size to use for effective diffusivity.
-         g=1._r8/(rhoh2o/(diff0*rhoair*qs)                                    &
-            +latvap*rhoh2o/(conduct0*tair)*(latvap/(rh2o*tair)-1._r8))
-         sqrtg(m)=sqrt(g)
-         beta=2._r8*pi*rhoh2o*g*gamma
-         etafactor2(m)=1._r8/(na(m)*beta*sqrtg(m))
-
 #ifdef OSLO_AERO
          if(present(lnsigman))then
             exp45logsig_var(m) = exp(4.5_r8*lnsigman(m)*lnsigman(m))
@@ -2425,6 +2421,11 @@ subroutine activate_modal(wbar, sigw, wdiab, wminf, wmaxf, tair, rhoair,  &
    !Std cam
          amcube(m)=(3._r8*volume(m)/(4._r8*pi*exp45logsig(m)*na(m)))  ! only if variable size dist
 #endif
+         !           growth coefficent Abdul-Razzak & Ghan 1998 eqn 16
+         !           should depend on mean radius of mode to account for gas kinetic effects
+         !           see Fountoukis and Nenes, JGR2005 and Meskhidze et al., JGR2006
+         !           for approriate size to use for effective diffusivity.
+         etafactor2(m)=1._r8/(na(m)*beta*sqrtg)
          if(hygro(m).gt.1.e-10_r8)then
             smc(m)=2._r8*aten*sqrt(aten/(27._r8*hygro(m)*amcube(m))) ! only if variable size dist
          else
@@ -2432,9 +2433,6 @@ subroutine activate_modal(wbar, sigw, wdiab, wminf, wmaxf, tair, rhoair,  &
          endif
          !	    write(iulog,*)'sm,hygro,amcube=',smcrit(m),hygro(m),amcube(m)
       else
-         g=1._r8/(rhoh2o/(diff0*rhoair*qs)                                    &
-            +latvap*rhoh2o/(conduct0*tair)*(latvap/(rh2o*tair)-1._r8))
-         sqrtg(m)=sqrt(g)
          smc(m)=1._r8
          etafactor2(m)=etafactor2max ! this should make eta big if na is very small.
       endif
@@ -2453,16 +2451,7 @@ subroutine activate_modal(wbar, sigw, wdiab, wminf, wmaxf, tair, rhoair,  &
       dw=dwmax
       dfmax=0.2_r8
       dfmin=0.1_r8
-      if(wmax.le.w)then
-         do m=1,nmode
-            fluxn(m)=0._r8
-            fn(m)=0._r8
-            fluxm(m)=0._r8
-            fm(m)=0._r8
-         enddo
-         flux_fullact=0._r8
-         return
-      endif
+      if (wmax <= w) return
       do m=1,nmode
          sumflxn(m)=0._r8
          sumfn(m)=0._r8
@@ -2478,8 +2467,8 @@ subroutine activate_modal(wbar, sigw, wdiab, wminf, wmaxf, tair, rhoair,  &
       gold=0._r8
 
       dwmin = min( dwmax, 0.01_r8 )
+      do n = 1, nx
 
-      do n=1,200
 100      wnuc=w+wdiab
          !           write(iulog,*)'wnuc=',wnuc
          alw=alpha*wnuc
@@ -2488,7 +2477,7 @@ subroutine activate_modal(wbar, sigw, wdiab, wminf, wmaxf, tair, rhoair,  &
 
          do m=1,nmode
             eta(m)=etafactor1*etafactor2(m)
-            zeta(m)=twothird*sqrtalw*aten/sqrtg(m)
+            zeta(m)=twothird*sqrtalw*aten/sqrtg
          enddo
 
          call maxsat(zeta,eta,nmode,smc,smax &
@@ -2571,26 +2560,28 @@ subroutine activate_modal(wbar, sigw, wdiab, wminf, wmaxf, tair, rhoair,  &
          gold=g
          wold=w
          dw=dwnew
-         if(n.gt.1.and.(w.gt.wmax.or.fnmin.gt.fmax))go to 20
+         if (n > 1 .and. (w > wmax .or. fnmin > fmax)) exit
          w=w+dw
-      enddo
-      write(iulog,*)'do loop is too short in activate'
-      write(iulog,*)'wmin=',wmin,' w=',w,' wmax=',wmax,' dw=',dw
-      write(iulog,*)'wbar=',wbar,' sigw=',sigw,' wdiab=',wdiab
-      write(iulog,*)'wnuc=',wnuc
-      write(iulog,*)'na=',(na(m),m=1,nmode)
-      write(iulog,*)'fn=',(fn(m),m=1,nmode)
-      !   dump all subr parameters to allow testing with standalone code
-      !   (build a driver that will read input and call activate)
-      write(iulog,*)'wbar,sigw,wdiab,tair,rhoair,nmode='
-      write(iulog,*) wbar,sigw,wdiab,tair,rhoair,nmode
-      write(iulog,*)'na=',na
-      write(iulog,*)'volume=', (volume(m),m=1,nmode)
-      write(iulog,*)'hydro='
-      write(iulog,*) hygro
+         if (n == nx) then
+            write(iulog,*)'do loop is too short in activate'
+            write(iulog,*)'wmin=',wmin,' w=',w,' wmax=',wmax,' dw=',dw
+            write(iulog,*)'wbar=',wbar,' sigw=',sigw,' wdiab=',wdiab
+            write(iulog,*)'wnuc=',wnuc
+            write(iulog,*)'na=',(na(m),m=1,nmode)
+            write(iulog,*)'fn=',(fn(m),m=1,nmode)
+            !   dump all subr parameters to allow testing with standalone code
+            !   (build a driver that will read input and call activate)
+            write(iulog,*)'wbar,sigw,wdiab,tair,rhoair,nmode='
+            write(iulog,*) wbar,sigw,wdiab,tair,rhoair,nmode
+            write(iulog,*)'na=',na
+            write(iulog,*)'volume=', (volume(m),m=1,nmode)
+            write(iulog,*)'hydro='
+            write(iulog,*) hygro
+            call endrun(subname)
+         end if
 
-      call endrun
-20    continue
+      enddo
+
       ndist(n)=ndist(n)+1
       if(w.lt.wmaxf)then
 
@@ -2658,7 +2649,7 @@ subroutine activate_modal(wbar, sigw, wdiab, wminf, wmaxf, tair, rhoair,  &
 
          do m=1,nmode
             eta(m)=etafactor1*etafactor2(m)
-            zeta(m)=twothird*sqrtalw*aten/sqrtg(m)
+            zeta(m)=twothird*sqrtalw*aten/sqrtg
          enddo
 
          call maxsat(zeta,eta,nmode,smc,smax &
@@ -2706,10 +2697,10 @@ subroutine maxsat(zeta,eta,nmode,smc,smax, f1_in, f2_in)
    !      Abdul-Razzak and Ghan, A parameterization of aerosol activation.
    !      2. Multiple aerosol types. J. Geophys. Res., 105, 6837-6844.
 
-   integer, intent(in)  :: nmode ! number of modes
-   real(r8), intent(in) :: smc(nmode) ! critical supersaturation for number mode radius
-   real(r8), intent(in) :: zeta(nmode)
-   real(r8), intent(in) :: eta(nmode)
+   integer,  intent(in)  :: nmode ! number of modes
+   real(r8), intent(in)  :: smc(nmode) ! critical supersaturation for number mode radius
+   real(r8), intent(in)  :: zeta(nmode)
+   real(r8), intent(in)  :: eta(nmode)
    real(r8), intent(in), optional, target :: f1_in(:)
    real(r8), intent(in), optional, target :: f2_in(:)
 
@@ -2733,15 +2724,14 @@ subroutine maxsat(zeta,eta,nmode,smc,smax, f1_in, f2_in)
          smax=1.e-20_r8
       else
          !            significant activation of this mode. calc activation all modes.
-         go to 1
+         exit
       endif
+          ! No significant activation in any mode.  Do nothing.
+      if (m == nmode) return
+
    enddo
 
-   return
-
-1  continue
-
-   sum=0
+   sum=0.0_r8
    do m=1,nmode
       if(eta(m).gt.1.e-20_r8)then
          g1=zeta(m)/eta(m)

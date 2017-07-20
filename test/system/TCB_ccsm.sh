@@ -60,11 +60,11 @@ if [[ -n "$CCSM_MPILIB" ]]; then
 else
     mpiopt=""
 fi
-echo "${CAM_ROOT}/cime/scripts/create_newcase -case ${CAM_TESTDIR}/case.$1.$2 \
-    -res $1 -compset $compset -mach ${CCSM_MACH} ${mpiopt}"
+echo "${CAM_ROOT}/cime/scripts/create_newcase --case ${CAM_TESTDIR}/case.$1.$2 \
+    --res $1 --compset $compset  ${mpiopt} --run-unsupported "
 
-${CAM_ROOT}/cime/scripts/create_newcase -case ${CAM_TESTDIR}/case.$1.$2 \
-    -res $1 -compset $compset -mach ${CCSM_MACH} ${mpiopt} >test.log 2>&1
+${CAM_ROOT}/cime/scripts/create_newcase --case ${CAM_TESTDIR}/case.$1.$2 \
+    --res $1 --compset $compset ${mpiopt} --run-unsupported  >test.log 2>&1
 rc=$?
 if [ $rc -eq 0 ]; then
     echo "TCB_ccsm.sh: create_newcase was successful" 
@@ -76,22 +76,22 @@ else
 fi
 
 cd ${CAM_TESTDIR}/case.$1.$2
-echo "./xmlchange -id EXEROOT -val ${CAM_TESTDIR}/case.$1.$2/bld"
-./xmlchange -id EXEROOT -val ${CAM_TESTDIR}/case.$1.$2/bld
+echo "./xmlchange EXEROOT=${CAM_TESTDIR}/case.$1.$2/bld"
+./xmlchange EXEROOT=${CAM_TESTDIR}/case.$1.$2/bld
 
-echo "./xmlchange -id RUNDIR -val ${CAM_TESTDIR}/case.$1.$2/run"
-./xmlchange -id RUNDIR -val ${CAM_TESTDIR}/case.$1.$2/run
+echo "./xmlchange RUNDIR=${CAM_TESTDIR}/case.$1.$2/run"
+./xmlchange RUNDIR=${CAM_TESTDIR}/case.$1.$2/run
 
-echo "./xmlchange -id RUN_WITH_SUBMIT -val TRUE"
-./xmlchange -id RUN_WITH_SUBMIT -val TRUE
+echo "./xmlchange RUN_WITH_SUBMIT=TRUE"
+./xmlchange RUN_WITH_SUBMIT=TRUE
 
 # chemistry preprocessor
 if [ $usrmech != $2 ]; then
    string1=`grep CAM_CONFIG_OPTS env_build.xml`
    string2=`echo $string1 | cut -d "=" -f 3`
    cfgstring=`echo $string2 | cut -d "\"" -f 2`
-   echo "./xmlchange -id CAM_CONFIG_OPTS -val ""$cfgstring -usr_mech_infile ${CAM_SCRIPTDIR}/config_files/$usrmech -build_chem_proc"" "
-   ./xmlchange -id CAM_CONFIG_OPTS -val "$cfgstring -usr_mech_infile ${CAM_SCRIPTDIR}/config_files/$usrmech -build_chem_proc" 
+   echo "./xmlchange CAM_CONFIG_OPTS=""$cfgstring -usr_mech_infile ${CAM_SCRIPTDIR}/config_files/$usrmech -build_chem_proc"" "
+   ./xmlchange CAM_CONFIG_OPTS="$cfgstring -usr_mech_infile ${CAM_SCRIPTDIR}/config_files/$usrmech -build_chem_proc" 
 fi
 
 #
@@ -99,12 +99,12 @@ fi
 #
 
 for comp in ATM LND ICE OCN CPL GLC ROF WAV ESP; do
-    echo "./xmlchange -id NTASKS_${comp} -val $CAM_TASKS"
-    ./xmlchange -id NTASKS_${comp} -val $CAM_TASKS
+    echo "./xmlchange NTASKS_${comp}=$CAM_TASKS"
+    ./xmlchange NTASKS_${comp}=$CAM_TASKS
 #    echo "./xmlchange DEBUG=TRUE"
 #    ./xmlchange DEBUG=TRUE
-    echo "./xmlchange -id NTHRDS_${comp} -val $CAM_THREADS"
-    ./xmlchange -id NTHRDS_${comp} -val $CAM_THREADS
+    echo "./xmlchange NTHRDS_${comp}=$CAM_THREADS"
+    ./xmlchange NTHRDS_${comp}=$CAM_THREADS
 done
 
 
