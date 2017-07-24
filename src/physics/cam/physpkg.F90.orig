@@ -1224,7 +1224,7 @@ contains
     use rayleigh_friction,  only: rayleigh_friction_tend
     use constituents,       only: cnst_get_ind
     use physics_types,      only: physics_state, physics_tend, physics_ptend, physics_update,    &
-                                  physics_dme_adjust, set_dry_to_wet, physics_state_check
+         physics_dme_adjust, set_dry_to_wet, physics_state_check
     use waccmx_phys_intr,   only: waccmx_phys_mspd_tend  ! WACCM-X major diffusion
     use waccmx_phys_intr,   only: waccmx_phys_ion_elec_temp_tend ! WACCM-X 
     use aoa_tracers,        only: aoa_tracers_timestep_tend
@@ -1286,7 +1286,6 @@ contains
     real(r8) :: tmp_q     (pcols,pver) ! tmp space
     real(r8) :: tmp_cldliq(pcols,pver) ! tmp space
     real(r8) :: tmp_cldice(pcols,pver) ! tmp space
-    real(r8) :: tmp_t     (pcols,pver) !tht: tmp space
 
     ! physics buffer fields for total energy and mass adjustment
     integer itim_old, ifld
@@ -1297,10 +1296,6 @@ contains
     real(r8), pointer, dimension(:,:) :: cldiceini
     real(r8), pointer, dimension(:,:) :: dtcore
     real(r8), pointer, dimension(:,:) :: ast     ! relative humidity cloud fraction 
-
-    !tht: variables for dme_energy_adjust 
-    real(r8):: eflx(pcols), dsema(pcols) 
-    logical, parameter:: ohf_adjust =.true.  ! condensates have surface specific enthalpy
 
     !-----------------------------------------------------------------------
     lchnk = state%lchnk
@@ -1540,16 +1535,10 @@ contains
     ! Scale dry mass and energy (does nothing if dycore is EUL or SLD)
     call cnst_get_ind('CLDLIQ', ixcldliq)
     call cnst_get_ind('CLDICE', ixcldice)
-
-    tmp_t     (:ncol,:pver) = state%t(:ncol,:pver) 
     tmp_q     (:ncol,:pver) = state%q(:ncol,:pver,1)
     tmp_cldliq(:ncol,:pver) = state%q(:ncol,:pver,ixcldliq)
     tmp_cldice(:ncol,:pver) = state%q(:ncol,:pver,ixcldice)
-
-   !call physics_dme_adjust(state, tend, qini, ztodt)
-    call physics_dme_adjust(state, tend, qini, ztodt, eflx, dsema, &
-                            ohf_adjust, cam_in%ocnfrac, cam_in%sst, cam_in%ts) !tht
-
+    call physics_dme_adjust(state, tend, qini, ztodt)
 !!!   REMOVE THIS CALL, SINCE ONLY Q IS BEING ADJUSTED. WON'T BALANCE ENERGY. TE IS SAVED BEFORE THIS
 !!!   call check_energy_chng(state, tend, "drymass", nstep, ztodt, zero, zero, zero, zero)
 
@@ -1570,10 +1559,8 @@ contains
        endif
     endif
 
-   !call diag_phys_tend_writeout (state, pbuf,  tend, ztodt, tmp_q,        tmp_cldliq, tmp_cldice, &
-   !     qini, cldliqini, cldiceini)
-    call diag_phys_tend_writeout (state, pbuf,  tend, ztodt, tmp_q, tmp_t, tmp_cldliq, tmp_cldice, &
-         qini, cldliqini, cldiceini, eflx, dsema) !tht
+    call diag_phys_tend_writeout (state, pbuf,  tend, ztodt, tmp_q, tmp_cldliq, tmp_cldice, &
+         qini, cldliqini, cldiceini)
 
     call clybry_fam_set( ncol, lchnk, map2chm, state%q, pbuf )
 
