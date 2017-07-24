@@ -815,8 +815,6 @@ subroutine radiation_tend( &
 
    real(r8) :: ftem(pcols,pver)        ! Temporary workspace for outfld variables
 
-   logical, parameter :: cosz_rad_call=.true.
-
    character(*), parameter :: name = 'radiation_tend'
    !--------------------------------------------------------------------------------------
 
@@ -842,7 +840,7 @@ subroutine radiation_tend( &
    call shr_orb_decl(calday, eccen, mvelpp, lambm0, obliqr, &
                      delta, eccf)
    do i = 1, ncol
-      coszrs(i) = shr_orb_cosz(calday, clat(i), clon(i), delta, dt_avg, cosz_rad_call)
+      coszrs(i) = shr_orb_cosz(calday, clat(i), clon(i), delta, dt_avg)
    end do
 
    ! Gather night/day column indices.

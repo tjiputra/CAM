@@ -601,14 +601,6 @@ Relaxation time (hours) applied to specified meteorology.
 Default: 0.0
 </entry>
 
-<entry id="met_nudge_only_uvps" type="logical"  category="dyn_fv_off"
-       group="metdata_nl" valid_values="" >
-if true, nudge only u, v and ps. If false, nudge other fields as well
-(T, Q, TS, SHOWH, TAUX, TAUY, SHFLX, QFLX)
-Default: true
-</entry>
-
-
 <entry id="met_fix_mass" type="logical"  category="dyn_fv_off"
        group="metdata_nl" valid_values="" >
 switch to turn on/off mass fixer for offline driver 
@@ -3524,7 +3516,7 @@ Default: set by build-namelist
        group="phys_ctl_nl" valid_values="trop_mam3,trop_mam4,trop_mam7,trop_mozart,trop_strat_mam4_vbs,
                                          trop_bam,trop_ghg,waccm_ma,waccm_mad_mam4,waccm_ma_mam4,
                                          waccm_ma_sulfur,waccm_sc,waccm_sc_mam4,waccm_tsmlt,waccm_tsmlt_mam4,
-                                         waccm_tsmlt_sulfur,super_fast_llnl,super_fast_llnl_mam3,terminator,trop_mam_oslo,none" >
+                                         waccm_tsmlt_sulfur,super_fast_llnl,super_fast_llnl_mam3,terminator,none" >
 Name of the CAM chemistry package.  N.B. this variable may not be set by
 the user.  It is set by build-namelist via information in the configure
 cache file to be consistent with how CAM was built.
@@ -3651,14 +3643,6 @@ Default: 'HB'
 Switch to use new convective scavenging for modal aerosols.  This scheme
 replaces the call to ZM's convtran for the the modal aerosol number and
 mass mixing ratio constituents.
-Default: .false.
-</entry>
-
-<!-- Hydrostatic pressure work in mass adjustment -->
-<entry id="dme_energy_adjust" type="logical"  category="NorESM"
-       group="phys_ctl_nl" valid_values="" >
-Switch to use appropriate energy adjustment in dry-mass adjustment at the
-end of tphysac. 
 Default: .false.
 </entry>
 
@@ -6422,10 +6406,6 @@ Default: FALSE
        group="seq_cplflds_inparm" valid_values="" >
 Default: FALSE
 </entry>
-<entry id="flds_co2_dmsb" type="logical"  category="driver"
-       group="seq_cplflds_inparm" valid_values="" >
-Default: FALSE
-</entry>
 <entry id="cplflds_custom" type="char*80"  category="driver"
        group="seq_cplflds_userspec" valid_values="" >
 Default: 
@@ -7392,82 +7372,4 @@ List of filepaths for dataset for offline unit driver.
 Default: none
 </entry>
 
-<!-- CAM-Oslo variables  -->
-
-<entry id="volc_fraction_coarse" type="real" category="cam_oslo"
-       group="oslo_ctl_nl" valid_values="" >
-Fraction of volcanic aerosols which will end up in coarse mode 
-Default: 0.0
-</entry>
-<entry id="aerotab_table_dir" type="char*256" input_pathname="abs" category="cam_oslo"
-       group="oslo_ctl_nl" valid_values="" >
-Directory where we will expect to find the CAM-Oslo tables
-created from AeroTab
-</entry>
-
-<entry id="energy_conservation_type" type="integer" category="cam_oslo"
-       group="phys_ctl_nl" valid_values="0,1" >
-Type of energy conservation scheme used. 0 = original, 1 = THT scheme
-Default: 0
-</entry>
-
-<entry id="lprint_energy_global" type="logical" category="cam_oslo"
-       group="phys_ctl_nl" valid_values="" >
-Do printing of energy problems (global)
-Default : false
-</entry>
-
-<entry id="lprint_energy_clutter" type="logical" category="cam_oslo"
-       group="phys_ctl_nl" valid_values="" >
-Do printing of energy problems (clutter)
-Default : false
-</entry>
-
-<entry id="dms_source" type="char*20" category="cam_oslo"
-       group="oslo_ctl_nl" valid_values="" >
-Type of DMS data source
-Default: emission_file
-</entry>
-
-<entry id="dms_source_type" type="char*32" category="cam_oslo"
-       group="oslo_ctl_nl" valid_values="" >
-Type of DMS data source type
-Default: CYCLICAL
-</entry>
-
-<entry id="dms_cycle_year" type="integer" category="cam_oslo"
-       group="oslo_ctl_nl" valid_values="" >
-DMS cycle year
-Default: 2000
-</entry>
-
-<entry id="opom_source" type="char*20" category="cam_oslo"
-       group="oslo_ctl_nl" valid_values="" >
-Type of ocean POM data source
-Default: no_file
-</entry>
-
-<entry id="opom_source_type" type="char*32" category="cam_oslo"
-       group="oslo_ctl_nl" valid_values="" >
-Type of ocean POM data source type
-Default: CYCLICAL
-</entry>
-
-<entry id="opom_cycle_year" type="integer" category="cam_oslo"
-       group="oslo_ctl_nl" valid_values="" >
-Ocean POM cycle year
-Default: 2000
-</entry>
-
-<entry id="ocean_filename" type="char*256" input_pathname="rel:ocean_filepath" category="cam_oslo"
-       group="oslo_ctl_nl" valid_values="" >
-Filename for ocean concentration of DMS, chlorophyll and poc
-Default: name
-</entry>
-
-<entry id="ocean_filepath" type="char*256" input_pathname="abs" category="cam_oslo"
-       group="oslo_ctl_nl" valid_values="" >
-Path to ocean file
-Default: path
-</entry>
 </namelist_definition>
