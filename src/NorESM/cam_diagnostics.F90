@@ -216,7 +216,13 @@ contains
     call addfld ('VAP',     (/ 'lev' /), 'A','m/s',           'Meridional wind (after physics)'   )
     call addfld (apcnst(1), (/ 'lev' /), 'A','kg/kg',         trim(cnst_longname(1))//' (after physics)')
     if ( dycore_is('LR') .or. dycore_is('SE') ) then
-      call addfld ('TFIX',    horiz_only,  'A', 'K/s',        'T fixer (T equivalent of Energy correction)')
+      call addfld ('TFIX',   horiz_only, 'A','K/s',           'T fixer (T equivalent of Energy correction)')
+      call addfld ('PTTEND_DME', (/ 'lev' /), 'A', 'K/s ', &
+                   'T-tendency due to dry mass adjustment at the end of tphysac'    )
+      call addfld ('IETEND_DME',  horiz_only, 'A','W/m2 ', &
+                   'Column DSE tendency due to mass adjustment at end of tphysac'   )
+      call addfld ('EFLX    '  ,  horiz_only, 'A','W/m2 ', &
+                   'Material enthalpy flux due to mass adjustment at end of tphysac')
     end if
     call addfld ('TTEND_TOT', (/ 'lev' /), 'A', 'K/s',        'Total temperature tendency')
 
@@ -603,7 +609,10 @@ contains
       call add_default ('VAP     '  , history_budget_histfile_num, ' ')
       call add_default (apcnst(1)   , history_budget_histfile_num, ' ')
       if ( dycore_is('LR') .or. dycore_is('SE') ) then
-        call add_default ('TFIX    '    , history_budget_histfile_num, ' ')
+        call add_default ('TFIX    '  , history_budget_histfile_num, ' ')
+        call add_default ('PTTEND_DME', history_budget_histfile_num, ' ') !+tht
+        call add_default ('IETEND_DME', history_budget_histfile_num, ' ') !+tht
+        call add_default ('EFLX    '  , history_budget_histfile_num, ' ') !+tht
       end if
     end if
 
@@ -2418,7 +2427,8 @@ contains
 
 !#######################################################################
 
-  subroutine diag_phys_tend_writeout_dry(state, pbuf,  tend, ztodt)
+ !subroutine diag_phys_tend_writeout_dry(state, pbuf, tend, ztodt)
+  subroutine diag_phys_tend_writeout_dry(state, pbuf, tend, ztodt, tmp_t, eflx, dsema) !tht
 
     !---------------------------------------------------------------
     !
@@ -2436,6 +2446,10 @@ contains
     type(physics_buffer_desc), pointer :: pbuf(:)
     type(physics_tend ), intent(in)    :: tend
     real(r8),            intent(in)    :: ztodt             ! physics timestep
+
+    real(r8)           , intent(inout) :: tmp_t     (pcols,pver) !tht: holds last physics_updated T (FV)
+    real(r8)           , intent(in), optional ::eflx (pcols    ) !tht: surface sensible heat flux assoc.with mass adj.
+    real(r8)           , intent(in), optional ::dsema(pcols    ) !tht: column enthalpy tendency assoc. with mass adj.
 
     !---------------------------Local workspace-----------------------------
 
@@ -2459,9 +2473,16 @@ contains
     call outfld('UAP', state%u, pcols, lchnk   )
     call outfld('VAP', state%v, pcols, lchnk   )
 
+    !tht: heat tendencies from dme_adjust
+    if (dycore_is('LR')) then
+      tmp_t(:ncol,:pver) = (state%t(:ncol,:pver) - tmp_t(:ncol,:pver))/ztodt ! T tendency
+      call outfld('PTTEND_DME', tmp_t, pcols, lchnk   )
+      if(present(dsema))call outfld('IETEND_DME', dsema, pcols, lchnk)       ! dry enthalpy
+      if(present(eflx) )call outfld('EFLX'      ,  eflx, pcols, lchnk)       ! moist enthalpy
+    end if
+
     ! Total physics tendency for Temperature
     ! (remove global fixer tendency from total for FV and SE dycores)
-
     if (dycore_is('LR') .or. dycore_is('SE')) then
       call check_energy_get_integrals( heat_glob_out=heat_glob )
       ftem2(:ncol)  = heat_glob/cpair
@@ -2627,8 +2648,8 @@ contains
 !       tmp_q, tmp_cldliq, tmp_cldice, qini, cldliqini, cldiceini)
 !AL
   subroutine diag_phys_tend_writeout(state, pbuf,  tend, ztodt              &
-       , tmp_q, tmp_cldliq, tmp_cldice, tmp_cldnc,tmp_cldni                 &
-       , qini, cldliqini, cldiceini,cldncini, cldniini)
+       , tmp_q, tmp_t, tmp_cldliq, tmp_cldice, tmp_cldnc,tmp_cldni                 &
+       , qini, cldliqini, cldiceini,cldncini, cldniini, eflx, dsema)
     !---------------------------------------------------------------
     !
     ! Purpose:  Dump physics tendencies for moisture and temperature
@@ -2643,6 +2664,7 @@ contains
     type(physics_tend ), intent(in)    :: tend
     real(r8),            intent(in)    :: ztodt                  ! physics timestep
     real(r8)           , intent(inout) :: tmp_q     (pcols,pver) ! As input, holds pre-adjusted tracers (FV)
+    real(r8)           , intent(inout) :: tmp_t     (pcols,pver) !tht: holds last physics_updated T (FV)
     real(r8),            intent(inout) :: tmp_cldliq(pcols,pver) ! As input, holds pre-adjusted tracers (FV)
     real(r8),            intent(inout) :: tmp_cldice(pcols,pver) ! As input, holds pre-adjusted tracers (FV)
     real(r8),            intent(in)    :: qini      (pcols,pver) ! tracer fields at beginning of physics
@@ -2654,10 +2676,14 @@ contains
    real(r8)           , intent(in   ) :: cldncini (pcols,pver) ! tracer fields at beginning of physics
    real(r8)           , intent(in   ) :: cldniini (pcols,pver) ! tracer fields at beginning of physics
 !AL
+    real(r8)           , intent(in), optional ::eflx (pcols    ) !tht: surface sensible heat flux assoc.with mass adj.
+    real(r8)           , intent(in), optional ::dsema(pcols    ) !tht: column enthalpy tendency assoc. with mass adj.
 
     !-----------------------------------------------------------------------
 
-    call diag_phys_tend_writeout_dry(state, pbuf, tend, ztodt)
+   !call diag_phys_tend_writeout_dry(state, pbuf, tend, ztodt)
+    call diag_phys_tend_writeout_dry(state, pbuf, tend, ztodt, tmp_t, eflx, dsema) !tht
+
     if (moist_physics) then
       call diag_phys_tend_writeout_moist(state, pbuf,  tend, ztodt,           &
            tmp_q, tmp_cldliq, tmp_cldice, tmp_cldnc, tmp_cldni                &

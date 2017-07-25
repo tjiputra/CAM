@@ -1234,7 +1234,7 @@ contains
     use rayleigh_friction,  only: rayleigh_friction_tend
     use constituents,       only: cnst_get_ind
     use physics_types,      only: physics_state, physics_tend, physics_ptend, physics_update,    &
-         physics_dme_adjust, set_dry_to_wet, physics_state_check
+                                  physics_dme_adjust, set_dry_to_wet, physics_state_check
     use waccmx_phys_intr,   only: waccmx_phys_mspd_tend  ! WACCM-X major diffusion
     use waccmx_phys_intr,   only: waccmx_phys_ion_elec_temp_tend ! WACCM-X 
     use aoa_tracers,        only: aoa_tracers_timestep_tend
@@ -1298,6 +1298,7 @@ contains
     real(r8) :: tmp_q     (pcols,pver) ! tmp space
     real(r8) :: tmp_cldliq(pcols,pver) ! tmp space
     real(r8) :: tmp_cldice(pcols,pver) ! tmp space
+    real(r8) :: tmp_t     (pcols,pver) !tht: tmp space
 
     ! physics buffer fields for total energy and mass adjustment
     integer itim_old, ifld
@@ -1315,25 +1316,16 @@ contains
     real(r8) :: tmp_cldni(pcols,pver) ! tmp space
 !AL
 
-!+tht 22/5/14 variables and flags for dry-mass energy adjustment
-    real(r8):: eflx(pcols), dsema(pcols) !+tht 05.11.2015: added DSEMA
-    integer :: energy_conservation_type
-  ! make choices clearer here
-  ! logical :: lglobal, lclutter, te_conserve, ohf_adjust ! last one added 29/10/2015
-  !!+tht 02/11/2015: strict energy budgeting option  (N.B. =.true. is a kludge)
-  ! logical, parameter:: lstickback=.false.
-    logical :: lglobal, lclutter
-    logical, parameter:: lstickback =.true.  ! strict energy budgeting option  (T -> kludge)
-    logical, parameter:: ohf_adjust =.false.  ! condensates have surface specific enthalpy
-!-tht
+    !tht: variables for dme_energy_adjust 
+    real(r8):: eflx(pcols), dsema(pcols) 
+    logical, parameter:: ohf_adjust =.true.  ! condensates have surface specific enthalpy
+
     !-----------------------------------------------------------------------
     lchnk = state%lchnk
     ncol  = state%ncol
 
     nstep = get_nstep()
     
-    call phys_getopts(energy_conservation_type_out=energy_conservation_type)
-
     ! Adjust the surface fluxes to reduce instabilities in near sfc layer
     if (phys_do_flux_avg()) then 
        call flux_avg_run(state, cam_in,  pbuf, nstep, ztodt)
@@ -1408,7 +1400,6 @@ contains
     call check_tracers_chng(state, tracerint, "aoa_tracers_timestep_tend", nstep, ztodt,   &
          cam_in%cflx)
 
-    lglobal = .FALSE.
     !===================================================
     ! Chemistry and MAM calculation
     ! MAM core aerosol conversion process is performed in the below 'chem_timestep_tend'.
@@ -1571,6 +1562,8 @@ contains
     ! Scale dry mass and energy (does nothing if dycore is EUL or SLD)
     call cnst_get_ind('CLDLIQ', ixcldliq)
     call cnst_get_ind('CLDICE', ixcldice)
+
+    tmp_t     (:ncol,:pver) = state%t(:ncol,:pver) 
     tmp_q     (:ncol,:pver) = state%q(:ncol,:pver,1)
     tmp_cldliq(:ncol,:pver) = state%q(:ncol,:pver,ixcldliq)
     tmp_cldice(:ncol,:pver) = state%q(:ncol,:pver,ixcldice)
@@ -1580,7 +1573,10 @@ contains
     tmp_cldnc(:ncol,:pver) = state%q(:ncol,:pver,ixnumliq)
     tmp_cldni(:ncol,:pver) = state%q(:ncol,:pver,ixnumice)
 !AL
-    call physics_dme_adjust(state, tend, qini, ztodt)
+   !call physics_dme_adjust(state, tend, qini, ztodt)
+    call physics_dme_adjust(state, tend, qini, ztodt, eflx, dsema, &
+                            ohf_adjust, cam_in%ocnfrac, cam_in%sst, cam_in%ts) !tht
+
 !!!   REMOVE THIS CALL, SINCE ONLY Q IS BEING ADJUSTED. WON'T BALANCE ENERGY. TE IS SAVED BEFORE THIS
 !!!   call check_energy_chng(state, tend, "drymass", nstep, ztodt, zero, zero, zero, zero)
 
@@ -1604,8 +1600,8 @@ contains
 !AL
 !    call diag_phys_tend_writeout (state, pbuf,  tend, ztodt, tmp_q, tmp_cldliq, tmp_cldice, &
 !         qini, cldliqini, cldiceini)
-    call diag_phys_tend_writeout (state, pbuf,  tend, ztodt, tmp_q, tmp_cldliq, tmp_cldice, &
-         tmp_cldnc,tmp_cldni,qini, cldliqini, cldiceini, cldncini, cldniini ) 
+    call diag_phys_tend_writeout (state, pbuf,  tend, ztodt, tmp_q, tmp_t, tmp_cldliq, tmp_cldice, &
+         tmp_cldnc,tmp_cldni,qini, cldliqini, cldiceini, cldncini, cldniini, eflx, dsema ) 
     !++alfgr add these if needed later, eflx,dsema ) !+tht 05.11.2015 added D
 !AL
     call clybry_fam_set( ncol, lchnk, map2chm, state%q, pbuf )
@@ -1847,7 +1843,6 @@ contains
    real(r8) :: v3ss(pcols,pver,nmodes)   ! Modal mass fraction of sea-salt
    real(r8) :: frh(pcols,pver,nmodes)    ! Modal humidity growth factor 
 #endif ! aerocom
-    call phys_getopts (energy_conservation_type_out = energy_conservation_type) 
     !-----------------------------------------------------------------------
 
     call t_startf('bc_init')

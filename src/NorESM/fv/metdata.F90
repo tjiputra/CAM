@@ -669,9 +669,6 @@ contains
 !-------------------------------------------------------------------
   subroutine get_dyn_flds( state, tend, dt )
 
-!+tht
-      use phys_control, only: phys_getopts
-!-tht
     use physics_types,  only: physics_state, physics_tend, physics_dme_adjust
     use ppgrid,         only: pcols, pver, begchunk, endchunk
     use phys_grid,      only: get_ncols_p
@@ -690,15 +687,7 @@ contains
 
     real(r8) :: tmp(pcols,pver)
 
-!+tht    
-    integer :: energy_conservation_type
-!-tht
-
     call t_startf('MET__GET_DYN2')
-
-!+tht    
-    call phys_getopts(energy_conservation_type_out=energy_conservation_type)
-!-tht
 
     !++ IH don't nudge T and Q if met_nudge_only_uvps is true
     !      (I don't think Q is nudged by the defalut settings anyways since alpha is 1)
