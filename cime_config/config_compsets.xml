@@ -176,6 +176,11 @@
   </compset>
 
   <compset>
+    <alias>QSC6O</alias>
+    <lname>2000_CAM60%PTAERO_SLND_SICE_DOCN%SOMAQP_SROF_SGLC_SWAV</lname>
+  </compset>
+
+  <compset>
    <alias>NFPTAERO</alias>
    <lname>2000_CAM5%PTAEROUPD1_CLM40%SP_CICE%PRES_DOCN%DOM_RTM_SGLC_SWAV</lname>
   </compset>

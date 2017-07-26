@@ -7405,24 +7405,6 @@ Directory where we will expect to find the CAM-Oslo tables
 created from AeroTab
 </entry>
 
-<entry id="energy_conservation_type" type="integer" category="cam_oslo"
-       group="phys_ctl_nl" valid_values="0,1" >
-Type of energy conservation scheme used. 0 = original, 1 = THT scheme
-Default: 0
-</entry>
-
-<entry id="lprint_energy_global" type="logical" category="cam_oslo"
-       group="phys_ctl_nl" valid_values="" >
-Do printing of energy problems (global)
-Default : false
-</entry>
-
-<entry id="lprint_energy_clutter" type="logical" category="cam_oslo"
-       group="phys_ctl_nl" valid_values="" >
-Do printing of energy problems (clutter)
-Default : false
-</entry>
-
 <entry id="dms_source" type="char*20" category="cam_oslo"
        group="oslo_ctl_nl" valid_values="" >
 Type of DMS data source

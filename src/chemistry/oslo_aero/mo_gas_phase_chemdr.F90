@@ -528,7 +528,10 @@ contains
     !        ... Calculate cosine of zenith angle
     !            then cast back to angle (radians)
     !-----------------------------------------------------------------------      
-    call zenith( calday, rlats, rlons, zen_angle, ncol )
+!+tht
+   !call zenith( calday, rlats, rlons, zen_angle, ncol )
+    call zenith( calday, rlats, rlons, zen_angle, ncol ,delt)
+!-tht
     zen_angle(:) = acos( zen_angle(:) )
 
     sza(:) = zen_angle(:) * rad2deg

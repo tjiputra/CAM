@@ -190,7 +190,8 @@ end subroutine check_energy_get_integrals
     call addfld('TEINP',  horiz_only,  'A', 'J/m2', 'Total energy of physics input')
     call addfld('TEOUT',  horiz_only,  'A', 'J/m2', 'Total energy of physics output')
     call addfld('TEFIX',  horiz_only,  'A', 'J/m2', 'Total energy after fixer')
-    call addfld('EFIX',   horiz_only,  'A', 'W/m2', 'Effective sensible heat flux due to energy fixer')
+   !+tht commented out next line, leave both TFIX and EFIX defined in cam_diagnostic.F90
+   !call addfld('EFIX',   horiz_only,  'A', 'W/m2', 'Effective sensible heat flux due to energy fixer')
     call addfld('DTCORE', (/ 'lev' /), 'A', 'K/s' , 'T tendency due to dynamical core')
 
     if ( history_budget ) then

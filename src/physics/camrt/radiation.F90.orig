@@ -938,8 +938,7 @@ subroutine radiation_tend( &
    ! Cosine solar zenith angle for current time step
    call get_rlat_all_p(lchnk, ncol, clat)
    call get_rlon_all_p(lchnk, ncol, clon)
-  !call zenith (calday, clat, clon, coszrs, ncol, dt_avg)
-   call zenith (calday, clat, clon, coszrs, ncol, dt_avg,use_rad_dt_cosz) !+tht
+   call zenith (calday, clat, clon, coszrs, ncol, dt_avg)
 
    ! Gather night/day column indices.
    Nday = 0

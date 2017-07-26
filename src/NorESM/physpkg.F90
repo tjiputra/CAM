@@ -1791,11 +1791,6 @@ contains
     real(r8) :: zero_tracers(pcols,pcnst)
 
     logical   :: lq(pcnst)
-!+tht 22/5/14
-    logical :: lglobal, lclutter
-!-tht
-    ! Debug physics_state.
-    integer :: energy_conservation_type
 
 #ifdef AEROCOM
    real(r8) :: logsig3d(pcols,pver,nmodes) ! Log (log10) of standard deviation for lognormal modes, method 2.

@@ -26,6 +26,10 @@ module mo_gas_phase_chemdr
   integer :: het1_ndx
   integer :: ndx_cldfr, ndx_cmfdqr, ndx_nevapr, ndx_cldtop, ndx_prain
   integer :: ndx_h2so4
+#ifdef OSLO_AERO
+  logical :: inv_o3, inv_oh, inv_no3, inv_ho2
+  integer :: id_o3, id_oh, id_no3, id_ho2
+#endif
 !
 ! CCMI
 !
@@ -55,7 +59,7 @@ contains
 
   subroutine gas_phase_chemdr_inti()
 
-    use mo_chem_utls,      only : get_spc_ndx, get_extfrc_ndx, get_rxt_ndx
+    use mo_chem_utls,      only : get_spc_ndx, get_extfrc_ndx, get_inv_ndx, get_rxt_ndx
     use cam_history,       only : addfld,add_default,horiz_only
     use mo_chm_diags,      only : chm_diags_inti
     use constituents,      only : cnst_get_ind
@@ -67,11 +71,32 @@ contains
     character(len=3) :: string
     integer          :: n, m, err
     logical :: history_cesm_forcing
+    logical           :: history_aerosol      ! Output the MAM aerosol tendencies
 
     !-----------------------------------------------------------------------
 
-    call phys_getopts( convproc_do_aer_out = convproc_do_aer, history_cesm_forcing_out=history_cesm_forcing )
-   
+    call phys_getopts( convproc_do_aer_out = convproc_do_aer, history_cesm_forcing_out=history_cesm_forcing, &
+                       history_aerosol_out = history_aerosol )
+
+#if defined(OSLO_AERO)
+    inv_o3   = get_inv_ndx('O3') > 0
+    inv_oh   = get_inv_ndx('OH') > 0
+    inv_no3  = get_inv_ndx('NO3') > 0
+    inv_ho2  = get_inv_ndx('HO2') > 0
+    if (inv_o3) then
+       id_o3 = get_inv_ndx('O3')
+    endif
+    if (inv_oh) then
+       id_oh = get_inv_ndx('OH')
+    endif
+    if (inv_no3) then
+       id_no3 = get_inv_ndx('NO3')
+    endif
+    if (inv_ho2) then
+       id_ho2 = get_inv_ndx('HO2')
+    endif
+#endif
+
     ndx_h2so4 = get_spc_ndx('H2SO4')
 !
 ! CCMI
@@ -288,6 +313,9 @@ contains
     use mo_chm_diags,      only : chm_diags, het_diags
     use perf_mod,          only : t_startf, t_stopf
     use gas_wetdep_opts,   only : gas_wetdep_method
+#if (defined OSLO_AERO)
+    use oxi_diurnal_var,   only : set_diurnal_invariants
+#endif
     use physics_buffer,    only : physics_buffer_desc, pbuf_get_field, pbuf_old_tim_idx
     use infnan,            only : nan, assignment(=)
     use rate_diags,        only : rate_diags_calc
@@ -500,10 +528,7 @@ contains
     !        ... Calculate cosine of zenith angle
     !            then cast back to angle (radians)
     !-----------------------------------------------------------------------      
-!+tht
-   !call zenith( calday, rlats, rlons, zen_angle, ncol )
-    call zenith( calday, rlats, rlons, zen_angle, ncol ,delt) !+tht delt
-!-tht
+    call zenith( calday, rlats, rlons, zen_angle, ncol )
     zen_angle(:) = acos( zen_angle(:) )
 
     sza(:) = zen_angle(:) * rad2deg
@@ -599,6 +624,13 @@ contains
     call setinv( invariants, tfld, h2ovmr, vmr, pmid, ncol, lchnk, pbuf )
 
     !-----------------------------------------------------------------------      
+#if defined (OSLO_AERO)
+    !        ... Set the "day/night cycle for prescribed oxidants"
+    !----------------------------------------------------------------------- 
+    if (inv_oh.or.inv_ho2)  &
+      call set_diurnal_invariants(invariants,delt,ncol,lchnk,inv_oh,inv_ho2,id_oh,id_ho2)
+  
+#endif
     !        ... stratosphere aerosol surface area
     !-----------------------------------------------------------------------  
     if (sad_pbf_ndx>0) then
@@ -743,7 +775,7 @@ contains
     
     cwat(:ncol,:pver) = cldw(:ncol,:pver)
 
-    call usrrxt( reaction_rates, tfld, ion_temp_fld, ele_temp_fld, invariants, h2ovmr, &
+    call usrrxt( reaction_rates, tfld, ion_temp_fld, ele_temp_fld, invariants, h2ovmr, ps, &
                  pmid, invariants(:,:,indexm), sulfate, mmr, relhum, strato_sad, &
                  troplevchem, dlats, ncol, sad_trop, reff, cwat, mbar, pbuf )
 
