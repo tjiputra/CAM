@@ -1889,7 +1889,8 @@ contains
     integer  :: ncol              ! number of columns in chunk
     real(r8) :: ftem2(pcols)      ! Temporary workspace for outfld variables
     real(r8) :: ftem3(pcols,pver) ! Temporary workspace for outfld variables
-    real(r8) :: heat_glob         ! global energy integral (FV only)
+    real(r8) :: heat_glob         ! T-tend from fixer (FV only)
+    real(r8) :: tedif_glob        !+tht energy flux from fixer (FV only)
     ! CAM pointers to get variables from the physics buffer
     real(r8), pointer, dimension(:,:) :: t_ttend
     integer  :: itim_old
@@ -1916,7 +1917,7 @@ contains
     ! Total physics tendency for Temperature
     ! (remove global fixer tendency from total for FV and SE dycores)
     if (dycore_is('LR') .or. dycore_is('SE')) then
-      call check_energy_get_integrals( heat_glob_out=heat_glob )
+      call check_energy_get_integrals( heat_glob_out=heat_glob , tedif_glob_out=tedif_glob )
       ftem2(:ncol)  = heat_glob/cpair
       call outfld('TFIX', ftem2, pcols, lchnk   )
      !+tht
