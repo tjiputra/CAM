@@ -153,14 +153,12 @@ echo "TER.sh: restarting sequential ccsm; output in ${CAM_TESTDIR}/${test_name}/
 echo "TER.sh: call to build-namelist:"
 echo "        env OMP_NUM_THREADS=${CAM_THREADS} ${cfgdir}/build-namelist -test -runtype continue \
     -config ${CAM_TESTDIR}/TCB.$1/config_cache.xml \
-    -config_cice ${CAM_TESTDIR}/TCB.$1/config_cache_cice.xml \
     -infile ${CAM_SCRIPTDIR}/nl_files/$nl_file \
     -infile ${CAM_TESTDIR}/${test_name}/$nl_file \
     -namelist \"&seq_timemgr_inparm stop_n=${restart_length} stop_option=\'$stop_option\' $decomp_str $history_output /\""  
 
-env OMP_NUM_THREADS=${CAM_THREADS} ${cfgdir}/build-namelist -test -runtype continue -cice_nl "&domain_nml distribution_type='roundrobin' /" \
+env OMP_NUM_THREADS=${CAM_THREADS} ${cfgdir}/build-namelist -test -runtype continue \
     -config ${CAM_TESTDIR}/TCB.$1/config_cache.xml \
-    -config_cice ${CAM_TESTDIR}/TCB.$1/config_cache_cice.xml \
     -ignore_ic_date $use_case_string \
     -infile ${CAM_TESTDIR}/${test_name}/$nl_file \
     -namelist "&seq_timemgr_inparm stop_n=${restart_length} stop_option='$stop_option' $decomp_str $history_output / &cam_inparm /" > test.log 2>&1

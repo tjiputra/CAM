@@ -81,6 +81,7 @@ module physpkg
   integer ::  snow_dp_idx        = 0
   integer ::  prec_sh_idx        = 0
   integer ::  snow_sh_idx        = 0
+  integer ::  dlfzm_idx          = 0     ! detrained convective cloud water mixing ratio.
 
 !======================================================================= 
 contains
@@ -126,7 +127,7 @@ contains
     use co2_cycle,          only: co2_register
     use flux_avg,           only: flux_avg_register
     use iondrag,            only: iondrag_register
-    use ionosphere,         only: ionos_register
+    use waccmx_phys_intr,   only: waccmx_phys_ion_elec_temp_reg
     use string_utils,       only: to_lower
     use prescribed_ozone,   only: prescribed_ozone_register
     use prescribed_volcaero,only: prescribed_volcaero_register
@@ -279,7 +280,7 @@ contains
 
        ! Register ionosphere variables with pbuf if mode set to ionosphere
        if( waccmx_is('ionosphere') ) then
-          call ionos_register()
+          call waccmx_phys_ion_elec_temp_reg()
        endif
 
        call aircraft_emit_register()
@@ -346,6 +347,7 @@ contains
     use polar_avg,           only: polar_average
     use short_lived_species, only: initialize_short_lived_species
     use cam_control_mod,     only: aqua_planet
+    use waccmx_phys_intr,    only: waccmx_phys_ion_elec_temp_inidat
 
     type(cam_out_t),     intent(inout) :: cam_out(begchunk:endchunk)
     type(physics_buffer_desc), pointer :: pbuf2d(:,:)
@@ -555,7 +557,10 @@ contains
           call infld('CLDLIQ',fh_ini,dim1name, 'lev', dim2name, 1, pcols, 1, pver, begchunk, endchunk, &
                tptr3d_2, found2, gridname='physgrid')
           if(found .and. found2) then
-             tptr3d(:,:,:)=tptr3d(:,:,:)+tptr3d_2(:,:,:)
+             do lchnk = begchunk, endchunk
+                ncol = get_ncols_p(lchnk)
+                tptr3d(:ncol,:,lchnk)=tptr3d(:ncol,:,lchnk)+tptr3d_2(:ncol,:,lchnk)
+             end do
              if (masterproc) write(iulog,*) trim(fieldname), ' initialized with CLDICE + CLDLIQ'
           else if (found) then ! Data already loaded in tptr3d
              if (masterproc) write(iulog,*) trim(fieldname), ' initialized with CLDICE only'
@@ -655,6 +660,13 @@ contains
     end if
 
     call initialize_short_lived_species(fh_ini, pbuf2d)
+
+    !---------------------------------------------------------------------------------
+    !  If needed, get ion and electron temperature fields from initial condition file
+    !---------------------------------------------------------------------------------
+
+    call waccmx_phys_ion_elec_temp_inidat(fh_ini,pbuf2d)
+    
   end subroutine phys_inidat
 
 
@@ -718,12 +730,13 @@ contains
     use metdata,            only: metdata_phys_init
 #endif
     use epp_ionization,     only: epp_ionization_init, epp_ionization_active
-    use ionosphere,         only: ionos_init  ! Initialization of ionosphere module (WACCM-X)
-    use majorsp_diffusion,  only: mspd_init   ! Initialization of major species diffusion module (WACCM-X)
+    use waccmx_phys_intr,   only: waccmx_phys_ion_elec_temp_init  ! Initialization of ionosphere module (WACCM-X)
+    use waccmx_phys_intr,   only: waccmx_phys_mspd_init   ! Initialization of major species diffusion module (WACCM-X)
     use clubb_intr,         only: clubb_ini_cam
     use sslt_rebin,         only: sslt_rebin_init
     use tropopause,         only: tropopause_init
     use solar_data,         only: solar_data_init
+    use dadadj_cam,         only: dadadj_init
     use cam_abortutils,     only: endrun
 
     ! Input/output arguments
@@ -735,6 +748,8 @@ contains
 
     ! local variables
     integer :: lchnk
+    integer :: ierr
+
     !-----------------------------------------------------------------------
 
     call physics_type_alloc(phys_state, phys_tend, begchunk, endchunk, pcols)
@@ -827,10 +842,10 @@ contains
     call vertical_diffusion_init(pbuf2d)
 
     if ( waccmx_is('ionosphere') .or. waccmx_is('neutral') ) then
-       call mspd_init ()
+       call waccmx_phys_mspd_init ()
        ! Initialization of ionosphere module if mode set to ionosphere
        if( waccmx_is('ionosphere') ) then
-          call ionos_init()
+          call waccmx_phys_ion_elec_temp_init(pbuf2d)
        endif
     endif
 
@@ -877,11 +892,14 @@ contains
 #endif
     call sslt_rebin_init()
     call tropopause_init()
+    call dadadj_init()
 
     prec_dp_idx  = pbuf_get_index('PREC_DP')
     snow_dp_idx  = pbuf_get_index('SNOW_DP')
     prec_sh_idx  = pbuf_get_index('PREC_SH')
     snow_sh_idx  = pbuf_get_index('SNOW_SH')
+
+    dlfzm_idx = pbuf_get_index('DLFZM', ierr)
 
     call phys_getopts(prog_modal_aero_out=prog_modal_aero)
 
@@ -1206,9 +1224,9 @@ contains
     use rayleigh_friction,  only: rayleigh_friction_tend
     use constituents,       only: cnst_get_ind
     use physics_types,      only: physics_state, physics_tend, physics_ptend, physics_update,    &
-         physics_dme_adjust, set_dry_to_wet, physics_state_check
-    use majorsp_diffusion,  only: mspd_intr  ! WACCM-X major diffusion
-    use ionosphere,         only: ionos_tend ! WACCM-X ionosphere
+                                  physics_dme_adjust, set_dry_to_wet, physics_state_check
+    use waccmx_phys_intr,   only: waccmx_phys_mspd_tend  ! WACCM-X major diffusion
+    use waccmx_phys_intr,   only: waccmx_phys_ion_elec_temp_tend ! WACCM-X 
     use aoa_tracers,        only: aoa_tracers_timestep_tend
     use physconst,          only: rhoh2o, latvap,latice
     use aero_model,         only: aero_model_drydep
@@ -1268,6 +1286,7 @@ contains
     real(r8) :: tmp_q     (pcols,pver) ! tmp space
     real(r8) :: tmp_cldliq(pcols,pver) ! tmp space
     real(r8) :: tmp_cldice(pcols,pver) ! tmp space
+    real(r8) :: tmp_t     (pcols,pver) !tht: tmp space
 
     ! physics buffer fields for total energy and mass adjustment
     integer itim_old, ifld
@@ -1278,6 +1297,10 @@ contains
     real(r8), pointer, dimension(:,:) :: cldiceini
     real(r8), pointer, dimension(:,:) :: dtcore
     real(r8), pointer, dimension(:,:) :: ast     ! relative humidity cloud fraction 
+
+    !tht: variables for dme_energy_adjust 
+    real(r8):: eflx(pcols), dsema(pcols) 
+    logical, parameter:: ohf_adjust =.true.  ! condensates have surface specific enthalpy
 
     !-----------------------------------------------------------------------
     lchnk = state%lchnk
@@ -1388,7 +1411,7 @@ contains
    ! Call major diffusion for extended model
    !------------------------------------------
     if ( waccmx_is('ionosphere') .or. waccmx_is('neutral') ) then
-       call mspd_intr (ztodt    ,state    ,ptend)
+       call waccmx_phys_mspd_tend (ztodt    ,state    ,ptend)
     endif
 
     call physics_update(state, ptend, ztodt, tend)
@@ -1471,7 +1494,7 @@ contains
     ! Call ionosphere routines for extended model if mode is set to ionosphere
     !----------------------------------------------------------------------------
     if( waccmx_is('ionosphere') ) then
-       call ionos_tend(state, ptend, pbuf, ztodt)
+       call waccmx_phys_ion_elec_temp_tend(state, ptend, pbuf, ztodt)
     endif
 
     call physics_update(state, ptend, ztodt, tend)
@@ -1517,10 +1540,16 @@ contains
     ! Scale dry mass and energy (does nothing if dycore is EUL or SLD)
     call cnst_get_ind('CLDLIQ', ixcldliq)
     call cnst_get_ind('CLDICE', ixcldice)
+
+    tmp_t     (:ncol,:pver) = state%t(:ncol,:pver) 
     tmp_q     (:ncol,:pver) = state%q(:ncol,:pver,1)
     tmp_cldliq(:ncol,:pver) = state%q(:ncol,:pver,ixcldliq)
     tmp_cldice(:ncol,:pver) = state%q(:ncol,:pver,ixcldice)
-    call physics_dme_adjust(state, tend, qini, ztodt)
+
+   !call physics_dme_adjust(state, tend, qini, ztodt)
+    call physics_dme_adjust(state, tend, qini, ztodt, eflx, dsema, &
+                            ohf_adjust, cam_in%ocnfrac, cam_in%sst, cam_in%ts) !tht
+
 !!!   REMOVE THIS CALL, SINCE ONLY Q IS BEING ADJUSTED. WON'T BALANCE ENERGY. TE IS SAVED BEFORE THIS
 !!!   call check_energy_chng(state, tend, "drymass", nstep, ztodt, zero, zero, zero, zero)
 
@@ -1541,8 +1570,10 @@ contains
        endif
     endif
 
-    call diag_phys_tend_writeout (state, pbuf,  tend, ztodt, tmp_q, tmp_cldliq, tmp_cldice, &
-         qini, cldliqini, cldiceini)
+   !call diag_phys_tend_writeout (state, pbuf,  tend, ztodt, tmp_q,        tmp_cldliq, tmp_cldice, &
+   !     qini, cldliqini, cldiceini)
+    call diag_phys_tend_writeout (state, pbuf,  tend, ztodt, tmp_q, tmp_t, tmp_cldliq, tmp_cldice, &
+         qini, cldliqini, cldiceini, eflx, dsema) !tht
 
     call clybry_fam_set( ncol, lchnk, map2chm, state%q, pbuf )
 
@@ -1674,6 +1705,8 @@ contains
 
     real(r8), pointer, dimension(:,:,:) :: fracis  ! fraction of transported species that are insoluble
 
+    real(r8), pointer :: dlfzm(:,:)                ! ZM detrained convective cloud water mixing ratio.
+
     ! convective precipitation variables
     real(r8),pointer :: prec_dp(:)                ! total precipitation from ZM convection
     real(r8),pointer :: snow_dp(:)                ! snow from ZM convection
@@ -1704,6 +1737,7 @@ contains
     real(r8) :: zero(pcols)                    ! array of zeros
     real(r8) :: zero_sc(pcols*psubcols)        ! array of zeros
     real(r8) :: rliq(pcols)                    ! vertical integral of liquid not yet in q(ixcldliq)
+    real(r8) :: rice(pcols)                    ! vertical integral of ice not yet in q(ixcldice)
     real(r8) :: rliq2(pcols)                   ! vertical integral of liquid from shallow scheme
     real(r8) :: det_s  (pcols)                 ! vertical integral of detrained static energy from ice
     real(r8) :: det_ice(pcols)                 ! vertical integral of detrained ice
@@ -1828,8 +1862,8 @@ contains
 
     call convect_deep_tend(  &
          cmfmc,      cmfcme,             &
-         dlf,        pflx,    zdu,       &
-         rliq,    &
+         pflx,    zdu,       &
+         rliq,    rice,      &
          ztodt,   &
          state,   ptend, cam_in%landfrac, pbuf) 
 
@@ -1855,12 +1889,21 @@ contains
 
     ! Check energy integrals, including "reserved liquid"
     flx_cnd(:ncol) = prec_dp(:ncol) + rliq(:ncol)
+    snow_dp(:ncol) = snow_dp(:ncol) + rice(:ncol)
     call check_energy_chng(state, tend, "convect_deep", nstep, ztodt, zero, flx_cnd, snow_dp, zero)
+    snow_dp(:ncol) = snow_dp(:ncol) - rice(:ncol)
 
     !
     ! Call Hack (1994) convection scheme to deal with shallow/mid-level convection
     !
     call t_startf ('convect_shallow_tend')
+
+    if (dlfzm_idx > 0) then
+       call pbuf_get_field(pbuf, dlfzm_idx, dlfzm)
+       dlf(:ncol,:) = dlfzm(:ncol,:)
+    else
+       dlf(:,:) = 0._r8
+    end if
 
     call convect_shallow_tend (ztodt   , cmfmc, &
          dlf        , dlf2   ,  rliq   , rliq2, & 
@@ -2004,7 +2047,7 @@ contains
                      cam_in%lhf(:ncol)/latvap/cld_macmic_num_steps, &
                      flx_cnd(:ncol)/cld_macmic_num_steps, &
                      det_ice(:ncol)/cld_macmic_num_steps, &
-                     flx_heat/cld_macmic_num_steps)
+                     flx_heat(:ncol)/cld_macmic_num_steps)
  
           endif
 
@@ -2219,8 +2262,7 @@ subroutine phys_timestep_init(phys_state, cam_in, cam_out, pbuf2d)
   use radheat,             only: radheat_timestep_init
   use solar_data,          only: solar_data_advance
   use qbo,                 only: qbo_timestep_init
-  use efield,              only: get_efield
-  use iondrag,             only: do_waccm_ions
+  use iondrag,             only: do_waccm_ions, iondrag_timestep_init
   use perf_mod
 
   use prescribed_ozone,    only: prescribed_ozone_adv
@@ -2232,6 +2274,8 @@ subroutine phys_timestep_init(phys_state, cam_in, cam_out, pbuf2d)
   use prescribed_strataero,only: prescribed_strataero_adv
   use mo_apex,             only: mo_apex_init
   use epp_ionization,      only: epp_ionization_active
+  use iop_forcing,         only: scam_use_iop_srf
+  use waccmx_phys_intr,    only: waccmx_phys_ion_elec_temp_stepinit
 
   implicit none
 
@@ -2290,12 +2334,12 @@ subroutine phys_timestep_init(phys_state, cam_in, cam_out, pbuf2d)
   !----------------------------------------------------------------------
   call qbo_timestep_init
 
-  if (do_waccm_ions) then
-     ! Compute the electric field
-     call t_startf ('efield')
-     call get_efield
-     call t_stopf ('efield')
-  endif
+  call iondrag_timestep_init()
+
+  !----------------------------------------------------------------------
+  ! update waccmx Te / Ti module
+  !----------------------------------------------------------------------
+  call waccmx_phys_ion_elec_temp_stepinit()
 
   call carma_timestep_init()
 

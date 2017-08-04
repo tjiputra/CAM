@@ -489,12 +489,14 @@ lat_loop3 : &
 
   subroutine ctem_init()
 
-  use hycoef, only     : hyai, hybi, ps0
+  use hycoef,       only : hyai, hybi, ps0
+  use phys_control, only : phys_getopts
 
 !-------------------------------------------------------------
 !	... local variables
 !-------------------------------------------------------------
     integer :: k
+    logical :: history_waccm
 
     if (.not.do_circulation_diags) return
 
@@ -520,6 +522,8 @@ lat_loop3 : &
        if( hybi(k) == 0._r8 ) ip_b = k
     end do
 
+    call phys_getopts( history_waccm_out = history_waccm )
+
 !-------------------------------------------------------------
 ! Initialize output buffer
 !-------------------------------------------------------------
@@ -533,18 +537,22 @@ lat_loop3 : &
     call addfld ('Wzm',  (/ 'ilev' /),'A','M/S','Zonal-Mean vertical wind - defined on ilev', gridname='fv_centers_zonal' )
     call addfld ('THzm', (/ 'ilev' /),'A',  'K','Zonal-Mean potential temp - defined on ilev', gridname='fv_centers_zonal' )
 
-    call addfld ('TH',   (/ 'ilev' /),'A','K','Potential Temperature', gridname='fv_centers' )
-    call addfld ('MSKtem',horiz_only,  'A','1','TEM mask', gridname='fv_centers' )
+    call addfld ('TH',   (/ 'ilev' /),'A','K',  'Potential Temperature', gridname='fv_centers' )
+    call addfld ('MSKtem',horiz_only, 'A','1',  'TEM mask', gridname='fv_centers' )
     
 !-------------------------------------------------------------
 ! primary tapes: 3D fields
 !-------------------------------------------------------------
-    call add_default ('VTHzm', 1, ' ')
-    call add_default ('WTHzm', 1, ' ')
-    call add_default ('UVzm' , 1, ' ')
-    call add_default ('UWzm' , 1, ' ')
-    call add_default ('TH' , 1, ' ')
-    call add_default ('MSKtem',1, ' ')
+    if (history_waccm) then
+       call add_default ('MSKtem',7, ' ')
+       call add_default ('VTHzm', 7, ' ')
+       call add_default ('UVzm', 7, ' ')
+       call add_default ('UWzm', 7, ' ')
+       call add_default ('Uzm', 7, ' ')
+       call add_default ('Vzm', 7, ' ')
+       call add_default ('Wzm', 7, ' ')
+       call add_default ('THzm', 7, ' ')
+    end if
 
     if (masterproc) then
        write(iulog,*) 'ctem_inti: do_circulation_diags = ',do_circulation_diags
@@ -564,7 +572,7 @@ subroutine ctem_readnl(nlfile)
    
    ! Local variables
    integer :: unitn, ierr
-   character(len=*), parameter :: subname = 'circ_diag_readnl'
+   character(len=*), parameter :: subname = 'ctem_readnl'
 
    namelist /circ_diag_nl/ do_circulation_diags
    !-----------------------------------------------------------------------------

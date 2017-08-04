@@ -34,7 +34,8 @@ module gw_drag
 
   ! These are the actual switches for different gravity wave sources.
   use phys_control,   only: use_gw_oro, use_gw_front, use_gw_front_igw, &
-                            use_gw_convect_dp, use_gw_convect_sh
+                            use_gw_convect_dp, use_gw_convect_sh,       &
+                            use_simple_phys
 
   use gw_common,      only: GWBand
   use gw_convect,     only: BeresSourceDesc
@@ -198,6 +199,7 @@ subroutine gw_drag_readnl(nlfile)
   use units,           only: getunit, freeunit
   use spmd_utils,      only: mpicom, mstrid=>masterprocid, mpi_real8, &
                              mpi_character, mpi_logical, mpi_integer
+  use gw_rdg,          only: gw_rdg_readnl
 
   ! File containing namelist input.
   character(len=*), intent(in) :: nlfile
@@ -228,6 +230,8 @@ subroutine gw_drag_readnl(nlfile)
        gw_oro_south_fac, gw_limit_tau_without_eff, &
        gw_lndscl_sgh, gw_prndl, gw_apply_tndmax, gw_qbo_hdepth_scaling
   !----------------------------------------------------------------------
+
+  if (use_simple_phys) return
 
   if (masterproc) then
      unitn = getunit()
@@ -341,6 +345,10 @@ subroutine gw_drag_readnl(nlfile)
   band_oro = GWBand(0, gw_dc, fcrit2, wavelength_mid)
   band_mid = GWBand(pgwv, gw_dc, 1.0_r8, wavelength_mid)
   band_long = GWBand(pgwv_long, gw_dc_long, 1.0_r8, wavelength_long)
+
+  if (use_gw_rdg_gamma .or. use_gw_rdg_beta) then
+     call gw_rdg_readnl(nlfile)
+  end if
 
 end subroutine gw_drag_readnl
 
@@ -555,6 +563,8 @@ subroutine gw_init()
           'Zonal gravity wave surface stress')
      call addfld ('TAUGWY',     horiz_only,  'A','N/m2', &
           'Meridional gravity wave surface stress')
+     call addfld ('UTGW_TOTAL',    (/ 'lev' /), 'A','m/s2', &
+          'Total U tendency due to gravity wave drag')
 
      if (history_amwg) then
         call add_default('TAUGWX  ', 1, ' ')
@@ -672,7 +682,12 @@ subroutine gw_init()
           'Ridge based momentum flux profile')
      call addfld('TAUARDGBETAX' , (/ 'ilev' /) , 'I'  ,'N/m2' , &
           'Ridge based momentum flux profile')
- 
+
+     if (history_waccm) then
+        call add_default('TAUARDGBETAX', 1, ' ')
+        call add_default('TAUARDGBETAY  ', 1, ' ')
+     end if
+
   end if
 
   if (use_gw_rdg_gamma) then
@@ -1847,6 +1862,8 @@ subroutine gw_tend(state, pbuf, dt, ptend, cam_in, flx_heat)
   ! Write totals to history file.
   call outfld('EKGW', egwdffi_tot , ncol, lchnk)
   call outfld('TTGW', ptend%s/cpairv(:,:,lchnk),  pcols, lchnk)
+ 
+  call outfld('UTGW_TOTAL', ptend%u, pcols, lchnk)
 
   call outfld('QTGW', ptend%q(:,:,1), pcols, lchnk)
   call outfld('CLDLIQTGW', ptend%q(:,:,ixcldliq), pcols, lchnk)
@@ -2027,19 +2044,19 @@ subroutine gw_rdg_calc( &
       effgw   = min( effgw_rdg_max , effgw )
 
       call gw_rdg_src(ncol, band_oro, p, &
-         u, v, t, mxdis(:,nn), angll(:,nn), anixy(:,nn), kwvrdg, isoflag, zm, zi, nm, &
+         u, v, t, mxdis(:,nn), angll(:,nn), anixy(:,nn), kwvrdg, isoflag, zi, nm, &
          src_level, tend_level, bwv_level, tlb_level, tau, ubm, ubi, xv, yv,  & 
          ubmsrc, usrc, vsrc, nsrc, rsrc, m2src, tlb, bwv, Fr1, Fr2, Frx, c)
 
       call gw_rdg_belowpeak(ncol, band_oro, rdg_cd_llb, &
-         u, v, t, mxdis(:,nn), anixy(:,nn), angll(:,nn), kwvrdg, & 
-         zm, zi, nm, ni, rhoi, &
-         src_level, tau, ubm, ubi, & 
-         xv, yv, ubmsrc, usrc, vsrc, nsrc, rsrc, m2src, tlb, bwv, Fr1, Fr2, Frx, & 
+         t, mxdis(:,nn), anixy(:,nn), kwvrdg, & 
+         zi, nm, ni, rhoi, &
+         src_level, tau, & 
+         ubmsrc, nsrc, rsrc, m2src, tlb, bwv, Fr1, Fr2, Frx, & 
          tauoro, taudsw, hdspwv, hdspdw)
 
       call gw_rdg_break_trap(ncol, band_oro, &
-         zm, zi, nm, ni, ubm, ubi, rhoi, kwvrdg , bwv, tlb, wbr, & 
+         zi, nm, ni, ubm, ubi, rhoi, kwvrdg , bwv, tlb, wbr, & 
          src_level, tlb_level, hdspwv, hdspdw,  mxdis(:,nn), & 
          tauoro, taudsw, tau, & 
          ldo_trapped_waves=trpd_leewv)
@@ -2218,13 +2235,6 @@ subroutine gw_spec_addflds(prefix, scheme, band, history_defaults)
      call add_default(trim(prefix)//'UTGWSPEC', 1, ' ')
      call add_default(trim(prefix)//'VTGWSPEC', 1, ' ')
      call add_default(trim(prefix)//'TTGWSPEC', 1, ' ')
-
-     call add_default(trim(prefix)//'UTEND1', 1, ' ')
-     call add_default(trim(prefix)//'UTEND2', 1, ' ')
-     call add_default(trim(prefix)//'UTEND3', 1, ' ')
-     call add_default(trim(prefix)//'UTEND4', 1, ' ')
-     call add_default(trim(prefix)//'UTEND5', 1, ' ')
-
      call add_default(trim(prefix)//'TAUE', 1, ' ')
      call add_default(trim(prefix)//'TAUW', 1, ' ')
      call add_default(trim(prefix)//'TAUNET', 1, ' ')

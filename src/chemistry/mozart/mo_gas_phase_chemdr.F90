@@ -56,7 +56,7 @@ contains
   subroutine gas_phase_chemdr_inti()
 
     use mo_chem_utls,      only : get_spc_ndx, get_extfrc_ndx, get_rxt_ndx
-    use cam_history,       only : addfld,horiz_only
+    use cam_history,       only : addfld,add_default,horiz_only
     use mo_chm_diags,      only : chm_diags_inti
     use constituents,      only : cnst_get_ind
     use physics_buffer,    only : pbuf_get_index
@@ -66,10 +66,11 @@ contains
 
     character(len=3) :: string
     integer          :: n, m, err
+    logical :: history_cesm_forcing
 
     !-----------------------------------------------------------------------
 
-    call phys_getopts( convproc_do_aer_out = convproc_do_aer )
+    call phys_getopts( convproc_do_aer_out = convproc_do_aer, history_cesm_forcing_out=history_cesm_forcing )
    
     ndx_h2so4 = get_spc_ndx('H2SO4')
 !
@@ -176,6 +177,9 @@ contains
     call addfld( 'RAD_ICE',    (/ 'lev' /), 'I', 'cm',      'sad ice' )
     call addfld( 'SAD_TROP',   (/ 'lev' /), 'I', 'cm2/cm3', 'tropospheric aerosol SAD' )
     call addfld( 'SAD_AERO',   (/ 'lev' /), 'I', 'cm2/cm3', 'aerosol surface area density' )
+    if (history_cesm_forcing) then
+       call add_default ('SAD_AERO',8,' ')
+    endif
     call addfld( 'REFF_AERO',  (/ 'lev' /), 'I', 'cm',      'aerosol effective radius' )
     call addfld( 'SULF_TROP',  (/ 'lev' /), 'I', 'mol/mol', 'tropospheric aerosol SAD' )
     call addfld( 'QDSETT',     (/ 'lev' /), 'I', '/s',      'water vapor settling delta' )
@@ -209,8 +213,8 @@ contains
     sad_pbf_ndx= pbuf_get_index('VOLC_SAD',errcode=err) ! prescribed  strat aerosols (volcanic)
     if (.not.sad_pbf_ndx>0) sad_pbf_ndx = pbuf_get_index('SADSULF',errcode=err) ! CARMA's version of strat aerosols
 
-    ele_temp_ndx = pbuf_get_index('ElecTemp',errcode=err)! electron temperature index 
-    ion_temp_ndx = pbuf_get_index('IonTemp',errcode=err) ! ion temperature index
+    ele_temp_ndx = pbuf_get_index('TElec',errcode=err)! electron temperature index 
+    ion_temp_ndx = pbuf_get_index('TIon',errcode=err) ! ion temperature index
 
     ! diagnostics for stratospheric heterogeneous reactions
     call addfld( 'GAMMA_HET1', (/ 'lev' /), 'I', '1', 'Reaction Probability' )
@@ -236,7 +240,7 @@ contains
                               delt, ps, xactive_prates, &
                               fsds, ts, asdir, ocnfrac, icefrac, &
                               precc, precl, snowhland, ghg_chem, latmapback, &
-                              drydepflx, cflx, fire_sflx, fire_ztop, qtend, pbuf)
+                              drydepflx, wetdepflx, cflx, fire_sflx, fire_ztop, nhx_nitrogen_flx, noy_nitrogen_flx, qtend, pbuf)
 
     !-----------------------------------------------------------------------
     !     ... Chem_solver advances the volumetric mixing ratio
@@ -343,6 +347,9 @@ contains
     real(r8),       intent(inout) :: qtend(pcols,pver,pcnst)        ! species tendencies (kg/kg/s)
     real(r8),       intent(inout) :: cflx(pcols,pcnst)              ! constituent surface flux (kg/m^2/s)
     real(r8),       intent(out)   :: drydepflx(pcols,pcnst)         ! dry deposition flux (kg/m^2/s)
+    real(r8),       intent(in)    :: wetdepflx(pcols,pcnst)         ! wet deposition flux (kg/m^2/s)
+    real(r8), intent(out) :: nhx_nitrogen_flx(pcols)
+    real(r8), intent(out) :: noy_nitrogen_flx(pcols)
 
     type(physics_buffer_desc), pointer :: pbuf(:)
 
@@ -412,6 +419,7 @@ contains
     real(r8) :: soilw(pcols)
     real(r8) :: prect(pcols)
     real(r8) :: sflx(pcols,gas_pcnst)
+    real(r8) :: wetdepflx_diag(pcols,gas_pcnst)
     real(r8) :: dust_vmr(ncol,pver,ndust)
     real(r8) :: dt_diag(pcols,8)               ! od diagnostics
     real(r8) :: fracday(pcols)                 ! fraction of day
@@ -442,7 +450,6 @@ contains
     real(r8) :: xlat
     real(r8) :: pm25(ncol)
 
-    logical :: zero_aerosols
     real(r8) :: dlats(ncol)
 
     real(r8), dimension(ncol,pver) :: &      ! aerosol reaction diagnostics
@@ -493,7 +500,10 @@ contains
     !        ... Calculate cosine of zenith angle
     !            then cast back to angle (radians)
     !-----------------------------------------------------------------------      
-    call zenith( calday, rlats, rlons, zen_angle, ncol )
+!+tht
+   !call zenith( calday, rlats, rlons, zen_angle, ncol )
+    call zenith( calday, rlats, rlons, zen_angle, ncol ,delt) !+tht delt
+!-tht
     zen_angle(:) = acos( zen_angle(:) )
 
     sza(:) = zen_angle(:) * rad2deg
@@ -733,7 +743,7 @@ contains
     
     cwat(:ncol,:pver) = cldw(:ncol,:pver)
 
-    call usrrxt( reaction_rates, tfld, ion_temp_fld, ele_temp_fld, invariants, h2ovmr, ps, &
+    call usrrxt( reaction_rates, tfld, ion_temp_fld, ele_temp_fld, invariants, h2ovmr, &
                  pmid, invariants(:,:,indexm), sulfate, mmr, relhum, strato_sad, &
                  troplevchem, dlats, ncol, sad_trop, reff, cwat, mbar, pbuf )
 
@@ -1087,12 +1097,14 @@ contains
        if ( n > 0 ) then
          cflx(:ncol,m)      = cflx(:ncol,m) - sflx(:ncol,n)
          drydepflx(:ncol,m) = sflx(:ncol,n)
+         wetdepflx_diag(:ncol,n) = wetdepflx(:ncol,m)
        endif
     end do
 
     call chm_diags( lchnk, ncol, vmr(:ncol,:,:), mmr_new(:ncol,:,:), &
                     reaction_rates(:ncol,:,:), invariants(:ncol,:,:), depvel(:ncol,:),  sflx(:ncol,:), &
-                    mmr_tend(:ncol,:,:), pdel(:ncol,:), pmid(:ncol,:), troplev(:ncol) )
+                    mmr_tend(:ncol,:,:), pdel(:ncol,:), pmid(:ncol,:), troplev(:ncol), wetdepflx_diag(:ncol,:), &
+                    nhx_nitrogen_flx(:ncol), noy_nitrogen_flx(:ncol) )
 
     call rate_diags_calc( reaction_rates(:,:,:), vmr(:,:,:), invariants(:,:,indexm), ncol, lchnk )
 !

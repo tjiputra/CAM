@@ -25,19 +25,22 @@ module mo_chm_diags
   integer :: id_hf,id_f,id_cof2,id_cofcl,id_ch3br
   integer :: id_br,id_bro,id_hbr,id_hobr,id_ch4,id_h2o,id_h2
   integer :: id_o,id_o2,id_h
+  integer :: id_co2,id_o3,id_oh,id_ho2,id_so4_a1,id_so4_a2,id_so4_a3
+
+  integer :: id_ndep,id_nhdep
 
   integer, parameter :: NJEUV = neuv
   integer :: rid_jeuv(NJEUV), rid_jno_i, rid_jno
 
   logical :: has_jeuvs, has_jno_i, has_jno
 
-  integer :: nox_species(3),  noy_species(15)
+  integer :: nox_species(3),  noy_species(26)
   integer :: clox_species(6), cloy_species(9), tcly_species(21)
   integer :: brox_species(4), broy_species(6), tbry_species(13)
   integer :: foy_species(4),  tfy_species(16)
   integer :: toth_species(3)
   integer :: sox_species(3)
-  integer :: nhx_species(3)
+  integer :: nhx_species(2)
   integer :: aer_species(gas_pcnst)
 
   character(len=fieldname_len) :: dtchem_name(gas_pcnst)
@@ -80,6 +83,17 @@ contains
     integer :: id_pan, id_onit, id_mpan, id_isopno3, id_onitr, id_nh4no3
     integer :: id_so2, id_so4, id_h2so4
     integer :: id_nh3, id_nh4
+    integer :: id_honitr
+    integer :: id_alknit
+    integer :: id_isopnita
+    integer :: id_isopnitb
+    integer :: id_isopnooh
+    integer :: id_nc4ch2oh
+    integer :: id_nc4cho
+    integer :: id_noa
+    integer :: id_nterpooh
+    integer :: id_pbznit
+    integer :: id_terpnit
     integer :: id_dst01, id_dst02, id_dst03, id_dst04, id_sslt01, id_sslt02, id_sslt03, id_sslt04
     integer :: id_soa,  id_oc1, id_oc2, id_cb1, id_cb2
     integer :: id_soam,id_soai,id_soat,id_soab,id_soax
@@ -87,7 +101,9 @@ contains
 
     logical :: history_aerosol      ! Output the MAM aerosol tendencies
     logical :: history_chemistry
-    logical :: history_amwg         ! output the variables used by the AMWG diag package
+    logical :: history_cesm_forcing
+    logical :: history_scwaccm_forcing
+    logical :: history_chemspecies_srf ! output the chemistry constituents species in the surface layer
     integer :: bulkaero_species(20)
 #ifdef OSLO_AERO
     integer :: cloudTracerIndex
@@ -98,7 +114,9 @@ contains
 
     call phys_getopts( history_aerosol_out = history_aerosol, &
                        history_chemistry_out = history_chemistry, &
-                       history_amwg_out = history_amwg )
+                       history_chemspecies_srf_out = history_chemspecies_srf, &
+                       history_cesm_forcing_out = history_cesm_forcing, &
+                       history_scwaccm_forcing_out = history_scwaccm_forcing )
 
     id_bry     = get_spc_ndx( 'BRY' )
     id_cly     = get_spc_ndx( 'CLY' )
@@ -120,6 +138,14 @@ contains
     id_oclo    = get_spc_ndx( 'OCLO' )
     id_hcl     = get_spc_ndx( 'HCL' )
     id_brcl    = get_spc_ndx( 'BRCL' )
+
+    id_co2     = get_spc_ndx( 'CO2' )
+    id_o3      = get_spc_ndx( 'O3' )
+    id_oh      = get_spc_ndx( 'OH' )
+    id_ho2     = get_spc_ndx( 'HO2' )
+    id_so4_a1  = get_spc_ndx( 'so4_a1' )
+    id_so4_a2  = get_spc_ndx( 'so4_a2' )
+    id_so4_a3  = get_spc_ndx( 'so4_a3' )
 
     id_f       = get_spc_ndx( 'F' )
     id_hf      = get_spc_ndx( 'HF' )
@@ -167,6 +193,20 @@ contains
     id_onitr   = get_spc_ndx( 'ONITR' )
     id_nh4no3  = get_spc_ndx( 'NH4NO3' )
 
+    id_honitr    = get_spc_ndx( 'HONITR' ) 
+    id_alknit    = get_spc_ndx( 'ALKNIT' ) 
+    id_isopnita  = get_spc_ndx( 'ISOPNITA' ) 
+    id_isopnitb  = get_spc_ndx( 'ISOPNITB' ) 
+    id_isopnooh  = get_spc_ndx( 'ISOPNOOH' ) 
+    id_nc4ch2oh  = get_spc_ndx( 'NC4CH2OH' ) 
+    id_nc4cho    = get_spc_ndx( 'NC4CHO' ) 
+    id_noa       = get_spc_ndx( 'NOA' ) 
+    id_nterpooh  = get_spc_ndx( 'NTERPOOH' ) 
+    id_pbznit    = get_spc_ndx( 'PBZNIT' )
+    id_terpnit   = get_spc_ndx( 'TERPNIT' ) 
+    id_ndep      = get_spc_ndx( 'NDEP' )
+    id_nhdep     = get_spc_ndx( 'NHDEP' )
+
     id_so2     = get_spc_ndx( 'SO2' )
     id_so4     = get_spc_ndx( 'SO4' )
     id_h2so4   = get_spc_ndx( 'H2SO4' )
@@ -203,7 +243,9 @@ contains
 !... NOY species
     nox_species = (/ id_n, id_no, id_no2 /)
     noy_species = (/ id_n, id_no, id_no2, id_no3, id_n2o5, id_hno3, id_ho2no2, id_clono2, &
-                     id_brono2, id_pan, id_onit, id_mpan, id_isopno3, id_onitr, id_nh4no3 /)
+                     id_brono2, id_pan, id_onit, id_mpan, id_isopno3, id_onitr, id_nh4no3, &
+                     id_honitr, id_alknit, id_isopnita, id_isopnitb, id_isopnooh, id_nc4ch2oh, &
+                     id_nc4cho, id_noa, id_nterpooh, id_pbznit, id_terpnit /)
 !... CLOY species
     clox_species = (/ id_cl, id_clo, id_hocl, id_cl2, id_cl2o2, id_oclo /)
     cloy_species = (/ id_cl, id_clo, id_hocl, id_cl2, id_cl2o2, id_oclo, id_hcl, id_clono2, id_brcl /)
@@ -223,7 +265,7 @@ contains
                       id_h2402, id_ch2br2, id_chbr3 /)
 
     sox_species = (/ id_so2, id_so4, id_h2so4 /)
-    nhx_species = (/ id_nh3, id_nh4, id_nh4no3 /)
+    nhx_species = (/ id_nh3, id_nh4 /)
     bulkaero_species(:) = -1
     bulkaero_species(1:20) = (/ id_dst01, id_dst02, id_dst03, id_dst04, &
                                 id_sslt01, id_sslt02, id_sslt03, id_sslt04, &
@@ -247,7 +289,7 @@ contains
 
     call addfld( 'NOX',     (/ 'lev' /), 'A', 'mol/mol', 'nox (N+NO+NO2)' )
     call addfld( 'NOY',     (/ 'lev' /), 'A', 'mol/mol', &
-                 'noy = total inorganic nitrogen (N+NO+NO2+NO3+2N2O5+HNO3+HO2NO2+ORGNOY+NH4NO3' )
+                 'noy = total nitrogen (N+NO+NO2+NO3+2N2O5+HNO3+HO2NO2+ORGNOY+NH4NO3' )
     call addfld( 'NOY_SRF', horiz_only,  'A', 'mol/mol', 'surface noy volume mixing ratio' )
 
     call addfld( 'BROX',    (/ 'lev' /), 'A', 'mol/mol', 'brox (Br+BrO+BRCl+HOBr)' )
@@ -366,11 +408,29 @@ contains
        if ((m /= id_cly) .and. (m /= id_bry)) then
           if (history_aerosol.or.history_chemistry) then
              call add_default( spc_name, 1, ' ' )
-             call add_default( trim(spc_name)//'_SRF', 1, ' ' )
           endif 
-          if (history_amwg) then
+          if (history_chemspecies_srf) then
              call add_default( trim(spc_name)//'_SRF', 1, ' ' )
           endif
+       endif
+
+       if ( history_cesm_forcing ) then
+          if (m==id_o3)  call add_default( spc_name, 1, ' ')
+          if (m==id_oh)  call add_default( spc_name, 1, ' ')
+          if (m==id_no3) call add_default( spc_name, 1, ' ')
+          if (m==id_ho2) call add_default( spc_name, 1, ' ')
+
+          if (m==id_o3)     call add_default( spc_name, 8, ' ')
+          if (m==id_so4_a1) call add_default( spc_name, 8, ' ')
+          if (m==id_so4_a2) call add_default( spc_name, 8, ' ')
+          if (m==id_so4_a3) call add_default( spc_name, 8, ' ')
+       endif
+       if ( history_scwaccm_forcing ) then
+          if (m==id_co2) call add_default( spc_name, 8, ' ')
+          if (m==id_h)   call add_default( spc_name, 8, ' ')
+          if (m==id_no)  call add_default( spc_name, 8, ' ')
+          if (m==id_o)   call add_default( spc_name, 8, ' ')
+          if (m==id_o3)  call add_default( spc_name, 8, ' ')
        endif
 
 #ifdef OSLO_AERO
@@ -429,18 +489,28 @@ contains
    end do
 #endif
 
-    call addfld( 'DF_NOY', horiz_only, 'I', 'kg/m2/s', 'NOy dry deposition flux ' )
+    call addfld( 'dry_deposition_NOy_as_N', horiz_only, 'I', 'kg/m2/s', 'NOy dry deposition flux ' )
     call addfld( 'DF_SOX', horiz_only, 'I', 'kg/m2/s', 'SOx dry deposition flux ' )
-    call addfld( 'DF_NHX', horiz_only, 'I', 'kg/m2/s', 'NHx dry deposition flux ' )
-    if (gas_wetdep_method=='MOZ') then
-       call addfld( 'WD_NOY', horiz_only, 'A', 'kg/s', 'NOy wet deposition' )
+    call addfld( 'dry_deposition_NHx_as_N', horiz_only, 'I', 'kg/m2/s', 'NHx dry deposition flux ' )
+    if (gas_wetdep_method=='NEU') then
+       call addfld( 'wet_deposition_NOy_as_N', horiz_only, 'A', 'kg/m2/s', 'NOy wet deposition' )
+       call addfld( 'wet_deposition_NHx_as_N', horiz_only, 'A', 'kg/m2/s', 'NHx wet deposition' )
+    elseif (gas_wetdep_method=='MOZ') then
+       call addfld( 'wet_deposition_NOy_as_N', horiz_only, 'A', 'kg/s', 'NOy wet deposition' )
        call addfld( 'WD_SOX', horiz_only, 'A', 'kg/s', 'SOx wet deposition' )
-       call addfld( 'WD_NHX', horiz_only, 'A', 'kg/s', 'NHx wet deposition' )
+       call addfld( 'wet_deposition_NHx_as_N', horiz_only, 'A', 'kg/s', 'NHx wet deposition' )
+    endif
+    if ( history_cesm_forcing ) then
+       call add_default('dry_deposition_NOy_as_N', 1, ' ')
+       call add_default('dry_deposition_NHx_as_N', 1, ' ')
+       call add_default('wet_deposition_NOy_as_N', 1, ' ')
+       call add_default('wet_deposition_NHx_as_N', 1, ' ')
     endif
 
   end subroutine chm_diags_inti
 
-  subroutine chm_diags( lchnk, ncol, vmr, mmr, rxt_rates, invariants, depvel, depflx, mmr_tend, pdel, pmid, ltrop, pbuf )
+  subroutine chm_diags( lchnk, ncol, vmr, mmr, rxt_rates, invariants, depvel, depflx, mmr_tend, pdel, pmid, ltrop, &
+                        wetdepflx, nhx_nitrogen_flx, noy_nitrogen_flx )
     !--------------------------------------------------------------------
     !	... utility routine to output chemistry diagnostic variables
     !--------------------------------------------------------------------
@@ -452,7 +522,7 @@ contains
     use commondefinitions
     use aerosoldef,   only : getCloudTracerIndexDirect, getCloudTracerName &
                            , aerosolType
-    use physics_buffer,    only : pbuf_get_field
+    use physics_buffer,    only : pbuf_get_field, pbuf_get_index
     use physics_buffer, only : physics_buffer_desc
 #endif
 !
@@ -475,7 +545,9 @@ contains
     real(r8), intent(in)  :: pdel(ncol,pver)
     real(r8), intent(in)  :: pmid(ncol,pver)
     integer,  intent(in)  :: ltrop(ncol)
-
+    real(r8), intent(in)  :: wetdepflx(ncol, gas_pcnst)
+    real(r8), intent(out) :: nhx_nitrogen_flx(ncol) ! kgN/m2/sec
+    real(r8), intent(out) :: noy_nitrogen_flx(ncol) ! kgN/m2/sec
     type(physics_buffer_desc), pointer :: pbuf(:)
 
 #ifdef OSLO_AERO
@@ -500,10 +572,14 @@ contains
     real(r8), dimension(ncol,pver) :: vmr_tbry, vmr_foy, vmr_tfy
     real(r8), dimension(ncol,pver) :: mmr_noy, mmr_sox, mmr_nhx, net_chem
     real(r8), dimension(ncol)      :: df_noy, df_sox, df_nhx, do3chm_trp, do3chm_lms
+    real(r8), dimension(ncol)      :: wd_noy, wd_nhx
 
     real(r8) :: area(ncol), mass(ncol,pver)
     real(r8) :: wgt
     character(len=16) :: spc_name
+!   test djlo
+    integer :: ind_pbuf   
+
 
     !--------------------------------------------------------------------
     !	... "diagnostic" groups
@@ -526,6 +602,8 @@ contains
     df_sox(:ncol) = 0._r8
     df_nhx(:ncol) = 0._r8
 
+    wd_noy(:ncol) = 0._r8
+    wd_nhx(:ncol) = 0._r8
 
     call get_area_all_p(lchnk, ncol, area)
     area = area * rearth**2
@@ -632,7 +710,8 @@ contains
          cloudTracerIndex = getCloudTracerIndexDirect(n)
          if(cloudTracerIndex > 0)then
             cloudTracerName = getCloudTracerName(n)
-            call pbuf_get_field(pbuf, cloudTracerIndex, cloudTracerField )     
+! djlo - temporary switched off
+!           call pbuf_get_field(pbuf, cloudTracerIndex, cloudTracerField ) 
             call outfld ( trim(cloudTracerName),cloudTracerField,pcols,lchnk)
 
             !Treat column burden (cloud tracer)
@@ -672,6 +751,22 @@ contains
        if ( any( nhx_species == m ) ) then
           df_nhx(:ncol) = df_nhx(:ncol) +  wgt * depflx(:ncol,m)*N_molwgt/adv_mass(m)
        endif
+
+       if ( any( noy_species == m ) ) then
+          wd_noy(:ncol) = wd_noy(:ncol) +  wgt * wetdepflx(:ncol,m)*N_molwgt/adv_mass(m)
+       endif
+       if ( any( nhx_species == m ) ) then
+          wd_nhx(:ncol) = wd_nhx(:ncol) +  wgt * wetdepflx(:ncol,m)*N_molwgt/adv_mass(m)
+       endif
+!
+! add contribution from non-conservation tracers
+!
+       if ( id_ndep == m ) then
+          wd_noy(:ncol) = wd_noy(:ncol) +  wgt * wetdepflx(:ncol,m)*N_molwgt/adv_mass(m) 
+       end if
+       if ( id_nhdep == m ) then
+          wd_nhx(:ncol) = wd_nhx(:ncol) +  wgt * wetdepflx(:ncol,m)*N_molwgt/adv_mass(m) 
+       end if
 
        do k=1,pver
           do i=1,ncol
@@ -731,9 +826,18 @@ contains
     call outfld( 'NOY_mmr', mmr_noy(:ncol,:), ncol ,lchnk )
     call outfld( 'SOX_mmr', mmr_sox(:ncol,:), ncol ,lchnk )
     call outfld( 'NHX_mmr', mmr_nhx(:ncol,:), ncol ,lchnk )
-    call outfld( 'DF_NOY', df_noy(:ncol), ncol ,lchnk )
+    call outfld( 'dry_deposition_NOy_as_N', df_noy(:ncol), ncol ,lchnk )
     call outfld( 'DF_SOX', df_sox(:ncol), ncol ,lchnk )
-    call outfld( 'DF_NHX', df_nhx(:ncol), ncol ,lchnk )
+    call outfld( 'dry_deposition_NHx_as_N', df_nhx(:ncol), ncol ,lchnk )
+    if (gas_wetdep_method=='NEU') then
+      wd_noy(:ncol) = -wd_noy(:ncol) ! downward is possitive 
+      wd_nhx(:ncol) = -wd_nhx(:ncol)
+      call outfld( 'wet_deposition_NOy_as_N', wd_noy(:ncol), ncol, lchnk )
+      call outfld( 'wet_deposition_NHx_as_N', wd_nhx(:ncol), ncol, lchnk )
+    end if
+
+    nhx_nitrogen_flx = df_nhx + wd_nhx
+    noy_nitrogen_flx = df_noy + wd_noy
 
     !--------------------------------------------------------------------
     !	... euv ion production
@@ -850,8 +954,7 @@ contains
 #ifdef OSLO_AERO
     real(r8), dimension(ncol) :: area
 #endif OSLO_AERO
-    integer :: m, k, j
-    integer :: plat
+    integer :: m, k
     real(r8) :: wght(ncol)
     !
     ! output integrated wet deposition field
@@ -900,9 +1003,9 @@ contains
        endif
     end do
     if (gas_wetdep_method=='MOZ') then
-       call outfld( 'WD_NOY', noy_wk(:ncol), ncol, lchnk )
+       call outfld( 'wet_deposition_NOy_as_N', noy_wk(:ncol), ncol, lchnk )
        call outfld( 'WD_SOX', sox_wk(:ncol), ncol, lchnk )
-       call outfld( 'WD_NHX', nhx_wk(:ncol), ncol, lchnk )
+       call outfld( 'wet_deposition_NHx_as_N', nhx_wk(:ncol), ncol, lchnk )
     endif
 
   end subroutine het_diags

@@ -24,7 +24,7 @@ module clubb_intr
   use constituents,  only: pcnst, cnst_add
   use pbl_utils,     only: calc_ustar, calc_obklen
   use ref_pres,      only: top_lev => trop_cloud_top_lev  
-
+  use zm_conv_intr,  only: zmconv_microp
   implicit none
 
   private
@@ -186,6 +186,12 @@ module clubb_intr
     ixvp2 = 0
 
   integer :: cmfmc_sh_idx = 0
+
+  integer :: &
+    dlfzm_idx  = -1,    & ! ZM detrained convective cloud water mixing ratio.
+    difzm_idx  = -1,    & ! ZM detrained convective cloud ice mixing ratio.
+    dnlfzm_idx = -1,    & ! ZM detrained convective cloud water num concen.
+    dnifzm_idx = -1       ! ZM detrained convective cloud ice num concen.
 
   !  Output arrays for CLUBB statistics    
   real(r8), allocatable, dimension(:,:,:) :: out_zt, out_zm, out_radzt, out_radzm, out_sfc
@@ -742,7 +748,14 @@ end subroutine clubb_init_cnst
     iiedsclr_rt  = -1
     iiedsclr_thl = -1
     iiedsclr_CO2 = -1
-    
+
+    if (zmconv_microp) then
+       dlfzm_idx = pbuf_get_index('DLFZM')
+       difzm_idx = pbuf_get_index('DIFZM')
+       dnlfzm_idx = pbuf_get_index('DNLFZM')
+       dnifzm_idx = pbuf_get_index('DNIFZM')
+    end if
+
     ! ----------------------------------------------------------------- !
     ! Define number of tracers for CLUBB to diffuse
     ! ----------------------------------------------------------------- !    
@@ -975,10 +988,12 @@ end subroutine clubb_init_cnst
        call pbuf_set_field(pbuf2d, vpwp_idx,    0.0_r8)
        call pbuf_set_field(pbuf2d, tke_idx,     0.0_r8)
        call pbuf_set_field(pbuf2d, kvh_idx,     0.0_r8)
-       call pbuf_set_field(pbuf2d, fice_idx,    0.0_r8)
        call pbuf_set_field(pbuf2d, radf_idx,    0.0_r8)
 
     endif
+  
+    ! The following is physpkg, so it needs to be initialized every time
+    call pbuf_set_field(pbuf2d, fice_idx,    0.0_r8)
    
     ! --------------- !
     ! End             !
@@ -1294,6 +1309,12 @@ end subroutine clubb_init_cnst
    real(r8), pointer, dimension(:,:) :: prer_evap
    real(r8), pointer, dimension(:,:) :: qrl
    real(r8), pointer, dimension(:,:) :: radf_clubb
+
+  ! ZM microphysics
+   real(r8), pointer :: dlfzm(:,:)  ! ZM detrained convective cloud water mixing ratio.
+   real(r8), pointer :: difzm(:,:)  ! ZM detrained convective cloud ice mixing ratio.
+   real(r8), pointer :: dnlfzm(:,:) ! ZM detrained convective cloud water num concen.
+   real(r8), pointer :: dnifzm(:,:) ! ZM detrained convective cloud ice num concen.
 
    real(r8)                          :: stend(pcols,pver)
    real(r8)                          :: qvtend(pcols,pver)
@@ -1972,8 +1993,6 @@ end subroutine clubb_init_cnst
       khzt(i,:top_lev-1) = 0._r8
       qclvar(i,:top_lev-1) = 2._r8
 
-      call outfld('KVH_CLUBB', khzt, pcols, lchnk)
-
       ! enforce zero tracer tendencies above the top_lev level -- no change
       icnt=0
       do ixind=1,pcnst
@@ -2166,7 +2185,9 @@ end subroutine clubb_init_cnst
       
 
    enddo  ! end column loop
-   
+
+   call outfld('KVH_CLUBB', khzt, pcols, lchnk)
+
    ! Add constant to ghost point so that output is not corrupted 
    if (clubb_do_adv) then
       if (macmic_it .eq. cld_macmic_num_steps) then
@@ -2282,6 +2303,13 @@ end subroutine clubb_init_cnst
    lqice(ixnumice) = .true.
 
    call physics_ptend_init(ptend_loc,state%psetcols, 'clubb', ls=.true., lq=lqice)
+
+   if (zmconv_microp) then
+      call pbuf_get_field(pbuf, dlfzm_idx, dlfzm)
+      call pbuf_get_field(pbuf, difzm_idx, difzm)
+      call pbuf_get_field(pbuf, dnlfzm_idx, dnlfzm)
+      call pbuf_get_field(pbuf, dnifzm_idx, dnifzm)
+   end if
    
    do k=1,pver
       do i=1,ncol
@@ -2292,19 +2320,31 @@ end subroutine clubb_init_cnst
          else
             dum1 = ( 268.15_r8 - state1%t(i,k) ) / 30._r8 
          endif
-        
-         ptend_loc%q(i,k,ixcldliq) = dlf(i,k) * ( 1._r8 - dum1 )
-         ptend_loc%q(i,k,ixcldice) = dlf(i,k) * dum1
-         ptend_loc%q(i,k,ixnumliq) = 3._r8 * ( max(0._r8, ( dlf(i,k) - dlf2(i,k) )) * ( 1._r8 - dum1 ) ) &
+
+         if (zmconv_microp) then
+            ptend_loc%q(i,k,ixcldliq) = dlfzm(i,k) + dlf2(i,k) * ( 1._r8 - dum1 )
+            ptend_loc%q(i,k,ixcldice) = difzm(i,k) + dlf2(i,k) * dum1
+
+            ptend_loc%q(i,k,ixnumliq) = dnlfzm(i,k) + 3._r8 * ( dlf2(i,k) * ( 1._r8 - dum1 ) )   &
+                                                   / (4._r8*3.14_r8*10.e-6_r8**3*997._r8)      ! Shallow Convection
+            ptend_loc%q(i,k,ixnumice) = dnifzm(i,k) + 3._r8 * ( dlf2(i,k) * dum1 ) &
+                                                   / (4._r8*3.14_r8*50.e-6_r8**3*500._r8)      ! Shallow Convection
+            ptend_loc%s(i,k)          = dlf2(i,k) * dum1 * latice
+         else       
+
+            ptend_loc%q(i,k,ixcldliq) = dlf(i,k) * ( 1._r8 - dum1 )
+            ptend_loc%q(i,k,ixcldice) = dlf(i,k) * dum1
+            ptend_loc%q(i,k,ixnumliq) = 3._r8 * ( max(0._r8, ( dlf(i,k) - dlf2(i,k) )) * ( 1._r8 - dum1 ) ) &
                                      / (4._r8*3.14_r8* 8.e-6_r8**3*997._r8) + & ! Deep    Convection
                                      3._r8 * (                         dlf2(i,k)    * ( 1._r8 - dum1 ) ) &
                                      / (4._r8*3.14_r8*10.e-6_r8**3*997._r8)     ! Shallow Convection 
-         ptend_loc%q(i,k,ixnumice) = 3._r8 * ( max(0._r8, ( dlf(i,k) - dlf2(i,k) )) *  dum1 ) &
+            ptend_loc%q(i,k,ixnumice) = 3._r8 * ( max(0._r8, ( dlf(i,k) - dlf2(i,k) )) *  dum1 ) &
                                      / (4._r8*3.14_r8*25.e-6_r8**3*500._r8) + & ! Deep    Convection
                                      3._r8 * (                         dlf2(i,k)    *  dum1 ) &
                                      / (4._r8*3.14_r8*50.e-6_r8**3*500._r8)     ! Shallow Convection
-         ptend_loc%s(i,k)          = dlf(i,k) * dum1 * latice
- 
+            ptend_loc%s(i,k)          = dlf(i,k) * dum1 * latice
+         end if
+
          ! Only rliq is saved from deep convection, which is the reserved liquid.  We need to keep
          !   track of the integrals of ice and static energy that is effected from conversion to ice
          !   so that the energy checker doesn't complain.
@@ -2318,7 +2358,9 @@ end subroutine clubb_init_cnst
 
    call outfld( 'DPDLFLIQ', ptend_loc%q(:,:,ixcldliq), pcols, lchnk)
    call outfld( 'DPDLFICE', ptend_loc%q(:,:,ixcldice), pcols, lchnk)
-   call outfld( 'DPDLFT',   ptend_loc%s(:,:)/cpair, pcols, lchnk)
+   
+   temp2dp(:ncol,:pver) =  ptend_loc%s(:ncol,:pver)/cpair
+   call outfld( 'DPDLFT',   temp2d, pcols, lchnk)
   
    call physics_ptend_sum(ptend_loc,ptend_all,ncol)
    call physics_update(state1,ptend_loc,hdtime)
@@ -2524,7 +2566,7 @@ end subroutine clubb_init_cnst
    dummy2(:) = 0._r8
    dummy3(:) = 0._r8
    
-   where (kbfs .eq. -0.0_r8) kbfs = 0.0_r8
+   where (kbfs(:ncol) .eq. -0.0_r8) kbfs(:ncol) = 0.0_r8
 
    !  Compute PBL depth according to Holtslag-Boville Scheme
    call pblintd(ncol, thv, state1%zm, state1%u, state1%v, &
@@ -2552,7 +2594,10 @@ end subroutine clubb_init_cnst
    call outfld( 'VPWP_CLUBB',       vpwp,                    pcols, lchnk )
    call outfld( 'WPTHLP_CLUBB',     wpthlp_output,           pcols, lchnk )
    call outfld( 'WPRTP_CLUBB',      wprtp_output,            pcols, lchnk )
-   call outfld( 'RTP2_CLUBB',       rtp2*1000._r8,           pcols, lchnk )
+
+   temp2dp(:ncol,:) =  rtp2(:ncol,:)*1000._r8
+   call outfld( 'RTP2_CLUBB',       temp2dp,                 pcols, lchnk )
+
    call outfld( 'THLP2_CLUBB',      thlp2,                   pcols, lchnk )
 
    rtpthlp_output(:ncol,:) = rtpthlp_output(:ncol,:) * 1000._r8

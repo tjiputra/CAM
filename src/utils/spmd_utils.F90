@@ -1463,7 +1463,6 @@ contains
 
          call sync_images()
 
-!DIR$ CONCURRENT
          do i = 1, steps
             dest = dests(i)
             if (sendcnts(dest) > 0) then

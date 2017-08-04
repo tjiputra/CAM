@@ -1,3 +1,12 @@
+module d2a3dikj_mod
+
+implicit none
+save
+private
+public :: d2a3dikj
+
+contains
+
 !-----------------------------------------------------------------------
 !BOP
 ! !ROUTINE: d2a3ikj -- Generalized 2nd order D-to-A grid transform (3D)
@@ -345,3 +354,4 @@
 !EOC
       end
 !-----------------------------------------------------------------------
+end module d2a3dikj_mod

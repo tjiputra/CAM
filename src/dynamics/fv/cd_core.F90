@@ -1,17 +1,18 @@
 subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
                    delp,   pe,     pk,  ns,  dt,                  &
-                   ptopin, umax,   pi, ae,  cp,  akap,            &
+                   ptopin, umax,   pi, ae,                        &
+                   cp3vc,  cap3vc, cp3v, cap3v,                   &
                    iord_c, jord_c, iord_d, jord_d,   ipe,         &
                    div24del2flag, del2coef,                       &
                    om,     hs,     cx3  ,  cy3, mfx, mfy,         &
                    delpf, uc, vc, ptc, dpt, ptk,                  &
-                   wz3, pkc, wz,  hsxy, ptxy, pkxy,               &
+                   wz3, pxc, wz,  hsxy, ptxy, pkxy,               &
                    pexy, pkcc, wzc, wzxy, delpxy,                 &
                    pkkp, wzkp, cx_om, cy_om, filtcw, s_trac,      &
                    mlt, ncx, ncy, nmfx, nmfy, iremote,            &
                    cxtag, cytag, mfxtag, mfytag,                  &
                    cxreqs, cyreqs, mfxreqs, mfyreqs,              &
-                   am_correction, am_fixer, dod, don)
+                   kmtp, am_correction, am_fixer, dod, don ,high_order_top)
 
    ! Dynamical core for both C- and D-grid Lagrangian dynamics
    !
@@ -77,12 +78,21 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
    real(r8), intent(in) :: ptopin
    real(r8), intent(in) :: umax
    real(r8), intent(in) :: dt                !small time step in seconds
-   real(r8), intent(in) :: cp
-   real(r8), intent(in) :: akap
    integer,  intent(in) :: div24del2flag
    real(r8), intent(in) :: del2coef
+   integer,  intent(in) :: kmtp           ! range of levels (1:kmtp) where order is reduced
    logical,  intent(in) :: am_correction  ! logical switch for correction (applied here)
    logical,  intent(in) :: am_fixer       ! logical switch for fixer (generate out args)
+   logical,  intent(in) :: high_order_top ! use uniform 4th order everywhere (incl. model top)
+
+   real(r8), intent(in) ::   & 
+      cp3vc(grid%im,grid%jfirst:grid%jlast,grid%kfirst:grid%klast)         !C_p on yz
+   real(r8), intent(in) ::   & 
+      cap3vc(grid%im,grid%jfirst:grid%jlast,grid%kfirst:grid%klast)        !cappa on yz
+   real(r8), intent(in) ::   & 
+      cp3v(grid%ifirstxy:grid%ilastxy,grid%jfirstxy:grid%jlastxy,grid%km)  ! C_p on xy
+   real(r8), intent(in) ::   & 
+      cap3v(grid%ifirstxy:grid%ilastxy,grid%jfirstxy:grid%jlastxy,grid%km) ! cappa on xy -- on "a" grid
 
    ! Input time independent arrays:
    real(r8), intent(in) ::        &
@@ -126,7 +136,7 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
    real(r8), intent(inout) ::   &
       wz3(grid%im,grid%jfirst-1:grid%jlast  ,grid%kfirst:grid%klast+1)
    real(r8), intent(inout) ::   &
-      pkc(grid%im,grid%jfirst-1:grid%jlast+1,grid%kfirst:grid%klast+1) 
+      pxc(grid%im,grid%jfirst-1:grid%jlast+1,grid%kfirst:grid%klast+1) 
    real(r8), intent(inout) ::   &
       wz(grid%im,grid%jfirst-1:grid%jlast+1,grid%kfirst:grid%klast+1)
    real(r8), intent(inout) ::   &
@@ -158,6 +168,12 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
    real(r8), intent(out) ::   &
       ptk(grid%im,grid%jfirst:grid%jlast,grid%kfirst:grid%klast)
 
+! C.-C. Chen, omega calculation
+   real(r8), intent(out) ::   &
+      cx_om(grid%im,grid%jfirst:grid%jlast,grid%kfirst:grid%klast)   ! Courant in X
+   real(r8), intent(out) ::  &
+      cy_om(grid%im,grid%jfirst:grid%jlast+1,grid%kfirst:grid%klast) ! Courant in Y
+
    real(r8), intent(out) :: don(grid%jm,grid%km), & ! num of d(Omega)
                             dod(grid%jm,grid%km)    ! denom of same
 
@@ -174,6 +190,8 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
    real(r8) ::  v_cen(grid%im,grid%jfirst-grid%ng_s:grid%jlast+grid%ng_d,grid%kfirst:grid%klast)
    real(r8) ::  ua(grid%im,grid%jfirst-grid%ng_d:grid%jlast+grid%ng_d,grid%kfirst:grid%klast)
    real(r8) ::  va(grid%im,grid%jfirst-grid%ng_s:grid%jlast+grid%ng_d,grid%kfirst:grid%klast)
+
+   real(r8) :: pec(grid%im,grid%kfirst:grid%klast+1,grid%jfirst:grid%jlast) 
 
    ! Local scalars
    real(r8), parameter ::  D0_0                    =   0.0_r8
@@ -194,12 +212,8 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
    real(r8) ::  rat, ycrit
    real(r8) ::  dt5
 
-   integer :: msgtag             ! MPI message tag
-
    integer :: im, jm, km         ! problem dimensions
-   integer :: nq                 ! # of tracers to be advected by trac2d
-   integer :: ifirstxy,ilastxy   ! xy-decomp. longitude ranges
-   integer :: jfirstxy,jlastxy   ! xy-decomp. latitude ranges
+   integer :: ifirstxy, jfirstxy ! xy-decomp. lat/long ranges
    integer :: ng_c               ! ghost latitudes on C grid
    integer :: ng_d               ! ghost lats on D (Max NS dependencies, ng_d >= ng_c)
    integer :: ng_s               ! max(ng_c+1,ng_d) significant if ng_c = ng_d
@@ -212,16 +226,14 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
 
    integer :: iam
    integer :: npr_y
-   integer :: npes_xy
    integer :: npes_yz
 
    integer i, j, k, ml
-   integer js1g1, js2g0, js2g1, jn2g1
+   integer js1g1, js2g0, js2g1, jn2g1  ,js4g0,jn3g0 !+tht 04.07.2017
    integer jn2g0, jn1g1
    integer iord , jord
-   integer ktot, ktotp
 
-   real(r8) ::  tau, fac, pk4
+   real(r8) ::  tau, fac, px4
    real(r8) ::  tau4 ! coefficient for 4th-order divergence damping
 
 #if defined( SPMD )
@@ -248,12 +260,6 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
    logical :: ldiv4 = .false.  
    logical :: ldel2 = .false.   
 
-   ! C.-C. Chen, omega calculation
-   real(r8), intent(out) ::   &
-      cx_om(grid%im,grid%jfirst:grid%jlast,grid%kfirst:grid%klast)   ! Courant in X
-   real(r8), intent(out) ::  &
-      cy_om(grid%im,grid%jfirst:grid%jlast+1,grid%kfirst:grid%klast) ! Courant in Y
-
    ! AM correction and fixer
    integer  :: iord_c_min
    integer  :: iord_d_min
@@ -266,21 +272,24 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
    real(r8), pointer :: cosp(:)
    real(r8), pointer :: cose(:)
 
-   real(r8) ::help(grid%im,grid%jfirst-1:grid%jlast  ,grid%kfirst:grid%klast  ) 
-   real(r8) ::kelp(grid%im,grid%jfirst-1:grid%jlast  ,grid%kfirst:grid%klast  ) 
-   real(r8) :: dpn(grid%im,grid%jfirst  :grid%jlast  ,grid%kfirst:grid%klast  )
-   real(r8) :: dpo(grid%im,grid%jfirst  :grid%jlast  ,grid%kfirst:grid%klast  )
+   real(r8), allocatable :: help(:,:,:) 
+   real(r8), allocatable :: kelp(:,:,:) 
+   real(r8), allocatable :: dpn(:,:,:)
+   real(r8), allocatable :: dpo(:,:,:)
+   real(r8), allocatable :: dpr(:,:,:)
+   real(r8), allocatable :: ddpu(:,:,:)
+   real(r8), allocatable :: dpns(:,:)
+   real(r8), allocatable :: ddus(:,:)
 
+   ! referenced outside AM conditional even though it's not used
+   real(r8) :: ddpa(grid%im,grid%jfirst-1:grid%jlast  ,grid%kfirst:grid%klast  ) 
+   real(r8) :: ddu( grid%im,grid%jfirst  :grid%jlast  ,grid%kfirst:grid%klast  )
+   real(r8) :: vf(  grid%im,grid%jfirst-2:grid%jlast+2,grid%kfirst:grid%klast  )   ! v-Winds on U points
+
+   ! Used to allow the same code to execute with or without the AM correction
    real(r8) :: ptr(grid%im,grid%jfirst-1:grid%jlast+1,grid%kfirst:grid%klast+1)
-   real(r8) :: dpr(grid%im,grid%jfirst-1:grid%jlast+1,grid%kfirst:grid%klast  )
-   real(r8) ::ddpa(grid%im,grid%jfirst-1:grid%jlast  ,grid%kfirst:grid%klast  ) 
-   real(r8) ::ddpu(grid%im,grid%jfirst  :grid%jlast  ,grid%kfirst:grid%klast  )
-   real(r8) :: ddu(grid%im,grid%jfirst  :grid%jlast  ,grid%kfirst:grid%klast  )
 
-   real(r8) :: ddp(grid%im,grid%jfirst  :grid%jlast  )
-   real(r8) :: duc(grid%im,grid%jfirst  :grid%jlast  )
-   real(r8) :: dpns(grid%jfirst:grid%jlast,grid%kfirst:grid%klast), &
-               ddus(grid%jfirst:grid%jlast,grid%kfirst:grid%klast)
+   logical :: sw_am_corr
 
    !******************************************************************
    !******************************************************************
@@ -350,6 +359,8 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
    !     THT  16.11.18:   Add options for AM correction and fixer
    !--------------------------------------------------------------------------------------
 
+   logical :: high_alt
+   high_alt = grid%high_alt
 
    geopk_cdist = .false.
    geopk_ddist = .false.
@@ -360,13 +371,11 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
    endif
 #endif
 
-   npes_xy  = grid%npes_xy
    npes_yz  = grid%npes_yz
 
    im       = grid%im
    jm       = grid%jm
    km       = grid%km
-   nq       = grid%nq
 
    ng_c     = grid%ng_c
    ng_d     = grid%ng_d
@@ -382,15 +391,28 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
    npr_y    = grid%npr_y
 
    ifirstxy = grid%ifirstxy
-   ilastxy  = grid%ilastxy
    jfirstxy = grid%jfirstxy
-   jlastxy  = grid%jlastxy
 
-   ktot  = klast - kfirst + 1
-   ktotp = ktot + 1
+   if (am_correction .or. am_fixer) then 
+      allocate( &
+         help(grid%im,grid%jfirst-1:grid%jlast ,grid%kfirst:grid%klast  ), &
+         kelp(grid%im,grid%jfirst-1:grid%jlast ,grid%kfirst:grid%klast  ), &
+         dpn(grid%im,grid%jfirst  :grid%jlast  ,grid%kfirst:grid%klast  ), &
+         dpo(grid%im,grid%jfirst  :grid%jlast  ,grid%kfirst:grid%klast  ) )
+   endif
+   if (am_correction) then 
+      allocate( &
+         dpr(grid%im,grid%jfirst-1:grid%jlast+1,grid%kfirst:grid%klast  ), &
+         ddpu(grid%im,grid%jfirst  :grid%jlast ,grid%kfirst:grid%klast  ), &
+         dpns(grid%jfirst:grid%jlast,grid%kfirst:grid%klast), &
+         ddus(grid%jfirst:grid%jlast,grid%kfirst:grid%klast) )
+      xakap      = 1._r8/cap3vc(1,jfirst,kfirst)
+   else
+      xakap      = 1._r8
+   endif
 
-   if (am_correction) then
-      xakap      = 1._r8/akap
+   ! maintain consistent accuracy (uniform PPM order) over domain
+   if (high_order_top) then
       iord_c_min = iord_c
       jord_c_min = jord_c
       iord_d_min = iord_d
@@ -398,7 +420,6 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
       iord_d_low = iord_d
       jord_d_low = jord_d
    else
-      xakap      = 1._r8
       iord_c_min = 1
       jord_c_min = 1
       iord_d_min = 1
@@ -433,6 +454,10 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
       jn2g0  = min(jm-1,jlast)
       jn1g1  = min(jm,jlast+1)
       jn2g1 = min(jm-1,jlast+1)
+!+tht 04.07.2017
+      js4g0  = max(4,jfirst)
+      jn3g0  = min(jm-2,jlast)
+!-tht 04.07.2017
 
       if ( abs(grid%dt0-dt) > D0_1 ) then
 
@@ -740,8 +765,7 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
 !$omp parallel do private(i, j, k, iord, jord)    
       do  k = kfirst, klast
 
-         if ( k <= km/8 ) then
-            ! AM correction: maintain consistent accuracy (uniform PPM order) over domain 
+         if ( k <= kmtp ) then
             iord = iord_c_min
             jord = jord_c_min
          else
@@ -780,20 +804,30 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
          if (grid%geopk16byte) then
             call FVstartclock(grid,'---C_GEOP16')
             call geopk16(grid, pe, ptk, pkcc, wzc, hs, ptc, &
-                         0, cp, akap)
+                         0, cp3vc(1,jfirst,kfirst), cap3vc(1,jfirst,kfirst) )
          else
             call FVstartclock(grid,'---C_GEOP_D')
             call geopk_d(grid, pe, ptk, pkcc, wzc, hs, ptc, &
-                         0, cp, akap)
+                         0, cp3vc(1,jfirst,kfirst), cap3vc(1,jfirst,kfirst) )
          end if
 
          ! Geopk does not need j ghost zones of pkc and wz
+
+         if (.not.high_alt) then
+!$omp parallel do private(i, j, k)
+            do k = kfirst, klast+1
+               do j = jfirst, jlast
+                  do i = 1, im
+                     pxc(i,j,k) = pkcc(i,j,k)
+                  end do
+               end do
+            end do
+         endif
 
 !$omp parallel do private(i, j, k)
          do k = kfirst, klast+1
             do j = jfirst, jlast
                do i = 1, im
-                  pkc(i,j,k) = pkcc(i,j,k)
                   wz(i,j,k) = wzc(i,j,k)
                end do
             end do
@@ -860,7 +894,7 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
       end if
 
       call geopk(grid, pexy, delpxy, pkxy, wzxy, hsxy, ptxy, &
-                 cp, akap, nx)
+                 cp3v, cap3v, nx)
 
       if (grid%twod_decomp == 1) then
 
@@ -873,40 +907,65 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
 #if defined( SPMD )
 
          call FVstartclock(grid,'XY_TO_YZ_C_GEOP')
-         if (grid%modc_onetwo .eq. 1) then
+         if (high_alt) then
+            call mp_sendirr( grid%commxy, grid%pexy_to_pe%SendDesc,       &
+                 grid%pexy_to_pe%RecvDesc, pexy, pec,         &
+                 modc=grid%modc_dynrun )
+            call mp_recvirr( grid%commxy, grid%pexy_to_pe%SendDesc,       &
+                 grid%pexy_to_pe%RecvDesc, pexy, pec,         &
+                 modc=grid%modc_dynrun )
             call mp_sendirr( grid%commxy, grid%pkxy_to_pkc%SendDesc,      &
-                             grid%pkxy_to_pkc%RecvDesc, pkxy, pkkp,       &
-                             modc=grid%modc_cdcore )
+                 grid%pkxy_to_pkc%RecvDesc, wzxy, wzkp,       &
+                 modc=grid%modc_cdcore )
             call mp_recvirr( grid%commxy, grid%pkxy_to_pkc%SendDesc,      &
-                             grid%pkxy_to_pkc%RecvDesc, pkxy, pkkp,       &
-                             modc=grid%modc_cdcore )
-            call mp_sendirr( grid%commxy, grid%pkxy_to_pkc%SendDesc,      &
-                             grid%pkxy_to_pkc%RecvDesc, wzxy, wzkp,       &
-                             modc=grid%modc_cdcore )
-            call mp_recvirr( grid%commxy, grid%pkxy_to_pkc%SendDesc,      &
-                             grid%pkxy_to_pkc%RecvDesc, wzxy, wzkp,       &
-                             modc=grid%modc_cdcore )
+                 grid%pkxy_to_pkc%RecvDesc, wzxy, wzkp,       &
+                 modc=grid%modc_cdcore )
          else
-            call mp_sendirr( grid%commxy, grid%pkxy_to_pkc%SendDesc,      &
-                             grid%pkxy_to_pkc%RecvDesc, pkxy, pkkp,       &
-                             wzxy, wzkp,                                  &
-                             modc=grid%modc_cdcore )
-            call mp_recvirr( grid%commxy, grid%pkxy_to_pkc%SendDesc,      &
-                             grid%pkxy_to_pkc%RecvDesc, pkxy, pkkp,       &
-                             wzxy, wzkp,                                  &
-                             modc=grid%modc_cdcore )
-         end if
+            if (grid%modc_onetwo .eq. 1) then
+               call mp_sendirr( grid%commxy, grid%pkxy_to_pkc%SendDesc,      &
+                    grid%pkxy_to_pkc%RecvDesc, pkxy, pkkp,       &
+                    modc=grid%modc_cdcore )
+               call mp_recvirr( grid%commxy, grid%pkxy_to_pkc%SendDesc,      &
+                    grid%pkxy_to_pkc%RecvDesc, pkxy, pkkp,       &
+                    modc=grid%modc_cdcore )
+               call mp_sendirr( grid%commxy, grid%pkxy_to_pkc%SendDesc,      &
+                    grid%pkxy_to_pkc%RecvDesc, wzxy, wzkp,       &
+                    modc=grid%modc_cdcore )
+               call mp_recvirr( grid%commxy, grid%pkxy_to_pkc%SendDesc,      &
+                    grid%pkxy_to_pkc%RecvDesc, wzxy, wzkp,       &
+                    modc=grid%modc_cdcore )
+            else
+               call mp_sendirr( grid%commxy, grid%pkxy_to_pkc%SendDesc,      &
+                    grid%pkxy_to_pkc%RecvDesc, pkxy, pkkp,       &
+                    wzxy, wzkp,                                  &
+                    modc=grid%modc_cdcore )
+               call mp_recvirr( grid%commxy, grid%pkxy_to_pkc%SendDesc,      &
+                    grid%pkxy_to_pkc%RecvDesc, pkxy, pkkp,       &
+                    wzxy, wzkp,                                  &
+                    modc=grid%modc_cdcore )
+            end if
+         endif
          call FVstopclock(grid,'XY_TO_YZ_C_GEOP')
 
+         if (high_alt) then
 !$omp parallel do private(i, j, k)
-         do k = kfirst, klast+1
-            do j = jfirst, jlast
-               do i = 1, im
-                  pkc(i,j,k) = pkkp(i,j,k)
+            do k = kfirst, klast+1
+               do j = jfirst, jlast
+                  do i = 1, im
+                     pxc(i,j,k) = log(pec(i,k,j))
+                  end do
                end do
             end do
-         end do
-
+         else
+!$omp parallel do private(i, j, k)
+            do k = kfirst, klast+1
+               do j = jfirst, jlast
+                  do i = 1, im
+                     pxc(i,j,k) = pkkp(i,j,k)
+                  end do
+               end do
+            end do
+         endif
 !$omp parallel do private(i, j, k)
          do k = kfirst, klast+1
             do j = jfirst, jlast
@@ -924,11 +983,30 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
          do k = kfirst, klast+1
             do j = jfirst, jlast
                do i = 1, im
-                  pkc(i,j,k) = pkxy(i,j,k)
-                  wz(i,j,k) = wzxy(i,j,k)
+                 wz(i,j,k) = wzxy(i,j,k)
                end do
             end do
          end do
+         if (high_alt) then
+!$omp parallel do private(i, j, k)
+            do k = kfirst, klast+1
+               do j = jfirst, jlast
+                  do i = 1, im
+                     pec(i,k,j) = pexy(i,k,j)
+                     pxc(i,j,k) = log(pec(i,k,j))
+                  end do
+               end do
+            end do
+         else
+!$omp parallel do private(i, j, k)
+            do k = kfirst, klast+1
+               do j = jfirst, jlast
+                  do i = 1, im
+                     pxc(i,j,k) = pkxy(i,j,k)
+                  end do
+               end do
+            end do
+         endif
 
       end if
 
@@ -956,7 +1034,7 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
       if ( mod(iam,npr_y) == 0 ) src = -1
       call mp_send3d_2( grid%commyz, dest, src, im, jm, km+1,          &
                         1, im, jfirst-1, jlast+1, kfirst, klast+1,    &
-                        1, im, jlast, jlast, kfirst, klast+1, pkc, wz)
+                        1, im, jlast, jlast, kfirst, klast+1, pxc, wz)
       call FVstopclock(grid,'---PRE_D_CORE_COMM')
 #endif
 
@@ -972,8 +1050,8 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
 
                do i = 1, im
                   ! AM fix: ensure interior pressure torque vanishes 
-                  wk1(i,j) = pkc(i,j,k  )*max(pkc(i,j,k), tiny)**(xakap - 1.0_r8)
-                  wk3(i,j) = pkc(i,j,k+1)**xakap
+                  wk1(i,j) = pxc(i,j,k  )*max(pxc(i,j,k), tiny)**(xakap - 1.0_r8)
+                  wk3(i,j) = pxc(i,j,k+1)**xakap
                   p1d(i)   = wk3(i,j) - wk1(i,j)
                enddo
 
@@ -991,17 +1069,17 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
             else
 
                do i = 1, im
-                  p1d(i) = pkc(i,j,k+1) - pkc(i,j,k)
+                  p1d(i) = pxc(i,j,k+1) - pxc(i,j,k)
                enddo
 
                uc(1,j,k) = uc(1,j,k) + grid%dtdx2(j) * (                   &
-                           (wz(im,j,k+1)-wz(1,j,k))*(pkc(1,j,k+1)-pkc(im,j,k))  &
-                         + (wz(im,j,k)-wz(1,j,k+1))*(pkc(im,j,k+1)-pkc(1,j,k))) &
+                           (wz(im,j,k+1)-wz(1,j,k))*(pxc(1,j,k+1)-pxc(im,j,k))  &
+                         + (wz(im,j,k)-wz(1,j,k+1))*(pxc(im,j,k+1)-pxc(1,j,k))) &
                                            / (p1d(1)+p1d(im))
                do i = 2, im
                   uc(i,j,k) = uc(i,j,k) + grid%dtdx2(j) * (                &
-                              (wz(i-1,j,k+1)-wz(i,j,k))*(pkc(i,j,k+1)-pkc(i-1,j,k))  &
-                            + (wz(i-1,j,k)-wz(i,j,k+1))*(pkc(i-1,j,k+1)-pkc(i,j,k))) &
+                              (wz(i-1,j,k+1)-wz(i,j,k))*(pxc(i,j,k+1)-pxc(i-1,j,k))  &
+                            + (wz(i-1,j,k)-wz(i,j,k+1))*(pxc(i-1,j,k+1)-pxc(i,j,k))) &
                                                / (p1d(i)+p1d(i-1))
                end do
 
@@ -1040,7 +1118,7 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
       ! pkc and wz need only to be ghosted jfirst-1
       call mp_recv3d_2( grid%commyz, src, im, jm, km+1,                &
                         1, im, jfirst-1, jlast+1, kfirst, klast+1,    &
-                        1, im, jfirst-1, jfirst-1, kfirst, klast+1, pkc, wz)
+                        1, im, jfirst-1, jfirst-1, kfirst, klast+1, pxc, wz)
 
       call mp_send4d_ns( grid%commyz, im, jm, km, 1, jfirst, jlast,    &
                          kfirst, klast, ng_d, ng_d, uc )
@@ -1051,11 +1129,11 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
 
       if (am_correction) then
 !$omp parallel do private(i, j, k)
-         ! AM correction (pressure, advective winds): pkc -> ptr
+         ! AM correction (pressure, advective winds): pxc -> ptr
          do k = kfirst, klast+1
             do j = js1g1, jlast
                do i = 1, im
-                  ptr(i,j,k) = pkc(i,j,k)*max(pkc(i,j,k), tiny)**(xakap - 1.0_r8)
+                  ptr(i,j,k) = pxc(i,j,k)*max(pxc(i,j,k), tiny)**(xakap - 1.0_r8)
                end do
             end do
          end do
@@ -1064,7 +1142,7 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
          do k = kfirst, klast+1
             do j = js1g1, jlast
                do i = 1, im
-                  ptr(i,j,k) = pkc(i,j,k)
+                  ptr(i,j,k) = pxc(i,j,k)
                end do
             end do
          end do
@@ -1129,8 +1207,7 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
 !$omp parallel do private(i, j, k, iord, jord) 
       do k = kfirst, klast
 
-         if( k <= km/8 ) then
-            ! maintain consistent accuracy (uniform PPM order) over domain 
+         if( k <= kmtp ) then
             if( k == 1 ) then
                iord = iord_d_min
                jord = jord_d_min
@@ -1155,6 +1232,9 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
             end do
          end if
 
+         ! don't apply correction if order is not 4
+         sw_am_corr = am_correction .and. iord.eq.iord_d .and. jord.eq.jord_d 
+
          call d_sw( grid, u(1,jfirst-ng_d,k),      v(1,jfirst-ng_s,k),  &
                     uc(1,jfirst-ng_d,k),    vc(1,jfirst-2,k),           &
                     pt(1,jfirst-ng_d,k),   delp(1,jfirst,k),            &
@@ -1167,8 +1247,9 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
                     grid%cdxdiv(:,k),grid%cdydiv(:,k) ,                 & 
                     grid%cdx4 (js2g0:,k),grid%cdy4(js2g0:,k) ,          & 
                     grid%cdtau4(js2g0:,k), ldiv2, ldiv4, ldel2,         & 
-                    iord, jord, tiny, am_correction,                    &
-                    ddpa(1,jfirst,k), ddu(1,jfirst,k) )
+                    iord, jord, tiny, sw_am_corr,                       &
+                    ddpa(1,jfirst,k), ddu(1,jfirst,k),                  &
+                    vf(1,jfirst-2   ,k) )
 
          if (am_correction .or. am_fixer) then 
             do j = jfirst, jlast
@@ -1245,7 +1326,7 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
             do k = kfirst, klast
                do j = js2g0, jlast
                   do i = 1, im
-                     ddu(i,j,k)=ddu(i,j,k)* D0_5*(dpo(i,j,k)+dpn(i,j,k))
+                     ddu(i,j,k)=ddu(i,j,k)* D0_5*(dpo(i,j,k)+dpn(i,j,k)*3._r8)*D0_5
                   end do
                end do
             end do
@@ -1253,10 +1334,12 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
 !$omp parallel do private(i, j, k) 
             do k = kfirst, klast
                do j = js2g0, jlast
-                  ddus(j,k) =                ddu(1,j,k) +(u(1,j,k)+D0_5*uc(1,j,k))*ddpu(1,j,k)
-                  dpns(j,k) =                dpn(1,j,k)
+                  ddus(j,k) = ddu(1,j,k) + (u(1,j,k) + uc(1,j,k)/D4_0)*ddpu(1,j,k) - &
+                              vf(1,j,k)*(dpn(1,j,k) - dpo(1,j,k))*D0_5
+                  dpns(j,k) = dpn(1,j,k)
                   do i = 2, im
-                     ddus(j,k) = ddus(j,k) + ddu(i,j,k) +(u(i,j,k)+D0_5*uc(i,j,k))*ddpu(i,j,k)
+                     ddus(j,k) = ddus(j,k) + ddu(i,j,k) +(u(i,j,k)+uc(i,j,k)/D4_0)*ddpu(i,j,k) - &
+                                 vf(i,j,k)*(dpn(i,j,k)-dpo(i,j,k))*D0_5
                      dpns(j,k) = dpns(j,k) + dpn(i,j,k)
                   end do
                   ddus(j,k) = ddus(j,k)/dpns(j,k)  
@@ -1265,7 +1348,8 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
 
 !$omp parallel do private(i, j, k) 
             do k = kfirst, klast
-               do j = js2g0, jlast
+              !do j = js2g0, jlast
+               do j = js4g0, jn3g0 !tht 04.07.2017
                   do i = 1, im !+++++++++++++++++++++++++++++++++++++++++++++
                      uc(i,j,k) = uc(i,j,k) + ddus(j,k) !  APPLY AM CORRECTION
                   enddo        !+++++++++++++++++++++++++++++++++++++++++++++
@@ -1327,11 +1411,11 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
          if (grid%geopk16byte) then
             call FVstartclock(grid,'---D_GEOP16')
             call geopk16(grid, pe, delp, pkcc, wzc, hs, pt, &
-                         ng_d, cp, akap)
+                         ng_d, cp3vc(1,jfirst,kfirst), cap3vc(1,jfirst,kfirst))
          else
             call FVstartclock(grid,'---D_GEOP_D')
             call geopk_d(grid, pe, delp, pkcc, wzc, hs, pt, &
-                         ng_d, cp, akap)
+                         ng_d, cp3vc(1,jfirst,kfirst), cap3vc(1,jfirst,kfirst))
          end if
 
          ! Geopk does not need j ghost zones of pkc and wz
@@ -1340,11 +1424,20 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
          do k = kfirst, klast+1
             do j = jfirst, jlast
                do i = 1, im
-                  pkc(i,j,k) = pkcc(i,j,k)
                   wz(i,j,k) = wzc(i,j,k)
                end do
             end do
          end do
+         if (.not.high_alt) then
+!$omp parallel do private(i, j, k)
+            do k = kfirst, klast+1
+               do j = jfirst, jlast
+                  do i = 1, im
+                     pxc(i,j,k) = pkcc(i,j,k)
+                  end do
+               end do
+            end do
+         endif
 
          if (grid%geopk16byte) then
             call FVstopclock(grid,'---D_GEOP16')
@@ -1417,7 +1510,7 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
       end if
 
       call geopk(grid, pexy, delpxy, pkxy, wzxy, hsxy, ptxy, &
-                 cp, akap, nx)
+                 cp3v, cap3v, nx)
 
       if (grid%twod_decomp == 1) then
 
@@ -1428,40 +1521,65 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
 #if defined( SPMD )
 
          call FVstartclock(grid,'XY_TO_YZ_D_GEOP')
-         if (grid%modc_onetwo .eq. 1) then
+         if (high_alt) then
+            call mp_sendirr( grid%commxy, grid%pexy_to_pe%SendDesc,       &
+                 grid%pexy_to_pe%RecvDesc, pexy, pec,         &
+                 modc=grid%modc_dynrun )
+            call mp_recvirr( grid%commxy, grid%pexy_to_pe%SendDesc,       &
+                 grid%pexy_to_pe%RecvDesc, pexy, pec,         &
+                 modc=grid%modc_dynrun )
             call mp_sendirr( grid%commxy, grid%pkxy_to_pkc%SendDesc,      &
-                             grid%pkxy_to_pkc%RecvDesc, pkxy, pkkp,       &
-                             modc=grid%modc_cdcore )
+                 grid%pkxy_to_pkc%RecvDesc, wzxy, wzkp,       &
+                 modc=grid%modc_cdcore )
             call mp_recvirr( grid%commxy, grid%pkxy_to_pkc%SendDesc,      &
-                             grid%pkxy_to_pkc%RecvDesc, pkxy, pkkp,       &
-                             modc=grid%modc_cdcore )
-            call mp_sendirr( grid%commxy, grid%pkxy_to_pkc%SendDesc,      &
-                             grid%pkxy_to_pkc%RecvDesc, wzxy, wzkp,       &
-                             modc=grid%modc_cdcore )
-            call mp_recvirr( grid%commxy, grid%pkxy_to_pkc%SendDesc,      &
-                             grid%pkxy_to_pkc%RecvDesc, wzxy, wzkp,       &
-                             modc=grid%modc_cdcore )
+                 grid%pkxy_to_pkc%RecvDesc, wzxy, wzkp,       &
+                 modc=grid%modc_cdcore )
          else
-            call mp_sendirr( grid%commxy, grid%pkxy_to_pkc%SendDesc,      &
-                             grid%pkxy_to_pkc%RecvDesc, pkxy, pkkp,       &
-                             wzxy, wzkp,                                  &
-                             modc=grid%modc_cdcore )
-            call mp_recvirr( grid%commxy, grid%pkxy_to_pkc%SendDesc,      &
-                             grid%pkxy_to_pkc%RecvDesc, pkxy, pkkp,       &
-                             wzxy, wzkp,                                  &
-                             modc=grid%modc_cdcore )
-         end if
+            if (grid%modc_onetwo .eq. 1) then
+               call mp_sendirr( grid%commxy, grid%pkxy_to_pkc%SendDesc,      &
+                    grid%pkxy_to_pkc%RecvDesc, pkxy, pkkp,       &
+                    modc=grid%modc_cdcore )
+               call mp_recvirr( grid%commxy, grid%pkxy_to_pkc%SendDesc,      &
+                    grid%pkxy_to_pkc%RecvDesc, pkxy, pkkp,       &
+                    modc=grid%modc_cdcore )
+               call mp_sendirr( grid%commxy, grid%pkxy_to_pkc%SendDesc,      &
+                    grid%pkxy_to_pkc%RecvDesc, wzxy, wzkp,       &
+                    modc=grid%modc_cdcore )
+               call mp_recvirr( grid%commxy, grid%pkxy_to_pkc%SendDesc,      &
+                    grid%pkxy_to_pkc%RecvDesc, wzxy, wzkp,       &
+                    modc=grid%modc_cdcore )
+            else
+               call mp_sendirr( grid%commxy, grid%pkxy_to_pkc%SendDesc,      &
+                    grid%pkxy_to_pkc%RecvDesc, pkxy, pkkp,       &
+                    wzxy, wzkp,                                  &
+                    modc=grid%modc_cdcore )
+               call mp_recvirr( grid%commxy, grid%pkxy_to_pkc%SendDesc,      &
+                    grid%pkxy_to_pkc%RecvDesc, pkxy, pkkp,       &
+                    wzxy, wzkp,                                  &
+                    modc=grid%modc_cdcore )
+            end if
+         endif
          call FVstopclock(grid,'XY_TO_YZ_D_GEOP')
 
+         if (high_alt) then
 !$omp parallel do private(i, j, k)
-         do k = kfirst, klast+1
-            do j = jfirst, jlast
-               do i = 1, im
-                  pkc(i,j,k) = pkkp(i,j,k)
+            do k = kfirst, klast+1
+               do j = jfirst, jlast
+                  do i = 1, im
+                     pxc(i,j,k) = log(pec(i,k,j))
+                  end do
                end do
             end do
-         end do
-
+         else
+!$omp parallel do private(i, j, k)
+            do k = kfirst, klast+1
+               do j = jfirst, jlast
+                  do i = 1, im
+                     pxc(i,j,k) = pkkp(i,j,k)
+                  end do
+               end do
+            end do
+         endif
 !$omp parallel do private(i, j, k)
          do k = kfirst, klast+1
             do j = jfirst, jlast
@@ -1470,6 +1588,7 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
                end do
             end do
          end do
+
 #endif
 
       else
@@ -1478,11 +1597,30 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
          do k = kfirst, klast+1
             do j = jfirst, jlast
                do i = 1, im
-                  pkc(i,j,k) = pkxy(i,j,k)
                   wz(i,j,k) = wzxy(i,j,k)
                end do
             end do
          end do
+         if (high_alt) then
+!$omp parallel do private(i, j, k)
+            do k = kfirst, klast+1
+               do j = jfirst, jlast
+                  do i = 1, im
+                     pec(i,k,j) = pexy(i,k,j)
+                     pxc(i,j,k) = log(pec(i,k,j))
+                  end do
+               end do
+            end do
+         else
+!$omp parallel do private(i, j, k)
+            do k = kfirst, klast+1
+               do j = jfirst, jlast
+                  do i = 1, im
+                     pxc(i,j,k) = pkxy(i,j,k)
+                  end do
+               end do
+            end do
+         endif
 
       end if
 
@@ -1504,7 +1642,7 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
       call FVstartclock(grid,'---PRE_D_PGRAD_COMM_1')
       ! Exchange boundary regions on north and south for pkc and wz
       call mp_send2_ns( grid%commyz, im, jm, km+1, jfirst, jlast,      &
-                        kfirst, klast+1, 1, pkc, wz)
+                        kfirst, klast+1, 1, pxc, wz)
       call FVstopclock(grid,'---PRE_D_PGRAD_COMM_1')
 #endif
 
@@ -1532,7 +1670,7 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
          do k = kfirst, klast+1
             do j = jfirst, jlast
                do i = 1, im
-                  pk(i,j,k) = pkc(i,j,k)
+                  pk(i,j,k) = pxc(i,j,k)
                end do
             end do
          end do
@@ -1541,7 +1679,7 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
 #if defined( SPMD )
       call FVstartclock(grid,'---PRE_D_PGRAD_COMM_1')
       call mp_recv2_ns( grid%commyz, im, jm, km+1, jfirst, jlast,          &
-                        kfirst, klast+1, 1, pkc, wz)
+                        kfirst, klast+1, 1, pxc, wz)
       if ( ipe /= 1 ) then          !  not the last call
          call mp_send4d_ns( grid%commyz, im, jm, km, 1, jfirst, jlast,     &
                             kfirst, klast, ng_d, ng_d, delpf )
@@ -1549,23 +1687,45 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
       call FVstopclock(grid,'---PRE_D_PGRAD_COMM_1')
 #endif
 
+      if (am_correction) then
+         ! AM correction (pressure, prognostic winds): pkc -> ptr
 !$omp parallel do private(i, j, k)
-      ! AM correction (pressure, prognostic winds): pkc -> ptr
-      do k = kfirst, klast+1
-         do j = js1g1, jn1g1                     ! dpt needed NS
-            do i = 1,im                          ! wz, pkc ghosted NS
-               ptr(i,j,k) = pkc(i,j,k)**xakap
+         do k = kfirst, klast+1
+            do j = js1g1, jn1g1                     ! dpt needed NS
+               do i = 1,im                          ! wz, pkc ghosted NS
+                  ptr(i,j,k) = pxc(i,j,k)**xakap
+               end do
             end do
          end do
-      end do
+      else
+!$omp parallel do private(i, j, k)
+         do k = kfirst, klast+1
+            do j = js1g1, jn1g1
+               do i = 1,im
+                  ptr(i,j,k) = pxc(i,j,k)
+               end do
+            end do
+         end do
+      endif
+
+      if (am_correction) then
+!$omp parallel do private(i, j, k)
+         ! Beware k+1 references directly below (AAM)
+         do k = kfirst, klast
+            do j = js1g1, jn1g1
+               do i = 1, im                       ! wz, pkc ghosted NS
+                  dpr(i,j,k) = (wz(i,j,k+1) + wz(i,j,k))*(ptr(i,j,k+1) - ptr(i,j,k))
+               end do
+            end do
+         end do
+      end if
 
 !$omp parallel do private(i, j, k)
       ! Beware k+1 references directly below (AAM)
       do k = kfirst, klast
          do j = js1g1, jn1g1                   ! dpt needed NS
             do i = 1, im                       ! wz, pkc ghosted NS
-               dpt(i,j,k) = (wz(i,j,k+1) + wz(i,j,k))*(pkc(i,j,k+1) - pkc(i,j,k))
-               dpr(i,j,k) = (wz(i,j,k+1) + wz(i,j,k))*(ptr(i,j,k+1) - ptr(i,j,k))
+               dpt(i,j,k) = (wz(i,j,k+1) + wz(i,j,k))*(pxc(i,j,k+1) - pxc(i,j,k))
             end do
          end do
       end do
@@ -1575,6 +1735,12 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
 
       call FVstopclock(grid,'---PRE_D_PGRAD')
       call FVstartclock(grid,'---D_PGRAD_1')
+
+      if (high_alt) then
+         px4 = 4.0_r8*log(grid%ptop)
+      else
+         px4 = 4.0_r8*grid%ptop**cap3v(ifirstxy,jfirstxy,1)
+      endif
 
 !$omp parallel do private(i, j, k, wk3, wk1)
       do k = kfirst, klast+1
@@ -1586,10 +1752,9 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
                   wz(i,j,1) = D0_0
                end do
             end do
-            pk4 = 4.0_r8*grid%ptop**akap
             do j = js2g0, jn1g1
                do i = 1, im
-                  pkc(i,j,1) = pk4
+                  pxc(i,j,1) = px4
                   ptr(i,j,1) = 4.0_r8*grid%ptop
               end do
             end do
@@ -1609,10 +1774,10 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
          else
             do j=js2g1,jn2g0                             ! wk3 needed S
                wk3(1,j) = (wz(1,j,k)+wz(im,j,k)) *       &
-                       (pkc(1,j,k) - pkc(im,j,k))
+                       (pxc(1,j,k) - pxc(im,j,k))
                do i=2,im
                   wk3(i,j) = (wz(i,j,k)+wz(i-1,j,k)) *      & 
-                          (pkc(i,j,k) - pkc(i-1,j,k))
+                          (pxc(i,j,k) - pxc(i-1,j,k))
 
                enddo
             enddo
@@ -1652,7 +1817,7 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
                enddo
             else
                do i=1,im                         ! wz, pkc ghosted NS
-                  wk1(i,j) = (wz(i,j,k) + wz(i,j-1,k))*(pkc(i,j,k) - pkc(i,j-1,k))
+                  wk1(i,j) = (wz(i,j,k) + wz(i,j-1,k))*(pxc(i,j,k) - pxc(i,j-1,k))
                enddo
             end if
          enddo
@@ -1670,17 +1835,17 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
             enddo
          enddo
 
-         ! preserve this section to leave pkc inchanged in output of cd_core (tht)
+         ! preserve this section to leave pkc inchanged in output of cd_core
          do j=js1g1,jn1g1
-            wk1(1,j) = pkc(1,j,k) + pkc(im,j,k)
+            wk1(1,j) = pxc(1,j,k) + pxc(im,j,k)
             do i=2,im
-               wk1(i,j) = pkc(i,j,k) + pkc(i-1,j,k)
+               wk1(i,j) = pxc(i,j,k) + pxc(i-1,j,k)
             enddo
          enddo
  
          do j=js2g0,jn1g1
             do i=1,im
-               pkc(i,j,k) = wk1(i,j) + wk1(i,j-1)
+               pxc(i,j,k) = wk1(i,j) + wk1(i,j-1)
             enddo
          enddo
 
@@ -1736,7 +1901,7 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
             do j = js2g0, jn1g1
                do i = 1, im
                   wk2(i,j) = wk1(i,j) + wk1(i,j-1)
-                  wk(i,j) = pkc(i,j,k+1) - pkc(i,j,k)
+                  wk(i,j) = pxc(i,j,k+1) - pxc(i,j,k)
                end do
             end do
          end if

@@ -125,10 +125,6 @@ else
    master_ocn_restart=`ls -1rt ${CAM_TESTDIR}/TSM.$1.$2.${initial_length}${stop_flag}/*.camdom*.r.* \
        | tail -2 | head -1`
 fi
-master_cice_path=`ls -1rt ${CAM_TESTDIR}/TSM.$1.$2.${initial_length}${stop_flag}/*.cice.r.[0-9]* \
-    | tail -2 | head -1`
-# cice_ic requires just the filename, not the absolute path
-master_cice_restart=${master_cice_path##/*/}
 
 ## modify the # of tasks/threads for restart if not testing fv decomposition
 if grep -ic npr_yz ${CAM_SCRIPTDIR}/nl_files/$nl_file > /dev/null; then
@@ -169,22 +165,18 @@ echo "TBR.sh: branching cam; output in ${CAM_TESTDIR}/${test_name}/test.log"
 echo "TBR.sh: call to build-namelist:"
 echo "        env OMP_NUM_THREADS=${CAM_THREADS} ${cfgdir}/build-namelist -test -runtype branch  \
     -config ${CAM_TESTDIR}/TCB.$1/config_cache.xml \
-    -config_cice ${CAM_TESTDIR}/TCB.$1/config_cache_cice.xml \
     -infile ${CAM_TESTDIR}/${test_name}/$nl_file \
     -ignore_ic_date $use_case_string \
-    -cice_nl \"&ice ice_ic=\'${master_cice_restart}\' /\" \
     -namelist \"&seq_timemgr_inparm stop_n=${branch_length} stop_option=\'$stop_option\' $decomp_str $history_output / \
     &seq_infodata_inparm brnch_retain_casename=.true. restart_file=\'${master_cpl_restart}\' / \
     &cam_inparm cam_branch_file=\'${master_cam_restart}\' / \
     &${ocn_inparm} ${ocn_branch_nlparm}='${master_ocn_restart} ' / \
     &clm_inparm nrevsn=\'${master_clm_restart}\' /\""
 
-env OMP_NUM_THREADS=${CAM_THREADS} ${cfgdir}/build-namelist -test -runtype branch -cice_nl "&domain_nml distribution_type='roundrobin' /" \
+env OMP_NUM_THREADS=${CAM_THREADS} ${cfgdir}/build-namelist -test -runtype branch \
     -config ${CAM_TESTDIR}/TCB.$1/config_cache.xml \
-    -config_cice ${CAM_TESTDIR}/TCB.$1/config_cache_cice.xml \
     -ignore_ic_date $use_case_string \
     -infile ${CAM_TESTDIR}/${test_name}/$nl_file \
-    -cice_nl "&ice ice_ic='${master_cice_restart}' /" \
     -namelist "&seq_timemgr_inparm stop_n=${branch_length} stop_option='$stop_option' $decomp_str $history_output / \
     &seq_infodata_inparm brnch_retain_casename=.true. \
     restart_file='${master_cpl_restart}' / \

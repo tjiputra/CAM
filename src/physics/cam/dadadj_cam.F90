@@ -5,8 +5,9 @@ module dadadj_cam
 use shr_kind_mod,    only: r8=>shr_kind_r8, cs=>shr_kind_cs
 use ppgrid,          only: pcols, pver, pverp
 use constituents,    only: pcnst
-use physconst,       only: cappa, cpair, pi
+use physconst,       only: cappav, cpairv, pi
 use physics_types,   only: physics_state, physics_ptend, physics_ptend_init
+use phys_control,    only: use_simple_phys
 use cam_abortutils,  only: endrun
 use cam_logfile,     only: iulog
 use error_messages,  only: handle_errmsg
@@ -23,10 +24,12 @@ save
 
 public :: &
    dadadj_readnl, &
+   dadadj_init, &
    dadadj_tend
 
 ! Namelist variables
 integer :: dadadj_nlvdry = 3  ! number of layers from top of model to apply the adjustment
+integer :: dadadj_niter = 15  ! number of iterations for convergence
 
 !===============================================================================
 contains
@@ -36,7 +39,7 @@ subroutine dadadj_readnl(filein)
 
    character(len=cs), intent(in) :: filein ! Input namelist filename
 
-   namelist /dadadj_nl/ dadadj_nlvdry
+   namelist /dadadj_nl/ dadadj_nlvdry, dadadj_niter
 
    integer :: unitn, ierr
    character(len=*), parameter :: sub='dadadj_readnl'
@@ -60,31 +63,47 @@ subroutine dadadj_readnl(filein)
 #ifdef SPMD
    ! Broadcast namelist variables
    call mpibcast(dadadj_nlvdry, 1, mpi_integer, masterprocid, mpicom)
+   call mpibcast(dadadj_niter, 1, mpi_integer, masterprocid, mpicom)
 #endif
 
-   call dadadj_initial(dadadj_nlvdry, cappa)
+   call dadadj_initial(dadadj_nlvdry, dadadj_niter)
 
-   if (masterproc) then
+   if (masterproc .and. .not. use_simple_phys) then
       write(iulog,*)'Dry adiabatic adjustment applied to top N layers; N=', &
                     dadadj_nlvdry
+      write(iulog,*)'Dry adiabatic adjustment number of iterations for convergence =', &
+                    dadadj_niter
    end if
 
 end subroutine dadadj_readnl
 
+
+!===============================================================================
+
+subroutine dadadj_init()
+    use cam_history,   only: addfld
+
+    call addfld('DADADJ_PD', (/ 'lev' /), 'A', 'probability', 'dry adiabatic adjustment probability')
+
+end subroutine dadadj_init
+
+
 !===============================================================================
 
 subroutine dadadj_tend(dt, state, ptend)
+   use cam_history,   only: outfld
 
    real(r8),                  intent(in)  :: dt         ! Time step [s]
    type(physics_state),       intent(in)  :: state      ! Physics state variables
    type(physics_ptend),       intent(out) :: ptend      ! parameterization tendencies
 
    logical :: lq(pcnst)
-   integer :: ncol, icol_err
+   real(r8) :: dadpdf(pcols, pver)
+   integer :: ncol, lchnk, icol_err
    character(len=128) :: errstring  ! Error string
 
     ncol  = state%ncol
-
+    lchnk = state%lchnk
     lq(:) = .FALSE.
     lq(1) = .TRUE.
     call physics_ptend_init(ptend, state%psetcols, 'dadadj', ls=.true., lq=lq)
@@ -96,8 +115,10 @@ subroutine dadadj_tend(dt, state, ptend)
     ptend%q(:ncol,:pver,1) = state%q(:ncol,:pver,1)
 
     call dadadj_calc( &
-       ncol, state%pmid, state%pint, state%pdel, ptend%s, &
-       ptend%q(:,:,1), icol_err)
+       ncol, state%pmid, state%pint, state%pdel, cappav(:,:,lchnk), ptend%s, &
+       ptend%q(:,:,1), dadpdf, icol_err)
+       
+    call outfld('DADADJ_PD',  dadpdf(:ncol,:),  ncol, lchnk)
 
     if (icol_err > 0) then
        ! error exit
@@ -107,7 +128,7 @@ subroutine dadadj_tend(dt, state, ptend)
        call handle_errmsg(errstring, subname="dadadj_tend")
     end if
 
-    ptend%s(:ncol,:)   = (ptend%s(:ncol,:)   - state%t(:ncol,:)  )/dt * cpair
+    ptend%s(:ncol,:)   = (ptend%s(:ncol,:)   - state%t(:ncol,:)  )/dt * cpairv(:ncol,:,lchnk)
     ptend%q(:ncol,:,1) = (ptend%q(:ncol,:,1) - state%q(:ncol,:,1))/dt
 
 end subroutine dadadj_tend

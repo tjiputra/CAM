@@ -4,7 +4,7 @@ module constituents
 ! Metadata manager for the advected constituents.
 
 use shr_kind_mod,     only: r8 => shr_kind_r8
-use physconst,        only: r_universal
+use shr_const_mod,    only: shr_const_rgas
 use spmd_utils,       only: masterproc
 use cam_abortutils,   only: endrun
 use cam_logfile,      only: iulog
@@ -266,7 +266,7 @@ subroutine cnst_add (name, mwc, cpc, qminc, &
       qmincg(ind) = qminc
    end if
 
-   cnst_rgas(ind) = r_universal * mwc
+   cnst_rgas(ind) = shr_const_rgas * mwc
    cnst_cv  (ind) = cpc - cnst_rgas(ind)
 
 end subroutine cnst_add

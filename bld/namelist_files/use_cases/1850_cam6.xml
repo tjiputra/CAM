@@ -4,14 +4,9 @@
 
   <do_tms              >   .false.   </do_tms>
   <do_beljaars         >   .true.   </do_beljaars>
-  <bnd_topo            >   'atm/cam/topo/fv_0.9x1.25_nc3000_Nsw042_Nrs008_Co060_Fi001_ZR_160505.nc'   </bnd_topo>
-  <clubb_do_liqsupersat>   .true.   </clubb_do_liqsupersat>
-  <dust_emis_fact      >   1.50D0   </dust_emis_fact>
   <use_gw_oro          >   .false.   </use_gw_oro>
   <use_gw_rdg_beta     >   .true.   </use_gw_rdg_beta>
   <zmconv_num_cin      >   1   </zmconv_num_cin>
-  <clubb_gamma_coef    >   0.29   </clubb_gamma_coef>
-  <micro_do_sb_physics >  .true.  </micro_do_sb_physics>
 
 <!-- Solar constant from Lean (via Caspar Ammann) -->
   <solar_data_file     >   'atm/cam/solar/SolarForcingCMIP6piControl_c160921.nc'   </solar_data_file>

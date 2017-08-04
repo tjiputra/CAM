@@ -95,7 +95,7 @@ subroutine neu_wetdep_init
          test_name = 'SO2'
       case ( 'CLONO2','BRONO2','HCL','HOCL','HOBR','HBR', 'Pb', 'MACROOH', 'ISOPOOH', 'XOOH', 'H2SO4', 'HF', 'COF2', 'COFCL')
          test_name = 'HNO3'
-      case ( 'NH_50W', 'NDEP', 'NHDEP' ) 
+      case ( 'NH_50W', 'NDEP', 'NHDEP', 'NH4', 'NH4NO3' ) 
          test_name = 'HNO3'
       case ( 'ALKOOH', 'MEKOOH', 'TOLOOH' )
          test_name = 'CH3OOH'        
@@ -194,7 +194,7 @@ subroutine neu_wetdep_init
 !
   do m=1,gas_wetdep_cnt
     call addfld     ('DTWR_'//trim(gas_wetdep_list(m)),(/ 'lev' /), 'A','kg/kg/s','wet removal Neu scheme tendency')
-    call addfld     ('WD_'//trim(gas_wetdep_list(m)),horiz_only, 'A','kg/s','vertical integrated wet deposition flux')
+    call addfld     ('WD_'//trim(gas_wetdep_list(m)),horiz_only, 'A','kg/m2/s','vertical integrated wet deposition flux')
     if (history_chemistry) then
        call add_default('DTWR_'//trim(gas_wetdep_list(m)), 1, ' ')
        call add_default('WD_'//trim(gas_wetdep_list(m)), 1, ' ')
@@ -219,7 +219,7 @@ subroutine neu_wetdep_init
 end subroutine neu_wetdep_init
 !
 subroutine neu_wetdep_tend(lchnk,ncol,mmr,pmid,pdel,zint,tfld,delt, &
-     prain, nevapr, cld, cmfdqr, wd_tend)
+     prain, nevapr, cld, cmfdqr, wd_tend, wd_tend_int)
 !
   use ppgrid,           only : pcols, pver
 !!DEK  
@@ -242,6 +242,7 @@ subroutine neu_wetdep_tend(lchnk,ncol,mmr,pmid,pdel,zint,tfld,delt, &
   real(r8),       intent(in)    :: cld(ncol, pver)
   real(r8),       intent(in)    :: cmfdqr(ncol, pver)
   real(r8),       intent(inout) :: wd_tend(pcols,pver,pcnst)
+  real(r8),       intent(inout) :: wd_tend_int(pcols,pcnst)
 !
 ! local arrays and variables
 !
@@ -284,7 +285,7 @@ subroutine neu_wetdep_tend(lchnk,ncol,mmr,pmid,pdel,zint,tfld,delt, &
 !
 ! reset output variables
 !
-!  wd_tend = 0._r8
+   wd_tend_int = 0._r8
 !
 ! get area (in radians square)
 !
@@ -458,14 +459,20 @@ subroutine neu_wetdep_tend(lchnk,ncol,mmr,pmid,pdel,zint,tfld,delt, &
     wd_tend(1:ncol,:,mapping_to_mmr(m)) = wd_tend(1:ncol,:,mapping_to_mmr(m)) + dtwr(1:ncol,:,m)
     call outfld( 'DTWR_'//trim(gas_wetdep_list(m)),dtwr(:,:,m),ncol,lchnk )
 !
-! vertical integrated wet deposition rate [kg/s]
+! vertical integrated wet deposition rate [kg/m2/s]
 !
     wk_out = 0._r8
     do k=1,pver
       kk = pver - k + 1
-      wk_out(1:ncol) = wk_out(1:ncol) + dtwr(1:ncol,k,m) * mass_in_layer(1:ncol,kk)
+      wk_out(1:ncol) = wk_out(1:ncol) + (dtwr(1:ncol,k,m) * mass_in_layer(1:ncol,kk)/area(1:ncol))
     end do
     call outfld( 'WD_'//trim(gas_wetdep_list(m)),wk_out,ncol,lchnk )
+!
+! to be used in mo_chm_diags to compute wet_deposition_NOy_as_N and wet_deposition_NHx_as_N (units: kg/m2/s)
+!
+    if ( debug) print *,'mo_neu ',mapping_to_mmr(m),(wk_out(1:ncol))
+    wd_tend_int(1:ncol,mapping_to_mmr(m)) = wk_out(1:ncol)
+!
   end do
 !
   if ( do_diag ) then

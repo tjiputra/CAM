@@ -1,5 +1,5 @@
 module mo_gas_phase_chemdr
-  
+
   use shr_kind_mod,     only : r8 => shr_kind_r8
   use shr_const_mod,    only : pi => shr_const_pi
   use constituents,     only : pcnst
@@ -60,7 +60,7 @@ contains
   subroutine gas_phase_chemdr_inti()
 
     use mo_chem_utls,      only : get_spc_ndx, get_extfrc_ndx, get_inv_ndx, get_rxt_ndx
-    use cam_history,       only : addfld,horiz_only
+    use cam_history,       only : addfld,add_default,horiz_only
     use mo_chm_diags,      only : chm_diags_inti
     use constituents,      only : cnst_get_ind
     use physics_buffer,    only : pbuf_get_index
@@ -68,14 +68,15 @@ contains
 
     implicit none
 
-    character(len=3)  :: string
+    character(len=3) :: string
     integer          :: n, m, err
+    logical :: history_cesm_forcing
     logical           :: history_aerosol      ! Output the MAM aerosol tendencies
 
     !-----------------------------------------------------------------------
 
-    call phys_getopts( history_aerosol_out = history_aerosol, &
-                       convproc_do_aer_out = convproc_do_aer )
+    call phys_getopts( convproc_do_aer_out = convproc_do_aer, history_cesm_forcing_out=history_cesm_forcing, &
+                       history_aerosol_out = history_aerosol )
 
 #if defined(OSLO_AERO)
     inv_o3   = get_inv_ndx('O3') > 0
@@ -152,7 +153,7 @@ contains
     call cnst_get_ind( 'CLDICE', cldice_ndx )
     call cnst_get_ind( 'SNOWQM', snow_ndx, abort=.false. )
 
- 
+
     do m = 1,extcnt
        WRITE(UNIT=string, FMT='(I2.2)') m
        extfrc_name(m) = 'extfrc_'// trim(string)
@@ -201,6 +202,9 @@ contains
     call addfld( 'RAD_ICE',    (/ 'lev' /), 'I', 'cm',      'sad ice' )
     call addfld( 'SAD_TROP',   (/ 'lev' /), 'I', 'cm2/cm3', 'tropospheric aerosol SAD' )
     call addfld( 'SAD_AERO',   (/ 'lev' /), 'I', 'cm2/cm3', 'aerosol surface area density' )
+    if (history_cesm_forcing) then
+       call add_default ('SAD_AERO',8,' ')
+    endif
     call addfld( 'REFF_AERO',  (/ 'lev' /), 'I', 'cm',      'aerosol effective radius' )
     call addfld( 'SULF_TROP',  (/ 'lev' /), 'I', 'mol/mol', 'tropospheric aerosol SAD' )
     call addfld( 'QDSETT',     (/ 'lev' /), 'I', '/s',      'water vapor settling delta' )
@@ -221,7 +225,7 @@ contains
 
     call chm_diags_inti()
     call rate_diags_init()
-   
+
 !-----------------------------------------------------------------------
 ! get pbuf indicies
 !-----------------------------------------------------------------------
@@ -234,8 +238,8 @@ contains
     sad_pbf_ndx= pbuf_get_index('VOLC_SAD',errcode=err) ! prescribed  strat aerosols (volcanic)
     if (.not.sad_pbf_ndx>0) sad_pbf_ndx = pbuf_get_index('SADSULF',errcode=err) ! CARMA's version of strat aerosols
 
-    ele_temp_ndx = pbuf_get_index('ElecTemp',errcode=err)! electron temperature index 
-    ion_temp_ndx = pbuf_get_index('IonTemp',errcode=err) ! ion temperature index
+    ele_temp_ndx = pbuf_get_index('TElec',errcode=err)! electron temperature index 
+    ion_temp_ndx = pbuf_get_index('TIon',errcode=err) ! ion temperature index
 
     ! diagnostics for stratospheric heterogeneous reactions
     call addfld( 'GAMMA_HET1', (/ 'lev' /), 'I', '1', 'Reaction Probability' )
@@ -261,7 +265,7 @@ contains
                               delt, ps, xactive_prates, &
                               fsds, ts, asdir, ocnfrac, icefrac, &
                               precc, precl, snowhland, ghg_chem, latmapback, &
-                              drydepflx, cflx, fire_sflx, fire_ztop, qtend, pbuf)
+                              drydepflx, wetdepflx, cflx, fire_sflx, fire_ztop, nhx_nitrogen_flx, noy_nitrogen_flx, qtend, pbuf)
 
     !-----------------------------------------------------------------------
     !     ... Chem_solver advances the volumetric mixing ratio
@@ -371,6 +375,9 @@ contains
     real(r8),       intent(inout) :: qtend(pcols,pver,pcnst)        ! species tendencies (kg/kg/s)
     real(r8),       intent(inout) :: cflx(pcols,pcnst)              ! constituent surface flux (kg/m^2/s)
     real(r8),       intent(out)   :: drydepflx(pcols,pcnst)         ! dry deposition flux (kg/m^2/s)
+    real(r8),       intent(in)    :: wetdepflx(pcols,pcnst)         ! wet deposition flux (kg/m^2/s)
+    real(r8), intent(out) :: nhx_nitrogen_flx(pcols)
+    real(r8), intent(out) :: noy_nitrogen_flx(pcols)
 
     type(physics_buffer_desc), pointer :: pbuf(:)
 
@@ -440,6 +447,7 @@ contains
     real(r8) :: soilw(pcols)
     real(r8) :: prect(pcols)
     real(r8) :: sflx(pcols,gas_pcnst)
+    real(r8) :: wetdepflx_diag(pcols,gas_pcnst)
     real(r8) :: dust_vmr(ncol,pver,ndust)
     real(r8) :: dt_diag(pcols,8)               ! od diagnostics
     real(r8) :: fracday(pcols)                 ! fraction of day
@@ -470,7 +478,6 @@ contains
     real(r8) :: xlat
     real(r8) :: pm25(ncol)
 
-    logical :: zero_aerosols
     real(r8) :: dlats(ncol)
 
     real(r8), dimension(ncol,pver) :: &      ! aerosol reaction diagnostics
@@ -521,7 +528,10 @@ contains
     !        ... Calculate cosine of zenith angle
     !            then cast back to angle (radians)
     !-----------------------------------------------------------------------      
-    call zenith( calday, rlats, rlons, zen_angle, ncol )
+!+tht
+   !call zenith( calday, rlats, rlons, zen_angle, ncol )
+    call zenith( calday, rlats, rlons, zen_angle, ncol ,delt)
+!-tht
     zen_angle(:) = acos( zen_angle(:) )
 
     sza(:) = zen_angle(:) * rad2deg
@@ -616,7 +626,7 @@ contains
     !-----------------------------------------------------------------------  
     call setinv( invariants, tfld, h2ovmr, vmr, pmid, ncol, lchnk, pbuf )
 
-    !-----------------------------------------------------------------------     
+    !-----------------------------------------------------------------------      
 #if defined (OSLO_AERO)
     !        ... Set the "day/night cycle for prescribed oxidants"
     !----------------------------------------------------------------------- 
@@ -742,7 +752,7 @@ contains
           sulfate(:,:) = vmr(:,:,so4_ndx)
        endif
     endif
-
+    
     !-----------------------------------------------------------------
     ! ... zero out sulfate above tropopause
     !-----------------------------------------------------------------
@@ -765,7 +775,7 @@ contains
        relhum(:,k) = .622_r8 * h2ovmr(:,k) / satq(:,k)
        relhum(:,k) = max( 0._r8,min( 1._r8,relhum(:,k) ) )
     end do
-
+    
     cwat(:ncol,:pver) = cldw(:ncol,:pver)
 
     call usrrxt( reaction_rates, tfld, ion_temp_fld, ele_temp_fld, invariants, h2ovmr, ps, &
@@ -860,7 +870,7 @@ contains
 
     !-----------------------------------------------------------------------
     !        ... Compute the extraneous frcing at time = t(n+1)
-    !-----------------------------------------------------------------------      
+    !-----------------------------------------------------------------------    
     if ( o2_ndx > 0 .and. o_ndx > 0 ) then
        do k = 1,pver
           o2mmr(:ncol,k) = mmr(:ncol,k,o2_ndx)
@@ -1043,7 +1053,7 @@ contains
 
     !-----------------------------------------------------------------------      
     !         ... Set upper boundary mmr values
-    !-----------------------------------------------------------------------
+    !-----------------------------------------------------------------------      
     call set_fstrat_vals( vmr, pmid, pint, troplev, calday, ncol,lchnk )
 
     !-----------------------------------------------------------------------      
@@ -1060,7 +1070,7 @@ contains
        call ghg_chem_set_flbc( vmr, ncol )
     endif
 
-    !-----------------------------------------------------------------------      
+    !-----------------------------------------------------------------------
     ! force ion/electron balance -- ext forcings likely do not conserve charge
     !-----------------------------------------------------------------------      
     call charge_balance( ncol, vmr )
@@ -1122,12 +1132,14 @@ contains
        if ( n > 0 ) then
          cflx(:ncol,m)      = cflx(:ncol,m) - sflx(:ncol,n)
          drydepflx(:ncol,m) = sflx(:ncol,n)
+         wetdepflx_diag(:ncol,n) = wetdepflx(:ncol,m)
        endif
     end do
 
     call chm_diags( lchnk, ncol, vmr(:ncol,:,:), mmr_new(:ncol,:,:), &
                     reaction_rates(:ncol,:,:), invariants(:ncol,:,:), depvel(:ncol,:),  sflx(:ncol,:), &
-                    mmr_tend(:ncol,:,:), pdel(:ncol,:), pmid(:ncol,:), troplev(:ncol), pbuf )
+                    mmr_tend(:ncol,:,:), pdel(:ncol,:), pmid(:ncol,:), troplev(:ncol), wetdepflx_diag(:ncol,:), &
+                    nhx_nitrogen_flx(:ncol), noy_nitrogen_flx(:ncol) )
 
     call rate_diags_calc( reaction_rates(:,:,:), vmr(:,:,:), invariants(:,:,indexm), ncol, lchnk )
 !

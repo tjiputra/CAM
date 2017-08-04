@@ -218,7 +218,7 @@ end function chem_is
     e_ndx     = get_spc_ndx('e')
     np_ndx    = get_spc_ndx('Np')
     op_ndx    = get_spc_ndx('Op')
-    o1d_ndx   = get_spc_ndx('O1D_')
+    o1d_ndx   = get_spc_ndx('O1D')
     n2d_ndx   = get_spc_ndx('N2D')
     n2p_ndx   = get_spc_ndx('N2p')
     nop_ndx   = get_spc_ndx('NOp')
@@ -237,6 +237,7 @@ end function chem_is
     ! used later to check for a fixed upper boundary condition for species. 
     !----------------------------------------------------------------------------------
      do m = 1,gas_pcnst
+     ! setting of these variables is for registration of transported species
        ic_from_cam2  = .true.
        has_fixed_ubc = .false.
        has_fixed_ubflx = .false.
@@ -703,12 +704,12 @@ end function chem_is_active
     use mo_tracname,     only : solsym
 
 !-----------------------------------------------------------------------
-!	... dummy arguments
+!       ... dummy arguments
 !-----------------------------------------------------------------------
     character(len=*), intent(in) :: name   ! constituent name
     logical :: chem_implements_cnst        ! return value
 !-----------------------------------------------------------------------
-!	... local variables
+!       ... local variables
 !-----------------------------------------------------------------------
     integer :: m
     
@@ -781,6 +782,8 @@ end function chem_is_active
     integer :: n, ii
     logical :: history_aerosol
     logical :: history_chemistry
+    logical :: history_cesm_forcing
+
     character(len=2)  :: unit_basename  ! Units 'kg' or '1' 
     logical :: history_budget                 ! output tendencies and state variables for CAM
                                               ! temperature, water vapor, cloud ice and cloud
@@ -791,7 +794,8 @@ end function chem_is_active
                        history_aerosol_out=history_aerosol , &
                        history_chemistry_out=history_chemistry , &
                        history_budget_out = history_budget , &
-                       history_budget_histfile_num_out = history_budget_histfile_num)
+                       history_budget_histfile_num_out = history_budget_histfile_num, &
+                       history_cesm_forcing_out = history_cesm_forcing )
 
     ! aqueous chem initialization
     call sox_inti()
@@ -841,7 +845,13 @@ end function chem_is_active
           if ( history_aerosol .or. history_chemistry ) then 
              call add_default( sflxnam(n), 1, ' ' )
           endif
-       
+
+          if ( history_cesm_forcing ) then
+             if ( spc_name == 'NO' .or. spc_name == 'NH3' ) then
+                call add_default( sflxnam(n), 1, ' ' )
+             endif
+          endif
+  
           ! this is moved out of chem_register because we need to know where (what pressure) 
           ! the upper boundary is to determine if this is a high top configuration -- after
           ! initialization of ref_pres ...
@@ -1219,7 +1229,7 @@ end function chem_is_active
     call aurora_timestep_init
 
     !-----------------------------------------------------------------------------
-    !	... setup the time interpolation for mo_photo
+    !   ... setup the time interpolation for mo_photo
     !-----------------------------------------------------------------------------
     call photo_timestep_init( calday )
 
@@ -1282,6 +1292,7 @@ end function chem_is_active
     real(r8) :: cldw(pcols,pver)                   ! cloud water (kg/kg)
     real(r8) :: chem_dt              ! time step
     real(r8) :: drydepflx(pcols,pcnst)             ! dry deposition fluxes (kg/m2/s)
+    real(r8) :: wetdepflx(pcols,pcnst)             ! wet deposition fluxes (kg/m2/s)
     integer  :: tropLev(pcols), tropLevChem(pcols)
     real(r8) :: ncldwtr(pcols,pver)                ! droplet number concentration (#/kg)
     real(r8), pointer :: fsds(:)     ! longwave down at sfc
@@ -1291,6 +1302,8 @@ end function chem_is_active
     real(r8), pointer :: cmfdqr(:,:)
     real(r8), pointer :: nevapr(:,:)
     real(r8), pointer :: cldtop(:)
+    real(r8) :: nhx_nitrogen_flx(pcols)
+    real(r8) :: noy_nitrogen_flx(pcols)
 
     integer :: tim_ndx
 
@@ -1350,7 +1363,7 @@ end function chem_is_active
 ! call Neu wet dep scheme
 !-----------------------------------------------------------------------
     call neu_wetdep_tend(lchnk,ncol,state%q,state%pmid,state%pdel,state%zi,state%t,dt, &
-         prain, nevapr, cldfr, cmfdqr, ptend%q)
+         prain, nevapr, cldfr, cmfdqr, ptend%q, wetdepflx)
 
 !-----------------------------------------------------------------------
 ! compute tendencies and surface fluxes
@@ -1369,7 +1382,14 @@ end function chem_is_active
                           chem_dt, state%ps, xactive_prates, &
                           fsds, cam_in%ts, cam_in%asdir, cam_in%ocnfrac, cam_in%icefrac, &
                           cam_out%precc, cam_out%precl, cam_in%snowhland, ghg_chem, state%latmapback, &
-                          drydepflx, cam_in%cflx, cam_in%fireflx, cam_in%fireztop, ptend%q, pbuf)
+                          drydepflx, wetdepflx, cam_in%cflx, cam_in%fireflx, cam_in%fireztop, &
+                          nhx_nitrogen_flx, noy_nitrogen_flx, ptend%q, pbuf )
+    if (associated(cam_out%nhx_nitrogen_flx)) then
+       cam_out%nhx_nitrogen_flx(:ncol) = nhx_nitrogen_flx(:ncol)
+    endif
+    if (associated(cam_out%noy_nitrogen_flx)) then
+       cam_out%noy_nitrogen_flx(:ncol) = noy_nitrogen_flx(:ncol)
+    endif
 
     call t_stopf( 'chemdr' )
 

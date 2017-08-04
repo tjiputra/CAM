@@ -2076,7 +2076,7 @@ contains
                          wetland, vegetation_map, soilw_map, do_soilw )
 
     use mo_constants, only : r2d
-    use scamMod, only : latiop,loniop,scmlat,scmlon,use_camiop
+    use scamMod, only : latiop,loniop,scmlat,scmlon,scm_cambfb_mode
     use shr_scam_mod  , only: shr_scam_getCloseLatLon  ! Standardized system subroutines
     use cam_initfiles, only: initial_file_get_id
     use dycore, only : dycore_is
@@ -2145,7 +2145,7 @@ contains
     ju = plon
 
     if (single_column) then
-       if (use_camiop) then
+       if (scm_cambfb_mode) then
           piofile => initial_file_get_id()
           call shr_scam_getCloseLatLon(piofile%fh,scmlat,scmlon,closelat,closelon,latidx,lonidx)
           ploniop=size(loniop)

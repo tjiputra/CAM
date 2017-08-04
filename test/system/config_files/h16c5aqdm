@@ -2,8 +2,6 @@
 -dyn se
 -hgrid ne16np4
 -phys cam5
--ice sice
--lnd slnd
+-aquaplanet
 -debug
--ocn aquaplanet
 -s

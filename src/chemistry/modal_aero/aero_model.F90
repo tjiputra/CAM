@@ -70,6 +70,9 @@ module aero_model
 
   integer :: sulfeq_idx = -1
 
+  integer :: nh3_ndx    = 0
+  integer :: nh4_ndx    = 0
+
   ! variables for table lookup of aerosol impaction/interception scavenging rates
   integer, parameter :: nimptblgrow_mind=-7, nimptblgrow_maxd=12
   real(r8) :: dlndg_nimptblgrow
@@ -202,7 +205,7 @@ contains
     character(len=20) :: dummy
 
     logical  :: history_aerosol ! Output MAM or SECT aerosol tendencies
-    logical  :: history_chemistry
+    logical  :: history_chemistry, history_cesm_forcing
 
     integer :: l
     character(len=6) :: test_name
@@ -229,6 +232,7 @@ contains
     
     call phys_getopts(history_aerosol_out = history_aerosol, &
                       history_chemistry_out=history_chemistry, &
+                      history_cesm_forcing_out=history_cesm_forcing, &
                       convproc_do_aer_out = convproc_do_aer)
     
     call rad_cnst_get_info(0, nmodes=nmodes)
@@ -257,7 +261,6 @@ contains
     call dust_init()
     call seasalt_init(seasalt_emis_scale)
     call wetdep_init()
-
 
     nwetdep = 0
     ndrydep = 0
@@ -295,7 +298,7 @@ contains
        else
           call endrun(subrname//': invalid wetdep species: '//trim(wetdep_list(m)) )
        endif
-       
+
        if (masterproc) then
           write(iulog,*) subrname//': '//wetdep_list(m)//' will have wet removal'
        endif
@@ -555,6 +558,9 @@ contains
           call add_default( dgnum_name(n), 1, ' ' )
           call add_default( dgnumwet_name(n), 1, ' ' )
        endif
+       if ( history_cesm_forcing .and. n<4 ) then
+          call add_default( dgnumwet_name(n), 8, ' ' )
+       endif
       
        if (modal_strat_sulfate) then
           field_name = ' '
@@ -582,6 +588,8 @@ contains
     end do
 
     ndx_h2so4 = get_spc_ndx('H2SO4')
+    nh3_ndx = get_spc_ndx('NH3')
+    nh4_ndx = get_spc_ndx('NH4')
 
     allocate(num_idx(ntot_amode))
     num_idx = -1
@@ -1664,6 +1672,7 @@ contains
     integer :: beglev(ncol)
     integer :: endlev(ncol)
 
+    reff_strat = 0._r8
     strato_sad = 0._r8
 
     if (.not.modal_strat_sulfate) return
@@ -1739,13 +1748,18 @@ contains
     real(r8) ::  aqso4_h2o2(ncol)                     ! SO4 aqueous phase chemistry due to H2O2
     real(r8) ::  aqso4_o3(ncol)                       ! SO4 aqueous phase chemistry due to O3
     real(r8) ::  xphlwc(ncol,pver)                    ! pH value multiplied by lwc
-
-
+    real(r8) ::  nh3_beg(ncol,pver)
     real(r8), pointer :: fldcw(:,:)
     real(r8), pointer :: sulfeq(:,:,:)
 
     logical :: is_spcam_m2005
-
+!
+! ... initialize nh3
+!
+    if ( nh3_ndx > 0 ) then
+      nh3_beg = vmr(1:ncol,:,nh3_ndx)
+    end if
+!
     is_spcam_m2005   = cam_physpkg_is('spcam_m2005')
 
     call pbuf_get_field(pbuf, dgnum_idx,      dgnum)
@@ -1911,6 +1925,13 @@ contains
           call outfld( cnst_name_cw(n), fldcw(:,:), pcols, lchnk )
        endif
     end do
+!
+! ... put missing NH3 into NH4
+!
+    if ( nh3_ndx > 0 .and. nh4_ndx > 0 ) then
+      vmr(1:ncol,:,nh4_ndx) = vmr(1:ncol,:,nh4_ndx) + (nh3_beg-vmr(1:ncol,:,nh3_ndx))
+      vmr(1:ncol,:,nh4_ndx) = max(0._r8,vmr(1:ncol,:,nh4_ndx))
+    end if
 
   end subroutine aero_model_gasaerexch
 

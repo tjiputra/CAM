@@ -843,7 +843,6 @@
          ind0(lay) = ((jp(lay)-1)*5+(jt(lay)-1))*nspa(4) + js(lay)
          ind1(lay) = (jp(lay)*5+(jt1(lay)-1))*nspa(4) + js1(lay)
       enddo
-      !dir$ NOFUSION
       do lay = 1, laytrop
          if (specparm(lay) .lt. 0.125_r8) then
             p = fs(lay) - 1
@@ -907,7 +906,6 @@
             fac111(lay) = fs1(lay) * fac11(lay)
          endif
       enddo
-      !dir$ NOFUSION
       do lay = 1, laytrop
 
          do ig = 1, ng4
@@ -972,7 +970,6 @@
       enddo
 
 ! Upper atmosphere loop
-      !dir$ NOFUSION
       do lay = laytrop+1, nlayers
 
          speccomb(lay) = colo3(lay) + rat_o3co2(lay)*colco2(lay)
@@ -1124,7 +1121,6 @@
          ind0(lay) = ((jp(lay)-1)*5+(jt(lay)-1))*nspa(5) + js(lay)
          ind1(lay) = (jp(lay)*5+(jt1(lay)-1))*nspa(5) + js1(lay)
       enddo
-      !dir$ NOFUSION
       do lay = 1, laytrop
          if (specparm(lay) .lt. 0.125_r8) then
             p = fs(lay) - 1
@@ -1188,7 +1184,6 @@
             fac111(lay) = fs1(lay) * fac11(lay)
          endif
       enddo
-      !dir$ NOFUSION
       do lay = 1, laytrop
 
          do ig = 1, ng5
@@ -1295,7 +1290,6 @@
          ind0(lay) = ((jp(lay)-13)*5+(jt(lay)-1))*nspb(5) + js(lay)
          ind1(lay) = ((jp(lay)-12)*5+(jt1(lay)-1))*nspb(5) + js1(lay)
       enddo
-      !dir$ NOFUSION
       do lay = laytrop+1, nlayers
          do ig = 1, ng5
             taug(lay,ngs4+ig) = speccomb(lay) * &
@@ -1356,7 +1350,6 @@
          chi_co2(lay) = colco2(lay)/(coldry(lay))
          ratco2(lay) = 1.e20_r8*chi_co2(lay)/chi_mls(2,jp(lay)+1)
       enddo
-      !dir$ NOFUSION
       do lay = 1, laytrop
          if (ratco2(lay) .gt. 3.0_r8) then
             adjfac(lay) = 2.0_r8+(ratco2(lay)-2.0_r8)**0.77_r8
@@ -1365,13 +1358,11 @@
             adjcolco2(lay) = colco2(lay)
          endif
       enddo
-      !dir$ NOFUSION
       do lay = 1, laytrop
 
          ind0(lay) = ((jp(lay)-1)*5+(jt(lay)-1))*nspa(6) + 1
          ind1(lay) = (jp(lay)*5+(jt1(lay)-1))*nspa(6) + 1
       enddo
-      !dir$ NOFUSION
       do lay = 1, laytrop
 
          do ig = 1, ng6
@@ -2263,7 +2254,6 @@
          ind0(lay) = ((jp(lay)-1)*5+(jt(lay)-1))*nspa(12) + js(lay)
          ind1(lay) = (jp(lay)*5+(jt1(lay)-1))*nspa(12) + js1(lay)
       enddo
-      !dir$ NOFUSION
       do lay = 1, laytrop
          if (specparm(lay) .lt. 0.125_r8) then
             p = fs(lay) - 1
@@ -2297,7 +2287,6 @@
          endif
 
       enddo
-      !dir$ NOFUSION
       do lay = 1, laytrop
          if (specparm1(lay) .lt. 0.125_r8) then
             p = fs1(lay) - 1
@@ -2330,7 +2319,6 @@
             fac111(lay) = fs1(lay) * fac11(lay)
          endif
       enddo
-      !dir$ NOFUSION
       do lay = 1, laytrop
 
          do ig = 1, ng12
@@ -2490,7 +2478,6 @@
          chi_co2(lay) = colco2(lay)/(coldry(lay))
          ratco2(lay) = 1.e20_r8*chi_co2(lay)/3.55e-4_r8
       enddo
-      !dir$ NOFUSION
       do lay = 1, laytrop
          if (ratco2(lay) .gt. 3.0_r8) then
             adjfac(lay) = 2.0_r8+(ratco2(lay)-2.0_r8)**0.68_r8
@@ -2500,7 +2487,6 @@
          endif
 
       enddo
-      !dir$ NOFUSION
       do lay = 1, laytrop
          speccomb_mco(lay) = colh2o(lay) + refrat_m_a3*coln2o(lay)
          specparm_mco(lay) = colh2o(lay)/speccomb_mco(lay)
@@ -2519,7 +2505,6 @@
          ind0(lay) = ((jp(lay)-1)*5+(jt(lay)-1))*nspa(13) + js(lay)
          ind1(lay) = (jp(lay)*5+(jt1(lay)-1))*nspa(13) + js1(lay)
       enddo
-      !dir$ NOFUSION
       do lay = 1, laytrop
 
          if (specparm(lay) .lt. 0.125_r8) then
@@ -2554,7 +2539,6 @@
          endif
 
       enddo
-      !dir$ NOFUSION
       do lay = 1, laytrop
          if (specparm1(lay) .lt. 0.125_r8) then
             p = fs1(lay) - 1
@@ -2587,7 +2571,6 @@
             fac111(lay) = fs1(lay) * fac11(lay)
          endif
       enddo
-      !dir$ NOFUSION
       do lay = 1, laytrop
 
          do ig = 1, ng13
@@ -2818,7 +2801,6 @@
          
          scalen2(lay) = colbrd(lay)*scaleminor(lay)
       enddo
-      !dir$ NOFUSION
       do lay = 1, laytrop
          if (specparm(lay) .lt. 0.125_r8) then
             p = fs(lay) - 1
@@ -2851,7 +2833,6 @@
             fac110(lay) = fs(lay) * fac10(lay)
          endif
       enddo
-      !dir$ NOFUSION
       do lay = 1, laytrop
          if (specparm1(lay) .lt. 0.125_r8) then
             p = fs1(lay) - 1
@@ -2885,7 +2866,6 @@
          endif
 
       enddo
-      !dir$ NOFUSION
       do lay = 1, laytrop
          do ig = 1, ng15
             tauself = selffac(lay)* (selfref(indself(lay),ig) + selffrac(lay) * &
@@ -3032,7 +3012,6 @@
          ind0(lay) = ((jp(lay)-1)*5+(jt(lay)-1))*nspa(16) + js(lay)
          ind1(lay) = (jp(lay)*5+(jt1(lay)-1))*nspa(16) + js1(lay)
       enddo
-      !dir$ NOFUSION
       do lay = 1, laytrop
          if (specparm(lay) .lt. 0.125_r8) then
             p = fs(lay) - 1
@@ -3065,7 +3044,6 @@
             fac110(lay) = fs(lay) * fac10(lay)
          endif
       enddo
-      !dir$ NOFUSION
       do lay = 1, laytrop
 
          if (specparm1(lay) .lt. 0.125_r8) then
@@ -3099,7 +3077,6 @@
             fac111(lay) = fs1(lay) * fac11(lay)
          endif
       enddo
-      !dir$ NOFUSION
       do lay = 1, laytrop
 
          do ig = 1, ng16
@@ -3168,7 +3145,6 @@
          ind0(lay) = ((jp(lay)-13)*5+(jt(lay)-1))*nspb(16) + 1
          ind1(lay) = ((jp(lay)-12)*5+(jt1(lay)-1))*nspb(16) + 1
       enddo
-      !dir$ NOFUSION
       do lay = laytrop+1, nlayers
          do ig = 1, ng16
             taug(lay,ngs15+ig) = colch4(lay) * &

@@ -211,10 +211,8 @@
         real(r8), save :: a_quiescn_minbb = 0.30_r8  ! min area for final   total quiescent
 
 
-	integer, save :: num_moist_ecpp
 	integer, save :: num_chem_ecpp, param_first_ecpp
         
-        integer, save :: num_moist
         integer, save :: num_chem
         integer, save :: p_qc
         integer, save :: p_qv

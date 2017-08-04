@@ -1,10 +1,8 @@
-
 module mo_usrrxt
 
   use shr_kind_mod,     only : r8 => shr_kind_r8
   use cam_logfile,      only : iulog
   use ppgrid,           only : pver, pcols
-  use cam_abortutils,   only : endrun
 #ifdef OSLO_AERO
 !   use aerosoldef, only: nmodes_oslo=> nmodes, lifeCycleNumberMedianRadius
    use commondefinitions, only: nmodes_oslo=> nmodes
@@ -47,7 +45,15 @@ module mo_usrrxt
 !lke-TS1
   integer :: usr_PBZNIT_M_ndx
   integer :: tag_ACBZO2_NO2_ndx
-
+  integer :: usr_ISOPNITA_aer_ndx
+  integer :: usr_ISOPNITB_aer_ndx
+  integer :: usr_ONITR_aer_ndx
+  integer :: usr_HONITR_aer_ndx
+  integer :: usr_TERPNIT_aer_ndx
+  integer :: usr_NTERPOOH_aer_ndx
+  integer :: usr_NC4CHO_aer_ndx
+  integer :: usr_NC4CH2OH_aer_ndx
+!
   integer :: usr_OA_O2_NDX
   integer :: usr_XNO2NO3_M_ndx
   integer :: usr_NO2XNO3_M_ndx
@@ -98,7 +104,7 @@ module mo_usrrxt
   integer :: usr_clm_h2o_m_ndx, usr_clm_hcl_m_ndx
   integer :: usr_oh_co_ndx, het_no2_h2o_ndx, usr_oh_dms_ndx, aq_so2_h2o2_ndx, aq_so2_o3_ndx
 
-  integer :: h2o_ndx, so4_ndx, cb2_ndx, oc2_ndx, soa_ndx, nit_ndx
+  integer :: h2o_ndx
 !
 ! jfl
 !
@@ -152,8 +158,6 @@ module mo_usrrxt
   integer :: usr_CO42_OH_ndx
 !lke--
 
-  logical :: has_aerosols
-
   real(r8), parameter :: t0     = 300._r8                ! K
   real(r8), parameter :: trlim2 = 17._r8/3._r8           ! K
   real(r8), parameter :: trlim3 = 15._r8/3._r8           ! K
@@ -169,7 +173,6 @@ contains
 
     use mo_chem_utls,   only : get_rxt_ndx, get_spc_ndx
     use spmd_utils,     only : masterproc
-    use physics_buffer, only : pbuf_get_index
 
     implicit none
 
@@ -209,6 +212,14 @@ contains
 !lke-TS1
     usr_PBZNIT_M_ndx     = get_rxt_ndx( 'usr_PBZNIT_M' )
     tag_ACBZO2_NO2_ndx   = get_rxt_ndx( 'tag_ACBZO2_NO2' )
+    usr_ISOPNITA_aer_ndx = get_rxt_ndx( 'usr_ISOPNITA_aer' )
+    usr_ISOPNITB_aer_ndx = get_rxt_ndx( 'usr_ISOPNITB_aer' )
+    usr_ONITR_aer_ndx    = get_rxt_ndx( 'usr_ONITR_aer' )
+    usr_HONITR_aer_ndx   = get_rxt_ndx( 'usr_HONITR_aer' )
+    usr_TERPNIT_aer_ndx  = get_rxt_ndx( 'usr_TERPNIT_aer' )
+    usr_NTERPOOH_aer_ndx = get_rxt_ndx( 'usr_NTERPOOH_aer' )
+    usr_NC4CHO_aer_ndx   = get_rxt_ndx( 'usr_NC4CHO_aer' )
+    usr_NC4CH2OH_aer_ndx = get_rxt_ndx( 'usr_NC4CH2OH_aer' )
  !
  ! additional reactions for O3A/XNO
  !
@@ -349,11 +360,6 @@ contains
          all(iirb_ndx>0) .and. &
          usr_clm_h2o_m_ndx>0 .and. usr_clm_hcl_m_ndx>0
 
-    so4_ndx    = get_spc_ndx( 'SO4' )
-    cb2_ndx    = get_spc_ndx( 'CB2' )
-    oc2_ndx    = get_spc_ndx( 'OC2' )
-    soa_ndx    = get_spc_ndx( 'SOA' )
-    nit_ndx    = get_spc_ndx( 'NH4NO3' )
     h2o_ndx    = get_spc_ndx( 'H2O' )
 
     !
@@ -421,7 +427,8 @@ contains
                             ,tag_NO2_HO2_ndx,usr_HO2NO2_M_ndx,usr_N2O5_aer_ndx,usr_NO3_aer_ndx,usr_NO2_aer_ndx &
                             ,usr_CO_OH_b_ndx,tag_C2H4_OH_ndx,tag_C3H6_OH_ndx,tag_CH3CO3_NO2_ndx,usr_PAN_M_ndx,usr_CH3COCH3_OH_ndx &
                             ,usr_MCO3_NO2_ndx,usr_MPAN_M_ndx,usr_XOOH_OH_ndx,usr_SO2_OH_ndx,usr_DMS_OH_ndx,usr_HO2_aer_ndx &
-                            ,usr_GLYOXAL_aer_ndx
+                            ,usr_GLYOXAL_aer_ndx,usr_ISOPNITA_aer_ndx,usr_ISOPNITB_aer_ndx,usr_ONITR_aer_ndx,usr_HONITR_aer_ndx &
+                            ,usr_TERPNIT_aer_ndx,usr_NTERPOOH_aer_ndx,usr_NC4CHO_aer_ndx,usr_NC4CH2OH_aer_ndx
 
     end if
 
@@ -437,7 +444,6 @@ contains
     
     use mo_constants,  only : pi, avo => avogadro, boltz_cgs, rgas
     use chem_mods,     only : nfs, rxntot, gas_pcnst, inv_m_ndx=>indexm
-    use mo_chem_utls,  only : get_rxt_ndx, get_spc_ndx
     use mo_setinv,     only : inv_o2_ndx=>o2_ndx, inv_h2o_ndx=>h2o_ndx
     use physics_buffer,only : physics_buffer_desc
     use carma_flags_mod, only : carma_hetchem_feedback
@@ -485,6 +491,15 @@ contains
     real(r8), parameter :: gamma_no2  = 0.0001_r8       ! 
     real(r8), parameter :: gamma_no3  = 0.001_r8        ! 
     real(r8), parameter :: gamma_glyoxal  = 2.0e-4_r8   !  Washenfelder et al, JGR, 2011
+!TS1 species
+    real(r8), parameter :: gamma_isopnita  = 0.005_r8        ! from Fisher et al., ACP, 2016
+    real(r8), parameter :: gamma_isopnitb  = 0.005_r8        ! 
+    real(r8), parameter :: gamma_onitr     = 0.005_r8        ! 
+    real(r8), parameter :: gamma_honitr    = 0.005_r8        ! 
+    real(r8), parameter :: gamma_terpnit   = 0.01_r8         ! 
+    real(r8), parameter :: gamma_nterpooh  = 0.01_r8         ! 
+    real(r8), parameter :: gamma_nc4cho    = 0.005_r8        !
+    real(r8), parameter :: gamma_nc4ch2oh  = 0.005_r8        !
 
 
     integer  ::  i, k
@@ -507,6 +522,10 @@ contains
     real(r8) ::  kinf_m(ncol)   
     real(r8) ::  o2(ncol)
     real(r8) ::  c_n2o5, c_ho2, c_no2, c_no3, c_glyoxal
+!TS1 species
+    real(r8) ::  c_isopnita, c_isopnitb, c_onitr, c_honitr, c_terpnit, c_nterpooh
+    real(r8) ::  c_nc4cho, c_nc4ch2oh
+
     real(r8) ::  amas
     !-----------------------------------------------------------------
     !	... density of sulfate aerosol
@@ -555,7 +574,7 @@ contains
     integer :: ntot_amode
 
     real(r8), pointer :: sfc_array(:,:,:), dm_array(:,:,:)
-   
+    
 #ifdef OSLO_AERO
     ntot_amode = nmodes_oslo
 #else
@@ -709,14 +728,14 @@ contains
           end if
        end if
 !-----------------------------------------------------------------
-!           co + oh --> co2 + ho2     CAM-Chem
+!           co + oh --> co2 + ho2     (combined branches - do not use with CO_OH_b)
 !-----------------------------------------------------------------
        if( usr_CO_OH_a_ndx > 0 ) then
           rxt(:,k,usr_CO_OH_a_ndx) = 1.5e-13_r8 * &
                (1._r8 + 6.e-7_r8*boltz_cgs*m(:,k)*temp(:ncol,k))
        end if
 !-----------------------------------------------------------------
-! 	... co + oh --> co2 + h (second branch JPL15-10)
+! 	... co + oh --> co2 + h (second branch JPL15-10, with CO+OH+M)
 !-----------------------------------------------------------------
        if( usr_CO_OH_b_ndx > 0 ) then
          kinf(:)  = 2.1e+09_r8 * (temp(:ncol,k)/ t0)**(6.1_r8)
@@ -871,7 +890,7 @@ contains
 ! hydrolysis reactions on wetted aerosols
 !      
        if( usr_NO2_aer_ndx > 0 .or. usr_NO3_aer_ndx > 0 .or. usr_N2O5_aer_ndx > 0 .or. usr_HO2_aer_ndx > 0 &
-         .or. usr_GLYOXAL_aer_ndx > 0) then
+         .or. usr_GLYOXAL_aer_ndx > 0 ) then
 
           long_loop : do i = 1,ncol
 
@@ -883,6 +902,14 @@ contains
              c_no2  = 2.15e3_r8 * sqrt_t(i)         ! mean molecular speed of no2
              c_ho2  = 2.53e3_r8 * sqrt_t(i)         ! mean molecular speed of ho2
              c_glyoxal = 1.455e4_r8 * sqrt_t_58(i)  ! mean molecular speed of ho2
+             c_isopnita = 1.20e3_r8 * sqrt_t(i)         ! mean molecular speed of isopnita
+             c_isopnitb = 1.20e3_r8 * sqrt_t(i)         ! mean molecular speed of isopnitb
+             c_onitr    = 1.20e3_r8 * sqrt_t(i)         ! mean molecular speed of onitr 
+             c_honitr   = 1.26e3_r8 * sqrt_t(i)         ! mean molecular speed of honitr
+             c_terpnit  = 0.992e3_r8 * sqrt_t(i)        ! mean molecular speed of terpnit
+             c_nterpooh = 0.957e3_r8 * sqrt_t(i)        ! mean molecular speed of nterpooh
+             c_nc4cho   = 1.21e3_r8 * sqrt_t(i)         ! mean molecular speed of nc4cho
+             c_nc4ch2oh = 1.20e3_r8 * sqrt_t(i)         ! mean molecular speed of nc4ch2oh
 
              !-------------------------------------------------------------------------
              !  Heterogeneous reaction rates for uptake of a gas on an aerosol:
@@ -932,6 +959,55 @@ contains
              if( usr_GLYOXAL_aer_ndx > 0 ) then
                 rxt(i,k,usr_GLYOXAL_aer_ndx) = hetrxtrate_gly( sfc, c_glyoxal, gamma_glyoxal )
              end if
+             !-------------------------------------------------------------------------
+             ! 	... ISOPNITA -> HNO3  (on sulfate, nh4no3, oc2, soa)
+             !-------------------------------------------------------------------------
+             if( usr_ISOPNITA_aer_ndx > 0 ) then
+                rxt(i,k,usr_ISOPNITA_aer_ndx) = hetrxtrate( sfc, dm_aer, dg, c_isopnita, gamma_isopnita )
+             end if
+             !-------------------------------------------------------------------------
+             ! 	... ISOPNITB -> HNO3  (on sulfate, nh4no3, oc2, soa)
+             !-------------------------------------------------------------------------
+             if( usr_ISOPNITB_aer_ndx > 0 ) then
+                rxt(i,k,usr_ISOPNITB_aer_ndx) = hetrxtrate( sfc, dm_aer, dg, c_isopnitb, gamma_isopnitb )
+             end if
+             !-------------------------------------------------------------------------
+             ! 	...  ONITR -> HNO3 (on sulfate, nh4no3, oc2, soa)
+             !-------------------------------------------------------------------------
+             if( usr_ONITR_aer_ndx > 0 ) then
+                rxt(i,k,usr_ONITR_aer_ndx) = hetrxtrate( sfc, dm_aer, dg, c_onitr, gamma_onitr )
+             end if
+             !-------------------------------------------------------------------------
+             ! 	... HONITR -> HNO3  (on sulfate, nh4no3, oc2, soa)
+             !-------------------------------------------------------------------------
+             if( usr_HONITR_aer_ndx > 0 ) then
+                rxt(i,k,usr_HONITR_aer_ndx) = hetrxtrate( sfc, dm_aer, dg, c_honitr, gamma_honitr )
+             end if
+             !-------------------------------------------------------------------------
+             ! 	... TERPNIT -> HNO3  (on sulfate, nh4no3, oc2, soa)
+             !-------------------------------------------------------------------------
+             if( usr_TERPNIT_aer_ndx > 0 ) then
+                rxt(i,k,usr_TERPNIT_aer_ndx) = hetrxtrate( sfc, dm_aer, dg, c_terpnit, gamma_terpnit )
+             end if
+             !-------------------------------------------------------------------------
+             ! 	...  NTERPOOH -> HNO3 (on sulfate, nh4no3, oc2, soa)
+             !-------------------------------------------------------------------------
+             if( usr_NTERPOOH_aer_ndx > 0 ) then
+                rxt(i,k,usr_NTERPOOH_aer_ndx) = hetrxtrate( sfc, dm_aer, dg, c_nterpooh, gamma_nterpooh )
+             end if
+             !-------------------------------------------------------------------------
+             ! 	...  NC4CHO -> HNO3 (on sulfate, nh4no3, oc2, soa)
+             !-------------------------------------------------------------------------
+             if( usr_NC4CHO_aer_ndx > 0 ) then
+                rxt(i,k,usr_NC4CHO_aer_ndx) = hetrxtrate( sfc, dm_aer, dg, c_nc4cho, gamma_nc4cho )
+             end if
+             !-------------------------------------------------------------------------
+             ! 	...  NC4CH2OH -> HNO3 (on sulfate, nh4no3, oc2, soa)
+             !-------------------------------------------------------------------------
+             if( usr_NC4CH2OH_aer_ndx > 0 ) then
+                rxt(i,k,usr_NC4CH2OH_aer_ndx) = hetrxtrate( sfc, dm_aer, dg, c_nc4ch2oh, gamma_nc4ch2oh )
+             end if
+
           end do long_loop
        end if
 
@@ -1343,14 +1419,14 @@ contains
 
   end subroutine usrrxt
 
-      subroutine usrrxt_hrates( rxt, tempn, tempi, tempe, invariants, &
-				h2ovmr, pmid, m, ncol, kbot )
+      subroutine usrrxt_hrates( rxt, tempn, tempi, tempe, &
+				h2ovmr, m, ncol, kbot )
 !-----------------------------------------------------------------
 !        ... set the user specified reaction rates for heating
 !-----------------------------------------------------------------
 
       use shr_kind_mod,  only : r8 => shr_kind_r8
-      use chem_mods,     only : nfs, rxntot
+      use chem_mods,     only : rxntot
       use ppgrid,        only : pver, pcols
 
       implicit none
@@ -1365,8 +1441,6 @@ contains
       real(r8), intent(in)    :: tempe(pcols,pver)            ! electron temperature (K)
       real(r8), intent(in)    :: m(ncol,pver)                 ! total atm density (1/cm^3)
       real(r8), intent(in)    :: h2ovmr(ncol,pver)            ! water vapor (vmr)
-      real(r8), intent(in)    :: pmid(pcols,pver)             ! midpoint pressure (Pa)
-      real(r8), intent(in)    :: invariants(ncol,pver,nfs)    ! invariants density (1/cm^3)
       real(r8), intent(inout) :: rxt(ncol,pver,rxntot)        ! gas phase rates
       
 !-----------------------------------------------------------------
@@ -1379,8 +1453,7 @@ contains
                    tinv, &
                    ko, &
                    kinf, &
-                   fc, &
-                   xr                       ! factor to increase particle radii depending on rel hum
+                   fc
 
 !-----------------------------------------------------------------
 !	... o + o2 + m --> o3 + m

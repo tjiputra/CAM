@@ -155,7 +155,9 @@ contains
        aqh2so4,&
        aqso4_h2o2, &
        aqso4_o3,   &
-       yph_in  &
+       yph_in,  &
+       aqso4_h2o2_3d, &
+       aqso4_o3_3d &
        )
 
     !-----------------------------------------------------------------------      
@@ -209,6 +211,8 @@ contains
     real(r8),         intent(out)   :: aqso4_h2o2(:)                ! SO4 aqueous phase chemistry due to H2O2 (kg/m2)
     real(r8),         intent(out)   :: aqso4_o3(:)                  ! SO4 aqueous phase chemistry due to O3 (kg/m2)
     real(r8),         intent(in), optional :: yph_in                ! ph value
+    real(r8),         intent(out), optional :: aqso4_h2o2_3d(:, :)  ! 3D SO4 aqueous phase chemistry due to H2O2 (kg/m2)
+    real(r8),         intent(out), optional :: aqso4_o3_3d(:, :)    ! 3D SO4 aqueous phase chemistry due to O3 (kg/m2)
 
 
     !-----------------------------------------------------------------------      
@@ -862,7 +866,7 @@ contains
     call sox_cldaero_update( &
          ncol, lchnk, loffset, dtime, mbar, pdel, press, tfld, cldnum, cldfrc, cfact, cldconc%xlwc, &
          xdelso4hp, xh2so4, xso4, xso4_init, nh3g, hno3g, xnh3, xhno3, xnh4c,  xno3c, xmsa, xso2, xh2o2, qcw, qin, &
-         aqso4, aqh2so4, aqso4_h2o2, aqso4_o3 )
+         aqso4, aqh2so4, aqso4_h2o2, aqso4_o3, aqso4_h2o2_3d=aqso4_h2o2_3d, aqso4_o3_3d=aqso4_o3_3d )
     
     xphlwc(:,:) = 0._r8
     do k = 1, pver

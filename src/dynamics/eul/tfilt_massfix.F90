@@ -1,6 +1,22 @@
 module tfilt_massfix
+!----------------------------------------------------------------------- 
+! 
+! Purpose: 
+! Time filter (second half of filter for vorticity and divergence only)
+! 
+!----------------------------------------------------------------------- 
+  implicit none
+  private
+  save
 
+  public tfilt_massfixrun
+!
+! Private module data
+!
+
+!======================================================================= 
 contains
+!======================================================================= 
 
 subroutine tfilt_massfixrun (ztodt,         lat,    u3m1,   u3,     &
                           v3m1,   v3,    t3m1,   t3,     q3m1,   &
@@ -25,14 +41,13 @@ subroutine tfilt_massfixrun (ztodt,         lat,    u3m1,   u3,     &
    use cam_history,  only: outfld
    use eul_control_mod, only : fixmas,eps
    use pmgrid,       only: plon, plev, plevp, plat
-   use pspect
-   use commap
+   use commap,       only: clat
    use constituents, only: pcnst, qmin, cnst_cam_outfld, &
                            tottnam, tendnam, cnst_get_type_byind, fixcnam, &
                            hadvnam, vadvnam
    use time_manager, only: get_nstep
    use physconst,    only: cpair, gravit
-   use scamMod
+   use scamMod,      only: single_column, dqfxcam
    use phys_control, only: phys_getopts
    
 #if ( defined BFB_CAM_SCAM_IOP )
@@ -124,6 +139,8 @@ subroutine tfilt_massfixrun (ztodt,         lat,    u3m1,   u3,     &
 !   real(r8) engp                   ! Potential energy integral
    integer i, k, m,j,ixcldliq,ixcldice,ixnumliq,ixnumice
 #if ( defined BFB_CAM_SCAM_IOP )
+   real(r8) :: u3forecast(plon,plev)
+   real(r8) :: v3forecast(plon,plev)
    real(r8) :: t3forecast(plon,plev),delta_t3(plon,plev)
    real(r8) :: q3forecast(plon,plev,pcnst),delta_q3(plon,plev,pcnst)
 #endif
@@ -141,7 +158,11 @@ subroutine tfilt_massfixrun (ztodt,         lat,    u3m1,   u3,     &
    do k=1,plev
       do i=1,nlon
          divt3dsav(i,k,lat)=(t3(i,k)-tm2(i,k))/ztodt -t2sav(i,k,lat)
+         divu3dsav(i,k,lat)=(u3(i,k)-um2(i,k))/ztodt -fusav(i,k,lat)
+         divv3dsav(i,k,lat)=(v3(i,k)-vm2(i,k))/ztodt -fvsav(i,k,lat)
          t3forecast(i,k)=tm2(i,k)+ztodt*t2sav(i,k,lat)+ztodt*divt3dsav(i,k,lat)
+         u3forecast(i,k)=um2(i,k)+ztodt*fusav(i,k,lat)+ztodt*divu3dsav(i,k,lat)
+         v3forecast(i,k)=vm2(i,k)+ztodt*fvsav(i,k,lat)+ztodt*divv3dsav(i,k,lat)
       end do
    end do
    do i=1,nlon
@@ -181,6 +202,8 @@ subroutine tfilt_massfixrun (ztodt,         lat,    u3m1,   u3,     &
    call outfld('beta',beta_plon  ,plon   ,lat     )
    call outfld('CLAT    ',clat_plon  ,plon   ,lat     )
    call outfld('divT3d',divt3dsav(1,1,lat)  ,plon   ,lat     )
+   call outfld('divU3d',divu3dsav(1,1,lat)  ,plon   ,lat     )
+   call outfld('divV3d',divv3dsav(1,1,lat)  ,plon   ,lat     )
    do m =1,pcnst
       call outfld(trim(cnst_name(m))//'_dten',divq3dsav(1,1,m,lat)  ,plon   ,lat     )
    end do

@@ -140,7 +140,7 @@ subroutine wetdep_inputs_set( state, pbuf, inputs )
   inputs%cmfdqr(:ncol,:) = rprddp(:ncol,:)  + rprdsh(:ncol,:)
 
   ! sum deep and shallow convection contributions
-  if (cam_physpkg_is('cam5') .or. cam_physpkg_is('cam5.4')) then
+  if (cam_physpkg_is('cam5') .or. cam_physpkg_is('cam6')) then
      ! Dec.29.2009. Sungsu
      inputs%conicw(:ncol,:) = (icwmrdp(:ncol,:)*dp_frac(:ncol,:) + icwmrsh(:ncol,:)*sh_frac(:ncol,:))/ &
                               max(0.01_r8, sh_frac(:ncol,:) + dp_frac(:ncol,:))
@@ -1132,7 +1132,7 @@ end subroutine wetdepa_v2
             scavin = precic*(1._r8-weight)*mplb
 
             ! fraction of precip which entered above that leaves below
-            if (cam_physpkg_is('cam5') .or. cam_physpkg_is('cam5.4')) then
+            if (cam_physpkg_is('cam5') .or. cam_physpkg_is('cam6')) then
                ! Sungsu added evaporation of convective precipitation below.
                precxx = precab(i)-pdog*(evaps(i,k)+evapc(i,k))
             else

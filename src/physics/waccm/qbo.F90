@@ -31,12 +31,10 @@ module qbo
 
   use shr_kind_mod,   only: r8 => shr_kind_r8
   use spmd_utils,     only: masterproc
-  use pmgrid,         only: plon, plev, plevp
   use ppgrid,         only: pcols, pver
   use time_manager,   only: get_curr_date, get_curr_calday
   use phys_grid,      only: get_rlat_p
   use physics_types,  only: physics_state, physics_ptend, physics_ptend_init
-  use error_messages, only: alloc_err
   use cam_abortutils, only: endrun  
   use cam_logfile,    only: iulog
   use bnddyi_mod,     only: bnddyi
@@ -166,9 +164,7 @@ contains
 !---------------------------------------------------------------------
     real(r8), parameter :: hPa2Pa = 100._r8
 
-    integer  :: i, m, y, n         ! testing indexes
     integer  :: yr, mon, day       ! components of a date
-    integer  :: ncdate             ! current date in integer format [yyyymmdd]
     integer  :: ncsec              ! current time of day [seconds]
     integer  :: ncid               ! netcdf ID for input dataset 
     integer  :: astat              ! allocate status
@@ -547,7 +543,6 @@ master_proc : &
     calday = get_curr_calday()
     call get_curr_date( yr, mon, day, ncsec )
     if (masterproc) write(iulog,*) 'qbo_init: get_curr_date = ', yr,mon,day,ncsec
-    ncdate = yr*10000 + mon*100 + day
 
 !---------------------------------------------------------------------
 ! Set current day in run or in qbo cycle
@@ -878,7 +873,7 @@ has_qbo_forcing : &
     call pbuf_get_field(pbuf, uzm_idx, uzm)
 
     kl          = max( 1,ktop-1 )
-    ku          = min( plev,kbot+1 )
+    ku          = min( pver,kbot+1 )
 !--------------------------------------------------------------------------------
 ! get latitude in radians for present chunk
 !--------------------------------------------------------------------------------

@@ -55,6 +55,7 @@ module iondrag
   public :: iondrag_init             ! Initialization
   public :: iondrag_calc             ! ion drag tensors lxx,lyy,lxy,lyx
   public :: iondrag_readnl
+  public :: iondrag_timestep_init
   public :: do_waccm_ions
 
   interface iondrag_calc
@@ -70,6 +71,7 @@ module iondrag
   character(len=256) :: efield_lflux_file = 'coeff_lflux.dat'
   character(len=256) :: efield_hflux_file = 'coeff_hflux.dat'
   character(len=256) :: efield_wei96_file = 'wei96.cofcnts'
+  logical            :: empirical_ion_velocities = .true.
 
   real(r8),parameter :: amu    = 1.6605387e-27_r8  ! atomic mass unit (kg)
 
@@ -88,9 +90,8 @@ module iondrag
   integer :: indxTe  = -1    ! pbuf index for electron temperature
   integer :: indxTi  = -1    ! pbuf index for ion temperature
 
-  logical  :: xo2_slvd, xo1_slvd, o2p_slvd, op_slvd, nop_slvd, elec_slvd, n_slvd
+  logical  :: xo2_slvd, xo1_slvd, o2p_slvd, op_slvd, nop_slvd
 
-  real(r8) :: rmass_elec                 ! mass of electron (g/mole)
   real(r8) :: rmass_op                   ! mass of O+ (g/mole)
   real(r8) :: rmass_o2p                  ! mass of O2+ (g/mole)
   real(r8) :: rmass_nop                  ! mass of NO+ (g/mole)
@@ -107,7 +108,6 @@ module iondrag
   real(r8) :: rmi_op
   real(r8) :: rmi_o2p
   real(r8) :: rmi_nop
-  real(r8) :: rmi_elec
   real(r8) :: rmi_op_kg
   real(r8) :: rmi_o2p_kg
   real(r8) :: rmi_nop_kg
@@ -129,7 +129,6 @@ module iondrag
 
   logical doiodrg
   logical, protected :: do_waccm_ions = .false.
-  logical :: use_dynamo_drifts = .false.
 
   !
   ! Data statement for ALAMXX
@@ -202,7 +201,7 @@ contains
     ! E and B fields
     call exbdrift_register()
 
-    if ( waccmx_is("ionosphere") .or. waccmx_is("neutral") ) then
+    if ( waccmx_is("ionosphere") ) then
        ! Pedersen Conductivity and Hall Conductivity
        call pbuf_add_field('PedConduct',  'physpkg', dtype_r8, (/pcols,pver/), PedConduct_idx )
        call pbuf_add_field('HallConduct', 'physpkg', dtype_r8, (/pcols,pver/), HallConduct_idx)
@@ -225,7 +224,7 @@ contains
     integer :: unitn, ierr
     character(len=*), parameter :: subname = 'iondrag_readnl'
 
-    namelist /iondrag_nl/ efield_lflux_file, efield_hflux_file, efield_wei96_file
+    namelist /iondrag_nl/ efield_lflux_file, efield_hflux_file, efield_wei96_file, empirical_ion_velocities
 
     if (masterproc) then
        unitn = getunit()
@@ -246,6 +245,7 @@ contains
    call mpibcast (efield_lflux_file, len(efield_lflux_file), mpichar, 0, mpicom)
    call mpibcast (efield_hflux_file, len(efield_hflux_file), mpichar, 0, mpicom)
    call mpibcast (efield_wei96_file, len(efield_wei96_file), mpichar, 0, mpicom)
+   call mpibcast (empirical_ion_velocities, 1, mpilog, 0, mpicom)
 #endif
 
   end subroutine iondrag_readnl
@@ -302,11 +302,6 @@ contains
     call cnst_get_ind( 'e', id_elec, abort=.false. )
     if (id_elec < 0) then
        id_elec = slvd_index( 'e' )
-       if (id_elec > 0) then
-          elec_slvd = .true.
-       endif
-    else
-       elec_slvd = .false.
     endif
     call cnst_get_ind( 'Op', id_op, abort=.false. )
     if (id_op < 0) then
@@ -356,11 +351,6 @@ contains
     call cnst_get_ind( 'N', id_n, abort=.false. )
     if (id_n < 0) then
        id_n = slvd_index( 'N' )
-       if (id_n > 0) then
-          n_slvd = .true.
-       endif
-    else
-       n_slvd = .false.
     endif
  
     cnst_ids = (/ id_elec, id_op, id_o2p, id_nop, id_xo1, id_xo2, id_n /)
@@ -387,15 +377,14 @@ contains
     vi_idx = pbuf_get_index('VI')
     wi_idx = pbuf_get_index('WI')
 
-    indxTe = pbuf_get_index( 'ElecTemp',errcode=err )
-    indxTi = pbuf_get_index( 'IonTemp',errcode=err )
+    indxTe = pbuf_get_index( 'TElec',errcode=err )
+    indxTi = pbuf_get_index( 'TIon',errcode=err )
 
   end subroutine iondrag_init
 
   !================================================================================================
   subroutine ions_init
 
-    use constituents, only: cnst_mw
     use efield,       only: efield_init
     use exbdrift,     only: exbdrift_init
     use mo_chem_utls, only: get_spc_ndx
@@ -407,7 +396,6 @@ contains
     !-------------------------------------------------------------------------------
     ! local variables
     !-------------------------------------------------------------------------------
-    real(r8) :: rpsh
     integer  :: id
 
     logical :: history_waccm
@@ -419,10 +407,8 @@ contains
     !-------------------------------------------------------------------------------
 
     call efield_init (efield_lflux_file, efield_hflux_file, efield_wei96_file)
-    call exbdrift_init
+    call exbdrift_init( empirical_ion_velocities )
 
-    id = get_spc_ndx('e')
-    rmass_elec = adv_mass(id)
     id = get_spc_ndx('Op')
     rmass_op  = adv_mass(id)
     id = get_spc_ndx('O2p')
@@ -436,7 +422,6 @@ contains
     id = get_inv_ndx('N2')
     rmass_n2 = fix_mass(id)
 
-    rmi_elec   = 1._r8/rmass_elec
     rmi_o1     = 1._r8/rmass_o1
     rmi_o2     = 1._r8/rmass_o2
     rmi_n2     = 1._r8/rmass_n2
@@ -477,14 +462,14 @@ contains
 !
 ! 3d drifts from either edynamo or exbdrift.
 !
-    if (use_dynamo_drifts) then
-      call addfld('UI',(/ 'lev' /),'I','m/s', 'UI Zonal ion drift from edynamo') 
-      call addfld('VI',(/ 'lev' /),'I','m/s', 'VI Meridional ion drift from edynamo')
-      call addfld('WI',(/ 'lev' /),'I','m/s', 'WI Meridional ion drift from edynamo')
-    else
+    if (empirical_ion_velocities) then
       call addfld('UI',(/ 'lev' /),'I','m/s', 'UI Zonal empirical ExB drift from exbdrift')
       call addfld('VI',(/ 'lev' /),'I','m/s', 'VI Meridional empirical ExB drift from exbdrift')
       call addfld('WI',(/ 'lev' /),'I','m/s', 'WI Meridional empirical ExB drift from exbdrift')
+    else
+      call addfld('UI',(/ 'lev' /),'I','m/s', 'UI Zonal ion drift from edynamo') 
+      call addfld('VI',(/ 'lev' /),'I','m/s', 'VI Meridional ion drift from edynamo')
+      call addfld('WI',(/ 'lev' /),'I','m/s', 'WI Meridional ion drift from edynamo')
     endif
 
 
@@ -497,9 +482,6 @@ contains
     !
     ! initialization for ion drag calculation
     !
-
-    use ppgrid
-    use cam_abortutils,  only: endrun
 
     !------------------Input arguments---------------------------------------
 
@@ -570,6 +552,19 @@ contains
 
   end subroutine ghg_init
 
+  !================================================================================================
+
+  subroutine iondrag_timestep_init
+    use efield, only: get_efield
+
+    if (do_waccm_ions) then
+       ! Compute the electric field
+       call t_startf ('efield')
+       call get_efield
+       call t_stopf ('efield')
+    endif
+
+  end subroutine iondrag_timestep_init
 
   !================================================================================================
   subroutine iondrag_calc_ions( lchnk, ncol, state, ptend, pbuf,  delt )
@@ -579,7 +574,6 @@ contains
     ! This is called from tphysac.
     !-------------------------------------------------------------------------------
 
-    use constituents ,only: cnst_get_ind      ! get constituent index function
     use mo_apex,only: & ! (pcols,begchunk:endchunk)
          bnorth,      & ! northward component of magnetic field (nT)
          beast,       & ! eastward component of magnetic field (nT)
@@ -588,7 +582,7 @@ contains
     use physconst,     only: avogad, boltz
     use chemistry,     only: imozart
     use mo_mean_mass,  only: set_mean_mass
-    use exbdrift,      only: get_exbdrift
+    use exbdrift,      only: exbdrift_ion_vels
     use short_lived_species, only: slvd_pbf_ndx => pbf_idx
     use physics_buffer, only : physics_buffer_desc, pbuf_get_field, pbuf_set_field
     use time_manager,   only : is_first_step
@@ -660,7 +654,6 @@ contains
     real(r8) :: lxxnorot(pcols,pver)   ! XX before rotation
     real(r8) :: lyynorot(pcols,pver)   ! YY before rotation
     real(r8) :: lxynorot(pcols,pver)   ! XY before rotation
-    real(r8) :: lyxnorot(pcols,pver)   ! YX before rotation
 
     !-------------------------------------------------------------------------------
     ! Ion-neutral momentum transfer collision frequencies.
@@ -686,9 +679,7 @@ contains
     real(r8) :: decmag       (pcols)     ! magnetic declination
     real(r8) :: btesla       (pcols)     ! magnetic field (teslas)
     real(r8) :: sindip       (pcols)     ! sin(dipmag)
-    real(r8) :: cosdip       (pcols)     ! cos(dipmag)
     real(r8) :: sin2dip      (pcols)     ! sindip^2
-    real(r8) :: cos2dip      (pcols)     ! cosdip^2
     real(r8) :: sindec       (pcols)     ! sin(decmag)
     real(r8) :: cosdec       (pcols)     ! cos(decmag)
     real(r8) :: sin2dec      (pcols)     ! sindec^2
@@ -718,7 +709,7 @@ contains
 
     real(r8) :: qout(pcols,pver)         ! temp for outfld
 
-    real(r8), dimension(:,:), pointer :: q_elec, q_xo1,  q_xo2, q_o2p, q_op, q_nop
+    real(r8), dimension(:,:), pointer :: q_xo1,  q_xo2, q_o2p, q_op, q_nop
 
     real(r8), dimension(:,:), pointer :: tE  	 ! electron temperature in pbuf (K) 
     real(r8), dimension(:,:), pointer :: tI   	 ! ion temperature in pbuf (K) 
@@ -730,11 +721,6 @@ contains
     call outfld ('BDOWN' , bdown(:,lchnk),  pcols, lchnk )
     call outfld ('BMAG'  , bmag(:,lchnk),   pcols, lchnk )
 
-    if ( elec_slvd ) then
-      call pbuf_get_field(pbuf, slvd_pbf_ndx, q_elec, start=(/1,1,id_elec/), kount=(/pcols,pver,1/) )
-    else
-      q_elec => state%q(:,:,id_elec)
-    endif
     if ( xo1_slvd ) then
       call pbuf_get_field(pbuf, slvd_pbf_ndx, q_xo1, start=(/1,1,id_xo1/), kount=(/pcols,pver,1/) )
     else
@@ -795,10 +781,10 @@ contains
     ! calculate empirical ExB drift velocities if not using edynamo drifts
     ! (if edynamo calculated the drifts, then they are already in pbuf%ui, etc.)
     !-------------------------------------------------------------------------------
-    if (.not.use_dynamo_drifts) then
-      call t_startf ( 'exbdrift' )
-      call get_exbdrift( lchnk, ncol, pbuf)
-      call t_stopf  ( 'exbdrift' )
+    if (empirical_ion_velocities .or. is_first_step()) then
+      call t_startf ( 'exbdrift_ion_vels' )
+      call exbdrift_ion_vels( lchnk, ncol, pbuf)
+      call t_stopf  ( 'exbdrift_ion_vels' )
     endif
 
     !-------------------------------------------------------------------------------
@@ -831,18 +817,14 @@ contains
        sindec(i) = sin( decmag(i) )
        if( abs(dipmag(i)) >= dipmin ) then
           sindip(i) = sin(dipmag(i))
-          cosdip(i) = cos(dipmag(i))
        else
           if( dipmag(i) >= 0._r8 ) then
              sindip(i) = sin( dipmin )
-             cosdip(i) = cos( dipmin )
           else
              sindip(i) = sin( -dipmin )
-             cosdip(i) = cos( -dipmin )
           end if
        end if
        sin2dip(i) = sindip(i)**2
-       cos2dip(i) = cosdip(i)**2
        sin2dec(i) = sindec(i)**2
        cos2dec(i) = cosdec(i)**2
     end do
@@ -911,9 +893,7 @@ contains
           nop_cm3(i,k) = nop(i,k)*xnmbar(i,k)*rmi_nop  ! no+ (cm-3)
 !
 !----------------------------------------------------------------------------------
-! btf 7/8/15: q_elec is no longer used for Ne for conductivity calculations.
-!   old: ne(i,k) = q_elec(i,k)*xnmbar(i,k)*rmi_elec  ! e (cm-3)
-!   new: Use sum of the 3 major ion number densities (as in tiegcm)
+!  Use sum of the 3 major ion number densities (as in tiegcm)
 !----------------------------------------------------------------------------------
 ! 
           ne_sigmas(i,k)      = op_cm3(i,k) + o2p_cm3(i,k) + nop_cm3(i,k)
@@ -975,7 +955,7 @@ contains
           ! Pedersen conductivity (siemens/m):
           !-------------------------------------------------------------------------------
           sigma_ped(i,k) = qe_fac(i)                           &
-               *((op_cm3 (i,k)*rnu_op (i,k)/(1._r8 + rnu_op (i,k)**2)) &
+               *((op_cm3   (i,k)*rnu_op (i,k)/(1._r8 + rnu_op (i,k)**2)) &
                + (o2p_cm3  (i,k)*rnu_o2p(i,k)/(1._r8 + rnu_o2p(i,k)**2)) &
                + (nop_cm3  (i,k)*rnu_nop(i,k)/(1._r8 + rnu_nop(i,k)**2)) &
                + (ne_sigmas(i,k)*rnu_ne (i,k)/(1._r8 + rnu_ne (i,k)**2)))
@@ -1018,7 +998,6 @@ contains
           lxxnorot(i,k) = lamda1(i,k)
           lyynorot(i,k) = lamda1(i,k)*sin2dip(i)
           lxynorot(i,k) = lamda2(i,k)*sindip(i)
-          lyxnorot(i,k) = lxynorot(i,k)
        end do
     end do
 
@@ -1107,7 +1086,6 @@ contains
 
     integer i
     integer k
-    integer kinv
 
     !-------------------------------------------------------------------------
 
@@ -1187,8 +1165,6 @@ contains
     real(r8) :: detr
     real(r8) :: us, vs
     real(r8) :: l11, l12, l21, l22
-    real(r8) :: du(pcols,pver)             ! zonal ion drag tendency
-    real(r8) :: dv(pcols,pver)             ! meridional ion drag tendency
     real(r8) :: dui(pcols,pver)            ! zonal ion drag tendency
     real(r8) :: dvi(pcols,pver)            ! meridional ion drag tendency
     real(r8), pointer :: ui(:,:)           ! pointer to 3d zonal ion drift from edynamo
@@ -1198,7 +1174,7 @@ contains
     !-------------------------------------------------------------------------------
     ! Get ion ExB drift from physics buffer (they were defined by either the exbdrift 
     !   module in chemistry (2d), or the dynamo module in dynamics dpie_coupling (3d), 
-    !   depending on the switch use_dynamo_drifts (edyn_init.F90). If using dynamo drifts, 
+    !   depending on the switch empirical_ion_velocities. If using dynamo drifts, 
     !   they were put into pbuf by dp_coupling. If using empirical exbdrifts, then
     !   they are redundant in the vertical dimension (i.e., 2d only).
     !-------------------------------------------------------------------------------
@@ -1284,7 +1260,7 @@ contains
     ! This is called from sub iondrag_calc.
     !-------------------------------------------------------------------------------
 
-    use physconst, only: cpair,pi,cpairv
+    use physconst, only: pi,cpairv
     use phys_grid, only: get_rlon_p, get_rlat_p
 
     !-------------------------------------------------------------------------------
@@ -1305,7 +1281,6 @@ contains
     ! Local variables
     !-------------------------------------------------------------------------------
     integer  :: k, i
-    integer  :: ndx_ue, ndx_ve             ! indices to ion velocities in pbuf
     integer  :: max_ind(2)
     real(r8) :: us, vs
     real(r8) :: max_q
@@ -1313,6 +1288,8 @@ contains
     real(r8) :: qout(pcols,pver)           ! temp for outfld
     real(r8), pointer :: ui(:,:)           ! pointer to pbuf
     real(r8), pointer :: vi(:,:)           ! pointer to pbuf
+
+    logical, parameter :: debug = .false.
 
     !-------------------------------------------------------------------------------
     ! Get ion velocities from physics buffer (they were defined by exbdrift module)
@@ -1342,30 +1319,30 @@ contains
        ptend%s(:ncol,k) = 0._r8        ! no joule heating tendency
     end do
 
-#ifdef SW_DEBUG
-    max_q      = 100._r8*maxval( abs( qjoule(:ncol,ntop_lev:nbot_lev) )/state%t(:ncol,ntop_lev:nbot_lev) )
-    max_ind(:) = maxloc( abs( qjoule(:ncol,ntop_lev:nbot_lev) )/state%t(:ncol,ntop_lev:nbot_lev) )
-    i = max_ind(1)
-    k = max_ind(2)
-    if( lchnk == 25 ) then
-       i = 14
-       k = 3
-       write(iulog,*) ' '
-       write(iulog,*) '-------------------------------------------------------'
-       write(iulog,*) 'jouleheat_tend: lon,lat = ',get_rlon_p(lchnk,14)*180._r8/pi, get_rlat_p(lchnk,14)*180._r8/pi
-       write(iulog,*) 'jouleheat_tend: dt,t,max% dt/t = ',qjoule(i,k)/cpairv(i,k,lchnk),state%t(i,k),max_q, &
-            ' @ lchnk,i,k = ',lchnk,max_ind(:)
-       write(iulog,*) 'jouleheat_tend: lxx,xy,yx,yy   = ',lxx(i,k),lxy(i,k),lyx(i,k),lyy(i,k)
-       write(iulog,*) 'jouleheat_tend: u,ui,v,vi      = ',state%u(i,k),ui(i,k),state%v(i,k),vi(i,k)
-       write(iulog,*) 'jouleheat_tend: us,vs          = ',ui(i,k) - state%u(i,k),vi(i,k) - state%v(i,k)
-       write(iulog,*) 'jouleheat_tend: du,dv          = ',ptend%u(i,k),ptend%v(i,k)
-       write(iulog,*) 'jouleheat_tend: dt'
-       write(iulog,'(1p,5g15.7)') qjoule(max_ind(1),ntop_lev:nbot_lev)/cpairv(max_ind(1),ntop_lev:nbot_lev,lchnk)
-       write(iulog,*) '-------------------------------------------------------'
-       write(iulog,*) ' '
-       ! stop 'diagnostics'
-    end if
-#endif
+    sw_debug: if (debug) then
+       max_q      = 100._r8*maxval( abs( qjoule(:ncol,ntop_lev:nbot_lev) )/state%t(:ncol,ntop_lev:nbot_lev) )
+       max_ind(:) = maxloc( abs( qjoule(:ncol,ntop_lev:nbot_lev) )/state%t(:ncol,ntop_lev:nbot_lev) )
+       i = max_ind(1)
+       k = max_ind(2)
+       if( lchnk == 25 ) then
+          i = 14
+          k = 3
+          write(iulog,*) ' '
+          write(iulog,*) '-------------------------------------------------------'
+          write(iulog,*) 'jouleheat_tend: lon,lat = ',get_rlon_p(lchnk,14)*180._r8/pi, get_rlat_p(lchnk,14)*180._r8/pi
+          write(iulog,*) 'jouleheat_tend: dt,t,max% dt/t = ',qjoule(i,k)/cpairv(i,k,lchnk),state%t(i,k),max_q, &
+               ' @ lchnk,i,k = ',lchnk,max_ind(:)
+          write(iulog,*) 'jouleheat_tend: lxx,xy,yx,yy   = ',lxx(i,k),lxy(i,k),lyx(i,k),lyy(i,k)
+          write(iulog,*) 'jouleheat_tend: u,ui,v,vi      = ',state%u(i,k),ui(i,k),state%v(i,k),vi(i,k)
+          write(iulog,*) 'jouleheat_tend: us,vs          = ',ui(i,k) - state%u(i,k),vi(i,k) - state%v(i,k)
+          write(iulog,*) 'jouleheat_tend: du,dv          = ',ptend%u(i,k),ptend%v(i,k)
+          write(iulog,*) 'jouleheat_tend: dt'
+          write(iulog,'(1p,5g15.7)') qjoule(max_ind(1),ntop_lev:nbot_lev)/cpairv(max_ind(1),ntop_lev:nbot_lev,lchnk)
+          write(iulog,*) '-------------------------------------------------------'
+          write(iulog,*) ' '
+          ! stop 'diagnostics'
+       end if
+    endif sw_debug
 
     qout(:ncol,:) = qjoule(:ncol,:)/cpairv(:ncol,:,lchnk)
 

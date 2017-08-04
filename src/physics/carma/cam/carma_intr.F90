@@ -1417,7 +1417,8 @@ contains
         jn(:)  = 0.0_r8
         pa(:)  = 0.0_r8
         vm(:)  = 0.0_r8
-      
+        ar(:)  = 0.0_r8
+
         do ibin = 1, NBIN
           call CARMASTATE_GetBin(cstate, ielem, ibin, newstate(:), rc, &
                  numberDensity=numberDensity, nucleationRate=nucleationRate, surface=dd, vd=vd, vf=vf, dtpart=dtpart)
@@ -2126,7 +2127,7 @@ contains
             ! use a constant value for each group.
             z_scavcoef(:, :) = scavcoef
     
-            if (cam_physpkg_is('cam5') .or. cam_physpkg_is('cam5.4')) then
+            if (cam_physpkg_is('cam5') .or. cam_physpkg_is('cam6')) then
 
               call wetdepa_v2( &
                            state%pmid, &

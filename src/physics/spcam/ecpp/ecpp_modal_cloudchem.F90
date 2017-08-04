@@ -189,7 +189,6 @@ subroutine parampollu_tdx_cldchem(               &
 		alt_tmp(:,:,:), cldfra_tmp(:,:,:), &
 		qlsink_tmp(:,:,:), precr_tmp(:,:,:), &
 		precs_tmp(:,:,:), precg_tmp(:,:,:), preci_tmp(:,:,:)
-	real(r8), allocatable :: moist_tmp(:,:,:,:)
 	real(r8), allocatable :: chem_tmpa(:,:,:,:), chem_tmpb(:,:,:,:), chem_tmpc(:,:,:,:)
 
         real(r8), allocatable :: cwat_tmp(:,:,:)
@@ -200,6 +199,8 @@ subroutine parampollu_tdx_cldchem(               &
         real(r8), allocatable :: aqso4_h2o2_tmp(:)
         real(r8), allocatable :: aqso4_o3_tmp(:)
         real(r8), allocatable :: xphlwc_tmp(:,:)
+        real(r8), allocatable :: aqso4_h2o2_3dtmp(:,:)
+        real(r8), allocatable :: aqso4_o3_3dtmp(:,:)
 
         real(r8), allocatable :: mmr(:, :), vmr(:,:), mmrcw(:, :), vmrcw(:, :)
         real(r8), allocatable :: vmr_3d(:,:,:), vmrcw_3d(:,:, :)
@@ -257,7 +258,6 @@ subroutine parampollu_tdx_cldchem(               &
 	allocate ( preci_tmp(     1:4,kts:ktecen,1:ncls_use) )
         allocate ( cwat_tmp(      1:4,kts:ktecen,1:ncls_use) )
         allocate ( pdel_tmp(      1:4,kts:ktecen,1:ncls_use) )
-	allocate ( moist_tmp(     1:4,kts:ktecen,1:ncls_use,1:num_moist_ecpp) )
 	allocate ( chem_tmpa(     1:4,kts:ktecen,1:ncls_use,1:num_chem_ecpp) )
 	allocate ( chem_tmpb(     1:4,kts:ktecen,1:ncls_use,1:num_chem_ecpp) )
         allocate ( chem_tmpc(     1:4,kts:ktecen,1:ncls_use,1:num_chem_ecpp) )
@@ -276,11 +276,13 @@ subroutine parampollu_tdx_cldchem(               &
        allocate  ( mmrcw_3d(1, kts:ktecen, 1:gas_pcnst) )
        allocate  ( mbar_3d(1, kts:ktecen) )
 
-       allocate  (aqso4_tmp(ntot_amode,kts:ktecen))
-       allocate  (aqh2so4_tmp(ntot_amode,kts:ktecen))
-       allocate  (aqso4_h2o2_tmp(kts:ktecen))
-       allocate  (aqso4_o3_tmp(kts:ktecen))
+       allocate  (aqso4_tmp(1, ntot_amode))
+       allocate  (aqh2so4_tmp(1, ntot_amode))
+       allocate  (aqso4_h2o2_tmp(1))
+       allocate  (aqso4_o3_tmp(1))
        allocate  (xphlwc_tmp(1,kts:ktecen))
+       allocate  (aqso4_h2o2_3dtmp(1,kts:ktecen))
+       allocate  (aqso4_o3_3dtmp(1,kts:ktecen))
 
        allocate  (qsrflx_full(pcols, gas_pcnst, nsrflx))
        allocate  (qqcwsrflx_full(pcols, gas_pcnst, nsrflx))
@@ -319,7 +321,6 @@ subroutine parampollu_tdx_cldchem(               &
 	end do
 
 	cldfra_tmp(:,:,:) = 0.0_r8
-	moist_tmp(:,:,:,:) = 0.0_r8
 	qlsink_tmp(:,:,:) = 0.0_r8
 	precr_tmp(:,:,:) = 0.0_r8
 	precg_tmp(:,:,:) = 0.0_r8
@@ -343,7 +344,6 @@ subroutine parampollu_tdx_cldchem(               &
 	    end if
 	    tmpq = qcloud_sub2(km,icc,jcls,ipp)
 	    if ((tmpa > afrac_cut_0p5) .and. (tmpq > qcldwtr_cutoff)) then
-		moist_tmp(iccpp,k,jcls,p_qc) = tmpq
 		qlsink_tmp(iccpp,k,jcls) = qlsink_sub2(km,icc,jcls,ipp)
                 cwat_tmp(iccpp,k,jcls) = tmpq
 	    end if
@@ -383,7 +383,7 @@ subroutine parampollu_tdx_cldchem(               &
               lnumcw = numptr_aer(im, in, cw_phase)
               do k=kts, ktecen
                 km=ktecen-k+1
-                cldnum(1,k) = cldnum(1,k)+chem_tmpb(iccpp,k,jcls,lnumcw)           
+                cldnum(1,k) = cldnum(1,k)+chem_tmpb(iccpp,km,jcls,lnumcw)           
               end do
             end do
           end do
@@ -441,7 +441,7 @@ subroutine parampollu_tdx_cldchem(               &
               vmr_full(:, k, n) = vmr(k, n)
             end do
           end do
-          call setinv( invariants_full, t_full, h2ovmr_full, vmr_full, pmid_full, pcols, jt, pbuf)   ! jt=lchnk
+          call setinv( invariants_full(:it,:,:), t_full, h2ovmr_full(:it,:), vmr_full(:it,:,:), pmid_full, it, jt, pbuf) ! jt=lchnk
 
           !--------------------------------------------------------------------------
           !        ... Aqueous chemistry
@@ -466,7 +466,9 @@ subroutine parampollu_tdx_cldchem(               &
                aqh2so4_tmp, &
                aqso4_h2o2_tmp,  &
                aqso4_o3_tmp, &
-               yph )
+               yph, &
+               aqso4_h2o2_3dtmp, &
+               aqso4_o3_3dtmp )
 
           !-----------------------------------------------------------------------
           !         ... Xform from vmr to mmr
@@ -502,8 +504,8 @@ subroutine parampollu_tdx_cldchem(               &
                  tmpa = acen_prec_use(k,icc,jcls)
               end if
               if (tmpa > afrac_cut_0p5) then
-                 aqso4_h2o2 = aqso4_h2o2+tmpa * aqso4_h2o2_tmp(km)*dt_tmp
-                 aqso4_o3 = aqso4_o3 + tmpa * aqso4_o3_tmp(km)*dt_tmp
+                 aqso4_h2o2 = aqso4_h2o2+tmpa * aqso4_h2o2_3dtmp(1, km)*dt_tmp
+                 aqso4_o3 = aqso4_o3 + tmpa * aqso4_o3_3dtmp(1, km)*dt_tmp
               end if 
 !
 ! xphlwc_tmp is defined in CAM( top to bottom), and xphlwc3d is defined in ECPP (bottom to top)
@@ -683,12 +685,15 @@ subroutine parampollu_tdx_cldchem(               &
 	             cldfra_tmp, &
 	             qlsink_tmp, &
 	             precr_tmp, precs_tmp, precg_tmp, preci_tmp )
-	deallocate ( moist_tmp, &
-	             chem_tmpa, chem_tmpb, chem_tmpc)
+	deallocate ( chem_tmpa, chem_tmpb, chem_tmpc) 
         deallocate ( mmr, mmrcw, vmr, vmrcw, vmr_sv1, vmrcw_sv1, &
                     mbar, cldnum, mmr_3d, mmrcw_3d, mbar_3d,  &
                     qsrflx_full, qqcwsrflx_full)
 
+        deallocate ( cwat_tmp, pdel_tmp, vmr_3d, vmrcw_3d, &
+                     aqso4_tmp, aqh2so4_tmp, aqso4_h2o2_tmp, &
+                     aqso4_o3_tmp, xphlwc_tmp, aqso4_h2o2_3dtmp, &
+                     aqso4_o3_3dtmp)
 	return
 	end subroutine parampollu_tdx_cldchem
 

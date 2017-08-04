@@ -79,6 +79,8 @@ module camsrfexch
      real(r8) :: dstdry3(pcols)      ! dry deposition of dust (bin3)
      real(r8) :: dstwet4(pcols)      ! wet deposition of dust (bin4)
      real(r8) :: dstdry4(pcols)      ! dry deposition of dust (bin4)
+     real(r8), pointer, dimension(:) :: nhx_nitrogen_flx ! nitrogen deposition fluxes (kgN/m2/s)
+     real(r8), pointer, dimension(:) :: noy_nitrogen_flx ! nitrogen deposition fluxes (kgN/m2/s)
   end type cam_out_t 
 
 !---------------------------------------------------------------------------
@@ -295,10 +297,11 @@ CONTAINS
 !
 !!USES:
 !
+    use cam_cpl_indices, only: index_a2x_Faxa_nhx, index_a2x_Faxa_noy
 !
 !!ARGUMENTS:
 !
-   type(cam_out_t), pointer :: cam_out(:)    ! Atmosphere to surface input
+    type(cam_out_t), pointer :: cam_out(:)    ! Atmosphere to surface input
 !
 !!LOCAL VARIABLES:
 !
@@ -352,6 +355,20 @@ CONTAINS
        cam_out(c)%dstwet3(:)  = 0._r8
        cam_out(c)%dstdry4(:)  = 0._r8
        cam_out(c)%dstwet4(:)  = 0._r8
+
+       nullify(cam_out(c)%nhx_nitrogen_flx)
+       nullify(cam_out(c)%noy_nitrogen_flx)
+
+       if (index_a2x_Faxa_nhx>0) then
+          allocate (cam_out(c)%nhx_nitrogen_flx(pcols), stat=ierror)
+          if ( ierror /= 0 ) call endrun('atm2hub_alloc error: allocation error nhx_nitrogen_flx')
+          cam_out(c)%nhx_nitrogen_flx(:) = 0._r8
+       endif
+       if (index_a2x_Faxa_noy>0) then
+          allocate (cam_out(c)%noy_nitrogen_flx(pcols), stat=ierror)
+          if ( ierror /= 0 ) call endrun('atm2hub_alloc error: allocation error noy_nitrogen_flx')
+          cam_out(c)%noy_nitrogen_flx(:) = 0._r8
+       endif
     end do
 
   end subroutine atm2hub_alloc

@@ -61,7 +61,6 @@ contains
     use physics_types,      only: physics_ptend_init
     use cam_abortutils,     only: endrun
     use cam_history,        only: outfld
-    use time_manager,       only: get_nstep
     use held_suarez,        only: held_suarez_1994
 
     !
@@ -78,7 +77,6 @@ contains
 
     integer                            :: lchnk            ! chunk identifier
     integer                            :: ncol             ! number of atmospheric columns
-    integer                            :: nstep            ! timestep number
 
     real(r8)                           :: clat(pcols)      ! latitudes(radians) for columns
     real(r8)                           :: pmid(pcols,pver) ! mid-point pressure
@@ -91,8 +89,6 @@ contains
     lchnk = state%lchnk
     ncol  = state%ncol
 
-    nstep   = get_nstep()
-
     call get_rlat_all_p(lchnk, ncol, clat)
     do k = 1, pver
       do i = 1, ncol
@@ -103,7 +99,7 @@ contains
     ! initialize individual parameterization tendencies
     call physics_ptend_init(ptend, state%psetcols, 'held_suarez', ls=.true., lu=.true., lv=.true.)
 
-    call held_suarez_1994(pcols, ncol, clat, pmid, &
+    call held_suarez_1994(pcols, ncol, clat, state%pmid, &
          state%u, state%v, state%t, ptend%u, ptend%v, ptend%s)
 
     ! Note, we assume that there are no subcolumns in simple physics

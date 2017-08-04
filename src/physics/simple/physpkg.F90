@@ -37,14 +37,15 @@ module physpkg
   ! Private module data
 
   !  Physics buffer indices
-  integer ::  teout_idx          = 0
-  integer ::  dtcore_idx         = 0
+  integer           :: teout_idx     = 0
+  integer           :: dtcore_idx    = 0
 
-  integer ::  qini_idx           = 0
-  integer ::  cldliqini_idx      = 0
-  integer ::  cldiceini_idx      = 0
+  integer           :: qini_idx      = 0
+  integer           :: cldliqini_idx = 0
+  integer           :: cldiceini_idx = 0
+  integer           :: prec_sed_idx  = 0
 
-  ! Physics package options
+ ! Physics package options
   character(len=16) :: convection_scheme
   logical           :: state_debug_checks  ! Debug physics_state.
 
@@ -64,11 +65,12 @@ contains
     use constituents,       only: cnst_add, cnst_chk_dim
     use physics_buffer,     only: pbuf_init_time, dtype_r8, pbuf_add_field
 
-    use cam_control_mod,    only: moist_physics
+    use cam_control_mod,    only: moist_physics, kessler_phys
     use cam_diagnostics,    only: diag_register
     use chemistry,          only: chem_register
     use tracers,            only: tracers_register
     use check_energy,       only: check_energy_register
+    use kessler_cam,        only: kessler_register
 
     !---------------------------Local variables-----------------------------
     !
@@ -92,10 +94,18 @@ contains
            longname='Specific humidity', readiv=.false., is_convtran1=.true.)
     end if
 
+    if (kessler_phys) then
+      call kessler_register()
+      call pbuf_add_field('PREC_SED', 'physpkg', dtype_r8, (/pcols/), prec_sed_idx)
+    end if
+
     ! Fields for physics package diagnostics
     call pbuf_add_field('QINI',      'physpkg', dtype_r8, (/pcols,pver/), qini_idx)
-    call pbuf_add_field('CLDLIQINI', 'physpkg', dtype_r8, (/pcols,pver/), cldliqini_idx)
-    call pbuf_add_field('CLDICEINI', 'physpkg', dtype_r8, (/pcols,pver/), cldiceini_idx)
+
+    if (moist_physics) then
+      call pbuf_add_field('CLDLIQINI', 'physpkg', dtype_r8, (/pcols,pver/), cldliqini_idx)
+      call pbuf_add_field('CLDICEINI', 'physpkg', dtype_r8, (/pcols,pver/), cldiceini_idx)
+    end if
 
     ! check energy package
     call check_energy_register
@@ -128,21 +138,20 @@ contains
     use cam_grid_support,    only: cam_grid_get_dim_names
 
     ! Dummy arguments
-    type(cam_out_t),           intent(inout) :: cam_out(begchunk:endchunk)
-    type(physics_buffer_desc), pointer       :: pbuf2d(:,:)
+    type(cam_out_t), intent(inout)     :: cam_out(begchunk:endchunk)
+    type(physics_buffer_desc), pointer :: pbuf2d(:,:)
 
     ! Local variables
-    character(len=11) :: subname='phys_inidat' ! subroutine name
-
-    character(len=8)  :: dim1name, dim2name
-    integer           :: grid_id  ! grid ID for data mapping
+    character(len=8)                   :: dim1name, dim2name
+    integer                            :: grid_id ! grid ID for data mapping
+    character(len=*), parameter        :: subname='phys_inidat'
 
     !   dynamics variables are handled in dyn_init - here we read variables
     !      needed for physics but not dynamics
 
     grid_id = cam_grid_id('physgrid')
     if (.not. cam_grid_check(grid_id)) then
-      call endrun(trim(subname)//': Internal error, no "physgrid" grid')
+      call endrun(subname//': Internal error, no "physgrid" grid')
     end if
     call cam_grid_get_dim_names(grid_id, dim1name, dim2name)
 
@@ -159,12 +168,14 @@ contains
     use physics_buffer,     only: physics_buffer_desc, pbuf_initialize, pbuf_get_index
     use physconst,          only: physconst_init
 
-    use cam_control_mod,    only: initial_run, ideal_phys
+    use cam_control_mod,    only: initial_run, ideal_phys, kessler_phys
     use check_energy,       only: check_energy_init
     use chemistry,          only: chem_init, chem_is_active
     use cam_diagnostics,    only: diag_init
     use held_suarez_cam,    only: held_suarez_init
+    use kessler_cam,        only: kessler_init
     use tracers,            only: tracers_init
+    use wv_saturation,      only: wv_sat_init
     use phys_debug_util,    only: phys_debug_init
 
     ! Input/output arguments
@@ -203,6 +214,12 @@ contains
     teout_idx  = pbuf_get_index('TEOUT')
     dtcore_idx = pbuf_get_index('DTCORE')
 
+    ! wv_saturation is relatively independent of everything else and
+    ! low level, so init it early. Must at least do this before radiation.
+    if (kessler_phys) then
+      call wv_sat_init()
+    end if
+
     call tracers_init()
 
     if (initial_run) then
@@ -211,6 +228,8 @@ contains
 
     if (ideal_phys) then
       call held_suarez_init(pbuf2d)
+    else if (kessler_phys) then
+      call kessler_init(pbuf2d)
     end if
 
     if (chem_is_active()) then
@@ -463,10 +482,16 @@ contains
     if (state_debug_checks) then
       call physics_state_check(state, name="before tphysac")
     end if
-
     call pbuf_get_field(pbuf, qini_idx, qini)
-    call pbuf_get_field(pbuf, cldliqini_idx, cldliqini)
-    call pbuf_get_field(pbuf, cldiceini_idx, cldiceini)
+    if (moist_physics) then
+      call pbuf_get_field(pbuf, cldliqini_idx, cldliqini)
+      call pbuf_get_field(pbuf, cldiceini_idx, cldiceini)
+    else
+      allocate(cldliqini(pcols, pver))
+      cldliqini = 0.0_r8
+      allocate(cldiceini(pcols, pver))
+      cldiceini = 0.0_r8
+    end if
 
     ! FV & SE: convert dry-type mixing ratios to moist here because
     !   physics_dme_adjust assumes moist. This is done in p_d_coupling for
@@ -477,11 +502,19 @@ contains
 
     if (moist_physics) then
       ! Scale dry mass and energy (does nothing if dycore is EUL or SLD)
-      call cnst_get_ind('CLDLIQ', ixcldliq)
-      call cnst_get_ind('CLDICE', ixcldice)
+      call cnst_get_ind('CLDLIQ', ixcldliq, abort=.false.)
+      call cnst_get_ind('CLDICE', ixcldice, abort=.false.)
       tmp_q     (:ncol,:pver) = state%q(:ncol,:pver,1)
-      tmp_cldliq(:ncol,:pver) = state%q(:ncol,:pver,ixcldliq)
-      tmp_cldice(:ncol,:pver) = state%q(:ncol,:pver,ixcldice)
+      if (ixcldliq > 0) then
+        tmp_cldliq(:ncol,:pver) = state%q(:ncol,:pver,ixcldliq)
+      else
+        tmp_cldliq(:ncol,:pver) = 0.0_r8
+      end if
+      if (ixcldice > 0) then
+        tmp_cldice(:ncol,:pver) = state%q(:ncol,:pver,ixcldice)
+      else
+        tmp_cldice(:ncol,:pver) = 0.0_r8
+      end if
       call physics_dme_adjust(state, tend, qini, ztodt)
     else
       tmp_q     (:ncol,:pver) = 0.0_r8
@@ -498,6 +531,11 @@ contains
 
     call diag_phys_tend_writeout (state, pbuf,  tend, ztodt,                  &
          tmp_q, tmp_cldliq, tmp_cldice, qini, cldliqini, cldiceini)
+
+    if (.not. moist_physics) then
+      deallocate(cldliqini)
+      deallocate(cldiceini)
+    end if
 
    end subroutine tphysac
 
@@ -533,7 +571,8 @@ contains
     use physics_buffer,    only: pbuf_get_index, pbuf_old_tim_idx
     use physics_buffer,    only: dyn_time_lvls
     use physics_types,     only: physics_state_check, physics_tend_init
-    use cam_control_mod,   only: moist_physics, ideal_phys, adiabatic
+    use cam_control_mod,   only: moist_physics, adiabatic, ideal_phys, kessler_phys
+    use constituents,      only: cnst_get_ind
 
     use cam_diagnostics,   only: diag_phys_writeout, diag_state_b4_phys_write
     use cam_diagnostics,   only: diag_conv_tend_ini, diag_conv, diag_export
@@ -543,11 +582,12 @@ contains
     use check_energy,      only: check_tracers_data, check_tracers_init, check_tracers_chng
     use chemistry,         only: chem_is_active, chem_timestep_tend
     use held_suarez_cam,   only: held_suarez_tend
+    use kessler_cam,       only: kessler_tend
     use dycore,            only: dycore_is
 
     ! Arguments
 
-    real(r8),                  intent(in)    :: ztodt ! 2 delta t (model time increment)
+    real(r8),                  intent(in)    :: ztodt ! model time increment
 
     type(physics_state),       intent(inout) :: state
     type(physics_tend ),       intent(inout) :: tend
@@ -566,12 +606,18 @@ contains
     integer                  :: lchnk       ! chunk identifier
     integer                  :: ncol        ! number of atmospheric columns
     integer                  :: itim_old
+    integer                  :: ixcldliq
+    integer                  :: ixcldice
 
     ! physics buffer fields for total energy and mass adjustment
     real(r8), pointer        :: teout(:)
+    real(r8), pointer        :: qini(:,:)
+    real(r8), pointer        :: cldliqini(:,:)
+    real(r8), pointer        :: cldiceini(:,:)
     real(r8), pointer        :: dtcore(:,:)
+    real(r8), pointer        :: prec_sed(:) ! total precip from cloud sedimentation
 
-    ! energy checking variables
+                                            ! energy checking variables
     real(r8)                 :: zero(pcols) ! array of zeros
     real(r8)                 :: flx_heat(pcols)
     type(check_tracers_data) :: tracerint   ! energy integrals and cummulative boundary fluxes
@@ -592,6 +638,16 @@ contains
     ! Associate pointers with physics buffer fields
     call pbuf_get_field(pbuf, teout_idx, teout, (/1,itim_old/), (/pcols,1/))
     call pbuf_get_field(pbuf, dtcore_idx, dtcore, start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
+
+    call pbuf_get_field(pbuf, qini_idx, qini)
+    if (moist_physics) then
+      call pbuf_get_field(pbuf, cldliqini_idx, cldliqini)
+      call pbuf_get_field(pbuf, cldiceini_idx, cldiceini)
+    end if
+
+    if (kessler_phys) then
+      call pbuf_get_field(pbuf, prec_sed_idx, prec_sed)
+    end if
 
     ! Set physics tendencies to 0
     if (moist_physics) then
@@ -617,14 +673,6 @@ contains
 
     call t_stopf('bc_init')
 
-    call t_startf('bc_history_write')
-    if (moist_physics) then
-      call diag_phys_writeout(state, cam_out%psl)
-    else
-      call diag_phys_writeout(state)
-    end if
-    call t_stopf('bc_history_write')
-
     !===================================================
     ! Global mean total energy fixer
     !===================================================
@@ -639,6 +687,18 @@ contains
     end if
     ! Save state for convective tendency calculations.
     call diag_conv_tend_ini(state, pbuf)
+
+    call cnst_get_ind('CLDLIQ', ixcldliq, abort=.false.)
+    call cnst_get_ind('CLDICE', ixcldice, abort=.false.)
+    qini     (:ncol,:pver) = state%q(:ncol,:pver,       1)
+    if (moist_physics) then
+      if (ixcldliq > 0) then
+        cldliqini(:ncol,:pver) = state%q(:ncol,:pver,ixcldliq)
+      end if
+      if (ixcldice > 0) then
+        cldiceini(:ncol,:pver) = state%q(:ncol,:pver,ixcldice)
+      end if
+    end if
 
     call outfld('TEOUT', teout       , pcols, lchnk   )
     call outfld('TEINP', state%te_ini, pcols, lchnk   )
@@ -657,6 +717,10 @@ contains
     !===================================================
     if (ideal_phys) then
       call held_suarez_tend(state, ptend, ztodt)
+      ! update the state and total physics tendency
+      call physics_update(state, ptend, ztodt, tend)
+    else if (kessler_phys) then
+      call kessler_tend(state, ptend, ztodt, cam_out, prec_sed)
       ! update the state and total physics tendency
       call physics_update(state, ptend, ztodt, tend)
     end if
@@ -678,6 +742,15 @@ contains
       call t_stopf('simple_chem')
       call physics_ptend_dealloc(ptend)
     end if
+
+    call t_startf('bc_history_write')
+    if (moist_physics) then
+      call diag_phys_writeout(state, cam_out%psl)
+      call diag_conv(state, ztodt, pbuf)
+    else
+      call diag_phys_writeout(state)
+    end if
+    call t_stopf('bc_history_write')
 
     ! Save total enery after physics for energy conservation checks
     teout = state%te_cur

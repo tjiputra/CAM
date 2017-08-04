@@ -5,7 +5,7 @@
 <start_ymd>00010101</start_ymd>
 
 <ncdata dyn="fv" hgrid="0.9x1.25">atm/cam/inic/fv/b.e15.B1850G.f09_g16.pi_control.25.cam.i.0041-01-01-00000_chem_c160602.nc</ncdata>
-<ncdata dyn="fv" hgrid="1.9x2.5">'/glade/p/acd/tilmes/inputdata/init/cam5/fgeos5.cesm1_5_alpha02d_mam4vbs.FSTRATVBSL45.19.19.chemV2.vbs.cam.i.2006.32L.nc'</ncdata>
+<ncdata dyn="fv" hgrid="1.9x2.5" >atm/cam/inic/fv/fgeos5.cesm1_5_alpha02d_mam4vbs.FSTRATVBSL45.19.19.chemV2.vbs.cam.i.2006.32L_c160314.nc</ncdata>
 
 <solar_data_file>atm/cam/solar/SOLAR_SPECTRAL_Lean_1610-2008_annual_c090324.nc</solar_data_file>
 <solar_data_type>'FIXED'</solar_data_type>

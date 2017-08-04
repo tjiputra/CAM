@@ -202,11 +202,15 @@ module cam_grid_support
     integer                      :: global_size = 0      ! var patch dim size
     integer                      :: global_lat_size = 0  ! lat patch dim size
     integer                      :: global_lon_size = 0  ! lon patch dim size
+    integer                      :: num_points = 0       ! task-local size
     real(r8)                     :: lon_range(2)
     real(r8)                     :: lat_range(2)
+    logical                      :: collected_columns    ! Output unstructured
     type(cam_filemap_t), pointer :: mask       => null() ! map for active pts
-    integer(iMap),       pointer :: latmap(:) => null() ! map for patch coords
-    integer(iMap),       pointer :: lonmap(:) => null() ! map for patch coords
+    integer(iMap),       pointer :: latmap(:)  => null() ! map for patch coords
+    integer(iMap),       pointer :: lonmap(:)  => null() ! map for patch coords
+    real(r8),            pointer :: lonvals(:) => null() ! For collected output
+    real(r8),            pointer :: latvals(:) => null() ! For collected output
   contains
     procedure :: gridid              => cam_grid_patch_get_id
     procedure :: get_axis_names      => cam_grid_patch_get_axis_names
@@ -1642,7 +1646,7 @@ contains
   end function cam_grid_is_zonal
 
   ! Compute or update a grid patch mask
-  subroutine cam_grid_compute_patch(id, patch, lonl, lonu, latl, latu)
+  subroutine cam_grid_compute_patch(id, patch, lonl, lonu, latl, latu, cco)
 
     ! Dummy arguments
     integer,                         intent(in)    :: id
@@ -1651,13 +1655,14 @@ contains
     real(r8),                        intent(in)    :: lonu
     real(r8),                        intent(in)    :: latl
     real(r8),                        intent(in)    :: latu
+    logical,                         intent(in)    :: cco ! Collect columns?
 
     ! Local variables
     integer                                        :: gridid
 
     gridid = get_cam_grid_index(id)
     if (gridid > 0) then
-      call cam_grids(gridid)%get_patch_mask(lonl, lonu, latl, latu, patch)
+      call cam_grids(gridid)%get_patch_mask(lonl, lonu, latl, latu, patch, cco)
     else
       call endrun('cam_grid_compute_patch: Bad grid ID')
     end if
@@ -1821,7 +1826,8 @@ contains
     class(cam_grid_attribute_t), pointer             :: attr
 
     ! Push a new attribute onto the grid
-    type(cam_grid_attr_ptr_t),  pointer              :: attrPtr => NULL()
+    type(cam_grid_attr_ptr_t),  pointer              :: attrPtr
+
     allocate(attrPtr)
     call attrPtr%initialize(attr)
     call attrPtr%setNext(cam_grids(gridind)%attributes)
@@ -1913,12 +1919,14 @@ contains
     integer(iMap),         intent(in), target, optional :: map(:)
 
     ! Local variables
-    type(cam_grid_attribute_1d_int_t), pointer          :: attr   => NULL()
-    class(cam_grid_attribute_t),       pointer          :: attptr => NULL()
+    type(cam_grid_attribute_1d_int_t), pointer          :: attr
+    class(cam_grid_attribute_t),       pointer          :: attptr
     character(len=120)                                  :: errormsg
     integer                                             :: gridind
     integer                                             :: dimsize
 
+    nullify(attr)
+    nullify(attptr)
     gridind = get_cam_grid_index(trim(gridname))
     if (gridind > 0) then
       call find_cam_grid_attr(gridind, trim(name), attptr)
@@ -2401,8 +2409,9 @@ contains
     ! Local variables
     character(len=120)               :: errormsg
     integer                          :: ierr
-    type(io_desc_t), pointer         :: iodesc => NULL()
+    type(io_desc_t), pointer         :: iodesc
 
+    nullify(iodesc)
     ! Since more than one grid can share an attribute, assume that if the
     ! vardesc is not associated, another grid write the values
     if (associated(attr%vardesc)) then
@@ -2438,8 +2447,9 @@ contains
     ! Local variables
     character(len=120)               :: errormsg
     integer                          :: ierr
-    type(io_desc_t), pointer         :: iodesc => NULL()
+    type(io_desc_t), pointer         :: iodesc
 
+    nullify(iodesc)
     ! Since more than one grid can share an attribute, assume that if the
     ! vardesc is not associated, another grid write the values
     if (associated(attr%vardesc)) then
@@ -3289,9 +3299,10 @@ contains
     type(var_desc_t),          intent(inout) :: varid
 
     ! Local variables
-    type(io_desc_t), pointer                 :: iodesc => NULL()
+    type(io_desc_t), pointer                 :: iodesc
     integer                                  :: ierr
 
+    nullify(iodesc)
     call cam_pio_get_decomp(iodesc, adims, fdims, PIO_REAL, this%map)
     call pio_write_darray(File, varid, iodesc, hbuf, ierr)
     call cam_pio_handle_error(ierr, 'cam_grid_write_darray_3d_real: Error writing variable')
@@ -3303,20 +3314,20 @@ contains
   !       within the input patch.
   !
   !---------------------------------------------------------------------------
-  subroutine cam_grid_get_patch_mask(this, lonl, lonu, latl, latu, patch)
-    use spmd_utils,      only: mpi_min, mpi_real8, mpicom
+  subroutine cam_grid_get_patch_mask(this, lonl, lonu, latl, latu, patch, cco)
+    use spmd_utils,      only: mpi_min, mpi_max, mpi_real8, mpicom
     use physconst,       only: pi
 
     ! Dummy arguments
-    class(cam_grid_t)                        :: this
-    real(r8),                  intent(in)    :: lonl, lonu ! Longitude bounds
-    real(r8),                  intent(in)    :: latl, latu ! Latitude bounds
-    type(cam_grid_patch_t),    intent(inout) :: patch
+    class(cam_grid_t)                     :: this
+    real(r8),               intent(in)    :: lonl, lonu ! Longitude bounds
+    real(r8),               intent(in)    :: latl, latu ! Latitude bounds
+    type(cam_grid_patch_t), intent(inout) :: patch
+    logical,                intent(in)    :: cco        ! Collect columns?
 
     ! Local arguments
-    real(r8)                         :: mindist
-    real(r8)                         :: minlondist
-    real(r8)                         :: dist    ! Test distance
+    real(r8)                         :: mindist, minlondist
+    real(r8)                         :: dist, temp1, temp2  ! Test distance calc
     real(r8)                         :: londeg, latdeg
     real(r8)                         :: lon,    lat
     real(r8)                         :: londeg_min, latdeg_min
@@ -3325,55 +3336,74 @@ contains
     integer                          :: mapind  ! Grid map index
     integer                          :: latind, lonind
     integer                          :: ierr    ! For MPI calls
+    integer                          :: dims(2) ! Global dim sizes
     integer                          :: gridloc ! local size of grid
     logical                          :: unstructured ! grid type
     logical                          :: findClosest  ! .false. == patch output
     logical                          :: isMapped     ! .true. iff point in map
-    logical                          :: closer       ! Test for new closest pt
 
-    real(r8), parameter              :: maxangle = pi / 4.0_r8
-    real(r8), parameter              :: deg2rad = pi / 180.0_r8
-    real(r8), parameter              :: maxlat = 89.5_r8
+    real(r8),         parameter      :: maxangle = pi / 4.0_r8
+    real(r8),         parameter      :: deg2rad = pi / 180.0_r8
+    real(r8),         parameter      :: maxtol = 0.99999_r8 ! max cos value
+    real(r8),         parameter      :: maxlat = pi * maxtol / 2.0_r8
+    character(len=*), parameter      :: subname = 'cam_grid_get_patch_mask'
 
     if (.not. associated(this%map)) then
       call endrun('cam_grid_get_patch_mask: Grid, '//trim(this%name)//', has no map')
     end if
     gridloc = this%map%num_elem()
+    unstructured = this%is_unstructured()
+    call this%coord_lengths(dims)
     if (associated(patch%mask)) then
       if (patch%mask%num_elem() /= gridloc) then
         ! The mask needs to be the same size as the map
-        call endrun('cam_grid_get_patch_mask: mask is incorrect size')
+        call endrun(subname//': mask is incorrect size')
         ! No else, just needed a check
         ! In particular, we are not zeroing the mask since multiple calls with
         ! the same mask can be used for collected-column output
         ! NB: Compacting the mask must be done after all calls (for a
         !     particular mask) to this function.
       end if
+      if (patch%collected_columns .neqv. cco) then
+        call endrun(subname//': collected_column mismatch')
+      end if
     else
       if (associated(patch%latmap)) then
-        call endrun('cam_grid_get_patch_mask: unallocated patch has latmap')
+        call endrun(subname//': unallocated patch has latmap')
       end if
       if (associated(patch%lonmap)) then
-        call endrun('cam_grid_get_patch_mask: unallocated patch has lonmap')
+        call endrun(subname//': unallocated patch has lonmap')
       end if
-      call patch%set_patch(lonl, lonu, latl, latu, this%id, this%map)
+      call patch%set_patch(lonl, lonu, latl, latu, cco, this%id, this%map)
       if (patch%mask%num_elem() /= gridloc) then
         ! Basic check to make sure the copy worked
-        call endrun('cam_grid_get_patch_mask: grid map is invalid')
+        call endrun(subname//': grid map is invalid')
       end if
       call patch%mask%clear()
       ! Set up the lat/lon maps
-      if (associated(this%lat_coord%values)) then
-        allocate(patch%latmap(LBOUND(this%lat_coord%values, 1):UBOUND(this%lat_coord%values, 1)))
+      if (cco) then
+        ! For collected column output, we need to collect coordinates and values
+        allocate(patch%latmap(patch%mask%num_elem()))
         patch%latmap = 0
-      else
-        nullify(patch%latmap)
-      end if
-      if (associated(this%lon_coord%values)) then
-        allocate(patch%lonmap(LBOUND(this%lon_coord%values, 1):UBOUND(this%lon_coord%values, 1)))
+        allocate(patch%latvals(patch%mask%num_elem()))
+        patch%latvals = 91.0_r8
+        allocate(patch%lonmap(patch%mask%num_elem()))
         patch%lonmap = 0
+        allocate(patch%lonvals(patch%mask%num_elem()))
+        patch%lonvals = 361.0_r8
       else
-        nullify(patch%lonmap)
+        if (associated(this%lat_coord%values)) then
+          allocate(patch%latmap(LBOUND(this%lat_coord%values, 1):UBOUND(this%lat_coord%values, 1)))
+          patch%latmap = 0
+        else
+          nullify(patch%latmap)
+        end if
+        if (associated(this%lon_coord%values)) then
+          allocate(patch%lonmap(LBOUND(this%lon_coord%values, 1):UBOUND(this%lon_coord%values, 1)))
+          patch%lonmap = 0
+        else
+          nullify(patch%lonmap)
+        end if
       end if
     end if
 
@@ -3381,7 +3411,6 @@ contains
     ! We have four cases, structured vs. unstructured grid *
     !   patch area vs. closest column
     ! Note that a 1-d patch 'area' is not allowed for unstructured grids
-    unstructured = this%is_unstructured()
     findClosest = .false.
     ! Make sure our search items are in order
     lonmin = min(lonl, lonu)
@@ -3392,7 +3421,7 @@ contains
       if (latl == latu) then
         findClosest = .true.
       else if (unstructured) then
-        call endrun('cam_grid_get_patch_mask: 1-D patch (lon) not allowed for unstructured grids')
+        call endrun(subname//': 1-D patch (lon) not allowed for unstructured grids')
       else
         ! Find closest lon line to lonu
         ! This is a lat lon grid so it should have coordinate axes
@@ -3420,7 +3449,7 @@ contains
       end if
     else if (latl == latu) then
       if (unstructured) then
-        call endrun('cam_grid_get_patch_mask: 1-D patch (lat) not allowed for unstructured grids')
+        call endrun(subname//': 1-D patch (lat) not allowed for unstructured grids')
       else
         ! Find closest lat line to latu
         ! This is a lat lon grid so it should have coordinate axes
@@ -3455,17 +3484,16 @@ contains
     latmax = latmax * deg2rad
     ! Loop through all the local grid elements and find the closest match
     ! (or all matches depending on the value of findClosest)
-    mapind = 1
     minind = -1
     londeg_min = 361.0_r8
     latdeg_min = 91.0_r8
-    mindist = maxangle * 2.0_r8
-    minlondist = 361.0_r8
+    mindist = 2.0_r8 * pi
+
     do mapind = 1, patch%mask%num_elem()
       call this%get_lon_lat(mapind, londeg, latdeg, isMapped)
-      lon = londeg * deg2rad
-      lat = latdeg * deg2rad
       if (isMapped) then
+        lon = londeg * deg2rad
+        lat = latdeg * deg2rad
         if (findClosest) then
           ! Use the Spherical Law of Cosines to find the great-circle distance.
           ! Might as well use the unit sphere since we just want differences
@@ -3473,85 +3501,153 @@ contains
                (abs(lon - lonmin) <= maxangle)) then
             ! maxangle could be pi but why waste all those trig functions?
             ! XXgoldyXX: What should we use for maxangle given coarse Eul grids?
-            dist = acos((sin(latmin) * sin(lat)) +                            &
-                 (cos(latmin) * cos(lat) * cos(lon - lonmin)))
-            closer = dist < mindist
-            if (abs(latdeg) > maxlat) then
-              closer = closer .and. ((lon - lonmin) < minlondist)
+            if ((lat == latmin) .and. (lon == lonmin)) then
+              dist = 0.0_r8
+            else
+              temp1 = (sin(latmin) * sin(lat)) +                              &
+                   (cos(latmin) * cos(lat) * cos(lon - lonmin))
+              if (temp1 > maxtol) then
+                ! Use haversine formula
+                temp1 = sin(latmin - lat)
+                temp2 = sin((lonmin - lon) / 2.0_r8)
+                dist = 2.0_r8 * asin((temp1*temp1) + (cos(latmin)*cos(lat)*temp2*temp2))
+              else
+                dist = acos(temp1)
+              end if
             end if
-            if (closer) then
+            if ( (dist < mindist) .or.                                        &
+                 ((dist == mindist) .and.                                     &
+                  (abs(lon - lonmin) < abs(londeg_min*deg2rad - lonmin)))) then
               minind = mapind
               mindist = dist
               londeg_min = londeg
               latdeg_min = latdeg
-              minlondist = (londeg_min * deg2rad) - lonmin
             end if
           end if
         else
           if ( (latmin <= lat) .and. (lat <= latmax) .and.                    &
                (lonmin <= lon) .and. (lon <= lonmax)) then
             if (patch%mask%num_elem() >= mapind) then
-              call patch%mask%copy_elem(this%map, mapind)
-              if (this%block_indexed) then
-                 call this%map%coord_dests(mapind, lonind, latind)
-                 if (latind == 0) then
-                   latind = lonind
-                 end if
-                 if (associated(patch%latmap)) then
-                   patch%latmap(mapind) = latind
-                 end if
-                 if (associated(patch%lonmap)) then
-                   patch%lonmap(mapind) = lonind
-                 end if
-              else
-                 call this%map%coord_vals(mapind, lonind, latind)
-                 if (associated(patch%latmap)) then
-                   patch%latmap(latind) = latind
-                 end if
-                 if (associated(patch%lonmap)) then
-                   patch%lonmap(lonind) = lonind
-                 end if
-             end if
+              if (.not. patch%mask%is_mapped(mapind)) then
+                call patch%mask%copy_elem(this%map, mapind)
+                patch%num_points = patch%num_points + 1
+                if (cco) then
+                  if (patch%num_points > size(patch%latvals, 1)) then
+                    call endrun(subname//': Number of cols larger than mask!?')
+                  end if
+                  call this%map%coord_dests(mapind, lonind, latind)
+                  if (latind > 0) then
+                    ! Grid is structured, get unique index
+                    lonind = lonind + (latind * dims(1))
+                  end if
+                  patch%latmap(patch%num_points) = lonind
+                  patch%latvals(patch%num_points) = latdeg
+                  patch%lonmap(patch%num_points) = lonind
+                  patch%lonvals(patch%num_points) = londeg
+                else if ((this%block_indexed) .or. unstructured) then
+                  call this%map%coord_dests(mapind, lonind, latind)
+                  if (latind == 0) then
+                    latind = lonind
+                  end if
+                  if (associated(patch%latmap)) then
+                    patch%latmap(mapind) = latind
+                  end if
+                  if (associated(patch%lonmap)) then
+                    patch%lonmap(mapind) = lonind
+                  end if
+                else
+                  call this%map%coord_vals(mapind, lonind, latind)
+                  if (associated(patch%latmap)) then
+                    patch%latmap(latind) = latind
+                  end if
+                  if (associated(patch%lonmap)) then
+                    patch%lonmap(lonind) = lonind
+                  end if
+                end if
+              ! else do nothing, we already found this point
+              end if
             else
-              call endrun('cam_grid_get_patch_mask: PE has patch points but mask too small')
+              call endrun(subname//': PE has patch points but mask too small')
             end if
           end if
-        end if
-      end if
+        end if ! findClosest
+      end if ! isMapped
     end do
     if (findClosest) then
       ! We need to find the minimum mindist and use only that value
       dist = mindist
       call MPI_allreduce(dist, mindist, 1, mpi_real8, mpi_min, mpicom, ierr)
-      lon = minlondist
-      call MPI_allreduce(lon, minlondist, 1, mpi_real8, mpi_min, mpicom, ierr)
-      ! Now, only task(s) which has real minimum distance should set their mask
+      ! Special case for pole points
+      if (latdeg_min > 90.0_r8) then
+        temp1 = 0.0_r8
+      else
+        temp1 = abs(latdeg_min*deg2rad)
+      end if
+      call MPI_allreduce(temp1, lat, 1, mpi_real8, mpi_max, mpicom, ierr)
+      if ((abs(latmin) > maxlat) .or. (lat > maxlat)) then
+        if (dist == mindist) then
+          ! Only distance winners can compete
+          lon = abs(londeg_min - lonl)
+        else
+          lon = 361.0_r8
+        end if
+        call MPI_allreduce(lon, minlondist, 1, mpi_real8, mpi_min, mpicom, ierr)
+        ! Kill the losers
+        if (lon /= minlondist) then
+          dist = dist + 1.0_r8
+        end if
+      end if
+      ! Now, only task(s) which have real minimum distance should set their mask
       ! minind test allows for no match
-      if ( (dist == mindist) .and.                                            &
-           ((abs(latdeg_min) <= maxlat) .or. (lon == minlondist))) then
+      if (dist == mindist) then
         if (minind < 0) then
           call endrun("cam_grid_get_patch_mask: No closest point found!!")
         else
           if (patch%mask%num_elem() >= minind) then
-            call patch%mask%copy_elem(this%map, minind)
-            if (this%block_indexed) then
-              call this%map%coord_dests(minind, lonind, latind)
-              if (latind == 0) then
-                latind = lonind
+            if (.not. patch%mask%is_mapped(minind)) then
+              call patch%mask%copy_elem(this%map, minind)
+              patch%num_points = patch%num_points + 1
+              if (cco) then
+                if (patch%num_points > size(patch%latvals, 1)) then
+                  call endrun(subname//': Number of columns larger than mask!?')
+                end if
+                call this%map%coord_dests(minind, lonind, latind)
+                if (latind > 0) then
+                  ! Grid is structured, get unique index
+                  lonind = lonind + (latind * dims(1))
+                end if
+                patch%latmap(patch%num_points) = lonind
+                patch%latvals(patch%num_points) = latdeg_min
+                patch%lonmap(patch%num_points) = lonind
+                patch%lonvals(patch%num_points) = londeg_min
+              else if ((this%block_indexed) .or. unstructured) then
+                call this%map%coord_dests(minind, lonind, latind)
+                if (latind == 0) then
+                  latind = lonind
+                end if
+                if (associated(patch%latmap)) then
+                  patch%latmap(minind) = latind
+                end if
+                if (associated(patch%lonmap)) then
+                  patch%lonmap(minind) = lonind
+                end if
+              else
+                call this%map%coord_vals(minind, lonind, latind)
+                if (associated(patch%latmap)) then
+                  patch%latmap(latind) = latind
+                end if
+                if (associated(patch%lonmap)) then
+                  patch%lonmap(lonind) = lonind
+                end if
               end if
-              patch%latmap(minind) = latind
-              patch%lonmap(minind) = lonind
-            else
-              call this%map%coord_vals(minind, lonind, latind)
-              patch%latmap(latind) = latind
-              patch%lonmap(lonind) = lonind
+              ! else do nothing, we already found this point
             end if
           else
-            call endrun('cam_grid_get_patch_mask: PE has patch closest point but mask too small')
+            call endrun(subname//': PE has patch closest point but mask too small')
           end if
         end if
       end if
-    end if
+    end if ! findClosest
 
   end subroutine cam_grid_get_patch_mask
 
@@ -3617,11 +3713,6 @@ contains
       ! Get coordinate and dim names
       call cam_grids(index)%lat_coord%get_coord_name(lat_name)
       call cam_grids(index)%lon_coord%get_coord_name(lon_name)
-      if (unstruct) then
-        call cam_grids(index)%lon_coord%get_dim_name(col_name)
-      else
-        col_name = ''
-      end if
       grid_name = cam_grids(index)%name
       if (col_output .or. unstruct) then
         ! In this case, we are using collect_column_output on a lat/lon grid
@@ -3697,20 +3788,22 @@ contains
 
   end subroutine cam_grid_patch_get_coord_units
 
-  subroutine cam_grid_patch_set_patch(this, lonl, lonu, latl, latu, id, map)
+  subroutine cam_grid_patch_set_patch(this, lonl, lonu, latl, latu, cco, id, map)
 
     ! Dummy arguments
-    class(cam_grid_patch_t)                  :: this
-    real(r8),                  intent(in)    :: lonl, lonu ! Longitude bounds
-    real(r8),                  intent(in)    :: latl, latu ! Latitude bounds
-    integer,                   intent(in)    :: id
-    type(cam_filemap_t),       intent(in)    :: map
+    class(cam_grid_patch_t)            :: this
+    real(r8),               intent(in) :: lonl, lonu ! Longitude bounds
+    real(r8),               intent(in) :: latl, latu ! Latitude bounds
+    logical,                intent(in) :: cco        ! Collect columns?
+    integer,                intent(in) :: id
+    type(cam_filemap_t),    intent(in) :: map
 
-    this%grid_id      = id
-    this%lon_range(1) = lonl
-    this%lon_range(2) = lonu
-    this%lat_range(1) = latl
-    this%lat_range(2) = latu
+    this%grid_id           = id
+    this%lon_range(1)      = lonl
+    this%lon_range(2)      = lonu
+    this%lat_range(1)      = latl
+    this%lat_range(2)      = latu
+    this%collected_columns = cco
     if (.not. associated(this%mask)) then
       allocate(this%mask)
     end if
@@ -3747,19 +3840,22 @@ contains
 
     ! Local variables
     integer                               :: index ! Our grid's index
-    logical                               :: unstructured
+    logical                               :: dups_ok
 
     index = this%grid_index()
     if (index > 0) then
-      unstructured = cam_grids(index)%is_unstructured()
+      dups_ok = cam_grids(index)%is_unstructured()
     else
       ! This is probably an error condition but someone else will catch it first
-      unstructured = .false.
+      dups_ok = .false.
+    end if
+    if (present(collected_output)) then
+      dups_ok = dups_ok .or. collected_output
     end if
     call this%mask%compact(this%lonmap, this%latmap,                          &
          num_lons=this%global_lon_size, num_lats=this%global_lat_size,        &
          num_mapped=this%global_size, columnize=collected_output,             &
-         dups_ok_in=unstructured)
+         dups_ok_in=dups_ok)
 
   end subroutine cam_grid_patch_compact
 
@@ -3793,14 +3889,18 @@ contains
 
     ! Local variables
     type(io_desc_t)                             :: iodesc
-    type(var_desc_t), pointer                   :: vdesc      => NULL()
-    real(r8),         pointer                   :: coord_p(:) => NULL()
-    real(r8),         pointer                   :: coord(:)   => NULL()
-    integer(iMap),    pointer                   :: map(:)     => null()
+    type(var_desc_t), pointer                   :: vdesc
+    real(r8),         pointer                   :: coord_p(:)
+    real(r8),         pointer                   :: coord(:)
+    integer(iMap),    pointer                   :: map(:)
     integer                                     :: field_lens(1)
     integer                                     :: file_lens(1)
     integer                                     :: ierr
 
+    nullify(vdesc)
+    nullify(coord_p)
+    nullify(coord)
+    nullify(map)
     if (this%grid_id /= header_info%get_gridid()) then
       call endrun('CAM_GRID_PATCH_WRITE_VALS: Grid id mismatch')
     end if
@@ -3815,11 +3915,15 @@ contains
     file_lens(1) = this%global_lon_size
     !! XXgoldyXX: Think about caching these decomps
     call pio_initdecomp(pio_subsystem, pio_double, file_lens, map, iodesc)
-    coord_p => cam_grid_get_lonvals(this%grid_id)
-    if (associated(coord_p)) then
-      coord => coord_p
+    if (associated(this%lonvals)) then
+      coord => this%lonvals
     else
-      allocate(coord(0))
+      coord_p => cam_grid_get_lonvals(this%grid_id)
+      if (associated(coord_p)) then
+        coord => coord_p
+      else
+        allocate(coord(0))
+      end if
     end if
     vdesc => header_info%get_lon_varid()
     call pio_write_darray(File, vdesc, iodesc, coord, ierr)
@@ -3828,7 +3932,7 @@ contains
       deallocate(map)
       nullify(map)
     end if
-    if (.not. associated(coord_p)) then
+    if (.not. (associated(coord_p) .or. associated(this%lonvals))) then
       deallocate(coord)
       nullify(coord)
     end if
@@ -3844,11 +3948,15 @@ contains
     !! XXgoldyXX: Think about caching these decomps
     call pio_initdecomp(pio_subsystem, pio_double, file_lens, map, iodesc)
 
-    coord_p => cam_grid_get_latvals(this%grid_id)
-    if (associated(coord_p)) then
-      coord => coord_p
+    if (associated(this%latvals)) then
+      coord => this%latvals
     else
-      allocate(coord(0))
+      coord_p => cam_grid_get_latvals(this%grid_id)
+      if (associated(coord_p)) then
+        coord => coord_p
+      else
+        allocate(coord(0))
+      end if
     end if
     vdesc => header_info%get_lat_varid()
     call pio_write_darray(File, vdesc, iodesc, coord, ierr)
@@ -3857,7 +3965,7 @@ contains
       deallocate(map)
       nullify(map)
     end if
-    if (.not. associated(coord_p)) then
+    if (.not. (associated(coord_p) .or. associated(this%latvals))) then
       deallocate(coord)
       nullify(coord)
     end if

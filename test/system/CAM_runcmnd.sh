@@ -64,6 +64,54 @@ case $hostname in
 	fi
     fi ;;
 
+    ##cheyenne
+    ch* | r* )
+    ##search config options file for parallelization info; default on aix is hybrid
+    if grep -ic NOSPMD ${CAM_SCRIPTDIR}/config_files/$1 > /dev/null; then
+	if grep -ic NOSMP ${CAM_SCRIPTDIR}/config_files/$1 > /dev/null; then
+            ##serial
+	    cmnd=""                                   
+	else
+            ##open-mp only
+#	    cmnd="env OMP_NUM_THREADS=${CAM_THREADS} "
+	    cmnd="env LSB_PJL_TASK_GEOMETRY="\{\(0\)\}" OMP_NUM_THREADS=${CAM_THREADS} "
+	fi
+    else
+	if grep -ic NOSMP ${CAM_SCRIPTDIR}/config_files/$1 > /dev/null; then
+            ##mpi only
+            CAM_TASKS=$(( $CAM_TASKS * $CAM_THREADS / ( $min_cpus_per_task * $2 ) ))
+	fi
+
+	num_nodes=`echo $LSB_MCPU_HOSTS | wc -w`
+	num_nodes=`expr $num_nodes / 2`
+	tpn=`expr $CAM_TASKS / $num_nodes `
+	proc=0
+	geo_string="\{"
+	count1=$num_nodes
+	while [ "$count1" != "0" ]; do
+	    geo_string="${geo_string}\("
+	    count2=$tpn
+	    while [ "$count2" != "0" ]; do
+		if [ "$count2" != "$tpn" ]; then
+		    geo_string="${geo_string}\,"
+		fi
+		geo_string="${geo_string}$proc"
+		proc=`expr $proc + 1`
+		count2=`expr $count2 - 1`
+	    done
+	    geo_string="${geo_string}\)"
+	    count1=`expr $count1 - 1`
+	done
+	geo_string="${geo_string}\}"
+
+	if grep -ic NOSMP ${CAM_SCRIPTDIR}/config_files/$1 > /dev/null; then
+            ##mpi only
+	    cmnd=" mpiexec_mpt omplace "
+	else
+            ##hybrid
+	    cmnd="env OMP_NUM_THREADS=${CAM_THREADS} mpiexec_mpt omplace " 
+	fi
+    fi ;;
 
     ##yellowstone
     ye* | ys* | ca* )

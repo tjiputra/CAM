@@ -32,7 +32,8 @@ logical, protected :: restart_run  ! continue a previous run; requires a restart
 logical, protected :: branch_run   ! branch from a previous run; requires a restart file
 
 logical, protected :: adiabatic         ! true => no physics
-logical, protected :: ideal_phys        ! true => run "idealized" model configuration
+logical, protected :: ideal_phys        ! true => run Held-Suarez (1994) physics
+logical, protected :: kessler_phys      ! true => run Kessler physics
 logical, protected :: aqua_planet       ! Flag to run model in "aqua planet" mode
 logical, protected :: moist_physics     ! true => moist physics enabled, i.e.,
                                         ! (.not. ideal_phys) .and. (.not. adiabatic)
@@ -135,6 +136,7 @@ subroutine cam_ctrl_set_physics_type(phys_package)
 
   adiabatic = trim(phys_package) == 'adiabatic'
   ideal_phys = trim(phys_package) == 'held_suarez'
+  kessler_phys = trim(phys_package) == 'kessler'
   moist_physics = .not. (adiabatic .or. ideal_phys)
   if (adiabatic .and. ideal_phys) then
     call endrun (subname//': FATAL: Only one of ADIABATIC or HELD_SUAREZ can be .true.')
@@ -150,6 +152,9 @@ subroutine cam_ctrl_set_physics_type(phys_package)
     end if
     if (ideal_phys) then
       write(iulog,*) 'Run model with Held-Suarez physics forcing'
+    end if
+    if (kessler_phys) then
+      write(iulog,*) 'Run model with Kessler physics forcing'
     end if
   end if
 

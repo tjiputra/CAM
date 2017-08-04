@@ -84,7 +84,6 @@ subroutine cldprmc_sw(ncol,nlayers, inflag, iceflag, liqflag, zcldfmc, &
       ! Main g-point interval loop
       do ig = 1, ngptsw 
 
-         !dir$ vector aligned
          do iplon=1, ncol
 
             ztaormc(iplon,lay,ig) = ztaucmc(iplon,lay,ig)

@@ -21,6 +21,7 @@ module iondrag
   public :: iondrag_init             ! Initialization
   public :: iondrag_calc             ! ion drag tensors lxx,lyy,lxy,lyx
   public :: iondrag_readnl
+  public :: iondrag_timestep_init
   public :: do_waccm_ions
 
   interface iondrag_calc
@@ -56,6 +57,11 @@ contains
     real(r8), intent(in) :: pref_mid(pver)
 
   end subroutine iondrag_init
+
+  !================================================================================================
+
+  subroutine iondrag_timestep_init
+  end subroutine iondrag_timestep_init
 
   !================================================================================================
   subroutine iondrag_calc_ions( lchnk, ncol, state, ptend, pbuf, delt )

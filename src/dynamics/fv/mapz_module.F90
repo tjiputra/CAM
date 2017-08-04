@@ -277,7 +277,6 @@ contains
 #if defined( UNICOSMP ) || defined ( NEC_SX )
       do kk = km, 1, -1
          do k = 1, kn+1
-!dir$ prefervector
             do i = i1, i2
                if (pe2(i,k) <= pe1(i,kk+1)) then
                   k0(i,k) = kk
@@ -430,7 +429,6 @@ contains
 #if defined( UNICOSMP ) || defined ( NEC_SX )
       do kk = km, 1, -1
          do k = 1, kn+1
-!dir$ prefervector
             do i = i1, i2
                if (pe2(i,k) <= pe1(i,kk+1)) then
                   k0(i,k) = kk
@@ -588,7 +586,6 @@ contains
 #if defined( UNICOSMP ) || defined ( NEC_SX )
       do kk = km, 1, -1
          do k = 1, kn+1
-!dir$ prefervector
             do i = i1, i2
                if (pe2(i,k) <= pe1(i,kk+1)) then
                   k0(i,k) = kk
@@ -775,7 +772,7 @@ contains
       c3 = dq - D0_5*c1*(d2*(D5_0*d1+d2)-D3_0*d1**2)
       a4(2,i,2) = qm - D0_25*c1*d1*d2*(d2+D3_0*d1)
       a4(2,i,1) = d1*(D2_0*c1*d1**2-c3) + a4(2,i,2)
-      dc(i,1) =  a4(1,i,1) - a4(2,i,1)
+      dc(i,1) = 0.5_r8*(a4(1,i,1) - a4(2,i,1))
 ! No over- and undershoot condition
       cmax = max(a4(1,i,1), a4(1,i,2))
       cmin = min(a4(1,i,1), a4(1,i,2))
@@ -828,7 +825,7 @@ contains
          c3 = dq - D2_0*c1*(d2*(D5_0*d1+d2)-D3_0*d1**2)
          a4(2,i,km) = qm - c1*d1*d2*(d2+D3_0*d1)
          a4(3,i,km) = d1*(D8_0*c1*d1**2-c3) + a4(2,i,km)
-         dc(i,km) = a4(3,i,km) -  a4(1,i,km)
+         dc(i,km) = 0.5_r8*(a4(3,i,km) -  a4(1,i,km))
 ! No over- and under-shoot condition
          cmax = max(a4(1,i,km), a4(1,i,km1))
          cmin = min(a4(1,i,km), a4(1,i,km1))

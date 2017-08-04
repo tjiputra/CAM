@@ -16,6 +16,7 @@ use shr_const_mod,  only: shr_const_g,      shr_const_stebol, shr_const_tkfrz,  
 use shr_flux_mod,   only: shr_flux_adjust_constants
 use ppgrid,         only: pcols, pver, pverp, begchunk, endchunk
 use cam_abortutils, only: endrun
+use constituents,   only: pcnst
 
 implicit none
 private
@@ -24,6 +25,7 @@ save
 public  :: physconst_readnl
 public  :: physconst_init
 public  :: physconst_update
+public  :: physconst_calc_kappav
 
 ! Constants based off share code or defined in physconst
 
@@ -92,6 +94,9 @@ real(r8), public, dimension(:,:,:), pointer :: cappav ! rairv/cpairv
 real(r8), public, dimension(:,:,:), pointer :: mbarv  ! composition dependent atmosphere mean mass
 real(r8), public, dimension(:,:,:), pointer :: kmvis  ! molecular viscosity      kg/m/s
 real(r8), public, dimension(:,:,:), pointer :: kmcnd  ! molecular conductivity   J/m/s/K
+
+real(r8) :: o2_mwi, o_mwi, h_mwi, n2_mwi ! inverse molecular weights
+integer :: o2_ndx=-1, o_ndx=-1, h_ndx=-1 ! constituent indexes
 
 !================================================================================================
 contains
@@ -197,8 +202,11 @@ end subroutine physconst_readnl
 !===============================================================================
 
 subroutine physconst_init()
+   use constituents, only: cnst_get_ind, cnst_mw
 
+   integer :: n_ndx
    integer :: ierr
+   real(r8) :: o2_mw, o_mw, h_mw, n_mw
 
    !-------------------------------------------------------------------------------
    !  Allocate constituent dependent properties 
@@ -219,11 +227,33 @@ subroutine physconst_init()
    cappav(:pcols,:pver,begchunk:endchunk) = rair/cpair
    mbarv(:pcols,:pver,begchunk:endchunk) = mwdry
 
+   call cnst_get_ind('O2',o2_ndx,abort=.false.)
+   call cnst_get_ind('O' ,o_ndx, abort=.false.)
+   call cnst_get_ind('H' ,h_ndx, abort=.false.)
+   call cnst_get_ind('N' ,n_ndx, abort=.false.)
+
+   if (o2_ndx>0) then
+      o2_mw = cnst_mw(o2_ndx)
+      o2_mwi = 1.0_r8/o2_mw
+   endif
+   if (o_ndx>0) then
+      o_mw = cnst_mw(o_ndx)
+      o_mwi = 1.0_r8/o_mw
+   endif
+   if (h_ndx>0) then
+      h_mw = cnst_mw(h_ndx)
+      h_mwi = 1.0_r8/h_mw
+   endif
+   if (n_ndx>0) then
+      n_mw = cnst_mw(n_ndx)
+      n2_mwi = 0.5_r8/n_mw
+   endif
+
 end subroutine physconst_init
 
 !===============================================================================
   
-  subroutine physconst_update(mmr, t, cnst_mw_o, cnst_mw_o2, cnst_mw_h, cnst_mw_n, ixo, ixo2, ixh, ncnst, lchnk, ncol)
+  subroutine physconst_update(mmr, t, lchnk, ncol)
   
 !-----------------------------------------------------------------------
 ! Update the physics "constants" that vary
@@ -231,13 +261,8 @@ end subroutine physconst_init
 
 !------------------------------Arguments--------------------------------------------------------------
 
-    integer, intent(in)  :: ncnst           ! number of constituents in mmr array
-    real(r8), intent(in) :: mmr(pcols,pver,ncnst) ! constituents q array from state structure
+    real(r8), intent(in) :: mmr(pcols,pver,pcnst) ! constituents q array from state structure
     real(r8), intent(in) :: t(pcols,pver)   ! temperature t array from state structure
-
-    real(r8), intent(in) :: cnst_mw_o, cnst_mw_o2, cnst_mw_h, cnst_mw_n  ! Molecular weight of O, O2, H, and N
-
-    integer, intent(in)  :: ixo, ixo2, ixh  ! indices for O, O2, and H
     integer, intent(in)  :: lchnk           ! Chunk number
     integer, intent(in)  :: ncol            ! number of columns
 !
@@ -263,44 +288,49 @@ end subroutine physconst_init
     kc3  = 75.9_r8
     kc4  = 0.69_r8
 
+    if (o2_ndx<0 .or. o_ndx<0 .or. h_ndx<0) then
+       call endrun('physconst_update: ERROR -- needed constituents are not available')
+    endif
+
      !--------------------------------------------
      ! update cpairv, rairv, mbarv, and cappav
      !--------------------------------------------
      do k=1,pver
         do i=1,ncol
-           mmro = mmr(i,k, ixo)
-           mmro2 = mmr(i,k, ixo2)
-           mmrh = mmr(i,k, ixh)
+           mmro = mmr(i,k, o_ndx)
+           mmro2 = mmr(i,k, o2_ndx)
+           mmrh = mmr(i,k, h_ndx)
            mmrn2 = 1._r8-mmro-mmro2-mmrh
-           mbarv(i,k,lchnk) = 1._r8/(mmro/cnst_mw_o +      &
-                                     mmro2/cnst_mw_o2 +    &
-                                     mmrn2/cnst_mw_n/2._r8 + &
-                                     mmrh/cnst_mw_h)
+           mbarv(i,k,lchnk) = 1._r8/( mmro *o_mwi  + &
+                                      mmro2*o2_mwi + &
+                                      mmrn2*n2_mwi + &
+                                      mmrh *h_mwi )
            rairv(i,k,lchnk) = shr_const_rgas / mbarv(i,k,lchnk)
-           cpairv(i,k,lchnk) = 0.5_r8*shr_const_rgas*    &
-                                 (dof1*mmro/cnst_mw_o+        &
-                                  dof2*mmro2/cnst_mw_o2+     &
-                                  dof2*mmrn2/cnst_mw_n/2._r8+ &
-                                     dof1*mmrh/cnst_mw_h)
+           cpairv(i,k,lchnk) = 0.5_r8*shr_const_rgas &
+                             * ( dof1*mmro *o_mwi  + &
+                                 dof2*mmro2*o2_mwi + &
+                                 dof2*mmrn2*n2_mwi + &
+                                 dof1*mmrh *h_mwi )
+
            cappav(i,k,lchnk) = rairv(i,k,lchnk)/cpairv(i,k,lchnk)
         enddo
      enddo
 
      do k=2,pver
         do i=1,ncol
-           mmro = .5_r8*(mmr(i,k-1, ixo)+mmr(i,k,ixo))
-           mmro2 = .5_r8*(mmr(i,k-1, ixo2)+mmr(i,k,ixo2))
+           mmro = .5_r8*(mmr(i,k-1, o_ndx)+mmr(i,k,o_ndx))
+           mmro2 = .5_r8*(mmr(i,k-1, o2_ndx)+mmr(i,k,o2_ndx))
            mmrn2 = 1._r8-mmro-mmro2
            mbarvi = .5_r8*(mbarv(i,k-1,lchnk)+mbarv(i,k,lchnk))
            tint = .5_r8*(t(i,k-1)+t(i,k))
  
-           kmvis(i,k,lchnk) = (kv1*mmro2/cnst_mw_o2+             &
-                               kv2*mmrn2/cnst_mw_n/2._r8+        &
-                               kv3*mmro/cnst_mw_o)*mbarvi*       &
+           kmvis(i,k,lchnk) = (kv1*mmro2*o2_mwi+        &
+                               kv2*mmrn2*n2_mwi+        &
+                               kv3*mmro*o_mwi)*mbarvi*  &
                                tint**kv4 * 1.e-7_r8
-           kmcnd(i,k,lchnk) = (kc1*mmro2/cnst_mw_o2+             &
-                               kc2*mmrn2/cnst_mw_n/2._r8+        &
-                               kc3*mmro/cnst_mw_o)*mbarvi*   &
+           kmcnd(i,k,lchnk) = (kc1*mmro2*o2_mwi+             &
+                               kc2*mmrn2*n2_mwi+        &
+                               kc3*mmro*o_mwi)*mbarvi*   &
                                tint**kc4 * 1.e-5_r8
         enddo
      enddo
@@ -312,6 +342,63 @@ end subroutine physconst_init
      enddo
 
    end subroutine physconst_update
+
+!===============================================================================
+
+   subroutine physconst_calc_kappav( i0,i1,j0,j1,k0,k1,ntotq, tracer, kappav, cpv )
+
+     ! args
+     integer,  intent(in) :: i0,i1,j0,j1,k0,k1, ntotq
+     real(r8), intent(in) :: tracer(i0:i1,j0:j1,k0:k1,ntotq) ! Tracer array
+     real(r8), intent(out) :: kappav(i0:i1,j0:j1,k0:k1)
+     real(r8), optional, intent(out) :: cpv(i0:i1,j0:j1,k0:k1) 
+
+     ! local vars
+     integer :: i,j,k
+     real(r8),  dimension(i0:i1,j0:j1,k0:k1) :: rgas_var, cp_var, mmro, mmro2, mmrh, mmrn2
+
+     real(r8), parameter :: dof1 = 5.0_r8 ! Degrees of freedom for cpair3v calculation
+     real(r8), parameter :: dof2 = 7.0_r8 ! Degrees of freedom for cpair3v calculation
+
+     if (o2_ndx<0 .or. o_ndx<0 .or. h_ndx<0) then
+        call endrun('physconst_calc_kappav: ERROR -- things are not initialized')
+     endif
+
+     !-----------------------------------------------------------------------
+     !  Calculate constituent dependent specific heat, gas constant and cappa
+     !-----------------------------------------------------------------------
+!$omp parallel do private(i,j,k)
+     do k = k0,k1
+        do j = j0,j1
+           do i = i0,i1
+              mmro(i,j,k)  = tracer(i,j,k,o_ndx)
+              mmro2(i,j,k) = tracer(i,j,k,o2_ndx)
+              mmrh(i,j,k)  = tracer(i,j,k,h_ndx)
+              mmrn2(i,j,k) = 1._r8-mmro(i,j,k)-mmro2(i,j,k)-mmrh(i,j,k)
+
+              rgas_var(i,j,k) = shr_const_rgas &
+                              * ( mmro (i,j,k)*o_mwi + &
+                                  mmro2(i,j,k)*o2_mwi + &
+                                  mmrn2(i,j,k)*n2_mwi + &
+                                  mmrh (i,j,k)*h_mwi )
+
+              cp_var(i,j,k) = 0.5_r8*shr_const_rgas &
+                            * ( dof1*mmro (i,j,k)*o_mwi + &
+                                dof2*mmro2(i,j,k)*o2_mwi + &
+                                dof2*mmrn2(i,j,k)*n2_mwi + &
+                                dof1*mmrh (i,j,k)*h_mwi )
+
+              kappav(i,j,k) = rgas_var(i,j,k)/cp_var(i,j,k)
+
+           enddo
+        enddo
+     enddo
+
+     if (present(cpv)) then
+        cpv(:,:,:) = cp_var(:,:,:)
+     endif
+
+   end subroutine physconst_calc_kappav
 
 end module physconst
 

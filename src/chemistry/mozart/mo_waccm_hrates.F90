@@ -81,8 +81,8 @@
         attr = 'total jo2 euv photolysis rate'
         call addfld( 'JO2_EUV',    (/ 'lev' /), 'I', '/s', trim(attr) )
 
-        ele_temp_ndx = pbuf_get_index('ElecTemp',errcode=err)! electron temperature index 
-        ion_temp_ndx = pbuf_get_index('IonTemp',errcode=err) ! ion temperature index
+        ele_temp_ndx = pbuf_get_index('TElec',errcode=err)! electron temperature index 
+        ion_temp_ndx = pbuf_get_index('TIon',errcode=err) ! ion temperature index
 
       end subroutine init_hrates
 
@@ -123,7 +123,7 @@
       use physics_buffer,    only : physics_buffer_desc
       use phys_control,      only : waccmx_is
       use orbit,             only : zenith
-      use time_manager,      only : is_first_step
+      use time_manager,      only : is_first_step ,get_step_size !+tht step_size
 
 !-----------------------------------------------------------------------
 !        ... dummy arguments
@@ -196,6 +196,9 @@
       real(r8)     ::  delta                                         ! solar declination (radians)
       logical      ::  do_diag
 
+      integer      :: dtime !+tht time step
+      real(r8)     :: dtavg !+tht time step
+
       real(r8), pointer :: ele_temp_fld(:,:) ! electron temperature pointer
       real(r8), pointer :: ion_temp_fld(:,:) ! ion temperature pointer
 
@@ -240,7 +243,12 @@
 !        ... calculate cosine of zenith angle then cast back to angle
 !-----------------------------------------------------------------------      
       calday = get_curr_calday()
-      call zenith( calday, rlats, rlons, zen_angle, ncol )
+!+tht
+     !call zenith( calday, rlats, rlons, zen_angle, ncol )
+      dtime=get_step_size()
+      dtavg=dtime
+      call zenith( calday, rlats, rlons, zen_angle, ncol ,dtavg)
+!-tht
       zen_angle(:) = acos( zen_angle(:) )
 
 !-----------------------------------------------------------------------      
@@ -305,8 +313,8 @@
          end do
       end do
       call setrxt_hrates( reaction_rates, state%t, invariants(1,1,indexm), ncol, kbot_hrates )
-      call usrrxt_hrates( reaction_rates, state%t, ele_temp_fld, ion_temp_fld, invariants, &
-                          h2ovmr, state%pmid, invariants(:,:,indexm), ncol, kbot_hrates )
+      call usrrxt_hrates( reaction_rates, state%t, ele_temp_fld, ion_temp_fld, &
+                          h2ovmr, invariants(:,:,indexm), ncol, kbot_hrates )
       call adjrxt( reaction_rates, invariants, invariants(1,1,indexm), ncol,pver )
       
 !-----------------------------------------------------------------------      

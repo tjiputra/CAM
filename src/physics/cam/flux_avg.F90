@@ -104,9 +104,6 @@ subroutine flux_avg_run(state, cam_in,  pbuf, nstep, deltat)
    ! Purpose: 
    !
    !----------------------------------------------------------------------- 
-!++ debug code to be removed after PBL code validated
-   use phys_debug,       only: phys_debug_flux1, phys_debug_flux2
-!-- debug code to be removed after PBL code validated
 
    ! Input arguments
 
@@ -150,21 +147,11 @@ subroutine flux_avg_run(state, cam_in,  pbuf, nstep, deltat)
    call pbuf_get_field(pbuf, taux_res_idx,  taux_res  )
    call pbuf_get_field(pbuf, tauy_res_idx,  tauy_res  )
 
-!++ debug code to be removed after PBL code validated
-   call phys_debug_flux1(lchnk, cam_in, lhflx, shflx, taux, tauy, qflx, &
-                         lhflx_res, shflx_res, taux_res, tauy_res, qflx_res)
-!-- debug code to be removed after PBL code validated
-
    call smooth (cam_in%lhf, lhflx, lhflx_res, nstep, deltat, ncol)
    call smooth (cam_in%shf, shflx, shflx_res, nstep, deltat, ncol)
    call smooth (cam_in%wsx, taux, taux_res, nstep, deltat, ncol)
    call smooth (cam_in%wsy, tauy, tauy_res, nstep, deltat, ncol)
    call smooth (cam_in%cflx(:pcols,1), qflx, qflx_res, nstep, deltat, ncol)
-
-!++ debug code to be removed after PBL code validated
-   call phys_debug_flux2(lchnk, cam_in, lhflx, &
-                         lhflx_res, shflx_res, taux_res, tauy_res, qflx_res)
-!-- debug code to be removed after PBL code validated
 
 end subroutine flux_avg_run
 

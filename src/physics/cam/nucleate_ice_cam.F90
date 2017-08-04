@@ -179,8 +179,9 @@ subroutine nucleate_ice_cam_init(mincld_in, bulk_scale_in)
 
    character(len=32) :: str32
    character(len=*), parameter :: routine = 'nucleate_ice_cam_init'
+   logical :: history_cesm_forcing
    !--------------------------------------------------------------------------------------------
-   call phys_getopts(prog_modal_aero_out = prog_modal_aero)
+   call phys_getopts(prog_modal_aero_out = prog_modal_aero, history_cesm_forcing_out = history_cesm_forcing)
 
    mincld     = mincld_in
    bulk_scale = bulk_scale_in
@@ -215,7 +216,9 @@ subroutine nucleate_ice_cam_init(mincld_in, bulk_scale_in)
    call addfld('NIREGM',(/ 'lev' /), 'A', 'C', 'Ice Nucleation Temperature Threshold for Regime')
    call addfld('NISUBGRID',(/ 'lev' /), 'A', '', 'Ice Nucleation subgrid saturation factor')
    call addfld('NITROP_PD',(/ 'lev' /), 'A', '', 'Chemical Tropopause probability')
-
+   if ( history_cesm_forcing ) then
+      call add_default('NITROP_PD',8,' ')
+   endif
 
    if (use_preexisting_ice) then
       call addfld('fhom',      (/ 'lev' /), 'A','fraction', 'Fraction of cirrus where homogeneous freezing occur'   ) 
@@ -753,7 +756,7 @@ subroutine nucleate_ice_cam_calc( &
             ! particles. It may not represent the proper saturation threshold for
             ! nucleation, and wsubi from CLUBB is probably not representative of
             ! wave driven varaibility in the polar stratosphere.
-            if (nucleate_ice_use_troplev) then 
+            if (nucleate_ice_use_troplev .and. clim_modal_aero) then 
               if ((k < troplev(i)) .and. (nucleate_ice_strat > 0._r8)) then
                  if (oso4_num > 0._r8) then
                     so4_num_ac = num_accum(i,k)*rho(i,k)*1.0e-6_r8

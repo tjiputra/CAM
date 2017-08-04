@@ -118,12 +118,9 @@ subroutine spegrd_bft (lat     ,nlon_fft, &
 ! Assemble northern and southern hemisphere grid values from the
 ! symmetric and antisymmetric fourier coefficients: pre-FFT
 !
-!DIR$ NOSTREAM
    rmlength = 2*numm(iam)
    if (lat > plat/2) then                       ! Northern hemisphere
-!DIR$ PREFERVECTOR
       do k=1,plev
-!cdir loopchg
          do i=1,rmlength
             fftbuf(i,vortdex,k) = grzs(i,k) + grza(i,k)
             fftbuf(i,divdex,k) = grds(i,k) + grda(i,k)
@@ -136,7 +133,6 @@ subroutine spegrd_bft (lat     ,nlon_fft, &
          end do
       end do
 !
-!cdir altcode=(loopcnt)
       do i=1,rmlength
          fftbuf(i,dpsdex,plevp) = grdps(i) + grdpa(i)
          fftbuf(i,psdex,plevp) = grpss(i) + grpsa(i)
@@ -146,9 +142,7 @@ subroutine spegrd_bft (lat     ,nlon_fft, &
 
    else                                          ! Southern hemisphere
 
-!DIR$ PREFERVECTOR
       do k=1,plev
-!cdir loopchg
          do i=1,rmlength
             fftbuf(i,vortdex,k) = grzs(i,k) - grza(i,k)
             fftbuf(i,divdex,k) = grds(i,k) - grda(i,k)
@@ -161,7 +155,6 @@ subroutine spegrd_bft (lat     ,nlon_fft, &
          end do
       end do
 
-!cdir altcode=(loopcnt)
       do i=1,rmlength
          fftbuf(i,dpsdex,plevp) = grdps(i) - grdpa(i)
          fftbuf(i,psdex,plevp) = grpss(i) - grpsa(i)

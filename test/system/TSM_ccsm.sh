@@ -88,10 +88,10 @@ else
   cp ${CAM_SCRIPTDIR}/nl_files/outfrq24h ./user_nl_cam
 fi
 
-./xmlchange  -id STOP_N -val $run_length
-./xmlchange  -id STOP_OPTION -val $stop_option
-./xmlchange  -id DOUT_S -val FALSE
-./xmlchange  -id RUN_WITH_SUBMIT -val TRUE
+./xmlchange  STOP_N=$run_length
+./xmlchange  STOP_OPTION=$stop_option
+./xmlchange  DOUT_S=FALSE
+./xmlchange  RUN_WITH_SUBMIT=TRUE
 runscript=`ls *.run` 
 CIMEROOT=${CAM_ROOT}/cime ./$runscript > ${CAM_TESTDIR}/${test_name}/test.log 2>&1
 rc=$?

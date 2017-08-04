@@ -8,24 +8,24 @@ module cam_diagnostics
 #include <preprocessorDefinitions.h>
 #endif
 
-use shr_kind_mod,  only: r8 => shr_kind_r8
-use camsrfexch,    only: cam_in_t, cam_out_t
+use shr_kind_mod,    only: r8 => shr_kind_r8
+use camsrfexch,      only: cam_in_t, cam_out_t
 use cam_control_mod, only: moist_physics
-use physics_types, only: physics_state, physics_tend
+use physics_types,   only: physics_state, physics_tend
 use ppgrid,          only: pcols, pver, begchunk, endchunk
 use physics_buffer,  only: physics_buffer_desc, pbuf_add_field, dtype_r8
 use physics_buffer,  only: dyn_time_lvls, pbuf_get_field, pbuf_get_index, pbuf_old_tim_idx
 
-use cam_history,    only: outfld, write_inithist, hist_fld_active, inithist_all
+use cam_history,     only: outfld, write_inithist, hist_fld_active, inithist_all
 use constituents,    only: pcnst, cnst_name, cnst_longname, cnst_cam_outfld
 use constituents,    only: ptendnam, dmetendnam, apcnst, bpcnst, cnst_get_ind
-use dycore,        only: dycore_is
-use phys_control,  only: phys_getopts
-use wv_saturation, only: qsat, qsat_water, svp_ice
-use time_manager,  only: is_first_step
+use dycore,          only: dycore_is
+use phys_control,    only: phys_getopts
+use wv_saturation,   only: qsat, qsat_water, svp_ice
+use time_manager,    only: is_first_step
 
-use scamMod,       only: single_column, wfld
-use cam_abortutils, only: endrun
+use scamMod,         only: single_column, wfld
+use cam_abortutils,  only: endrun
 
 #ifdef OSLO_AERO
 use opttab,        only: RF
@@ -113,32 +113,32 @@ contains
 !==============================================================================
 
   subroutine diag_readnl(nlfile)
-  use namelist_utils,  only: find_group_name
-  use units,           only: getunit, freeunit
-  use spmd_utils,      only: masterproc, masterprocid, mpi_character, mpicom
+    use namelist_utils,  only: find_group_name
+    use units,           only: getunit, freeunit
+    use spmd_utils,      only: masterproc, masterprocid, mpi_character, mpicom
 
-  character(len=*), intent(in) :: nlfile  ! filepath for file containing namelist input
+    character(len=*), intent(in) :: nlfile  ! filepath for file containing namelist input
 
-  ! Local variables
-  integer :: unitn, ierr
-  character(len=*), parameter :: subname = 'diag_readnl'
+    ! Local variables
+    integer :: unitn, ierr
+    character(len=*), parameter :: subname = 'diag_readnl'
 
-  namelist /cam_diag_opts/ diag_cnst_conv_tend
+    namelist /cam_diag_opts/ diag_cnst_conv_tend
     !--------------------------------------------------------------------------
 
-  if (masterproc) then
+    if (masterproc) then
       unitn = getunit()
       open( unitn, file=trim(nlfile), status='old' )
       call find_group_name(unitn, 'cam_diag_opts', status=ierr)
       if (ierr == 0) then
-         read(unitn, cam_diag_opts, iostat=ierr)
-         if (ierr /= 0) then
-            call endrun(subname // ':: ERROR reading namelist')
-         end if
+        read(unitn, cam_diag_opts, iostat=ierr)
+        if (ierr /= 0) then
+          call endrun(subname // ':: ERROR reading namelist')
+        end if
       end if
       close(unitn)
       call freeunit(unitn)
-   end if
+    end if
 
     ! Broadcast namelist variables
     call mpi_bcast(diag_cnst_conv_tend, len(diag_cnst_conv_tend), mpi_character, masterprocid, mpicom, ierr)
@@ -168,66 +168,73 @@ contains
 !==============================================================================
   
   subroutine diag_init_dry(pbuf2d)
-  ! Declare the history fields for which this module contains outfld calls.
+    ! Declare the history fields for which this module contains outfld calls.
 
-   use cam_history,        only: addfld, add_default, horiz_only
-   use cam_history,        only: register_vector_field
-   use constituent_burden, only: constituent_burden_init
-   use physics_buffer,     only: pbuf_set_field
-   use tidal_diag,         only: tidal_diag_init 
+    use cam_history,        only: addfld, add_default, horiz_only
+    use cam_history,        only: register_vector_field
+    use constituent_burden, only: constituent_burden_init
+    use physics_buffer,     only: pbuf_set_field
+    use tidal_diag,         only: tidal_diag_init
 !+
 #ifdef AEROCOM
-   use commondefinitions,  only: nbmodes 
+    use commondefinitions,  only: nbmodes 
 #endif  
 !-
 
-   type(physics_buffer_desc), pointer, intent(in) :: pbuf2d(:,:)
+    type(physics_buffer_desc), pointer, intent(in) :: pbuf2d(:,:)
 
-   integer :: k, m
-   integer :: ixcldice, ixcldliq ! constituent indices for cloud liquid and ice water.
+    integer :: k, m
+    integer :: ixcldice, ixcldliq ! constituent indices for cloud liquid and ice water.
 !AL
-   integer :: ixcldni, ixcldnc ! constituent indices for cloud liquid and ice water.
+    integer :: ixcldni, ixcldnc ! constituent indices for cloud liquid and ice water.
 !AL
-   integer :: ierr
+    integer :: ierr
 
 !+
 #ifdef AEROCOM
-      character(len=10) :: modeString
-      character(len=20) :: varname
-      integer :: i, irh
+    character(len=10) :: modeString
+    character(len=20) :: varname
+    integer :: i, irh
 #endif  
 !-
 
-   ! outfld calls in diag_phys_writeout
+    ! outfld calls in diag_phys_writeout
     call addfld ('NSTEP',horiz_only,    'A','timestep',       'Model timestep')
     call addfld ('PHIS', horiz_only,    'I','m2/s2',          'Surface geopotential')
 
-   call addfld ('PS',         horiz_only,  'A','Pa',   'Surface pressure')
-   call addfld ('T',          (/ 'lev' /), 'A','K',    'Temperature')
-   call addfld ('U',          (/ 'lev' /), 'A','m/s',  'Zonal wind')
-   call addfld ('V',          (/ 'lev' /), 'A','m/s',  'Meridional wind')
+    call addfld ('PS',         horiz_only,  'A','Pa',         'Surface pressure')
+    call addfld ('T',          (/ 'lev' /), 'A','K',          'Temperature')
+    call addfld ('U',          (/ 'lev' /), 'A','m/s',        'Zonal wind')
+    call addfld ('V',          (/ 'lev' /), 'A','m/s',        'Meridional wind')
 
-   ! State before physics
-   call addfld ('TBP',     (/ 'lev' /), 'A','K',    'Temperature (before physics)')
-   call addfld (bpcnst(1), (/ 'lev' /), 'A','kg/kg',         trim(cnst_longname(1))//' (before physics)')
-   ! State after physics
-   call addfld ('TAP',      (/ 'lev' /), 'A','K',    'Temperature (after physics)'       )
-   call addfld ('UAP',      (/ 'lev' /), 'A','m/s',  'Zonal wind (after physics)'        )
-   call addfld ('VAP',      (/ 'lev' /), 'A','m/s',  'Meridional wind (after physics)'   )
-   call addfld (apcnst(1), (/ 'lev' /), 'A','kg/kg',         trim(cnst_longname(1))//' (after physics)')
-   if ( dycore_is('LR') .or. dycore_is('SE') ) then
-      call addfld ('TFIX',    horiz_only,  'A', 'K/s',        'T fixer (T equivalent of Energy correction)')
-   end if
-   call addfld ('TTEND_TOT', (/ 'lev' /), 'A', 'K/s',        'Total temperature tendency')
+    ! State before physics
+    call addfld ('TBP',     (/ 'lev' /), 'A','K',             'Temperature (before physics)')
+    call addfld (bpcnst(1), (/ 'lev' /), 'A','kg/kg',         trim(cnst_longname(1))//' (before physics)')
+    ! State after physics
+    call addfld ('TAP',     (/ 'lev' /), 'A','K',             'Temperature (after physics)'       )
+    call addfld ('UAP',     (/ 'lev' /), 'A','m/s',           'Zonal wind (after physics)'        )
+    call addfld ('VAP',     (/ 'lev' /), 'A','m/s',           'Meridional wind (after physics)'   )
+    call addfld (apcnst(1), (/ 'lev' /), 'A','kg/kg',         trim(cnst_longname(1))//' (after physics)')
+    if ( dycore_is('LR') .or. dycore_is('SE') ) then
+      call addfld ('TFIX',   horiz_only, 'A','K/s',           'T fixer (T equivalent of Energy correction)')
+      call addfld ('EFIX',   horiz_only, 'A','W/m2',          'Energy fixer (Energy correction)')
+      call addfld ('PTTEND_DME', (/ 'lev' /), 'A', 'K/s ', &
+                   'T-tendency due to dry mass adjustment at the end of tphysac'    )
+      call addfld ('IETEND_DME',  horiz_only, 'A','W/m2 ', &
+                   'Column DSE tendency due to mass adjustment at end of tphysac'   )
+      call addfld ('EFLX    '  ,  horiz_only, 'A','W/m2 ', &
+                   'Material enthalpy flux due to mass adjustment at end of tphysac')
+    end if
+    call addfld ('TTEND_TOT', (/ 'lev' /), 'A', 'K/s',        'Total temperature tendency')
 
-   call addfld ('Z3',         (/ 'lev' /), 'A', 'm',         'Geopotential Height (above sea level)')
-   call addfld ('Z1000',      horiz_only,  'A', 'm',         'Geopotential Z at 700 mbar pressure surface')
-   call addfld ('Z700',       horiz_only,  'A', 'm',         'Geopotential Z at 700 mbar pressure surface')
-   call addfld ('Z500',       horiz_only,  'A', 'm',         'Geopotential Z at 500 mbar pressure surface')
-   call addfld ('Z300',       horiz_only,  'A', 'm',         'Geopotential Z at 300 mbar pressure surface')
-   call addfld ('Z200',       horiz_only,  'A', 'm',         'Geopotential Z at 200 mbar pressure surface')
-   call addfld ('Z100',       horiz_only,  'A', 'm',         'Geopotential Z at 100 mbar pressure surface')
-   call addfld ('Z050',       horiz_only,  'A', 'm',         'Geopotential Z at 50 mbar pressure surface')
+    call addfld ('Z3',         (/ 'lev' /), 'A', 'm',         'Geopotential Height (above sea level)')
+    call addfld ('Z1000',      horiz_only,  'A', 'm',         'Geopotential Z at 700 mbar pressure surface')
+    call addfld ('Z700',       horiz_only,  'A', 'm',         'Geopotential Z at 700 mbar pressure surface')
+    call addfld ('Z500',       horiz_only,  'A', 'm',         'Geopotential Z at 500 mbar pressure surface')
+    call addfld ('Z300',       horiz_only,  'A', 'm',         'Geopotential Z at 300 mbar pressure surface')
+    call addfld ('Z200',       horiz_only,  'A', 'm',         'Geopotential Z at 200 mbar pressure surface')
+    call addfld ('Z100',       horiz_only,  'A', 'm',         'Geopotential Z at 100 mbar pressure surface')
+    call addfld ('Z050',       horiz_only,  'A', 'm',         'Geopotential Z at 50 mbar pressure surface')
 
     call addfld ('ZZ',         (/ 'lev' /), 'A', 'm2',        'Eddy height variance' )
     call addfld ('VZ',         (/ 'lev' /), 'A', 'm2/s',      'Meridional transport of geopotential energy')
@@ -248,128 +255,128 @@ contains
     call addfld ('OMEGA850',   horiz_only,  'A', 'Pa/s',      'Vertical velocity at 850 mbar pressure surface')
     call addfld ('OMEGA500',   horiz_only,  'A', 'Pa/s',      'Vertical velocity at 500 mbar pressure surface')
 
-   call addfld ('PSL',        horiz_only,  'A', 'Pa','Sea level pressure')
+    call addfld ('PSL',        horiz_only,  'A', 'Pa','Sea level pressure')
 
-   call addfld ('T1000',      horiz_only,  'A', 'K','Temperature at 1000 mbar pressure surface')
-   call addfld ('T925',       horiz_only,  'A', 'K','Temperature at 925 mbar pressure surface')
-   call addfld ('T850',       horiz_only,  'A', 'K','Temperature at 850 mbar pressure surface')
-   call addfld ('T700',       horiz_only,  'A', 'K','Temperature at 700 mbar pressure surface')
-   call addfld ('T500',       horiz_only,  'A', 'K','Temperature at 500 mbar pressure surface')
-   call addfld ('T400',       horiz_only,  'A', 'K','Temperature at 400 mbar pressure surface')
-   call addfld ('T300',       horiz_only,  'A', 'K','Temperature at 300 mbar pressure surface')
-   call addfld ('T200',       horiz_only,  'A', 'K','Temperature at 200 mbar pressure surface')
-   call addfld ('T010',       horiz_only,  'A', 'K','Temperature at 10 mbar pressure surface')
+    call addfld ('T1000',      horiz_only,  'A', 'K','Temperature at 1000 mbar pressure surface')
+    call addfld ('T925',       horiz_only,  'A', 'K','Temperature at 925 mbar pressure surface')
+    call addfld ('T850',       horiz_only,  'A', 'K','Temperature at 850 mbar pressure surface')
+    call addfld ('T700',       horiz_only,  'A', 'K','Temperature at 700 mbar pressure surface')
+    call addfld ('T500',       horiz_only,  'A', 'K','Temperature at 500 mbar pressure surface')
+    call addfld ('T400',       horiz_only,  'A', 'K','Temperature at 400 mbar pressure surface')
+    call addfld ('T300',       horiz_only,  'A', 'K','Temperature at 300 mbar pressure surface')
+    call addfld ('T200',       horiz_only,  'A', 'K','Temperature at 200 mbar pressure surface')
+    call addfld ('T010',       horiz_only,  'A', 'K','Temperature at 10 mbar pressure surface')
 
-   call addfld ('T7001000',   horiz_only,  'A', 'K','Temperature difference 700 mb - 1000 mb')
-   call addfld ('TH7001000',  horiz_only,  'A', 'K','Theta difference 700 mb - 1000 mb')
-   call addfld ('THE7001000', horiz_only,  'A', 'K','ThetaE difference 700 mb - 1000 mb')
+    call addfld ('T7001000',   horiz_only,  'A', 'K','Temperature difference 700 mb - 1000 mb')
+    call addfld ('TH7001000',  horiz_only,  'A', 'K','Theta difference 700 mb - 1000 mb')
+    call addfld ('THE7001000', horiz_only,  'A', 'K','ThetaE difference 700 mb - 1000 mb')
 
-   call addfld ('T8501000',   horiz_only,  'A', 'K','Temperature difference 850 mb - 1000 mb')
-   call addfld ('TH8501000',  horiz_only,  'A', 'K','Theta difference 850 mb - 1000 mb')
-   call addfld ('T9251000',   horiz_only,  'A', 'K','Temperature difference 925 mb - 1000 mb')
-   call addfld ('TH9251000',  horiz_only,  'A', 'K','Theta difference 925 mb - 1000 mb')
+    call addfld ('T8501000',   horiz_only,  'A', 'K','Temperature difference 850 mb - 1000 mb')
+    call addfld ('TH8501000',  horiz_only,  'A', 'K','Theta difference 850 mb - 1000 mb')
+    call addfld ('T9251000',   horiz_only,  'A', 'K','Temperature difference 925 mb - 1000 mb')
+    call addfld ('TH9251000',  horiz_only,  'A', 'K','Theta difference 925 mb - 1000 mb')
 
-   call addfld ('TT',         (/ 'lev' /), 'A', 'K2','Eddy temperature variance' )
+    call addfld ('TT',         (/ 'lev' /), 'A', 'K2','Eddy temperature variance' )
 
-   call addfld ('U850',       horiz_only,  'A', 'm/s','Zonal wind at 850 mbar pressure surface')
-   call addfld ('U500',       horiz_only,  'A', 'm/s','Zonal wind at 500 mbar pressure surface')
-   call addfld ('U250',       horiz_only,  'A', 'm/s','Zonal wind at 250 mbar pressure surface')
-   call addfld ('U200',       horiz_only,  'A', 'm/s','Zonal wind at 200 mbar pressure surface')
-   call addfld ('U010',       horiz_only,  'A', 'm/s','Zonal wind at  10 mbar pressure surface')
-   call addfld ('V850',       horiz_only,  'A', 'm/s','Meridional wind at 850 mbar pressure surface')
-   call addfld ('V500',       horiz_only,  'A', 'm/s','Meridional wind at 500 mbar pressure surface')
-   call addfld ('V250',       horiz_only,  'A', 'm/s','Meridional wind at 250 mbar pressure surface')
-   call addfld ('V200',       horiz_only,  'A', 'm/s','Meridional wind at 200 mbar pressure surface')
+    call addfld ('U850',       horiz_only,  'A', 'm/s','Zonal wind at 850 mbar pressure surface')
+    call addfld ('U500',       horiz_only,  'A', 'm/s','Zonal wind at 500 mbar pressure surface')
+    call addfld ('U250',       horiz_only,  'A', 'm/s','Zonal wind at 250 mbar pressure surface')
+    call addfld ('U200',       horiz_only,  'A', 'm/s','Zonal wind at 200 mbar pressure surface')
+    call addfld ('U010',       horiz_only,  'A', 'm/s','Zonal wind at  10 mbar pressure surface')
+    call addfld ('V850',       horiz_only,  'A', 'm/s','Meridional wind at 850 mbar pressure surface')
+    call addfld ('V500',       horiz_only,  'A', 'm/s','Meridional wind at 500 mbar pressure surface')
+    call addfld ('V250',       horiz_only,  'A', 'm/s','Meridional wind at 250 mbar pressure surface')
+    call addfld ('V200',       horiz_only,  'A', 'm/s','Meridional wind at 200 mbar pressure surface')
 
-   call register_vector_field('U850', 'V850')
-   call register_vector_field('U500', 'V500')
-   call register_vector_field('U250', 'V250')
-   call register_vector_field('U200', 'V200')
+    call register_vector_field('U850', 'V850')
+    call register_vector_field('U500', 'V500')
+    call register_vector_field('U250', 'V250')
+    call register_vector_field('U200', 'V200')
 
-   call addfld ('UBOT',       horiz_only,  'A', 'm/s','Lowest model level zonal wind')
-   call addfld ('VBOT',       horiz_only,  'A', 'm/s','Lowest model level meridional wind')
-   call register_vector_field('UBOT', 'VBOT')
+    call addfld ('UBOT',       horiz_only,  'A', 'm/s','Lowest model level zonal wind')
+    call addfld ('VBOT',       horiz_only,  'A', 'm/s','Lowest model level meridional wind')
+    call register_vector_field('UBOT', 'VBOT')
 
-   call addfld ('ZBOT',       horiz_only,  'A', 'm','Lowest model level height')
+    call addfld ('ZBOT',       horiz_only,  'A', 'm','Lowest model level height')
 
-   call addfld ('ATMEINT',    horiz_only,  'A', 'J/m2','Vertically integrated total atmospheric energy ')
+    call addfld ('ATMEINT',    horiz_only,  'A', 'J/m2','Vertically integrated total atmospheric energy ')
 
 
 
 #ifdef OSLO_AERO
 
 #ifdef DIRIND
-   call addfld ('AOD_VIS ',horiz_only, 'A','unitless','Aerosol optical depth at 0.442-0.625um') ! CAM4-Oslo: 0.35-0.64um
-   call addfld ('ABSVIS  ',horiz_only, 'A','unitless','Aerosol absorptive optical depth at 0.442-0.625um') ! CAM4-Oslo: 0.35-0.64um
-   call addfld ('CAODVIS ',horiz_only, 'A','unitless','Clear air aerosol optical depth')  
-   call addfld ('CABSVIS ',horiz_only, 'A','unitless','Clear air aerosol absorptive optical depth')
-   call addfld ('CLDFREE ',horiz_only, 'A','unitless','Cloud free fraction wrt CAODVIS and CABSVIS')
-   call addfld ('DAYFOC  ',horiz_only, 'A','unitless','Daylight fraction')
-   call addfld ('N_AER   ',(/'lev'/),'A', 'unitless','Aerosol number concentration')
+    call addfld ('AOD_VIS ',horiz_only, 'A','unitless','Aerosol optical depth at 0.442-0.625um') ! CAM4-Oslo: 0.35-0.64um
+    call addfld ('ABSVIS  ',horiz_only, 'A','unitless','Aerosol absorptive optical depth at 0.442-0.625um') ! CAM4-Oslo: 0.35-0.64um
+    call addfld ('CAODVIS ',horiz_only, 'A','unitless','Clear air aerosol optical depth')  
+    call addfld ('CABSVIS ',horiz_only, 'A','unitless','Clear air aerosol absorptive optical depth')
+    call addfld ('CLDFREE ',horiz_only, 'A','unitless','Cloud free fraction wrt CAODVIS and CABSVIS')
+    call addfld ('DAYFOC  ',horiz_only, 'A','unitless','Daylight fraction')
+    call addfld ('N_AER   ',(/'lev'/),'A', 'unitless','Aerosol number concentration')
 !-   call addfld ('N_AERORG','unitless',pver, 'A','Aerosol number concentration',phys_decomp)
-   call addfld ('SSAVIS  ',(/'lev'/),'A','unitless','Aerosol single scattering albedo in visible wavelength band')    
-   call addfld ('ASYMMVIS',(/'lev'/),'A','unitless','Aerosol assymetry factor in visible wavelength band')    
-   call addfld ('EXTVIS  ',(/'lev'/),'A','1/km    ','Aerosol extinction')     
-   call addfld ('RELH    ',(/'lev'/),'A', 'unitless','Fictive relative humidity')
+    call addfld ('SSAVIS  ',(/'lev'/),'A','unitless','Aerosol single scattering albedo in visible wavelength band')    
+    call addfld ('ASYMMVIS',(/'lev'/),'A','unitless','Aerosol assymetry factor in visible wavelength band')    
+    call addfld ('EXTVIS  ',(/'lev'/),'A','1/km    ','Aerosol extinction')     
+    call addfld ('RELH    ',(/'lev'/),'A', 'unitless','Fictive relative humidity')
 #ifdef COLTST4INTCONS 
 ! optical depth for each mode/mixture:
-   call addfld ('TAUKC0 ','unitless',1,    'A','Aerosol optical depth at 0.442-0.625um for kcomp 0',phys_decomp)
-   call addfld ('TAUKC1 ','unitless',1,    'A','Aerosol optical depth at 0.442-0.625um for kcomp 1',phys_decomp)
-   call addfld ('TAUKC2 ','unitless',1,    'A','Aerosol optical depth at 0.442-0.625um for kcomp 2',phys_decomp)
-   call addfld ('TAUKC4 ','unitless',1,    'A','Aerosol optical depth at 0.442-0.625um for kcomp 4',phys_decomp)
-   call addfld ('TAUKC5 ','unitless',1,    'A','Aerosol optical depth at 0.442-0.625um for kcomp 5',phys_decomp)
-   call addfld ('TAUKC6 ','unitless',1,    'A','Aerosol optical depth at 0.442-0.625um for kcomp 6',phys_decomp)
-   call addfld ('TAUKC7 ','unitless',1,    'A','Aerosol optical depth at 0.442-0.625um for kcomp 7',phys_decomp)
-   call addfld ('TAUKC8 ','unitless',1,    'A','Aerosol optical depth at 0.442-0.625um for kcomp 8',phys_decomp)
-   call addfld ('TAUKC9 ','unitless',1,    'A','Aerosol optical depth at 0.442-0.625um for kcomp 9',phys_decomp)
-   call addfld ('TAUKC10','unitless',1,    'A','Aerosol optical depth at 0.442-0.625um for kcomp 10',phys_decomp)
-   call addfld ('TAUKC12','unitless',1,    'A','Aerosol optical depth at 0.442-0.625um for kcomp 12',phys_decomp)
-   call addfld ('TAUKC14','unitless',1,    'A','Aerosol optical depth at 0.442-0.625um for kcomp 14',phys_decomp)
+    call addfld ('TAUKC0 ','unitless',1,    'A','Aerosol optical depth at 0.442-0.625um for kcomp 0',phys_decomp)
+    call addfld ('TAUKC1 ','unitless',1,    'A','Aerosol optical depth at 0.442-0.625um for kcomp 1',phys_decomp)
+    call addfld ('TAUKC2 ','unitless',1,    'A','Aerosol optical depth at 0.442-0.625um for kcomp 2',phys_decomp)
+    call addfld ('TAUKC4 ','unitless',1,    'A','Aerosol optical depth at 0.442-0.625um for kcomp 4',phys_decomp)
+    call addfld ('TAUKC5 ','unitless',1,    'A','Aerosol optical depth at 0.442-0.625um for kcomp 5',phys_decomp)
+    call addfld ('TAUKC6 ','unitless',1,    'A','Aerosol optical depth at 0.442-0.625um for kcomp 6',phys_decomp)
+    call addfld ('TAUKC7 ','unitless',1,    'A','Aerosol optical depth at 0.442-0.625um for kcomp 7',phys_decomp)
+    call addfld ('TAUKC8 ','unitless',1,    'A','Aerosol optical depth at 0.442-0.625um for kcomp 8',phys_decomp)
+    call addfld ('TAUKC9 ','unitless',1,    'A','Aerosol optical depth at 0.442-0.625um for kcomp 9',phys_decomp)
+    call addfld ('TAUKC10','unitless',1,    'A','Aerosol optical depth at 0.442-0.625um for kcomp 10',phys_decomp)
+    call addfld ('TAUKC12','unitless',1,    'A','Aerosol optical depth at 0.442-0.625um for kcomp 12',phys_decomp)
+    call addfld ('TAUKC14','unitless',1,    'A','Aerosol optical depth at 0.442-0.625um for kcomp 14',phys_decomp)
 ! mass specific extinction (including condensed water) for each mode/mixture:
-   call addfld ('MECKC0 ','m2/g     ',pver, 'A','Aerosol MEC at 0.442-0.625um for kcomp 0',phys_decomp)
-   call addfld ('MECKC1 ','m2/g     ',pver, 'A','Aerosol MEC at 0.442-0.625um for kcomp 1',phys_decomp)
-   call addfld ('MECKC2 ','m2/g     ',pver, 'A','Aerosol MEC at 0.442-0.625um for kcomp 2',phys_decomp)
-   call addfld ('MECKC4 ','m2/g     ',pver, 'A','Aerosol MEC at 0.442-0.625um for kcomp 4',phys_decomp)
-   call addfld ('MECKC5 ','m2/g     ',pver, 'A','Aerosol MEC at 0.442-0.625um for kcomp 5',phys_decomp)
-   call addfld ('MECKC6 ','m2/g     ',pver, 'A','Aerosol MEC at 0.442-0.625um for kcomp 6',phys_decomp)
-   call addfld ('MECKC7 ','m2/g     ',pver, 'A','Aerosol MEC at 0.442-0.625um for kcomp 7',phys_decomp)
-   call addfld ('MECKC8 ','m2/g     ',pver, 'A','Aerosol MEC at 0.442-0.625um for kcomp 8',phys_decomp)
-   call addfld ('MECKC9 ','m2/g     ',pver, 'A','Aerosol MEC at 0.442-0.625um for kcomp 9',phys_decomp)
-   call addfld ('MECKC10','m2/g     ',pver, 'A','Aerosol MEC at 0.442-0.625um for kcomp 10',phys_decomp)
-   call addfld ('MECKC12','m2/g     ',pver, 'A','Aerosol MEC at 0.442-0.625um for kcomp 12',phys_decomp)
-   call addfld ('MECKC14','m2/g     ',pver, 'A','Aerosol MEC at 0.442-0.625um for kcomp 14',phys_decomp)
+    call addfld ('MECKC0 ','m2/g     ',pver, 'A','Aerosol MEC at 0.442-0.625um for kcomp 0',phys_decomp)
+    call addfld ('MECKC1 ','m2/g     ',pver, 'A','Aerosol MEC at 0.442-0.625um for kcomp 1',phys_decomp)
+    call addfld ('MECKC2 ','m2/g     ',pver, 'A','Aerosol MEC at 0.442-0.625um for kcomp 2',phys_decomp)
+    call addfld ('MECKC4 ','m2/g     ',pver, 'A','Aerosol MEC at 0.442-0.625um for kcomp 4',phys_decomp)
+    call addfld ('MECKC5 ','m2/g     ',pver, 'A','Aerosol MEC at 0.442-0.625um for kcomp 5',phys_decomp)
+    call addfld ('MECKC6 ','m2/g     ',pver, 'A','Aerosol MEC at 0.442-0.625um for kcomp 6',phys_decomp)
+    call addfld ('MECKC7 ','m2/g     ',pver, 'A','Aerosol MEC at 0.442-0.625um for kcomp 7',phys_decomp)
+    call addfld ('MECKC8 ','m2/g     ',pver, 'A','Aerosol MEC at 0.442-0.625um for kcomp 8',phys_decomp)
+    call addfld ('MECKC9 ','m2/g     ',pver, 'A','Aerosol MEC at 0.442-0.625um for kcomp 9',phys_decomp)
+    call addfld ('MECKC10','m2/g     ',pver, 'A','Aerosol MEC at 0.442-0.625um for kcomp 10',phys_decomp)
+    call addfld ('MECKC12','m2/g     ',pver, 'A','Aerosol MEC at 0.442-0.625um for kcomp 12',phys_decomp)
+    call addfld ('MECKC14','m2/g     ',pver, 'A','Aerosol MEC at 0.442-0.625um for kcomp 14',phys_decomp)
 #ifdef AEROCOM
 ! dry mass for  each mode/mixture (for calculation of specific extinction without condensed water):
-   call addfld ('CMDRY0 ',horiz_only, 'A','unitless','Total dry mass load for kcomp 0')
-   call addfld ('CMDRY1 ',horiz_only, 'A','unitless','Total dry mass load for kcomp 1')
-   call addfld ('CMDRY2 ',horiz_only, 'A','unitless','Total dry mass load for kcomp 2')
-   call addfld ('CMDRY4 ',horiz_only, 'A','unitless','Total dry mass load for kcomp 4')
-   call addfld ('CMDRY5 ',horiz_only, 'A','unitless','Total dry mass load for kcomp 5')
-   call addfld ('CMDRY6 ',horiz_only, 'A','unitless','Total dry mass load for kcomp 6')
-   call addfld ('CMDRY7 ',horiz_only, 'A','unitless','Total dry mass load for kcomp 7')
-   call addfld ('CMDRY8 ',horiz_only, 'A','unitless','Total dry mass load for kcomp 8')
-   call addfld ('CMDRY9 ',horiz_only, 'A','unitless','Total dry mass load for kcomp 9')
-   call addfld ('CMDRY10',horiz_only, 'A','unitless','Total dry mass load for kcomp 10')
-   call addfld ('CMDRY12',horiz_only, 'A','unitless','Total dry mass load for kcomp 12')
-   call addfld ('CMDRY14',horiz_only, 'A','unitless','Total dry mass load for kcomp 14')
+    call addfld ('CMDRY0 ',horiz_only, 'A','unitless','Total dry mass load for kcomp 0')
+    call addfld ('CMDRY1 ',horiz_only, 'A','unitless','Total dry mass load for kcomp 1')
+    call addfld ('CMDRY2 ',horiz_only, 'A','unitless','Total dry mass load for kcomp 2')
+    call addfld ('CMDRY4 ',horiz_only, 'A','unitless','Total dry mass load for kcomp 4')
+    call addfld ('CMDRY5 ',horiz_only, 'A','unitless','Total dry mass load for kcomp 5')
+    call addfld ('CMDRY6 ',horiz_only, 'A','unitless','Total dry mass load for kcomp 6')
+    call addfld ('CMDRY7 ',horiz_only, 'A','unitless','Total dry mass load for kcomp 7')
+    call addfld ('CMDRY8 ',horiz_only, 'A','unitless','Total dry mass load for kcomp 8')
+    call addfld ('CMDRY9 ',horiz_only, 'A','unitless','Total dry mass load for kcomp 9')
+    call addfld ('CMDRY10',horiz_only, 'A','unitless','Total dry mass load for kcomp 10')
+    call addfld ('CMDRY12',horiz_only, 'A','unitless','Total dry mass load for kcomp 12')
+    call addfld ('CMDRY14',horiz_only, 'A','unitless','Total dry mass load for kcomp 14')
 #endif !aerocom
 #endif !extra tests
 #ifdef AEROFFL
-   call addfld ('FSNT_DRF',horiz_only, 'A','W/m^2','Total column absorbed solar flux (DIRind)')
-   call addfld ('FSNTCDRF',horiz_only, 'A','W/m^2','Clear sky total column absorbed solar flux (DIRind)' )
-   call addfld ('FSNS_DRF',horiz_only, 'A','W/m^2   ','Surface absorbed solar flux (DIRind)' )
-   call addfld ('FSNSCDRF',horiz_only, 'A','W/m^2   ','Clear sky surface absorbed solar flux (DIRind)' )
-   call addfld ('QRS_DRF ',(/'lev'/), 'A','K/s     ','Solar heating rate (DIRind)')
-   call addfld ('QRSC_DRF',(/'lev'/), 'A','K/s     ','Clearsky solar heating rate (DIRind)' )
-   call addfld ('FLNT_DRF',horiz_only, 'A','W/m^2   ','Total column longwave flux (DIRind)' )
-   call addfld ('FLNTCDRF',horiz_only, 'A','W/m^2   ','Clear sky total column longwave flux (DIRind)' )
+    call addfld ('FSNT_DRF',horiz_only, 'A','W/m^2','Total column absorbed solar flux (DIRind)')
+    call addfld ('FSNTCDRF',horiz_only, 'A','W/m^2','Clear sky total column absorbed solar flux (DIRind)' )
+    call addfld ('FSNS_DRF',horiz_only, 'A','W/m^2   ','Surface absorbed solar flux (DIRind)' )
+    call addfld ('FSNSCDRF',horiz_only, 'A','W/m^2   ','Clear sky surface absorbed solar flux (DIRind)' )
+    call addfld ('QRS_DRF ',(/'lev'/), 'A','K/s     ','Solar heating rate (DIRind)')
+    call addfld ('QRSC_DRF',(/'lev'/), 'A','K/s     ','Clearsky solar heating rate (DIRind)' )
+    call addfld ('FLNT_DRF',horiz_only, 'A','W/m^2   ','Total column longwave flux (DIRind)' )
+    call addfld ('FLNTCDRF',horiz_only, 'A','W/m^2   ','Clear sky total column longwave flux (DIRind)' )
 #ifdef AEROCOM 
-   call addfld ('FSUTADRF',horiz_only, 'A','W/m^2   ','SW upwelling flux at TOA')
-   call addfld ('FSDS_DRF',horiz_only, 'A','W/m^2   ','SW downelling flux at surface')
-   call addfld ('FSUS_DRF',horiz_only, 'A','W/m^2   ','SW upwelling flux at surface')
-   call addfld ('FSDSCDRF',horiz_only, 'A','W/m^2   ','SW downwelling clear sky flux at surface')
-   call addfld ('FLUS    ',horiz_only, 'A','W/m^2   ','LW surface upwelling flux')
-   call addfld ('FLNT_ORG',horiz_only, 'A','W/m^2   ','Total column longwave flux (CAM5)' )
+    call addfld ('FSUTADRF',horiz_only, 'A','W/m^2   ','SW upwelling flux at TOA')
+    call addfld ('FSDS_DRF',horiz_only, 'A','W/m^2   ','SW downelling flux at surface')
+    call addfld ('FSUS_DRF',horiz_only, 'A','W/m^2   ','SW upwelling flux at surface')
+    call addfld ('FSDSCDRF',horiz_only, 'A','W/m^2   ','SW downwelling clear sky flux at surface')
+    call addfld ('FLUS    ',horiz_only, 'A','W/m^2   ','LW surface upwelling flux')
+    call addfld ('FLNT_ORG',horiz_only, 'A','W/m^2   ','Total column longwave flux (CAM5)' )
 #endif  ! aerocom
 #endif  ! aeroffl
 #ifdef AEROCOM 
@@ -551,7 +558,7 @@ contains
 #endif  ! OSLO_AERO
 
  
-   if (history_amwg) then
+    if (history_amwg) then
       call add_default ('PHIS    '  , 1, ' ')
       call add_default ('PS      '  , 1, ' ')
       call add_default ('T       '  , 1, ' ')
@@ -565,18 +572,18 @@ contains
       call add_default ('UU      ', 1, ' ')
       call add_default ('OMEGAT  ', 1, ' ')
       call add_default ('PSL     ', 1, ' ')
-   end if
-   
-   if (history_vdiag) then
-     call add_default ('U200', 2, ' ')
-     call add_default ('V200', 2, ' ')
-     call add_default ('U850', 2, ' ')
-     call add_default ('U200', 3, ' ')
-     call add_default ('U850', 3, ' ')
-     call add_default ('OMEGA500', 3, ' ')
-   end if
-   
-   if (history_eddy) then
+    end if
+
+    if (history_vdiag) then
+      call add_default ('U200', 2, ' ')
+      call add_default ('V200', 2, ' ')
+      call add_default ('U850', 2, ' ')
+      call add_default ('U200', 3, ' ')
+      call add_default ('U850', 3, ' ')
+      call add_default ('OMEGA500', 3, ' ')
+    end if
+
+    if (history_eddy) then
       call add_default ('VT      ', 1, ' ')
       call add_default ('VU      ', 1, ' ')
       call add_default ('VV      ', 1, ' ')
@@ -584,9 +591,9 @@ contains
       call add_default ('OMEGAT  ', 1, ' ')
       call add_default ('OMEGAU  ', 1, ' ')
       call add_default ('OMEGAV  ', 1, ' ')
-   endif
+    endif
 
-   if ( history_budget ) then
+    if ( history_budget ) then
       call add_default ('PHIS    '  , history_budget_histfile_num, ' ')
       call add_default ('PS      '  , history_budget_histfile_num, ' ')
       call add_default ('T       '  , history_budget_histfile_num, ' ')
@@ -603,13 +610,18 @@ contains
       call add_default ('VAP     '  , history_budget_histfile_num, ' ')
       call add_default (apcnst(1)   , history_budget_histfile_num, ' ')
       if ( dycore_is('LR') .or. dycore_is('SE') ) then
-         call add_default ('TFIX    '    , history_budget_histfile_num, ' ')
+        call add_default ('TFIX    '  , history_budget_histfile_num, ' ')
+        call add_default ('EFIX    '  , history_budget_histfile_num, ' ') !+tht
+        call add_default ('PTTEND_DME', history_budget_histfile_num, ' ') !+tht
+        call add_default ('IETEND_DME', history_budget_histfile_num, ' ') !+tht
+        call add_default ('EFLX    '  , history_budget_histfile_num, ' ') !+tht
       end if
-   end if
+    end if
 
     if (history_waccm) then
-      call add_default ('PS      ', 2, ' ')
-      call add_default ('T       ', 2, ' ')
+      call add_default ('PHIS', 7, ' ')
+      call add_default ('PS', 7, ' ')
+      call add_default ('PSL', 7, ' ')
     end if
 
     ! outfld calls in diag_phys_tend_writeout
@@ -618,9 +630,9 @@ contains
       call add_default ('PTTEND'          , history_budget_histfile_num, ' ')
     end if
 
-   ! create history variables for fourier coefficients of the diurnal 
-   ! and semidiurnal tide in T, U, V, and Z3
-   call tidal_diag_init() 
+    ! create history variables for fourier coefficients of the diurnal
+    ! and semidiurnal tide in T, U, V, and Z3
+    call tidal_diag_init()
 
 
 #ifdef DIRIND
@@ -887,14 +899,14 @@ contains
     integer :: ixcldice, ixcldliq ! constituent indices for cloud liquid and ice water.
     integer :: ierr
     !AL
-    integer ixcldnc
-    integer ixcldni
+    integer :: ixcldnc
+    integer :: ixcldni
     !AL
     ! column burdens for all constituents except water vapor
     call constituent_burden_init
 
-   call cnst_get_ind('CLDLIQ', ixcldliq)
-   call cnst_get_ind('CLDICE', ixcldice)
+    call cnst_get_ind('CLDLIQ', ixcldliq, abort=.false.)
+    call cnst_get_ind('CLDICE', ixcldice, abort=.false.)
 
     ! outfld calls in diag_phys_writeout
     call addfld (cnst_name(1), (/ 'lev' /), 'A', 'kg/kg',    cnst_longname(1))
@@ -923,126 +935,132 @@ contains
 
     ! outfld calls in diag_conv
 
-   call addfld ('DTCOND',       (/ 'lev' /), 'A','K/s','T tendency - moist processes')
-   call addfld ('DTCOND_24_COS',(/ 'lev' /), 'A','K/s','T tendency - moist processes 24hr. cos coeff.')
-   call addfld ('DTCOND_24_SIN',(/ 'lev' /), 'A','K/s','T tendency - moist processes 24hr. sin coeff.')
-   call addfld ('DTCOND_12_COS',(/ 'lev' /), 'A','K/s','T tendency - moist processes 12hr. cos coeff.')
-   call addfld ('DTCOND_12_SIN',(/ 'lev' /), 'A','K/s','T tendency - moist processes 12hr. sin coeff.')
+    call addfld ('DTCOND',       (/ 'lev' /), 'A','K/s','T tendency - moist processes')
+    call addfld ('DTCOND_24_COS',(/ 'lev' /), 'A','K/s','T tendency - moist processes 24hr. cos coeff.')
+    call addfld ('DTCOND_24_SIN',(/ 'lev' /), 'A','K/s','T tendency - moist processes 24hr. sin coeff.')
+    call addfld ('DTCOND_12_COS',(/ 'lev' /), 'A','K/s','T tendency - moist processes 12hr. cos coeff.')
+    call addfld ('DTCOND_12_SIN',(/ 'lev' /), 'A','K/s','T tendency - moist processes 12hr. sin coeff.')
+    call addfld ('DTCOND_08_COS',(/ 'lev' /), 'A','K/s','T tendency - moist processes  8hr. cos coeff.')
+    call addfld ('DTCOND_08_SIN',(/ 'lev' /), 'A','K/s','T tendency - moist processes  8hr. sin coeff.')
 !AL
-   call cnst_get_ind('NUMLIQ', ixcldnc)
-   call cnst_get_ind('NUMICE', ixcldni)
+    call cnst_get_ind('NUMLIQ', ixcldnc)
+    call cnst_get_ind('NUMICE', ixcldni)
 !AL
 
-   call addfld ('PRECL',    horiz_only, 'A', 'm/s','Large-scale (stable) precipitation rate (liq + ice)'                )
-   call addfld ('PRECC',    horiz_only, 'A', 'm/s','Convective precipitation rate (liq + ice)'                          )
-   call addfld ('PRECT',    horiz_only, 'A', 'm/s','Total (convective and large-scale) precipitation rate (liq + ice)'  )
-   call addfld ('PREC_PCW', horiz_only, 'A', 'm/s','LS_pcw precipitation rate')
-   call addfld ('PREC_zmc', horiz_only, 'A', 'm/s','CV_zmc precipitation rate')
-   call addfld ('PRECTMX',  horiz_only, 'X','m/s','Maximum (convective and large-scale) precipitation rate (liq+ice)'   )
-   call addfld ('PRECSL',   horiz_only, 'A', 'm/s','Large-scale (stable) snow rate (water equivalent)'                  )
-   call addfld ('PRECSC',   horiz_only, 'A', 'm/s','Convective snow rate (water equivalent)'                            )
-   call addfld ('PRECCav',  horiz_only, 'A', 'm/s','Average large-scale precipitation (liq + ice)'                      )
-   call addfld ('PRECLav',  horiz_only, 'A', 'm/s','Average convective precipitation  (liq + ice)'                      )
+    call addfld ('PRECL',    horiz_only, 'A', 'm/s','Large-scale (stable) precipitation rate (liq + ice)'                )
+    call addfld ('PRECC',    horiz_only, 'A', 'm/s','Convective precipitation rate (liq + ice)'                          )
+    call addfld ('PRECT',    horiz_only, 'A', 'm/s','Total (convective and large-scale) precipitation rate (liq + ice)'  )
+    call addfld ('PREC_PCW', horiz_only, 'A', 'm/s','LS_pcw precipitation rate')
+    call addfld ('PREC_zmc', horiz_only, 'A', 'm/s','CV_zmc precipitation rate')
+    call addfld ('PRECTMX',  horiz_only, 'X','m/s','Maximum (convective and large-scale) precipitation rate (liq+ice)'   )
+    call addfld ('PRECSL',   horiz_only, 'A', 'm/s','Large-scale (stable) snow rate (water equivalent)'                  )
+    call addfld ('PRECSC',   horiz_only, 'A', 'm/s','Convective snow rate (water equivalent)'                            )
+    call addfld ('PRECCav',  horiz_only, 'A', 'm/s','Average large-scale precipitation (liq + ice)'                      )
+    call addfld ('PRECLav',  horiz_only, 'A', 'm/s','Average convective precipitation  (liq + ice)'                      )
 
-   ! outfld calls in diag_surf
+    ! outfld calls in diag_surf
 
-   call addfld ('SHFLX',    horiz_only, 'A', 'W/m2','Surface sensible heat flux')
-   call addfld ('LHFLX',    horiz_only, 'A', 'W/m2','Surface latent heat flux')
-   call addfld ('QFLX',     horiz_only, 'A', 'kg/m2/s','Surface water flux')
+    call addfld ('SHFLX',    horiz_only, 'A', 'W/m2','Surface sensible heat flux')
+    call addfld ('LHFLX',    horiz_only, 'A', 'W/m2','Surface latent heat flux')
+    call addfld ('QFLX',     horiz_only, 'A', 'kg/m2/s','Surface water flux')
 
-   call addfld ('TAUX',     horiz_only, 'A', 'N/m2','Zonal surface stress')
-   call addfld ('TAUY',     horiz_only, 'A', 'N/m2','Meridional surface stress')
-   call addfld ('TREFHT',   horiz_only, 'A', 'K','Reference height temperature')
-   call addfld ('TREFHTMN', horiz_only, 'M','K','Minimum reference height temperature over output period')
-   call addfld ('TREFHTMX', horiz_only, 'X','K','Maximum reference height temperature over output period')
-   call addfld ('QREFHT',   horiz_only, 'A', 'kg/kg','Reference height humidity')
-   call addfld ('U10',      horiz_only, 'A', 'm/s','10m wind speed')
-   call addfld ('RHREFHT',  horiz_only, 'A', 'fraction','Reference height relative humidity')
+    call addfld ('TAUX',     horiz_only, 'A', 'N/m2','Zonal surface stress')
+    call addfld ('TAUY',     horiz_only, 'A', 'N/m2','Meridional surface stress')
+    call addfld ('TREFHT',   horiz_only, 'A', 'K','Reference height temperature')
+    call addfld ('TREFHTMN', horiz_only, 'M','K','Minimum reference height temperature over output period')
+    call addfld ('TREFHTMX', horiz_only, 'X','K','Maximum reference height temperature over output period')
+    call addfld ('QREFHT',   horiz_only, 'A', 'kg/kg','Reference height humidity')
+    call addfld ('U10',      horiz_only, 'A', 'm/s','10m wind speed')
+    call addfld ('RHREFHT',  horiz_only, 'A', 'fraction','Reference height relative humidity')
 
-   call addfld ('LANDFRAC', horiz_only, 'A', 'fraction','Fraction of sfc area covered by land')
-   call addfld ('ICEFRAC',  horiz_only, 'A', 'fraction','Fraction of sfc area covered by sea-ice')
-   call addfld ('OCNFRAC',  horiz_only, 'A', 'fraction','Fraction of sfc area covered by ocean')
+    call addfld ('LANDFRAC', horiz_only, 'A', 'fraction','Fraction of sfc area covered by land')
+    call addfld ('ICEFRAC',  horiz_only, 'A', 'fraction','Fraction of sfc area covered by sea-ice')
+    call addfld ('OCNFRAC',  horiz_only, 'A', 'fraction','Fraction of sfc area covered by ocean')
 
-   call addfld ('TREFMNAV', horiz_only, 'A', 'K','Average of TREFHT daily minimum')
-   call addfld ('TREFMXAV', horiz_only, 'A', 'K','Average of TREFHT daily maximum')
+    call addfld ('TREFMNAV', horiz_only, 'A', 'K','Average of TREFHT daily minimum')
+    call addfld ('TREFMXAV', horiz_only, 'A', 'K','Average of TREFHT daily maximum')
 
-   call addfld ('TS',       horiz_only, 'A', 'K','Surface temperature (radiative)')
-   call addfld ('TSMN',     horiz_only, 'M','K','Minimum surface temperature over output period')
-   call addfld ('TSMX',     horiz_only, 'X','K','Maximum surface temperature over output period')
-   call addfld ('SNOWHLND', horiz_only, 'A', 'm','Water equivalent snow depth')
-   call addfld ('SNOWHICE', horiz_only, 'A', 'm','Snow depth over ice', fill_value = 1.e30_r8)
-   call addfld ('TBOT',     horiz_only, 'A', 'K','Lowest model level temperature')
+    call addfld ('TS',       horiz_only, 'A', 'K','Surface temperature (radiative)')
+    call addfld ('TSMN',     horiz_only, 'M','K','Minimum surface temperature over output period')
+    call addfld ('TSMX',     horiz_only, 'X','K','Maximum surface temperature over output period')
+    call addfld ('SNOWHLND', horiz_only, 'A', 'm','Water equivalent snow depth')
+    call addfld ('SNOWHICE', horiz_only, 'A', 'm','Snow depth over ice', fill_value = 1.e30_r8)
+    call addfld ('TBOT',     horiz_only, 'A', 'K','Lowest model level temperature')
 
-   call addfld ('ASDIR',    horiz_only, 'A', '1','albedo: shortwave, direct')
-   call addfld ('ASDIF',    horiz_only, 'A', '1','albedo: shortwave, diffuse')
-   call addfld ('ALDIR',    horiz_only, 'A', '1','albedo: longwave, direct')
-   call addfld ('ALDIF',    horiz_only, 'A', '1','albedo: longwave, diffuse')
-   call addfld ('SST',      horiz_only, 'A', 'K','sea surface temperature')
+    call addfld ('ASDIR',    horiz_only, 'A', '1','albedo: shortwave, direct')
+    call addfld ('ASDIF',    horiz_only, 'A', '1','albedo: shortwave, diffuse')
+    call addfld ('ALDIR',    horiz_only, 'A', '1','albedo: longwave, direct')
+    call addfld ('ALDIF',    horiz_only, 'A', '1','albedo: longwave, diffuse')
+    call addfld ('SST',      horiz_only, 'A', 'K','sea surface temperature')
 
-   ! outfld calls in diag_phys_tend_writeout
+    ! outfld calls in diag_phys_tend_writeout
 
-   call addfld (ptendnam(       1),(/ 'lev' /), 'A', 'kg/kg/s',trim(cnst_name(       1))//' total physics tendency '      )
-   call addfld (ptendnam(ixcldliq),(/ 'lev' /), 'A', 'kg/kg/s',trim(cnst_name(ixcldliq))//' total physics tendency '      )
-   call addfld (ptendnam(ixcldice),(/ 'lev' /), 'A', 'kg/kg/s',trim(cnst_name(ixcldice))//' total physics tendency '      )
+    call addfld (ptendnam(       1),(/ 'lev' /), 'A', 'kg/kg/s',trim(cnst_name(       1))//' total physics tendency '      )
+    call addfld (ptendnam(ixcldliq),(/ 'lev' /), 'A', 'kg/kg/s',trim(cnst_name(ixcldliq))//' total physics tendency '      )
+    if (ixcldice > 0) then
+      call addfld (ptendnam(ixcldice),(/ 'lev' /), 'A', 'kg/kg/s',trim(cnst_name(ixcldice))//' total physics tendency ')
+    end if
 !AL
-   call addfld (ptendnam(ixcldnc), (/ 'lev' /), 'A', '#/kg/s ',trim(cnst_name(ixcldnc))//' total physics tendency ')
-   call addfld (ptendnam(ixcldni), (/ 'lev' /), 'A', '#/kg/s ',trim(cnst_name(ixcldni))//' total physics tendency ')
+    call addfld (ptendnam(ixcldnc), (/ 'lev' /), 'A', '#/kg/s ',trim(cnst_name(ixcldnc))//' total physics tendency ')
+    call addfld (ptendnam(ixcldni), (/ 'lev' /), 'A', '#/kg/s ',trim(cnst_name(ixcldni))//' total physics tendency ')
 !AL
-   if ( dycore_is('LR') )then
+    if ( dycore_is('LR') )then
       call addfld (dmetendnam(       1),(/ 'lev' /), 'A','kg/kg/s', &
            trim(cnst_name(       1))//' dme adjustment tendency (FV) ')
       call addfld (dmetendnam(ixcldliq),(/ 'lev' /), 'A','kg/kg/s', &
            trim(cnst_name(ixcldliq))//' dme adjustment tendency (FV) ')
-      call addfld (dmetendnam(ixcldice),(/ 'lev' /), 'A','kg/kg/s', &
-           trim(cnst_name(ixcldice))//' dme adjustment tendency (FV) ')
+      if (ixcldice > 0) then
+        call addfld (dmetendnam(ixcldice),(/ 'lev' /), 'A','kg/kg/s', &
+             trim(cnst_name(ixcldice))//' dme adjustment tendency (FV) ')
+      end if
 !AL
       call addfld (dmetendnam(ixcldnc),(/ 'lev' /), 'A','#/kg/s ',   &
            trim(cnst_name(ixcldnc))//' dme adjustment tendency (FV) ')
       call addfld (dmetendnam(ixcldni),(/ 'lev' /), 'A','#/kg/s ',   & 
            trim(cnst_name(ixcldni))//' dme adjustment tendency (FV) ')
 !AL
-   end if
+    end if
 
-   if ( history_budget ) then
+    if ( history_budget ) then
 !AL
       call add_default (ptendnam(ixcldnc), history_budget_histfile_num, ' ')
       call add_default (ptendnam(ixcldni), history_budget_histfile_num, ' ')
 !AL
-   end if
+    end if
 
-   ! outfld calls in diag_physvar_ic
+    ! outfld calls in diag_physvar_ic
 
-   call addfld ('QCWAT&IC',  (/ 'lev' /),  'I','kg/kg','q associated with cloud water'                   )
-   call addfld ('TCWAT&IC',  (/ 'lev' /),  'I','kg/kg','T associated with cloud water'                   )
-   call addfld ('LCWAT&IC',  (/ 'lev' /),  'I','kg/kg','Cloud water (ice + liq'                          )
-   call addfld ('CLOUD&IC',  (/ 'lev' /),  'I','fraction','Cloud fraction'                               )
-   call addfld ('CONCLD&IC', (/ 'lev' /),  'I','fraction','Convective cloud fraction'                    )
-   call addfld ('TKE&IC',    (/ 'ilev' /), 'I','m2/s2','Turbulent Kinetic Energy'                        )
-   call addfld ('CUSH&IC',   horiz_only,   'I','m','Convective Scale Height'                             )
-   call addfld ('KVH&IC',    (/ 'ilev' /), 'I','m2/s','Vertical diffusion diffusivities (heat/moisture)' )
-   call addfld ('KVM&IC',    (/ 'ilev' /), 'I','m2/s','Vertical diffusion diffusivities (momentum)'      )
-   call addfld ('PBLH&IC',   horiz_only,   'I','m','PBL height'                                          )
-   call addfld ('TPERT&IC',  horiz_only,   'I','K','Perturbation temperature (eddies in PBL)'            )
-   call addfld ('QPERT&IC',  horiz_only,   'I','kg/kg','Perturbation specific humidity (eddies in PBL)'  )
+    call addfld ('QCWAT&IC',  (/ 'lev' /),  'I','kg/kg','q associated with cloud water'                   )
+    call addfld ('TCWAT&IC',  (/ 'lev' /),  'I','kg/kg','T associated with cloud water'                   )
+    call addfld ('LCWAT&IC',  (/ 'lev' /),  'I','kg/kg','Cloud water (ice + liq'                          )
+    call addfld ('CLOUD&IC',  (/ 'lev' /),  'I','fraction','Cloud fraction'                               )
+    call addfld ('CONCLD&IC', (/ 'lev' /),  'I','fraction','Convective cloud fraction'                    )
+    call addfld ('TKE&IC',    (/ 'ilev' /), 'I','m2/s2','Turbulent Kinetic Energy'                        )
+    call addfld ('CUSH&IC',   horiz_only,   'I','m','Convective Scale Height'                             )
+    call addfld ('KVH&IC',    (/ 'ilev' /), 'I','m2/s','Vertical diffusion diffusivities (heat/moisture)' )
+    call addfld ('KVM&IC',    (/ 'ilev' /), 'I','m2/s','Vertical diffusion diffusivities (momentum)'      )
+    call addfld ('PBLH&IC',   horiz_only,   'I','m','PBL height'                                          )
+    call addfld ('TPERT&IC',  horiz_only,   'I','K','Perturbation temperature (eddies in PBL)'            )
+    call addfld ('QPERT&IC',  horiz_only,   'I','kg/kg','Perturbation specific humidity (eddies in PBL)'  )
 
-   ! CAM export state 
-   call addfld('a2x_BCPHIWET', horiz_only, 'A', 'kg/m2/s', 'wetdep of hydrophilic black carbon')
-   call addfld('a2x_BCPHIDRY', horiz_only, 'A', 'kg/m2/s', 'drydep of hydrophilic black carbon')
-   call addfld('a2x_BCPHODRY', horiz_only, 'A', 'kg/m2/s', 'drydep of hydrophobic black carbon')
-   call addfld('a2x_OCPHIWET', horiz_only, 'A', 'kg/m2/s', 'wetdep of hydrophilic organic carbon')
-   call addfld('a2x_OCPHIDRY', horiz_only, 'A', 'kg/m2/s', 'drydep of hydrophilic organic carbon')
-   call addfld('a2x_OCPHODRY', horiz_only, 'A', 'kg/m2/s', 'drydep of hydrophobic organic carbon')
-   call addfld('a2x_DSTWET1',  horiz_only, 'A',  'kg/m2/s', 'wetdep of dust (bin1)')
-   call addfld('a2x_DSTDRY1',  horiz_only, 'A',  'kg/m2/s', 'drydep of dust (bin1)')
-   call addfld('a2x_DSTWET2',  horiz_only, 'A',  'kg/m2/s', 'wetdep of dust (bin2)')
-   call addfld('a2x_DSTDRY2',  horiz_only, 'A',  'kg/m2/s', 'drydep of dust (bin2)')
-   call addfld('a2x_DSTWET3',  horiz_only, 'A',  'kg/m2/s', 'wetdep of dust (bin3)')
-   call addfld('a2x_DSTDRY3',  horiz_only, 'A',  'kg/m2/s', 'drydep of dust (bin3)')
-   call addfld('a2x_DSTWET4',  horiz_only, 'A',  'kg/m2/s', 'wetdep of dust (bin4)')
-   call addfld('a2x_DSTDRY4',  horiz_only, 'A',  'kg/m2/s', 'drydep of dust (bin4)')
+    ! CAM export state
+    call addfld('a2x_BCPHIWET', horiz_only, 'A', 'kg/m2/s', 'wetdep of hydrophilic black carbon')
+    call addfld('a2x_BCPHIDRY', horiz_only, 'A', 'kg/m2/s', 'drydep of hydrophilic black carbon')
+    call addfld('a2x_BCPHODRY', horiz_only, 'A', 'kg/m2/s', 'drydep of hydrophobic black carbon')
+    call addfld('a2x_OCPHIWET', horiz_only, 'A', 'kg/m2/s', 'wetdep of hydrophilic organic carbon')
+    call addfld('a2x_OCPHIDRY', horiz_only, 'A', 'kg/m2/s', 'drydep of hydrophilic organic carbon')
+    call addfld('a2x_OCPHODRY', horiz_only, 'A', 'kg/m2/s', 'drydep of hydrophobic organic carbon')
+    call addfld('a2x_DSTWET1',  horiz_only, 'A',  'kg/m2/s', 'wetdep of dust (bin1)')
+    call addfld('a2x_DSTDRY1',  horiz_only, 'A',  'kg/m2/s', 'drydep of dust (bin1)')
+    call addfld('a2x_DSTWET2',  horiz_only, 'A',  'kg/m2/s', 'wetdep of dust (bin2)')
+    call addfld('a2x_DSTDRY2',  horiz_only, 'A',  'kg/m2/s', 'drydep of dust (bin2)')
+    call addfld('a2x_DSTWET3',  horiz_only, 'A',  'kg/m2/s', 'wetdep of dust (bin3)')
+    call addfld('a2x_DSTDRY3',  horiz_only, 'A',  'kg/m2/s', 'drydep of dust (bin3)')
+    call addfld('a2x_DSTWET4',  horiz_only, 'A',  'kg/m2/s', 'wetdep of dust (bin4)')
+    call addfld('a2x_DSTDRY4',  horiz_only, 'A',  'kg/m2/s', 'drydep of dust (bin4)')
 
 #ifdef AEROCOM 
-     call add_default ('RHW     ', 1, ' ')
+    call add_default ('RHW     ', 1, ' ')
 #endif  ! aerocom
 
     ! defaults
@@ -1085,11 +1103,15 @@ contains
       call add_default ('PTTEND'          , history_budget_histfile_num, ' ')
       call add_default (ptendnam(       1), history_budget_histfile_num, ' ')
       call add_default (ptendnam(ixcldliq), history_budget_histfile_num, ' ')
-      call add_default (ptendnam(ixcldice), history_budget_histfile_num, ' ')
+      if (ixcldice > 0) then
+        call add_default (ptendnam(ixcldice), history_budget_histfile_num, ' ')
+      end if
       if ( dycore_is('LR') )then
         call add_default(dmetendnam(1)       , history_budget_histfile_num, ' ')
         call add_default(dmetendnam(ixcldliq), history_budget_histfile_num, ' ')
-        call add_default(dmetendnam(ixcldice), history_budget_histfile_num, ' ')
+        if (ixcldice > 0) then
+          call add_default(dmetendnam(ixcldice), history_budget_histfile_num, ' ')
+        end if
       end if
       if( history_budget_histfile_num > 1 ) then
         call add_default ('DTCOND  '         , history_budget_histfile_num, ' ')
@@ -1103,7 +1125,7 @@ contains
     end if
 
     ! Initial file - Optional fields
-    if (inithist_all) then
+    if (inithist_all.or.single_column) then
       call add_default ('CONCLD&IC  ',0, 'I')
       call add_default ('QCWAT&IC   ',0, 'I')
       call add_default ('TCWAT&IC   ',0, 'I')
@@ -1153,34 +1175,34 @@ contains
     end if
 
     ! Pbuf field indices for collecting output data
-  qcwat_idx  = pbuf_get_index('QCWAT',errcode=ierr)
-  tcwat_idx  = pbuf_get_index('TCWAT',errcode=ierr)
-  lcwat_idx  = pbuf_get_index('LCWAT',errcode=ierr)
-  cld_idx    = pbuf_get_index('CLD')
-  concld_idx = pbuf_get_index('CONCLD',errcode=ierr)
+    qcwat_idx  = pbuf_get_index('QCWAT',  errcode=ierr)
+    tcwat_idx  = pbuf_get_index('TCWAT',  errcode=ierr)
+    lcwat_idx  = pbuf_get_index('LCWAT',  errcode=ierr)
+    cld_idx    = pbuf_get_index('CLD',    errcode=ierr)
+    concld_idx = pbuf_get_index('CONCLD', errcode=ierr)
 
-  tke_idx  = pbuf_get_index('tke')
-  kvm_idx  = pbuf_get_index('kvm')
-  kvh_idx  = pbuf_get_index('kvh')
-  cush_idx = pbuf_get_index('cush', errcode=ierr)
-  
-  pblh_idx  = pbuf_get_index('pblh')
-  tpert_idx = pbuf_get_index('tpert')
-  qpert_idx = pbuf_get_index('qpert',errcode=ierr)
+    tke_idx  = pbuf_get_index('tke',  errcode=ierr)
+    kvm_idx  = pbuf_get_index('kvm',  errcode=ierr)
+    kvh_idx  = pbuf_get_index('kvh',  errcode=ierr)
+    cush_idx = pbuf_get_index('cush', errcode=ierr)
 
-  prec_dp_idx  = pbuf_get_index('PREC_DP') 
-  snow_dp_idx  = pbuf_get_index('SNOW_DP') 
-  prec_sh_idx  = pbuf_get_index('PREC_SH')
-  snow_sh_idx  = pbuf_get_index('SNOW_SH')
-  prec_sed_idx = pbuf_get_index('PREC_SED')
-  snow_sed_idx = pbuf_get_index('SNOW_SED')
-  prec_pcw_idx = pbuf_get_index('PREC_PCW')
-  snow_pcw_idx = pbuf_get_index('SNOW_PCW')
+    pblh_idx  = pbuf_get_index('pblh',  errcode=ierr)
+    tpert_idx = pbuf_get_index('tpert', errcode=ierr)
+    qpert_idx = pbuf_get_index('qpert', errcode=ierr)
 
-  if (is_first_step()) then
-    call pbuf_set_field(pbuf2d, trefmxav_idx, -1.0e36_r8)
-    call pbuf_set_field(pbuf2d, trefmnav_idx,  1.0e36_r8)
-  end if
+    prec_dp_idx  = pbuf_get_index('PREC_DP',  errcode=ierr)
+    snow_dp_idx  = pbuf_get_index('SNOW_DP',  errcode=ierr)
+    prec_sh_idx  = pbuf_get_index('PREC_SH',  errcode=ierr)
+    snow_sh_idx  = pbuf_get_index('SNOW_SH',  errcode=ierr)
+    prec_sed_idx = pbuf_get_index('PREC_SED', errcode=ierr)
+    snow_sed_idx = pbuf_get_index('SNOW_SED', errcode=ierr)
+    prec_pcw_idx = pbuf_get_index('PREC_PCW', errcode=ierr)
+    snow_pcw_idx = pbuf_get_index('SNOW_PCW', errcode=ierr)
+
+    if (is_first_step()) then
+      call pbuf_set_field(pbuf2d, trefmxav_idx, -1.0e36_r8)
+      call pbuf_set_field(pbuf2d, trefmnav_idx,  1.0e36_r8)
+    end if
 
   end subroutine diag_init_moist
 
@@ -1371,9 +1393,9 @@ contains
     !
     ! Arguments
     !
-   type(physics_state), intent(inout) :: state
-   real(r8),            intent(out)   :: p_surf_t(pcols, nsurf)  ! data interpolated to a pressure surface
-   real(r8), optional , intent(out)   :: psl(pcols) 
+    type(physics_state), intent(inout) :: state
+    real(r8),            intent(out)   :: p_surf_t(pcols, nsurf)  ! data interpolated to a pressure surface
+    real(r8), optional , intent(out)   :: psl(pcols)
     !
     !---------------------------Local workspace-----------------------------
     !
@@ -1417,39 +1439,39 @@ contains
     ! Add height of surface to midpoint height above surface
     !
     do k = 1, pver
-       z3(:ncol,k) = state%zm(:ncol,k) + state%phis(:ncol)*rga
+      z3(:ncol,k) = state%zm(:ncol,k) + state%phis(:ncol)*rga
     end do
     call outfld('Z3      ',z3,pcols,lchnk)
     !
     ! Output Z3 on pressure surfaces
     !
     if (hist_fld_active('Z1000')) then
-       call vertinterp(ncol, pcols, pver, state%pmid, 100000._r8, z3, p_surf)
-       call outfld('Z1000    ', p_surf, pcols, lchnk)
+      call vertinterp(ncol, pcols, pver, state%pmid, 100000._r8, z3, p_surf)
+      call outfld('Z1000    ', p_surf, pcols, lchnk)
     end if
     if (hist_fld_active('Z700')) then
-       call vertinterp(ncol, pcols, pver, state%pmid, 70000._r8, z3, p_surf)
-       call outfld('Z700    ', p_surf, pcols, lchnk)
+      call vertinterp(ncol, pcols, pver, state%pmid, 70000._r8, z3, p_surf)
+      call outfld('Z700    ', p_surf, pcols, lchnk)
     end if
     if (hist_fld_active('Z500')) then
-       call vertinterp(ncol, pcols, pver, state%pmid, 50000._r8, z3, p_surf)
-       call outfld('Z500    ', p_surf, pcols, lchnk)
+      call vertinterp(ncol, pcols, pver, state%pmid, 50000._r8, z3, p_surf)
+      call outfld('Z500    ', p_surf, pcols, lchnk)
     end if
     if (hist_fld_active('Z300')) then
-       call vertinterp(ncol, pcols, pver, state%pmid, 30000._r8, z3, p_surf)
-       call outfld('Z300    ', p_surf, pcols, lchnk)
+      call vertinterp(ncol, pcols, pver, state%pmid, 30000._r8, z3, p_surf)
+      call outfld('Z300    ', p_surf, pcols, lchnk)
     end if
     if (hist_fld_active('Z200')) then
-       call vertinterp(ncol, pcols, pver, state%pmid, 20000._r8, z3, p_surf)
-       call outfld('Z200    ', p_surf, pcols, lchnk)
+      call vertinterp(ncol, pcols, pver, state%pmid, 20000._r8, z3, p_surf)
+      call outfld('Z200    ', p_surf, pcols, lchnk)
     end if
     if (hist_fld_active('Z100')) then
-       call vertinterp(ncol, pcols, pver, state%pmid, 10000._r8, z3, p_surf)
-       call outfld('Z100    ', p_surf, pcols, lchnk)
+      call vertinterp(ncol, pcols, pver, state%pmid, 10000._r8, z3, p_surf)
+      call outfld('Z100    ', p_surf, pcols, lchnk)
     end if
     if (hist_fld_active('Z050')) then
-       call vertinterp(ncol, pcols, pver, state%pmid,  5000._r8, z3, p_surf)
-       call outfld('Z050    ', p_surf, pcols, lchnk)
+      call vertinterp(ncol, pcols, pver, state%pmid,  5000._r8, z3, p_surf)
+      call outfld('Z050    ', p_surf, pcols, lchnk)
     end if
     !
     ! Quadratic height fiels Z3*Z3
@@ -1480,14 +1502,14 @@ contains
     ftem(:ncol,:) = sqrt( state%u(:ncol,:)**2 + state%v(:ncol,:)**2)
     call outfld ('WSPEED  ',ftem    ,pcols   ,lchnk     )
     call outfld ('WSPDSRFMX',ftem(:,pver)   ,pcols   ,lchnk     )
-    call outfld ('WSPDSRFAV',ftem(:,pver)   ,pcols   ,lchnk     ) 
+    call outfld ('WSPDSRFAV',ftem(:,pver)   ,pcols   ,lchnk     )
 
     ! Vertical velocity and advection
 
     if (single_column) then
-       call outfld('OMEGA   ',wfld,    pcols,   lchnk     )
+      call outfld('OMEGA   ',wfld,    pcols,   lchnk     )
     else
-       call outfld('OMEGA   ',state%omega,    pcols,   lchnk     )
+      call outfld('OMEGA   ',state%omega,    pcols,   lchnk     )
     endif
 
 #if (defined BFB_CAM_SCAM_IOP )
@@ -1506,81 +1528,81 @@ contains
     ! Output omega at 850 and 500 mb pressure levels
     !
     if (hist_fld_active('OMEGA850')) then
-       call vertinterp(ncol, pcols, pver, state%pmid, 85000._r8, state%omega, p_surf)
-       call outfld('OMEGA850', p_surf, pcols, lchnk)
+      call vertinterp(ncol, pcols, pver, state%pmid, 85000._r8, state%omega, p_surf)
+      call outfld('OMEGA850', p_surf, pcols, lchnk)
     end if
     if (hist_fld_active('OMEGA500')) then
-       call vertinterp(ncol, pcols, pver, state%pmid, 50000._r8, state%omega, p_surf)
-       call outfld('OMEGA500', p_surf, pcols, lchnk)
+      call vertinterp(ncol, pcols, pver, state%pmid, 50000._r8, state%omega, p_surf)
+      call outfld('OMEGA500', p_surf, pcols, lchnk)
     end if
     !
     ! Sea level pressure
     !
     if (present(psl) .or. hist_fld_active('PSL')) then
-       call cpslec (ncol, state%pmid, state%phis, state%ps, state%t,psl_tmp, gravit, rair) 
-       call outfld ('PSL     ',psl_tmp  ,pcols, lchnk     )
-       if (present(psl)) then	
-          psl(:ncol) = psl_tmp(:ncol)
-       end if
+      call cpslec (ncol, state%pmid, state%phis, state%ps, state%t,psl_tmp, gravit, rair)
+      call outfld ('PSL     ',psl_tmp  ,pcols, lchnk     )
+      if (present(psl)) then	
+        psl(:ncol) = psl_tmp(:ncol)
+      end if
     end if
     !
     ! Output T,u,v fields on pressure surfaces
     !
     if (hist_fld_active('T850')) then
-       call vertinterp(ncol, pcols, pver, state%pmid, 85000._r8, state%t, p_surf)
-       call outfld('T850    ', p_surf, pcols, lchnk )
+      call vertinterp(ncol, pcols, pver, state%pmid, 85000._r8, state%t, p_surf)
+      call outfld('T850    ', p_surf, pcols, lchnk )
     end if
     if (hist_fld_active('T500')) then
-       call vertinterp(ncol, pcols, pver, state%pmid, 50000._r8, state%t, p_surf)
-       call outfld('T500    ', p_surf, pcols, lchnk )
+      call vertinterp(ncol, pcols, pver, state%pmid, 50000._r8, state%t, p_surf)
+      call outfld('T500    ', p_surf, pcols, lchnk )
     end if
     if (hist_fld_active('T400')) then
-       call vertinterp(ncol, pcols, pver, state%pmid, 40000._r8, state%t, p_surf)
-       call outfld('T400    ', p_surf, pcols, lchnk )
+      call vertinterp(ncol, pcols, pver, state%pmid, 40000._r8, state%t, p_surf)
+      call outfld('T400    ', p_surf, pcols, lchnk )
     end if
     if (hist_fld_active('T300')) then
-       call vertinterp(ncol, pcols, pver, state%pmid, 30000._r8, state%t, p_surf)
-       call outfld('T300    ', p_surf, pcols, lchnk )
+      call vertinterp(ncol, pcols, pver, state%pmid, 30000._r8, state%t, p_surf)
+      call outfld('T300    ', p_surf, pcols, lchnk )
     end if
     if (hist_fld_active('T200')) then
-       call vertinterp(ncol, pcols, pver, state%pmid, 20000._r8, state%t, p_surf)
-       call outfld('T200    ', p_surf, pcols, lchnk )
+      call vertinterp(ncol, pcols, pver, state%pmid, 20000._r8, state%t, p_surf)
+      call outfld('T200    ', p_surf, pcols, lchnk )
     end if
     if (hist_fld_active('U850')) then
-       call vertinterp(ncol, pcols, pver, state%pmid, 85000._r8, state%u, p_surf)
-       call outfld('U850    ', p_surf, pcols, lchnk )
+      call vertinterp(ncol, pcols, pver, state%pmid, 85000._r8, state%u, p_surf)
+      call outfld('U850    ', p_surf, pcols, lchnk )
     end if
     if (hist_fld_active('U500')) then
-       call vertinterp(ncol, pcols, pver, state%pmid, 50000._r8, state%u, p_surf)
-       call outfld('U500    ', p_surf, pcols, lchnk )
+      call vertinterp(ncol, pcols, pver, state%pmid, 50000._r8, state%u, p_surf)
+      call outfld('U500    ', p_surf, pcols, lchnk )
     end if
     if (hist_fld_active('U250')) then
-       call vertinterp(ncol, pcols, pver, state%pmid, 25000._r8, state%u, p_surf)
-       call outfld('U250    ', p_surf, pcols, lchnk )
+      call vertinterp(ncol, pcols, pver, state%pmid, 25000._r8, state%u, p_surf)
+      call outfld('U250    ', p_surf, pcols, lchnk )
     end if
     if (hist_fld_active('U200')) then
-       call vertinterp(ncol, pcols, pver, state%pmid, 20000._r8, state%u, p_surf)
-       call outfld('U200    ', p_surf, pcols, lchnk )
+      call vertinterp(ncol, pcols, pver, state%pmid, 20000._r8, state%u, p_surf)
+      call outfld('U200    ', p_surf, pcols, lchnk )
     end if
     if (hist_fld_active('U010')) then
-       call vertinterp(ncol, pcols, pver, state%pmid,  1000._r8, state%u, p_surf)
-       call outfld('U010    ', p_surf, pcols, lchnk )
+      call vertinterp(ncol, pcols, pver, state%pmid,  1000._r8, state%u, p_surf)
+      call outfld('U010    ', p_surf, pcols, lchnk )
     end if
     if (hist_fld_active('V850')) then
-       call vertinterp(ncol, pcols, pver, state%pmid, 85000._r8, state%v, p_surf)
-       call outfld('V850    ', p_surf, pcols, lchnk )
+      call vertinterp(ncol, pcols, pver, state%pmid, 85000._r8, state%v, p_surf)
+      call outfld('V850    ', p_surf, pcols, lchnk )
     end if
     if (hist_fld_active('V500')) then
-       call vertinterp(ncol, pcols, pver, state%pmid, 50000._r8, state%v, p_surf)
-       call outfld('V500    ', p_surf, pcols, lchnk )
+      call vertinterp(ncol, pcols, pver, state%pmid, 50000._r8, state%v, p_surf)
+      call outfld('V500    ', p_surf, pcols, lchnk )
     end if
     if (hist_fld_active('V250')) then
-       call vertinterp(ncol, pcols, pver, state%pmid, 25000._r8, state%v, p_surf)
-       call outfld('V250    ', p_surf, pcols, lchnk )
+      call vertinterp(ncol, pcols, pver, state%pmid, 25000._r8, state%v, p_surf)
+      call outfld('V250    ', p_surf, pcols, lchnk )
     end if
     if (hist_fld_active('V200')) then
-       call vertinterp(ncol, pcols, pver, state%pmid, 20000._r8, state%v, p_surf)
-       call outfld('V200    ', p_surf, pcols, lchnk )
+      call vertinterp(ncol, pcols, pver, state%pmid, 20000._r8, state%v, p_surf)
+      call outfld('V200    ', p_surf, pcols, lchnk )
     end if
 
     ftem(:ncol,:) = state%t(:ncol,:)*state%t(:ncol,:)
@@ -1692,7 +1714,6 @@ contains
     !
     !-----------------------------------------------------------------------
     use physconst,          only: gravit, rga, rair, cpair, latvap, rearth, pi, cappa
-    use time_manager,       only: get_nstep
     use interpolate_data,   only: vertinterp
     use constituent_burden, only: constituent_burden_comp
     use cam_control_mod,    only: moist_physics
@@ -1847,8 +1868,8 @@ contains
     ftem(:ncol,:) = (cpair*state%t(:ncol,:) +  ftem1(:ncol,:) + latvap*state%q(:ncol,:,1) + &
          0.5_r8*(state%u(:ncol,:)**2+state%v(:ncol,:)**2))*(state%pdel(:ncol,:)/gravit)
     !! vertically integrate
-    do k=2,pver       
-	ftem(:ncol,1) = ftem(:ncol,1) + ftem(:ncol,k)
+    do k=2,pver
+      ftem(:ncol,1) = ftem(:ncol,1) + ftem(:ncol,k)
     end do
     call outfld ('ATMEINT   ',ftem(:ncol,1)  ,pcols   ,lchnk     )
 
@@ -1877,16 +1898,16 @@ contains
     end if
 
     if (hist_fld_active('THE9251000')) then
-       call vertinterp(ncol, pcols, pver, state%pmid, 92500._r8, state%q(1,1,1), p_surf_q2)
+      call vertinterp(ncol, pcols, pver, state%pmid, 92500._r8, state%q(1,1,1), p_surf_q2)
     end if
 
 !!! at 1000 mb and 925 mb
     if (hist_fld_active('Q1000')) then
-       call outfld('Q1000    ', p_surf_q1, pcols, lchnk ) 
+      call outfld('Q1000    ', p_surf_q1, pcols, lchnk )
     end if
 
     if (hist_fld_active('Q925')) then
-       call outfld('Q925    ', p_surf_q2, pcols, lchnk )  
+      call outfld('Q925    ', p_surf_q2, pcols, lchnk )
     end if
 
     if (hist_fld_active('THE9251000')) then
@@ -1899,7 +1920,7 @@ contains
     if (hist_fld_active('THE8501000')) then
       if (p_surf_t(1, surf_085000) < 0.0_r8) then
         call vertinterp(ncol, pcols, pver, state%pmid, 85000._r8, state%t, p_surf_t(:, surf_085000))
-       end if
+      end if
     end if
 
 !!! at 1000 mb and 850 mb
@@ -1960,104 +1981,174 @@ contains
     ! Output diagnostics associated with all convective processes.
     !
     !-----------------------------------------------------------------------
-   use physconst,     only: cpair
-   use tidal_diag,    only: get_tidal_coeffs
+    use physconst,     only: cpair
+    use tidal_diag,    only: get_tidal_coeffs
 
     ! Arguments:
 
-   real(r8),            intent(in) :: ztodt   ! timestep for computing physics tendencies
-   type(physics_state), intent(in) :: state
-   type(physics_buffer_desc), pointer :: pbuf(:)
+    real(r8),            intent(in) :: ztodt   ! timestep for computing physics tendencies
+    type(physics_state), intent(in) :: state
+    type(physics_buffer_desc), pointer :: pbuf(:)
 
     ! convective precipitation variables
-   real(r8), pointer :: prec_dp(:)                 ! total precipitation   from ZM convection
-   real(r8), pointer :: snow_dp(:)                 ! snow from ZM   convection
-   real(r8), pointer :: prec_sh(:)                 ! total precipitation   from Hack convection
-   real(r8), pointer :: snow_sh(:)                 ! snow from   Hack   convection
-   real(r8), pointer :: prec_sed(:)                ! total precipitation   from ZM convection
-   real(r8), pointer :: snow_sed(:)                ! snow from ZM   convection
-   real(r8), pointer :: prec_pcw(:)                ! total precipitation   from Hack convection
-   real(r8), pointer :: snow_pcw(:)                ! snow from Hack   convection
+    real(r8), pointer :: prec_dp(:)                 ! total precipitation   from ZM convection
+    real(r8), pointer :: snow_dp(:)                 ! snow from ZM   convection
+    real(r8), pointer :: prec_sh(:)                 ! total precipitation   from Hack convection
+    real(r8), pointer :: snow_sh(:)                 ! snow from   Hack   convection
+    real(r8), pointer :: prec_sed(:)                ! total precipitation   from ZM convection
+    real(r8), pointer :: snow_sed(:)                ! snow from ZM   convection
+    real(r8), pointer :: prec_pcw(:)                ! total precipitation   from Hack convection
+    real(r8), pointer :: snow_pcw(:)                ! snow from Hack   convection
 
     ! Local variables:
-   
-   integer :: i, k, m, lchnk, ncol
 
-   real(r8) :: rtdt
+    integer :: i, k, m, lchnk, ncol
 
-   real(r8):: precc(pcols)                ! convective precip rate
-   real(r8):: precl(pcols)                ! stratiform precip rate
-   real(r8):: snowc(pcols)                ! convective snow rate
-   real(r8):: snowl(pcols)                ! stratiform snow rate
-   real(r8):: prect(pcols)                ! total (conv+large scale) precip rate
-   real(r8) :: dcoef(4)                   ! for tidal component of T tend
+    real(r8) :: rtdt
 
-   lchnk = state%lchnk
-   ncol  = state%ncol
+    real(r8):: precc(pcols)                ! convective precip rate
+    real(r8):: precl(pcols)                ! stratiform precip rate
+    real(r8):: snowc(pcols)                ! convective snow rate
+    real(r8):: snowl(pcols)                ! stratiform snow rate
+    real(r8):: prect(pcols)                ! total (conv+large scale) precip rate
+    real(r8) :: dcoef(6)                   ! for tidal component of T tend
 
-   rtdt = 1._r8/ztodt
+    lchnk = state%lchnk
+    ncol  = state%ncol
 
-   if (moist_physics) then
-      call pbuf_get_field(pbuf, prec_dp_idx, prec_dp)
-      call pbuf_get_field(pbuf, snow_dp_idx, snow_dp)
-      call pbuf_get_field(pbuf, prec_sh_idx, prec_sh)
-      call pbuf_get_field(pbuf, snow_sh_idx, snow_sh)
-      call pbuf_get_field(pbuf, prec_sed_idx, prec_sed)
-      call pbuf_get_field(pbuf, snow_sed_idx, snow_sed)
-      call pbuf_get_field(pbuf, prec_pcw_idx, prec_pcw)
-      call pbuf_get_field(pbuf, snow_pcw_idx, snow_pcw)
+    rtdt = 1._r8/ztodt
+
+    if (moist_physics) then
+      if (prec_dp_idx > 0) then
+        call pbuf_get_field(pbuf, prec_dp_idx, prec_dp)
+      else
+        nullify(prec_dp)
+      end if
+      if (snow_dp_idx > 0) then
+        call pbuf_get_field(pbuf, snow_dp_idx, snow_dp)
+      else
+        nullify(snow_dp)
+      end if
+      if (prec_sh_idx > 0) then
+        call pbuf_get_field(pbuf, prec_sh_idx, prec_sh)
+      else
+        nullify(prec_sh)
+      end if
+      if (snow_sh_idx > 0) then
+        call pbuf_get_field(pbuf, snow_sh_idx, snow_sh)
+      else
+        nullify(snow_sh)
+      end if
+      if (prec_sed_idx > 0) then
+        call pbuf_get_field(pbuf, prec_sed_idx, prec_sed)
+      else
+        nullify(prec_sed)
+      end if
+      if (snow_sed_idx > 0) then
+        call pbuf_get_field(pbuf, snow_sed_idx, snow_sed)
+      else
+        nullify(snow_sed)
+      end if
+      if (prec_pcw_idx > 0) then
+        call pbuf_get_field(pbuf, prec_pcw_idx, prec_pcw)
+      else
+        nullify(prec_pcw)
+      end if
+      if (snow_pcw_idx > 0) then
+        call pbuf_get_field(pbuf, snow_pcw_idx, snow_pcw)
+      else
+        nullify(snow_pcw)
+      end if
 
       ! Precipitation rates (multi-process)
-      precc(:ncol) = prec_dp(:ncol)  + prec_sh(:ncol)
-      precl(:ncol) = prec_sed(:ncol) + prec_pcw(:ncol)
-      snowc(:ncol) = snow_dp(:ncol)  + snow_sh(:ncol)
-      snowl(:ncol) = snow_sed(:ncol) + snow_pcw(:ncol)
+      if (associated(prec_dp) .and. associated(prec_sh)) then
+        precc(:ncol) = prec_dp(:ncol)  + prec_sh(:ncol)
+      else if (associated(prec_dp)) then
+        precc(:ncol) = prec_dp(:ncol)
+      else if (associated(prec_sh)) then
+        precc(:ncol) = prec_sh(:ncol)
+      else
+        precc(:ncol) = 0._r8
+      end if
+      if (associated(prec_sed) .and. associated(prec_pcw)) then
+        precl(:ncol) = prec_sed(:ncol) + prec_pcw(:ncol)
+      else if (associated(prec_sed)) then
+        precl(:ncol) = prec_sed(:ncol)
+      else if (associated(prec_pcw)) then
+        precl(:ncol) = prec_pcw(:ncol)
+      else
+        precl(:ncol) = 0._r8
+      end if
+      if (associated(snow_dp) .and. associated(snow_sh)) then
+        snowc(:ncol) = snow_dp(:ncol)  + snow_sh(:ncol)
+      else if (associated(snow_dp)) then
+        snowc(:ncol) = snow_dp(:ncol)
+      else if (associated(snow_sh)) then
+        snowc(:ncol) = snow_sh(:ncol)
+      else
+        snowc(:ncol) = 0._r8
+      end if
+      if (associated(snow_sed) .and. associated(snow_pcw)) then
+        snowl(:ncol) = snow_sed(:ncol) + snow_pcw(:ncol)
+      else if (associated(snow_sed)) then
+        snowl(:ncol) = snow_sed(:ncol)
+      else if (associated(snow_pcw)) then
+        snowl(:ncol) = snow_pcw(:ncol)
+      else
+        snowl(:ncol) = 0._r8
+      end if
       prect(:ncol) = precc(:ncol)    + precl(:ncol)
 
-   call outfld('PRECC   ', precc, pcols, lchnk )
-   call outfld('PRECL   ', precl, pcols, lchnk )
-   call outfld('PREC_PCW', prec_pcw,pcols   ,lchnk )
-   call outfld('PREC_zmc', prec_dp ,pcols   ,lchnk )
-   call outfld('PRECSC  ', snowc, pcols, lchnk )
-   call outfld('PRECSL  ', snowl, pcols, lchnk )
-   call outfld('PRECT   ', prect, pcols, lchnk )
-   call outfld('PRECTMX ', prect, pcols, lchnk )
+      call outfld('PRECC   ', precc, pcols, lchnk )
+      call outfld('PRECL   ', precl, pcols, lchnk )
+      if (associated(prec_pcw)) then
+        call outfld('PREC_PCW', prec_pcw,pcols   ,lchnk )
+      end if
+      if (associated(prec_dp)) then
+        call outfld('PREC_zmc', prec_dp ,pcols   ,lchnk )
+      end if
+      call outfld('PRECSC  ', snowc, pcols, lchnk )
+      call outfld('PRECSL  ', snowl, pcols, lchnk )
+      call outfld('PRECT   ', prect, pcols, lchnk )
+      call outfld('PRECTMX ', prect, pcols, lchnk )
 
-   call outfld('PRECLav ', precl, pcols, lchnk )
-   call outfld('PRECCav ', precc, pcols, lchnk )
+      call outfld('PRECLav ', precl, pcols, lchnk )
+      call outfld('PRECCav ', precc, pcols, lchnk )
 
 #if ( defined BFB_CAM_SCAM_IOP )
-   call outfld('Prec   ' , prect, pcols, lchnk )
+      call outfld('Prec   ' , prect, pcols, lchnk )
 #endif
 
-   ! Total convection tendencies.
+      ! Total convection tendencies.
 
-   do k = 1, pver
-      do i = 1, ncol
-         dtcond(i,k,lchnk) = (state%t(i,k) - dtcond(i,k,lchnk))*rtdt
+      do k = 1, pver
+        do i = 1, ncol
+          dtcond(i,k,lchnk) = (state%t(i,k) - dtcond(i,k,lchnk))*rtdt
+        end do
       end do
-   end do
-   call outfld('DTCOND  ', dtcond(:,:,lchnk), pcols, lchnk)
+      call outfld('DTCOND  ', dtcond(:,:,lchnk), pcols, lchnk)
 
-   ! output tidal coefficients
-   call get_tidal_coeffs( dcoef )
-   call outfld( 'DTCOND_24_SIN', dtcond(:ncol,:,lchnk)*dcoef(1), ncol, lchnk )
-   call outfld( 'DTCOND_24_COS', dtcond(:ncol,:,lchnk)*dcoef(2), ncol, lchnk )
-   call outfld( 'DTCOND_12_SIN', dtcond(:ncol,:,lchnk)*dcoef(3), ncol, lchnk )
-   call outfld( 'DTCOND_12_COS', dtcond(:ncol,:,lchnk)*dcoef(4), ncol, lchnk )
+      ! output tidal coefficients
+      call get_tidal_coeffs( dcoef )
+      call outfld( 'DTCOND_24_SIN', dtcond(:ncol,:,lchnk)*dcoef(1), ncol, lchnk )
+      call outfld( 'DTCOND_24_COS', dtcond(:ncol,:,lchnk)*dcoef(2), ncol, lchnk )
+      call outfld( 'DTCOND_12_SIN', dtcond(:ncol,:,lchnk)*dcoef(3), ncol, lchnk )
+      call outfld( 'DTCOND_12_COS', dtcond(:ncol,:,lchnk)*dcoef(4), ncol, lchnk )
+      call outfld( 'DTCOND_08_SIN', dtcond(:ncol,:,lchnk)*dcoef(5), ncol, lchnk )
+      call outfld( 'DTCOND_08_COS', dtcond(:ncol,:,lchnk)*dcoef(6), ncol, lchnk )
 
-   do m = 1, dqcond_num
-      if ( cnst_cam_outfld(m) ) then
-         do k = 1, pver
+      do m = 1, dqcond_num
+        if ( cnst_cam_outfld(m) ) then
+          do k = 1, pver
             do i = 1, ncol
-               dqcond(m)%cnst(i,k,lchnk) = (state%q(i,k,m) - dqcond(m)%cnst(i,k,lchnk))*rtdt
+              dqcond(m)%cnst(i,k,lchnk) = (state%q(i,k,m) - dqcond(m)%cnst(i,k,lchnk))*rtdt
             end do
-         end do
-         call outfld(dcconnam(m), dqcond(m)%cnst(:,:,lchnk), pcols, lchnk)
-      end if
-   end do
+          end do
+          call outfld(dcconnam(m), dqcond(m)%cnst(:,:,lchnk), pcols, lchnk)
+        end if
+      end do
 
-   end if
+    end if
   end subroutine diag_conv
 
 !===============================================================================
@@ -2070,9 +2161,9 @@ contains
     !
     !-----------------------------------------------------------------------
 
-   use time_manager,     only: is_end_curr_day
-   use co2_cycle,        only: c_i, co2_transport
-   use constituents,     only: sflxnam
+    use time_manager,     only: is_end_curr_day
+    use co2_cycle,        only: c_i, co2_transport
+    use constituents,     only: sflxnam
 
     !-----------------------------------------------------------------------
     !
@@ -2091,7 +2182,7 @@ contains
     real(r8) tem2(pcols)    ! temporary workspace
     real(r8) ftem(pcols)    ! temporary workspace
 
-    real(r8), pointer :: trefmnav(:) ! daily minimum tref  
+    real(r8), pointer :: trefmnav(:) ! daily minimum tref
     real(r8), pointer :: trefmxav(:) ! daily maximum tref
 
     !
@@ -2101,71 +2192,71 @@ contains
     ncol  = cam_in%ncol
 
     if (moist_physics) then
-    call outfld('SHFLX',    cam_in%shf,       pcols, lchnk)
-    call outfld('LHFLX',    cam_in%lhf,       pcols, lchnk)
-    call outfld('QFLX',     cam_in%cflx(1,1), pcols, lchnk)
+      call outfld('SHFLX',    cam_in%shf,       pcols, lchnk)
+      call outfld('LHFLX',    cam_in%lhf,       pcols, lchnk)
+      call outfld('QFLX',     cam_in%cflx(1,1), pcols, lchnk)
 
-    call outfld('TAUX',     cam_in%wsx,       pcols, lchnk)
-    call outfld('TAUY',     cam_in%wsy,       pcols, lchnk)
-    call outfld('TREFHT  ', cam_in%tref,      pcols, lchnk)
-    call outfld('TREFHTMX', cam_in%tref,      pcols, lchnk)
-    call outfld('TREFHTMN', cam_in%tref,      pcols, lchnk)
-    call outfld('QREFHT',   cam_in%qref,      pcols, lchnk)
-    call outfld('U10',      cam_in%u10,       pcols, lchnk)
+      call outfld('TAUX',     cam_in%wsx,       pcols, lchnk)
+      call outfld('TAUY',     cam_in%wsy,       pcols, lchnk)
+      call outfld('TREFHT  ', cam_in%tref,      pcols, lchnk)
+      call outfld('TREFHTMX', cam_in%tref,      pcols, lchnk)
+      call outfld('TREFHTMN', cam_in%tref,      pcols, lchnk)
+      call outfld('QREFHT',   cam_in%qref,      pcols, lchnk)
+      call outfld('U10',      cam_in%u10,       pcols, lchnk)
       !
       ! Calculate and output reference height RH (RHREFHT)
 
-   call qsat(cam_in%tref(:ncol), state%ps(:ncol), tem2(:ncol), ftem(:ncol))
-       ftem(:ncol) = cam_in%qref(:ncol)/ftem(:ncol)*100._r8
+      call qsat(cam_in%tref(:ncol), state%ps(:ncol), tem2(:ncol), ftem(:ncol))
+      ftem(:ncol) = cam_in%qref(:ncol)/ftem(:ncol)*100._r8
 
-      
-    call outfld('RHREFHT',   ftem,      pcols, lchnk)
+
+      call outfld('RHREFHT',   ftem,      pcols, lchnk)
 
 
 #if (defined BFB_CAM_SCAM_IOP )
-    call outfld('shflx   ',cam_in%shf,   pcols,   lchnk)
-    call outfld('lhflx   ',cam_in%lhf,   pcols,   lchnk)
-    call outfld('trefht  ',cam_in%tref,  pcols,   lchnk)
+      call outfld('shflx   ',cam_in%shf,   pcols,   lchnk)
+      call outfld('lhflx   ',cam_in%lhf,   pcols,   lchnk)
+      call outfld('trefht  ',cam_in%tref,  pcols,   lchnk)
 #endif
       !
       ! Ouput ocn and ice fractions
       !
-    call outfld('LANDFRAC', cam_in%landfrac, pcols, lchnk)
-    call outfld('ICEFRAC',  cam_in%icefrac,  pcols, lchnk)
-    call outfld('OCNFRAC',  cam_in%ocnfrac,  pcols, lchnk)
+      call outfld('LANDFRAC', cam_in%landfrac, pcols, lchnk)
+      call outfld('ICEFRAC',  cam_in%icefrac,  pcols, lchnk)
+      call outfld('OCNFRAC',  cam_in%ocnfrac,  pcols, lchnk)
       !
       ! Compute daily minimum and maximum of TREF
       !
-    call pbuf_get_field(pbuf, trefmxav_idx, trefmxav)
-    call pbuf_get_field(pbuf, trefmnav_idx, trefmnav)
-    do i = 1,ncol
-       trefmxav(i) = max(cam_in%tref(i),trefmxav(i))
-       trefmnav(i) = min(cam_in%tref(i),trefmnav(i))
-    end do
-    if (is_end_curr_day()) then
-       call outfld('TREFMXAV', trefmxav,pcols,   lchnk     )
-       call outfld('TREFMNAV', trefmnav,pcols,   lchnk     )
-       trefmxav(:ncol) = -1.0e36_r8
-       trefmnav(:ncol) =  1.0e36_r8
-    endif
+      call pbuf_get_field(pbuf, trefmxav_idx, trefmxav)
+      call pbuf_get_field(pbuf, trefmnav_idx, trefmnav)
+      do i = 1,ncol
+        trefmxav(i) = max(cam_in%tref(i),trefmxav(i))
+        trefmnav(i) = min(cam_in%tref(i),trefmnav(i))
+      end do
+      if (is_end_curr_day()) then
+        call outfld('TREFMXAV', trefmxav,pcols,   lchnk     )
+        call outfld('TREFMNAV', trefmnav,pcols,   lchnk     )
+        trefmxav(:ncol) = -1.0e36_r8
+        trefmnav(:ncol) =  1.0e36_r8
+      endif
 
-    call outfld('TBOT',     cam_out%tbot,     pcols, lchnk)
-    call outfld('TS',       cam_in%ts,        pcols, lchnk)
-    call outfld('TSMN',     cam_in%ts,        pcols, lchnk)
-    call outfld('TSMX',     cam_in%ts,        pcols, lchnk)
-    call outfld('SNOWHLND', cam_in%snowhland, pcols, lchnk)
-    call outfld('SNOWHICE', cam_in%snowhice,  pcols, lchnk)
-    call outfld('ASDIR',    cam_in%asdir,     pcols, lchnk)
-    call outfld('ASDIF',    cam_in%asdif,     pcols, lchnk)
-    call outfld('ALDIR',    cam_in%aldir,     pcols, lchnk)
-    call outfld('ALDIF',    cam_in%aldif,     pcols, lchnk)
-    call outfld('SST',      cam_in%sst,       pcols, lchnk)
+      call outfld('TBOT',     cam_out%tbot,     pcols, lchnk)
+      call outfld('TS',       cam_in%ts,        pcols, lchnk)
+      call outfld('TSMN',     cam_in%ts,        pcols, lchnk)
+      call outfld('TSMX',     cam_in%ts,        pcols, lchnk)
+      call outfld('SNOWHLND', cam_in%snowhland, pcols, lchnk)
+      call outfld('SNOWHICE', cam_in%snowhice,  pcols, lchnk)
+      call outfld('ASDIR',    cam_in%asdir,     pcols, lchnk)
+      call outfld('ASDIF',    cam_in%asdif,     pcols, lchnk)
+      call outfld('ALDIR',    cam_in%aldir,     pcols, lchnk)
+      call outfld('ALDIF',    cam_in%aldif,     pcols, lchnk)
+      call outfld('SST',      cam_in%sst,       pcols, lchnk)
 
-    if (co2_transport()) then
-       do m = 1,4
+      if (co2_transport()) then
+        do m = 1,4
           call outfld(sflxnam(c_i(m)), cam_in%cflx(:,c_i(m)), pcols, lchnk)
-       end do
-    end if
+        end do
+      end if
     end if
 
   end subroutine diag_surf
@@ -2180,20 +2271,20 @@ contains
     !
     !-----------------------------------------------------------------------
 
-   ! arguments
-   type(cam_out_t), intent(inout) :: cam_out
+    ! arguments
+    type(cam_out_t), intent(inout) :: cam_out
 
-   ! Local variables:
-   integer :: lchnk        ! chunk identifier
-   logical :: atm_dep_flux ! true ==> sending deposition fluxes to coupler.
-                           ! Otherwise, set them to zero.
-   !-----------------------------------------------------------------------
+    ! Local variables:
+    integer :: lchnk        ! chunk identifier
+    logical :: atm_dep_flux ! true ==> sending deposition fluxes to coupler.
+    ! Otherwise, set them to zero.
+    !-----------------------------------------------------------------------
 
-   lchnk = cam_out%lchnk
+    lchnk = cam_out%lchnk
 
-   call phys_getopts(atm_dep_flux_out=atm_dep_flux)
+    call phys_getopts(atm_dep_flux_out=atm_dep_flux)
 
-   if (.not. atm_dep_flux) then
+    if (.not. atm_dep_flux) then
       ! set the fluxes to zero before outfld and sending them to the
       ! coupler
       cam_out%bcphiwet = 0.0_r8
@@ -2210,7 +2301,7 @@ contains
       cam_out%dstdry3  = 0.0_r8
       cam_out%dstwet4  = 0.0_r8
       cam_out%dstdry4  = 0.0_r8
-   end if
+    end if
 
     if (moist_physics) then
       call outfld('a2x_BCPHIWET', cam_out%bcphiwet, pcols, lchnk)
@@ -2233,7 +2324,7 @@ contains
 
 !#######################################################################
 
-   subroutine diag_physvar_ic (lchnk,  pbuf, cam_out, cam_in)
+  subroutine diag_physvar_ic (lchnk,  pbuf, cam_out, cam_in)
     !
     !---------------------------------------------
     !
@@ -2245,21 +2336,21 @@ contains
     !
     ! Arguments
     !
-   integer       , intent(in) :: lchnk  ! chunk identifier
-   type(physics_buffer_desc), pointer :: pbuf(:)
-   
-   type(cam_out_t), intent(inout) :: cam_out
-   type(cam_in_t),  intent(inout) :: cam_in 
+    integer       , intent(in) :: lchnk  ! chunk identifier
+    type(physics_buffer_desc), pointer :: pbuf(:)
+
+    type(cam_out_t), intent(inout) :: cam_out
+    type(cam_in_t),  intent(inout) :: cam_in
     !
     !---------------------------Local workspace-----------------------------
     !
-   integer  :: k                 ! indices
-   integer  :: itim_old          ! indices
+    integer  :: k                 ! indices
+    integer  :: itim_old          ! indices
 
-   real(r8), pointer, dimension(:,:) :: cwat_var
-   real(r8), pointer, dimension(:,:) :: conv_var_3d
-   real(r8), pointer, dimension(:  ) :: conv_var_2d
-   real(r8), pointer :: tpert(:), pblh(:), qpert(:)
+    real(r8), pointer, dimension(:,:) :: cwat_var
+    real(r8), pointer, dimension(:,:) :: conv_var_3d
+    real(r8), pointer, dimension(:  ) :: conv_var_2d
+    real(r8), pointer :: tpert(:), pblh(:), qpert(:)
     !
     !-----------------------------------------------------------------------
     !
@@ -2271,33 +2362,33 @@ contains
       itim_old = pbuf_old_tim_idx()
 
       if (qcwat_idx > 0) then
-         call pbuf_get_field(pbuf, qcwat_idx, cwat_var, start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
-         call outfld('QCWAT&IC   ',cwat_var, pcols,lchnk)
+        call pbuf_get_field(pbuf, qcwat_idx, cwat_var, start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
+        call outfld('QCWAT&IC   ',cwat_var, pcols,lchnk)
       end if
 
       if (tcwat_idx > 0) then
-         call pbuf_get_field(pbuf, tcwat_idx,  cwat_var, start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
-         call outfld('TCWAT&IC   ',cwat_var, pcols,lchnk)
+        call pbuf_get_field(pbuf, tcwat_idx,  cwat_var, start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
+        call outfld('TCWAT&IC   ',cwat_var, pcols,lchnk)
       end if
 
       if (lcwat_idx > 0) then
-         call pbuf_get_field(pbuf, lcwat_idx,  cwat_var, start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
-         call outfld('LCWAT&IC   ',cwat_var, pcols,lchnk)
+        call pbuf_get_field(pbuf, lcwat_idx,  cwat_var, start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
+        call outfld('LCWAT&IC   ',cwat_var, pcols,lchnk)
       end if
 
       if (cld_idx > 0) then
-         call pbuf_get_field(pbuf, cld_idx,    cwat_var, start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
-         call outfld('CLOUD&IC   ',cwat_var, pcols,lchnk)
+        call pbuf_get_field(pbuf, cld_idx,    cwat_var, start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
+        call outfld('CLOUD&IC   ',cwat_var, pcols,lchnk)
       end if
 
       if (concld_idx > 0) then
-         call pbuf_get_field(pbuf, concld_idx, cwat_var, start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
-      call outfld('CONCLD&IC   ',cwat_var, pcols,lchnk)
+        call pbuf_get_field(pbuf, concld_idx, cwat_var, start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
+        call outfld('CONCLD&IC   ',cwat_var, pcols,lchnk)
       end if
 
       if (cush_idx > 0) then
-         call pbuf_get_field(pbuf, cush_idx, conv_var_2d ,(/1,itim_old/),  (/pcols,1/))
-         call outfld('CUSH&IC   ',conv_var_2d, pcols,lchnk)
+        call pbuf_get_field(pbuf, cush_idx, conv_var_2d ,(/1,itim_old/),  (/pcols,1/))
+        call outfld('CUSH&IC   ',conv_var_2d, pcols,lchnk)
 
       end if
 
@@ -2331,66 +2422,84 @@ contains
         call outfld('TPERT&IC   ', tpert, pcols, lchnk)
       end if
 
-   end if
+    end if
 
-   end subroutine diag_physvar_ic
+  end subroutine diag_physvar_ic
 
 
 !#######################################################################
 
-  subroutine diag_phys_tend_writeout_dry(state, pbuf,  tend, ztodt)
+ !subroutine diag_phys_tend_writeout_dry(state, pbuf, tend, ztodt)
+  subroutine diag_phys_tend_writeout_dry(state, pbuf, tend, ztodt, tmp_t, eflx, dsema) !tht
 
-   !---------------------------------------------------------------
-   !
-   ! Purpose:  Dump physics tendencies for temperature
-   !
-   !---------------------------------------------------------------
+    !---------------------------------------------------------------
+    !
+    ! Purpose:  Dump physics tendencies for temperature
+    !
+    !---------------------------------------------------------------
 
-   use check_energy,    only: check_energy_get_integrals
-   use physconst,       only: cpair
-   
-   ! Arguments
+    use check_energy,    only: check_energy_get_integrals
+    use physconst,       only: cpair
+
+    ! Arguments
 
     type(physics_state), intent(in)    :: state
-   
+
     type(physics_buffer_desc), pointer :: pbuf(:)
     type(physics_tend ), intent(in)    :: tend
     real(r8),            intent(in)    :: ztodt             ! physics timestep
 
-   !---------------------------Local workspace-----------------------------
+    real(r8)           , intent(inout) :: tmp_t     (pcols,pver) !tht: holds last physics_updated T (FV)
+    real(r8)           , intent(in), optional ::eflx (pcols    ) !tht: surface sensible heat flux assoc.with mass adj.
+    real(r8)           , intent(in), optional ::dsema(pcols    ) !tht: column enthalpy tendency assoc. with mass adj.
 
-   integer  :: lchnk  ! chunk index
-   integer  :: ncol   ! number of columns in chunk
+    !---------------------------Local workspace-----------------------------
+
+    integer  :: lchnk             ! chunk index
+    integer  :: ncol              ! number of columns in chunk
     real(r8) :: ftem2(pcols)      ! Temporary workspace for outfld variables
-   real(r8) :: ftem3(pcols,pver) ! Temporary workspace for outfld variables
-   real(r8) :: heat_glob         ! global energy integral (FV only)
-   ! CAM pointers to get variables from the physics buffer
-   real(r8), pointer, dimension(:,:) :: t_ttend  
-   integer  :: itim_old
+    real(r8) :: ftem3(pcols,pver) ! Temporary workspace for outfld variables
+    real(r8) :: heat_glob         ! global energy integral (FV only)
+    real(r8) :: tedif_glob        !+tht global energy integral fixer increment
+    ! CAM pointers to get variables from the physics buffer
+    real(r8), pointer, dimension(:,:) :: t_ttend
+    integer  :: itim_old
 
-   !-----------------------------------------------------------------------
+    !-----------------------------------------------------------------------
 
-   lchnk = state%lchnk
-   ncol  = state%ncol
+    lchnk = state%lchnk
+    ncol  = state%ncol
 
-   ! Dump out post-physics state (FV only)
+    ! Dump out post-physics state (FV only)
 
-   call outfld('TAP', state%t, pcols, lchnk   )
-   call outfld('UAP', state%u, pcols, lchnk   )
-   call outfld('VAP', state%v, pcols, lchnk   )
+    call outfld('TAP', state%t, pcols, lchnk   )
+    call outfld('UAP', state%u, pcols, lchnk   )
+    call outfld('VAP', state%v, pcols, lchnk   )
 
-   ! Total physics tendency for Temperature
-   ! (remove global fixer tendency from total for FV and SE dycores)
+    !tht: heat tendencies from dme_adjust
+    if (dycore_is('LR')) then
+      tmp_t(:ncol,:pver) = (state%t(:ncol,:pver) - tmp_t(:ncol,:pver))/ztodt ! T tendency
+      call outfld('PTTEND_DME', tmp_t, pcols, lchnk   )
+      if(present(dsema))call outfld('IETEND_DME', dsema, pcols, lchnk)       ! dry enthalpy
+      if(present(eflx) )call outfld('EFLX'      ,  eflx, pcols, lchnk)       ! moist enthalpy
+    end if
 
-   if (dycore_is('LR') .or. dycore_is('SE')) then
-      call check_energy_get_integrals( heat_glob_out=heat_glob )
+    ! Total physics tendency for Temperature
+    ! (remove global fixer tendency from total for FV and SE dycores)
+    if (dycore_is('LR') .or. dycore_is('SE')) then
+!+tht call check_energy_get_integrals( heat_glob_out=heat_glob )
+      call check_energy_get_integrals( heat_glob_out=heat_glob , tedif_glob_out=tedif_glob )
       ftem2(:ncol)  = heat_glob/cpair
       call outfld('TFIX', ftem2, pcols, lchnk   )
+     !+tht
+      ftem2(:ncol)  = tedif_glob/ztodt
+      call outfld('EFIX', ftem2, pcols, lchnk   )
+     !-tht
       ftem3(:ncol,:pver)  = tend%dtdt(:ncol,:pver) - heat_glob/cpair
-   else
+    else
       ftem3(:ncol,:pver)  = tend%dtdt(:ncol,:pver)
-   end if
-   call outfld('PTTEND',ftem3, pcols, lchnk )
+    end if
+    call outfld('PTTEND',ftem3, pcols, lchnk )
 
     ! Total (physics+dynamics, everything!) tendency for Temperature
 
@@ -2452,26 +2561,54 @@ contains
     lchnk = state%lchnk
     ncol  = state%ncol
     rtdt  = 1._r8/ztodt
-    call cnst_get_ind('CLDLIQ', ixcldliq)
-    call cnst_get_ind('CLDICE', ixcldice)
+    call cnst_get_ind('CLDLIQ', ixcldliq, abort=.false.)
+    call cnst_get_ind('CLDICE', ixcldice, abort=.false.)
 !AL
-   call cnst_get_ind('NUMLIQ', ixnumliq)
-   call cnst_get_ind('NUMICE', ixnumice)
+    call cnst_get_ind('NUMLIQ', ixnumliq)
+    call cnst_get_ind('NUMICE', ixnumice)
 !AL
 
-    if ( cnst_cam_outfld(       1) ) call outfld (apcnst(       1), state%q(1,1,       1), pcols, lchnk)
-    if ( cnst_cam_outfld(ixcldliq) ) call outfld (apcnst(ixcldliq), state%q(1,1,ixcldliq), pcols, lchnk)
-    if ( cnst_cam_outfld(ixcldice) ) call outfld (apcnst(ixcldice), state%q(1,1,ixcldice), pcols, lchnk)
+    if ( cnst_cam_outfld(       1) ) then
+      call outfld (apcnst(       1), state%q(1,1,       1), pcols, lchnk)
+    end if
+    if (ixcldliq > 0) then
+      if (cnst_cam_outfld(ixcldliq)) then
+        call outfld (apcnst(ixcldliq), state%q(1,1,ixcldliq), pcols, lchnk)
+      end if
+    end if
+    if (ixcldice > 0) then
+      if ( cnst_cam_outfld(ixcldice) ) then
+        call outfld (apcnst(ixcldice), state%q(1,1,ixcldice), pcols, lchnk)
+      end if
+    end if
 
-   ! Tendency for dry mass adjustment of q (FV only)
+    ! Tendency for dry mass adjustment of q (FV only)
 
-   if (dycore_is('LR')) then
+    if (dycore_is('LR')) then
       tmp_q     (:ncol,:pver) = (state%q(:ncol,:pver,       1) - tmp_q     (:ncol,:pver))*rtdt
-      tmp_cldliq(:ncol,:pver) = (state%q(:ncol,:pver,ixcldliq) - tmp_cldliq(:ncol,:pver))*rtdt
-      tmp_cldice(:ncol,:pver) = (state%q(:ncol,:pver,ixcldice) - tmp_cldice(:ncol,:pver))*rtdt
-      if ( cnst_cam_outfld(       1) ) call outfld (dmetendnam(       1), tmp_q     , pcols, lchnk)
-      if ( cnst_cam_outfld(ixcldliq) ) call outfld (dmetendnam(ixcldliq), tmp_cldliq, pcols, lchnk)
-      if ( cnst_cam_outfld(ixcldice) ) call outfld (dmetendnam(ixcldice), tmp_cldice, pcols, lchnk)
+      if (ixcldliq > 0) then
+        tmp_cldliq(:ncol,:pver) = (state%q(:ncol,:pver,ixcldliq) - tmp_cldliq(:ncol,:pver))*rtdt
+      else
+        tmp_cldliq(:ncol,:pver) = 0.0_r8
+      end if
+      if (ixcldice > 0) then
+        tmp_cldice(:ncol,:pver) = (state%q(:ncol,:pver,ixcldice) - tmp_cldice(:ncol,:pver))*rtdt
+      else
+        tmp_cldice(:ncol,:pver) = 0.0_r8
+      end if
+      if ( cnst_cam_outfld(       1) ) then
+        call outfld (dmetendnam(       1), tmp_q     , pcols, lchnk)
+      end if
+      if (ixcldliq > 0) then
+        if ( cnst_cam_outfld(ixcldliq) ) then
+          call outfld (dmetendnam(ixcldliq), tmp_cldliq, pcols, lchnk)
+        end if
+      end if
+      if (ixcldice > 0) then
+        if ( cnst_cam_outfld(ixcldice) ) then
+          call outfld (dmetendnam(ixcldice), tmp_cldice, pcols, lchnk)
+        end if
+      end if
 !AL
       tmp_cldnc(:ncol,:pver) = (state%q(:ncol,:pver,ixnumliq) - tmp_cldnc(:ncol,:pver))*rtdt
       tmp_cldni(:ncol,:pver) = (state%q(:ncol,:pver,ixnumice) - tmp_cldni(:ncol,:pver))*rtdt
@@ -2480,29 +2617,33 @@ contains
 !AL
    end if
 
-   ! Total physics tendency for moisture and other tracers
+    ! Total physics tendency for moisture and other tracers
 
-   if ( cnst_cam_outfld(       1) ) then
+    if ( cnst_cam_outfld(       1) ) then
       ftem3(:ncol,:pver) = (state%q(:ncol,:pver,       1) - qini     (:ncol,:pver) )*rtdt
       call outfld (ptendnam(       1), ftem3, pcols, lchnk)
-   end if
-   if ( cnst_cam_outfld(ixcldliq) ) then
-      ftem3(:ncol,:pver) = (state%q(:ncol,:pver,ixcldliq) - cldliqini(:ncol,:pver) )*rtdt
-      call outfld (ptendnam(ixcldliq), ftem3, pcols, lchnk)
-   end if
-   if ( cnst_cam_outfld(ixcldice) ) then
-      ftem3(:ncol,:pver) = (state%q(:ncol,:pver,ixcldice) - cldiceini(:ncol,:pver) )*rtdt
-      call outfld (ptendnam(ixcldice), ftem3, pcols, lchnk)
-   end if
+    end if
+    if (ixcldliq > 0) then
+      if (cnst_cam_outfld(ixcldliq) ) then
+        ftem3(:ncol,:pver) = (state%q(:ncol,:pver,ixcldliq) - cldliqini(:ncol,:pver) )*rtdt
+        call outfld (ptendnam(ixcldliq), ftem3, pcols, lchnk)
+      end if
+    end if
+    if (ixcldice > 0) then
+      if ( cnst_cam_outfld(ixcldice) ) then
+        ftem3(:ncol,:pver) = (state%q(:ncol,:pver,ixcldice) - cldiceini(:ncol,:pver) )*rtdt
+        call outfld (ptendnam(ixcldice), ftem3, pcols, lchnk)
+      end if
+    end if
 !AL
-   if ( cnst_cam_outfld(ixnumliq) ) then
+    if ( cnst_cam_outfld(ixnumliq) ) then
       ftem3(:ncol,:pver) = (state%q(:ncol,:pver,ixnumliq) - cldncini(:ncol,:pver) )*rtdt
       call outfld (ptendnam(ixnumliq), ftem3, pcols, lchnk)
-   end if
-   if ( cnst_cam_outfld(ixnumice) ) then
+    end if
+    if ( cnst_cam_outfld(ixnumice) ) then
       ftem3(:ncol,:pver) = (state%q(:ncol,:pver,ixnumice) - cldniini(:ncol,:pver) )*rtdt
       call outfld (ptendnam(ixnumice), ftem3, pcols, lchnk)
-   end if
+    end if
 
 !AL
 
@@ -2515,8 +2656,8 @@ contains
 !       tmp_q, tmp_cldliq, tmp_cldice, qini, cldliqini, cldiceini)
 !AL
   subroutine diag_phys_tend_writeout(state, pbuf,  tend, ztodt              &
-       , tmp_q, tmp_cldliq, tmp_cldice, tmp_cldnc,tmp_cldni                 &
-       , qini, cldliqini, cldiceini,cldncini, cldniini)
+       , tmp_q, tmp_t, tmp_cldliq, tmp_cldice, tmp_cldnc,tmp_cldni                 &
+       , qini, cldliqini, cldiceini,cldncini, cldniini, eflx, dsema)
     !---------------------------------------------------------------
     !
     ! Purpose:  Dump physics tendencies for moisture and temperature
@@ -2531,6 +2672,7 @@ contains
     type(physics_tend ), intent(in)    :: tend
     real(r8),            intent(in)    :: ztodt                  ! physics timestep
     real(r8)           , intent(inout) :: tmp_q     (pcols,pver) ! As input, holds pre-adjusted tracers (FV)
+    real(r8)           , intent(inout) :: tmp_t     (pcols,pver) !tht: holds last physics_updated T (FV)
     real(r8),            intent(inout) :: tmp_cldliq(pcols,pver) ! As input, holds pre-adjusted tracers (FV)
     real(r8),            intent(inout) :: tmp_cldice(pcols,pver) ! As input, holds pre-adjusted tracers (FV)
     real(r8),            intent(in)    :: qini      (pcols,pver) ! tracer fields at beginning of physics
@@ -2542,10 +2684,14 @@ contains
    real(r8)           , intent(in   ) :: cldncini (pcols,pver) ! tracer fields at beginning of physics
    real(r8)           , intent(in   ) :: cldniini (pcols,pver) ! tracer fields at beginning of physics
 !AL
+    real(r8)           , intent(in), optional ::eflx (pcols    ) !tht: surface sensible heat flux assoc.with mass adj.
+    real(r8)           , intent(in), optional ::dsema(pcols    ) !tht: column enthalpy tendency assoc. with mass adj.
 
     !-----------------------------------------------------------------------
 
-    call diag_phys_tend_writeout_dry(state, pbuf, tend, ztodt)
+   !call diag_phys_tend_writeout_dry(state, pbuf, tend, ztodt)
+    call diag_phys_tend_writeout_dry(state, pbuf, tend, ztodt, tmp_t, eflx, dsema) !tht
+
     if (moist_physics) then
       call diag_phys_tend_writeout_moist(state, pbuf,  tend, ztodt,           &
            tmp_q, tmp_cldliq, tmp_cldice, tmp_cldnc, tmp_cldni                &
@@ -2601,12 +2747,22 @@ contains
     !
     lchnk = state%lchnk
 
-    call cnst_get_ind('CLDLIQ', ixcldliq)
-    call cnst_get_ind('CLDICE', ixcldice)
+    call cnst_get_ind('CLDLIQ', ixcldliq, abort=.false.)
+    call cnst_get_ind('CLDICE', ixcldice, abort=.false.)
 
-    if ( cnst_cam_outfld(       1) ) call outfld (bpcnst(       1), state%q(1,1,       1), pcols, lchnk)
-    if ( cnst_cam_outfld(ixcldliq) ) call outfld (bpcnst(ixcldliq), state%q(1,1,ixcldliq), pcols, lchnk)
-    if ( cnst_cam_outfld(ixcldice) ) call outfld (bpcnst(ixcldice), state%q(1,1,ixcldice), pcols, lchnk)
+    if ( cnst_cam_outfld(       1) ) then
+      call outfld (bpcnst(       1), state%q(1,1,       1), pcols, lchnk)
+    end if
+    if (ixcldliq > 0) then
+      if (cnst_cam_outfld(ixcldliq)) then
+        call outfld (bpcnst(ixcldliq), state%q(1,1,ixcldliq), pcols, lchnk)
+      end if
+    end if
+    if (ixcldice > 0) then
+      if (cnst_cam_outfld(ixcldice)) then
+        call outfld (bpcnst(ixcldice), state%q(1,1,ixcldice), pcols, lchnk)
+      end if
+    end if
 
   end subroutine diag_state_b4_phys_write_moist
 

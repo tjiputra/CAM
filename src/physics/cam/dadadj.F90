@@ -23,27 +23,27 @@ public :: &
    dadadj_calc
 
 integer  :: nlvdry  ! number of layers from top of model to apply the adjustment
-real(r8) :: cappa   ! R/Cp for dry air
+integer  :: niter   ! number of iterations for convergence
 
 !===============================================================================
 contains
 !===============================================================================
 
-subroutine dadadj_initial(nlvdry_in, cappa_in)
+subroutine dadadj_initial(nlvdry_in, niter_in)
 
    integer,  intent(in) :: nlvdry_in
-   real(r8), intent(in) :: cappa_in
+   integer,  intent(in) :: niter_in
 
    nlvdry = nlvdry_in
-   cappa  = cappa_in
+   niter = niter_in
 
 end subroutine dadadj_initial
 
 !===============================================================================
 
 subroutine dadadj_calc( &
-   ncol, pmid, pint, pdel, t, &
-   q, icol_err)
+   ncol, pmid, pint, pdel, cappav, t, &
+   q, dadpdf, icol_err)
 
    ! Arguments
 
@@ -52,9 +52,12 @@ subroutine dadadj_calc( &
    real(r8), intent(in) :: pmid(:,:)   ! pressure at model levels
    real(r8), intent(in) :: pint(:,:)   ! pressure at model interfaces
    real(r8), intent(in) :: pdel(:,:)   ! vertical delta-p
+   real(r8), intent(in) :: cappav(:,:) ! variable Kappa
 
    real(r8), intent(inout) :: t(:,:)   ! temperature (K)
    real(r8), intent(inout) :: q(:,:)   ! specific humidity
+   
+   real(r8), intent(out) :: dadpdf(:,:)  ! PDF of where adjustments happened
 
    integer,  intent(out) :: icol_err ! index of column in which error occurred
 
@@ -74,11 +77,11 @@ subroutine dadadj_calc( &
    real(r8) :: zepsdp    ! zeps*delta-p
    real(r8) :: zgamma    ! intermediate constant
    real(r8) :: qave      ! mean q between levels
+   real(r8) :: cappa     ! Kappa at level intefaces
 
    logical :: ilconv          ! .TRUE. ==> convergence was attained
    logical :: dodad(ncol)     ! .TRUE. ==> do dry adjustment
 
-   integer, parameter :: niter = 15           ! number of iterations for convergence
    !-----------------------------------------------------------------------
 
    icol_err = 0
@@ -89,15 +92,22 @@ subroutine dadadj_calc( &
    ! Find gridpoints with unstable stratification
 
    do i = 1, ncol
+      cappa = 0.5_r8*(cappav(i,2) + cappav(i,1))
       gammad = cappa*0.5_r8*(t(i,2) + t(i,1))/pint(i,2)
       dtdp = (t(i,2) - t(i,1))/(pmid(i,2) - pmid(i,1))
       dodad(i) = (dtdp + zeps) .gt. gammad
    end do
+   
+   dadpdf(:ncol,:) = 0._r8
    do k= 2, nlvdry
       do i = 1, ncol
+         cappa = 0.5_r8*(cappav(i,k+1) + cappav(i,k))
          gammad = cappa*0.5_r8*(t(i,k+1) + t(i,k))/pint(i,k+1)
          dtdp = (t(i,k+1) - t(i,k))/(pmid(i,k+1) - pmid(i,k))
          dodad(i) = dodad(i) .or. (dtdp + zeps).gt.gammad
+         if ((dtdp + zeps).gt.gammad) then
+           dadpdf(i,k) = 1._r8
+         end if
       end do
    end do
 

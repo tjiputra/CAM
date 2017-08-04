@@ -67,7 +67,7 @@
          write(iulog,*) 'set_sim_dat: failed to allocate rxt_tag_map; error = ',ios
          call endrun
       end if
-      rxt_tag_lst(:rxt_tag_cnt) = (/ 'toy_k1          ', 'toy_k2          ' /)
+      rxt_tag_lst(:rxt_tag_cnt) = (/ 'toy_k1                          ', 'toy_k2                          ' /)
       rxt_tag_map(:rxt_tag_cnt) = (/    1,   2 /)
 
       end subroutine set_sim_dat

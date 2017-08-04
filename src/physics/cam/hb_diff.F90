@@ -520,10 +520,6 @@ end subroutine init_hb_diff
     !
     ! Author: B. Boville, B. Stevens (rewrite August 2000)
     ! 
-    !-----------------------------------------------------------------------
-!++ debug code to be removed after validation of PBL codes
-     use phys_debug, only: phys_debug_hbdiff1
-!++ debug code to be removed after validation of PBL codes
     !------------------------------Arguments--------------------------------
     !
     ! Input arguments
@@ -663,10 +659,6 @@ end subroutine init_hb_diff
           end if
        end do
     end do
-
-!++ debug code to be removed after validation of PBL codes
-    call phys_debug_hbdiff1(lchnk, pblh, zl, zh)
-!++ debug code to be removed after validation of PBL codes
 
     !
     ! Check whether last allowed midpoint is within pbl

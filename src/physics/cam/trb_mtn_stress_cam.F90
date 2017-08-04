@@ -54,9 +54,9 @@ subroutine trb_mtn_stress_readnl(nlfile)
      call find_group_name(unitn, 'tms_nl', status=ierr)
      if (ierr == 0) then
         read(unitn, tms_nl, iostat=ierr)
-     end if
-     if (ierr /= 0) then
-        call endrun(subname // ':: ERROR reading namelist')
+        if (ierr /= 0) then
+           call endrun(subname // ':: ERROR reading namelist')
+        end if
      end if
      close(unitn)
      call freeunit(unitn)

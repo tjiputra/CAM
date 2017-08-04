@@ -89,6 +89,7 @@ use cam_history,    only: addfld, add_default, outfld, horiz_only
 
 use cam_logfile,    only: iulog
 use cam_abortutils, only: endrun
+use scamMod,        only: single_column
 use error_messages, only: handle_errmsg
 use ref_pres,       only: top_lev=>trop_cloud_top_lev
 
@@ -112,7 +113,7 @@ integer :: micro_mg_sub_version = 0      ! Second part of version number.
 
 real(r8) :: micro_mg_dcs = -1._r8
 
-logical :: microp_uniform
+logical :: microp_uniform       = .false.
 logical :: micro_mg_adjust_cpt  = .false.
 
 character(len=16) :: micro_mg_precip_frac_method = 'max_overlap' ! type of precipitation fraction method
@@ -856,7 +857,7 @@ subroutine micro_mg_cam_init(pbuf2d)
       call addfld('FICE_SCOL', (/'psubcols','lev     '/), 'I', 'fraction', &
            'Sub-column fractional ice content within cloud', flag_xyfill=.true., fill_value=1.e30_r8)
    end if
-
+   
    
    ! This is only if the coldpoint temperatures are being adjusted.
    ! NOTE: Some fields related to these and output later are added in tropopause.F90.
@@ -1152,7 +1153,7 @@ subroutine micro_mg_cam_init(pbuf2d)
       call pbuf_set_field(pbuf2d, acpr_idx,   0._r8)
       call pbuf_set_field(pbuf2d, acgcme_idx, 0._r8)
       call pbuf_set_field(pbuf2d, acnum_idx,  0)
-      call pbuf_set_field(pbuf2d, relvar_idx, 2.0_r8)  
+      call pbuf_set_field(pbuf2d, relvar_idx, 2._r8)
       call pbuf_set_field(pbuf2d, accre_enhan_idx, 1._r8)
       call pbuf_set_field(pbuf2d, am_evp_st_idx,  0._r8)
       call pbuf_set_field(pbuf2d, evprain_st_idx, 0._r8)
@@ -2263,7 +2264,6 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
       case (1)
          select case (micro_mg_sub_version)
          case (0)
-
             call micro_mg_tend1_0( &
                  microp_uniform, mgncol, nlev, mgncol, 1, dtime/num_steps, &
                  packed_t, packed_q, packed_qc, packed_qi, packed_nc,     &
@@ -2562,7 +2562,7 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
       ! Cloud fraction for purposes of precipitation is maximum cloud
       ! fraction out of all the layers that the precipitation may be
       ! falling down from.
-      cldmax = max(mincld, ast)
+      cldmax(:ncol,:) = max(mincld, ast(:ncol,:))
       do k = top_lev+1, pver
          where (state_loc%q(:ncol,k-1,ixrain) >= qsmall .or. &
               state_loc%q(:ncol,k-1,ixsnow) >= qsmall)

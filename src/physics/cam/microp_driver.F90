@@ -50,14 +50,7 @@ subroutine microp_driver_readnl(nlfile)
    select case (microp_scheme)
    case ('MG')
       call micro_mg_cam_readnl(nlfile)
-   case ('RK')
-      ! microp_driver doesn't handle this one
-      continue
-   case ('SPCAM_sam1mom')
-      ! microp_driver doesn't handle this one
-      continue
-   case ('SPCAM_m2005')
-      ! microp_driver doesn't handle this one
+   case ('NONE', 'RK', 'SPCAM_sam1mom', 'SPCAM_m2005')
       continue
    case default
       call endrun('microp_driver_readnl:: unrecognized microp_scheme, "'//trim(microp_scheme)//'"')
@@ -102,14 +95,7 @@ function microp_driver_implements_cnst(name)
    select case (microp_scheme)
    case ('MG')
       microp_driver_implements_cnst = micro_mg_cam_implements_cnst(name)
-   case ('RK')
-      ! microp_driver doesn't handle this one
-      continue
-   case ('SPCAM_m2005')
-      ! microp_driver doesn't handle this one
-      continue
-   case ('SPCAM_sam1mom')
-      ! microp_driver doesn't handle this one
+   case ('NONE', 'RK', 'SPCAM_sam1mom', 'SPCAM_m2005')
       continue
    case default
       call endrun('microp_driver_implements_cnst:: unrecognized microp_scheme, '//trim(microp_scheme))

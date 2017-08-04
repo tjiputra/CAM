@@ -191,7 +191,14 @@ contains
     call addfld ('VAP',     (/ 'lev' /), 'A','m/s',           'Meridional wind (after physics)'   )
     call addfld (apcnst(1), (/ 'lev' /), 'A','kg/kg',         trim(cnst_longname(1))//' (after physics)')
     if ( dycore_is('LR') .or. dycore_is('SE') ) then
-      call addfld ('TFIX',    horiz_only,  'A', 'K/s',        'T fixer (T equivalent of Energy correction)')
+      call addfld ('TFIX',   horiz_only, 'A','K/s',           'T fixer (T equivalent of Energy correction)')
+      call addfld ('EFIX',   horiz_only, 'A','W/m2',          'Energy fixer (Energy correction)')
+      call addfld ('PTTEND_DME', (/ 'lev' /), 'A', 'K/s ', &
+                   'T-tendency due to dry mass adjustment at the end of tphysac'    )
+      call addfld ('IETEND_DME',  horiz_only, 'A','W/m2 ', &
+                   'Column DSE tendency due to mass adjustment at end of tphysac'   )
+      call addfld ('EFLX    '  ,  horiz_only, 'A','W/m2 ', &
+                   'Material enthalpy flux due to mass adjustment at end of tphysac')
     end if
     call addfld ('TTEND_TOT', (/ 'lev' /), 'A', 'K/s',        'Total temperature tendency')
 
@@ -321,13 +328,18 @@ contains
       call add_default ('VAP     '  , history_budget_histfile_num, ' ')
       call add_default (apcnst(1)   , history_budget_histfile_num, ' ')
       if ( dycore_is('LR') .or. dycore_is('SE') ) then
-        call add_default ('TFIX    '    , history_budget_histfile_num, ' ')
+        call add_default ('TFIX    '  , history_budget_histfile_num, ' ')
+        call add_default ('EFIX    '  , history_budget_histfile_num, ' ') !+tht
+        call add_default ('PTTEND_DME', history_budget_histfile_num, ' ') !+tht
+        call add_default ('IETEND_DME', history_budget_histfile_num, ' ') !+tht
+        call add_default ('EFLX    '  , history_budget_histfile_num, ' ') !+tht
       end if
     end if
 
     if (history_waccm) then
-      call add_default ('PS      ', 2, ' ')
-      call add_default ('T       ', 2, ' ')
+      call add_default ('PHIS', 7, ' ')
+      call add_default ('PS', 7, ' ')
+      call add_default ('PSL', 7, ' ')
     end if
 
     ! outfld calls in diag_phys_tend_writeout
@@ -359,8 +371,8 @@ contains
     ! column burdens for all constituents except water vapor
     call constituent_burden_init
 
-    call cnst_get_ind('CLDLIQ', ixcldliq)
-    call cnst_get_ind('CLDICE', ixcldice)
+    call cnst_get_ind('CLDLIQ', ixcldliq, abort=.false.)
+    call cnst_get_ind('CLDICE', ixcldice, abort=.false.)
 
     ! outfld calls in diag_phys_writeout
     call addfld (cnst_name(1), (/ 'lev' /), 'A', 'kg/kg',    cnst_longname(1))
@@ -394,6 +406,8 @@ contains
     call addfld ('DTCOND_24_SIN',(/ 'lev' /), 'A','K/s','T tendency - moist processes 24hr. sin coeff.')
     call addfld ('DTCOND_12_COS',(/ 'lev' /), 'A','K/s','T tendency - moist processes 12hr. cos coeff.')
     call addfld ('DTCOND_12_SIN',(/ 'lev' /), 'A','K/s','T tendency - moist processes 12hr. sin coeff.')
+    call addfld ('DTCOND_08_COS',(/ 'lev' /), 'A','K/s','T tendency - moist processes  8hr. cos coeff.')
+    call addfld ('DTCOND_08_SIN',(/ 'lev' /), 'A','K/s','T tendency - moist processes  8hr. sin coeff.')
 
     call addfld ('PRECL',    horiz_only, 'A', 'm/s','Large-scale (stable) precipitation rate (liq + ice)'                )
     call addfld ('PRECC',    horiz_only, 'A', 'm/s','Convective precipitation rate (liq + ice)'                          )
@@ -445,14 +459,18 @@ contains
 
     call addfld (ptendnam(       1),(/ 'lev' /), 'A', 'kg/kg/s',trim(cnst_name(       1))//' total physics tendency '      )
     call addfld (ptendnam(ixcldliq),(/ 'lev' /), 'A', 'kg/kg/s',trim(cnst_name(ixcldliq))//' total physics tendency '      )
-    call addfld (ptendnam(ixcldice),(/ 'lev' /), 'A', 'kg/kg/s',trim(cnst_name(ixcldice))//' total physics tendency '      )
+    if (ixcldice > 0) then
+      call addfld (ptendnam(ixcldice),(/ 'lev' /), 'A', 'kg/kg/s',trim(cnst_name(ixcldice))//' total physics tendency ')
+    end if
     if ( dycore_is('LR') )then
       call addfld (dmetendnam(       1),(/ 'lev' /), 'A','kg/kg/s', &
            trim(cnst_name(       1))//' dme adjustment tendency (FV) ')
       call addfld (dmetendnam(ixcldliq),(/ 'lev' /), 'A','kg/kg/s', &
            trim(cnst_name(ixcldliq))//' dme adjustment tendency (FV) ')
-      call addfld (dmetendnam(ixcldice),(/ 'lev' /), 'A','kg/kg/s', &
-           trim(cnst_name(ixcldice))//' dme adjustment tendency (FV) ')
+      if (ixcldice > 0) then
+        call addfld (dmetendnam(ixcldice),(/ 'lev' /), 'A','kg/kg/s', &
+             trim(cnst_name(ixcldice))//' dme adjustment tendency (FV) ')
+      end if
     end if
 
     ! outfld calls in diag_physvar_ic
@@ -526,11 +544,15 @@ contains
       call add_default ('PTTEND'          , history_budget_histfile_num, ' ')
       call add_default (ptendnam(       1), history_budget_histfile_num, ' ')
       call add_default (ptendnam(ixcldliq), history_budget_histfile_num, ' ')
-      call add_default (ptendnam(ixcldice), history_budget_histfile_num, ' ')
+      if (ixcldice > 0) then
+        call add_default (ptendnam(ixcldice), history_budget_histfile_num, ' ')
+      end if
       if ( dycore_is('LR') )then
         call add_default(dmetendnam(1)       , history_budget_histfile_num, ' ')
         call add_default(dmetendnam(ixcldliq), history_budget_histfile_num, ' ')
-        call add_default(dmetendnam(ixcldice), history_budget_histfile_num, ' ')
+        if (ixcldice > 0) then
+          call add_default(dmetendnam(ixcldice), history_budget_histfile_num, ' ')
+        end if
       end if
       if( history_budget_histfile_num > 1 ) then
         call add_default ('DTCOND  '         , history_budget_histfile_num, ' ')
@@ -544,7 +566,7 @@ contains
     end if
 
     ! Initial file - Optional fields
-    if (inithist_all) then
+    if (inithist_all.or.single_column) then
       call add_default ('CONCLD&IC  ',0, 'I')
       call add_default ('QCWAT&IC   ',0, 'I')
       call add_default ('TCWAT&IC   ',0, 'I')
@@ -594,29 +616,29 @@ contains
     end if
 
     ! Pbuf field indices for collecting output data
-    qcwat_idx  = pbuf_get_index('QCWAT',errcode=ierr)
-    tcwat_idx  = pbuf_get_index('TCWAT',errcode=ierr)
-    lcwat_idx  = pbuf_get_index('LCWAT',errcode=ierr)
-    cld_idx    = pbuf_get_index('CLD')
-    concld_idx = pbuf_get_index('CONCLD',errcode=ierr)
+    qcwat_idx  = pbuf_get_index('QCWAT',  errcode=ierr)
+    tcwat_idx  = pbuf_get_index('TCWAT',  errcode=ierr)
+    lcwat_idx  = pbuf_get_index('LCWAT',  errcode=ierr)
+    cld_idx    = pbuf_get_index('CLD',    errcode=ierr)
+    concld_idx = pbuf_get_index('CONCLD', errcode=ierr)
 
-    tke_idx  = pbuf_get_index('tke')
-    kvm_idx  = pbuf_get_index('kvm')
-    kvh_idx  = pbuf_get_index('kvh')
+    tke_idx  = pbuf_get_index('tke',  errcode=ierr)
+    kvm_idx  = pbuf_get_index('kvm',  errcode=ierr)
+    kvh_idx  = pbuf_get_index('kvh',  errcode=ierr)
     cush_idx = pbuf_get_index('cush', errcode=ierr)
 
-    pblh_idx  = pbuf_get_index('pblh')
-    tpert_idx = pbuf_get_index('tpert')
-    qpert_idx = pbuf_get_index('qpert',errcode=ierr)
+    pblh_idx  = pbuf_get_index('pblh',  errcode=ierr)
+    tpert_idx = pbuf_get_index('tpert', errcode=ierr)
+    qpert_idx = pbuf_get_index('qpert', errcode=ierr)
 
-    prec_dp_idx  = pbuf_get_index('PREC_DP')
-    snow_dp_idx  = pbuf_get_index('SNOW_DP')
-    prec_sh_idx  = pbuf_get_index('PREC_SH')
-    snow_sh_idx  = pbuf_get_index('SNOW_SH')
-    prec_sed_idx = pbuf_get_index('PREC_SED')
-    snow_sed_idx = pbuf_get_index('SNOW_SED')
-    prec_pcw_idx = pbuf_get_index('PREC_PCW')
-    snow_pcw_idx = pbuf_get_index('SNOW_PCW')
+    prec_dp_idx  = pbuf_get_index('PREC_DP',  errcode=ierr)
+    snow_dp_idx  = pbuf_get_index('SNOW_DP',  errcode=ierr)
+    prec_sh_idx  = pbuf_get_index('PREC_SH',  errcode=ierr)
+    snow_sh_idx  = pbuf_get_index('SNOW_SH',  errcode=ierr)
+    prec_sed_idx = pbuf_get_index('PREC_SED', errcode=ierr)
+    snow_sed_idx = pbuf_get_index('SNOW_SED', errcode=ierr)
+    prec_pcw_idx = pbuf_get_index('PREC_PCW', errcode=ierr)
+    snow_pcw_idx = pbuf_get_index('SNOW_PCW', errcode=ierr)
 
     if (is_first_step()) then
       call pbuf_set_field(pbuf2d, trefmxav_idx, -1.0e36_r8)
@@ -1133,7 +1155,6 @@ contains
     !
     !-----------------------------------------------------------------------
     use physconst,          only: gravit, rga, rair, cpair, latvap, rearth, pi, cappa
-    use time_manager,       only: get_nstep
     use interpolate_data,   only: vertinterp
     use constituent_burden, only: constituent_burden_comp
     use cam_control_mod,    only: moist_physics
@@ -1420,7 +1441,7 @@ contains
     real(r8):: snowc(pcols)                ! convective snow rate
     real(r8):: snowl(pcols)                ! stratiform snow rate
     real(r8):: prect(pcols)                ! total (conv+large scale) precip rate
-    real(r8) :: dcoef(4)                   ! for tidal component of T tend
+    real(r8) :: dcoef(6)                   ! for tidal component of T tend
 
     lchnk = state%lchnk
     ncol  = state%ncol
@@ -1428,26 +1449,94 @@ contains
     rtdt = 1._r8/ztodt
 
     if (moist_physics) then
-      call pbuf_get_field(pbuf, prec_dp_idx, prec_dp)
-      call pbuf_get_field(pbuf, snow_dp_idx, snow_dp)
-      call pbuf_get_field(pbuf, prec_sh_idx, prec_sh)
-      call pbuf_get_field(pbuf, snow_sh_idx, snow_sh)
-      call pbuf_get_field(pbuf, prec_sed_idx, prec_sed)
-      call pbuf_get_field(pbuf, snow_sed_idx, snow_sed)
-      call pbuf_get_field(pbuf, prec_pcw_idx, prec_pcw)
-      call pbuf_get_field(pbuf, snow_pcw_idx, snow_pcw)
+      if (prec_dp_idx > 0) then
+        call pbuf_get_field(pbuf, prec_dp_idx, prec_dp)
+      else
+        nullify(prec_dp)
+      end if
+      if (snow_dp_idx > 0) then
+        call pbuf_get_field(pbuf, snow_dp_idx, snow_dp)
+      else
+        nullify(snow_dp)
+      end if
+      if (prec_sh_idx > 0) then
+        call pbuf_get_field(pbuf, prec_sh_idx, prec_sh)
+      else
+        nullify(prec_sh)
+      end if
+      if (snow_sh_idx > 0) then
+        call pbuf_get_field(pbuf, snow_sh_idx, snow_sh)
+      else
+        nullify(snow_sh)
+      end if
+      if (prec_sed_idx > 0) then
+        call pbuf_get_field(pbuf, prec_sed_idx, prec_sed)
+      else
+        nullify(prec_sed)
+      end if
+      if (snow_sed_idx > 0) then
+        call pbuf_get_field(pbuf, snow_sed_idx, snow_sed)
+      else
+        nullify(snow_sed)
+      end if
+      if (prec_pcw_idx > 0) then
+        call pbuf_get_field(pbuf, prec_pcw_idx, prec_pcw)
+      else
+        nullify(prec_pcw)
+      end if
+      if (snow_pcw_idx > 0) then
+        call pbuf_get_field(pbuf, snow_pcw_idx, snow_pcw)
+      else
+        nullify(snow_pcw)
+      end if
 
       ! Precipitation rates (multi-process)
-      precc(:ncol) = prec_dp(:ncol)  + prec_sh(:ncol)
-      precl(:ncol) = prec_sed(:ncol) + prec_pcw(:ncol)
-      snowc(:ncol) = snow_dp(:ncol)  + snow_sh(:ncol)
-      snowl(:ncol) = snow_sed(:ncol) + snow_pcw(:ncol)
+      if (associated(prec_dp) .and. associated(prec_sh)) then
+        precc(:ncol) = prec_dp(:ncol)  + prec_sh(:ncol)
+      else if (associated(prec_dp)) then
+        precc(:ncol) = prec_dp(:ncol)
+      else if (associated(prec_sh)) then
+        precc(:ncol) = prec_sh(:ncol)
+      else
+        precc(:ncol) = 0._r8
+      end if
+      if (associated(prec_sed) .and. associated(prec_pcw)) then
+        precl(:ncol) = prec_sed(:ncol) + prec_pcw(:ncol)
+      else if (associated(prec_sed)) then
+        precl(:ncol) = prec_sed(:ncol)
+      else if (associated(prec_pcw)) then
+        precl(:ncol) = prec_pcw(:ncol)
+      else
+        precl(:ncol) = 0._r8
+      end if
+      if (associated(snow_dp) .and. associated(snow_sh)) then
+        snowc(:ncol) = snow_dp(:ncol)  + snow_sh(:ncol)
+      else if (associated(snow_dp)) then
+        snowc(:ncol) = snow_dp(:ncol)
+      else if (associated(snow_sh)) then
+        snowc(:ncol) = snow_sh(:ncol)
+      else
+        snowc(:ncol) = 0._r8
+      end if
+      if (associated(snow_sed) .and. associated(snow_pcw)) then
+        snowl(:ncol) = snow_sed(:ncol) + snow_pcw(:ncol)
+      else if (associated(snow_sed)) then
+        snowl(:ncol) = snow_sed(:ncol)
+      else if (associated(snow_pcw)) then
+        snowl(:ncol) = snow_pcw(:ncol)
+      else
+        snowl(:ncol) = 0._r8
+      end if
       prect(:ncol) = precc(:ncol)    + precl(:ncol)
 
       call outfld('PRECC   ', precc, pcols, lchnk )
       call outfld('PRECL   ', precl, pcols, lchnk )
-      call outfld('PREC_PCW', prec_pcw,pcols   ,lchnk )
-      call outfld('PREC_zmc', prec_dp ,pcols   ,lchnk )
+      if (associated(prec_pcw)) then
+        call outfld('PREC_PCW', prec_pcw,pcols   ,lchnk )
+      end if
+      if (associated(prec_dp)) then
+        call outfld('PREC_zmc', prec_dp ,pcols   ,lchnk )
+      end if
       call outfld('PRECSC  ', snowc, pcols, lchnk )
       call outfld('PRECSL  ', snowl, pcols, lchnk )
       call outfld('PRECT   ', prect, pcols, lchnk )
@@ -1475,6 +1564,8 @@ contains
       call outfld( 'DTCOND_24_COS', dtcond(:ncol,:,lchnk)*dcoef(2), ncol, lchnk )
       call outfld( 'DTCOND_12_SIN', dtcond(:ncol,:,lchnk)*dcoef(3), ncol, lchnk )
       call outfld( 'DTCOND_12_COS', dtcond(:ncol,:,lchnk)*dcoef(4), ncol, lchnk )
+      call outfld( 'DTCOND_08_SIN', dtcond(:ncol,:,lchnk)*dcoef(5), ncol, lchnk )
+      call outfld( 'DTCOND_08_COS', dtcond(:ncol,:,lchnk)*dcoef(6), ncol, lchnk )
 
       do m = 1, dqcond_num
         if ( cnst_cam_outfld(m) ) then
@@ -1768,7 +1859,8 @@ contains
 
 !#######################################################################
 
-  subroutine diag_phys_tend_writeout_dry(state, pbuf,  tend, ztodt)
+ !subroutine diag_phys_tend_writeout_dry(state, pbuf, tend, ztodt)
+  subroutine diag_phys_tend_writeout_dry(state, pbuf, tend, ztodt, tmp_t, eflx, dsema) !tht
 
     !---------------------------------------------------------------
     !
@@ -1787,13 +1879,18 @@ contains
     type(physics_tend ), intent(in)    :: tend
     real(r8),            intent(in)    :: ztodt             ! physics timestep
 
+    real(r8)           , intent(inout) :: tmp_t     (pcols,pver) !tht: holds last physics_updated T (FV)
+    real(r8)           , intent(in), optional ::eflx (pcols    ) !tht: surface sensible heat flux assoc.with mass adj.
+    real(r8)           , intent(in), optional ::dsema(pcols    ) !tht: column enthalpy tendency assoc. with mass adj.
+
     !---------------------------Local workspace-----------------------------
 
     integer  :: lchnk             ! chunk index
     integer  :: ncol              ! number of columns in chunk
     real(r8) :: ftem2(pcols)      ! Temporary workspace for outfld variables
     real(r8) :: ftem3(pcols,pver) ! Temporary workspace for outfld variables
-    real(r8) :: heat_glob         ! global energy integral (FV only)
+    real(r8) :: heat_glob         ! T-tend from fixer (FV only)
+    real(r8) :: tedif_glob        !+tht energy flux from fixer (FV only)
     ! CAM pointers to get variables from the physics buffer
     real(r8), pointer, dimension(:,:) :: t_ttend
     integer  :: itim_old
@@ -1809,13 +1906,24 @@ contains
     call outfld('UAP', state%u, pcols, lchnk   )
     call outfld('VAP', state%v, pcols, lchnk   )
 
+    !tht: heat tendencies from dme_adjust
+    if (dycore_is('LR')) then
+      tmp_t(:ncol,:pver) = (state%t(:ncol,:pver) - tmp_t(:ncol,:pver))/ztodt ! T tendency
+      call outfld('PTTEND_DME', tmp_t, pcols, lchnk   )
+      if(present(dsema))call outfld('IETEND_DME', dsema, pcols, lchnk)       ! dry enthalpy
+      if(present(eflx) )call outfld('EFLX'      ,  eflx, pcols, lchnk)       ! moist enthalpy
+    end if
+
     ! Total physics tendency for Temperature
     ! (remove global fixer tendency from total for FV and SE dycores)
-
     if (dycore_is('LR') .or. dycore_is('SE')) then
-      call check_energy_get_integrals( heat_glob_out=heat_glob )
+      call check_energy_get_integrals( heat_glob_out=heat_glob , tedif_glob_out=tedif_glob )
       ftem2(:ncol)  = heat_glob/cpair
       call outfld('TFIX', ftem2, pcols, lchnk   )
+     !+tht
+      ftem2(:ncol)  = tedif_glob/ztodt
+      call outfld('EFIX', ftem2, pcols, lchnk   )
+     !-tht
       ftem3(:ncol,:pver)  = tend%dtdt(:ncol,:pver) - heat_glob/cpair
     else
       ftem3(:ncol,:pver)  = tend%dtdt(:ncol,:pver)
@@ -1873,22 +1981,50 @@ contains
     lchnk = state%lchnk
     ncol  = state%ncol
     rtdt  = 1._r8/ztodt
-    call cnst_get_ind('CLDLIQ', ixcldliq)
-    call cnst_get_ind('CLDICE', ixcldice)
+    call cnst_get_ind('CLDLIQ', ixcldliq, abort=.false.)
+    call cnst_get_ind('CLDICE', ixcldice, abort=.false.)
 
-    if ( cnst_cam_outfld(       1) ) call outfld (apcnst(       1), state%q(1,1,       1), pcols, lchnk)
-    if ( cnst_cam_outfld(ixcldliq) ) call outfld (apcnst(ixcldliq), state%q(1,1,ixcldliq), pcols, lchnk)
-    if ( cnst_cam_outfld(ixcldice) ) call outfld (apcnst(ixcldice), state%q(1,1,ixcldice), pcols, lchnk)
+    if ( cnst_cam_outfld(       1) ) then
+      call outfld (apcnst(       1), state%q(1,1,       1), pcols, lchnk)
+    end if
+    if (ixcldliq > 0) then
+      if (cnst_cam_outfld(ixcldliq)) then
+        call outfld (apcnst(ixcldliq), state%q(1,1,ixcldliq), pcols, lchnk)
+      end if
+    end if
+    if (ixcldice > 0) then
+      if ( cnst_cam_outfld(ixcldice) ) then
+        call outfld (apcnst(ixcldice), state%q(1,1,ixcldice), pcols, lchnk)
+      end if
+    end if
 
     ! Tendency for dry mass adjustment of q (FV only)
 
     if (dycore_is('LR')) then
       tmp_q     (:ncol,:pver) = (state%q(:ncol,:pver,       1) - tmp_q     (:ncol,:pver))*rtdt
-      tmp_cldliq(:ncol,:pver) = (state%q(:ncol,:pver,ixcldliq) - tmp_cldliq(:ncol,:pver))*rtdt
-      tmp_cldice(:ncol,:pver) = (state%q(:ncol,:pver,ixcldice) - tmp_cldice(:ncol,:pver))*rtdt
-      if ( cnst_cam_outfld(       1) ) call outfld (dmetendnam(       1), tmp_q     , pcols, lchnk)
-      if ( cnst_cam_outfld(ixcldliq) ) call outfld (dmetendnam(ixcldliq), tmp_cldliq, pcols, lchnk)
-      if ( cnst_cam_outfld(ixcldice) ) call outfld (dmetendnam(ixcldice), tmp_cldice, pcols, lchnk)
+      if (ixcldliq > 0) then
+        tmp_cldliq(:ncol,:pver) = (state%q(:ncol,:pver,ixcldliq) - tmp_cldliq(:ncol,:pver))*rtdt
+      else
+        tmp_cldliq(:ncol,:pver) = 0.0_r8
+      end if
+      if (ixcldice > 0) then
+        tmp_cldice(:ncol,:pver) = (state%q(:ncol,:pver,ixcldice) - tmp_cldice(:ncol,:pver))*rtdt
+      else
+        tmp_cldice(:ncol,:pver) = 0.0_r8
+      end if
+      if ( cnst_cam_outfld(       1) ) then
+        call outfld (dmetendnam(       1), tmp_q     , pcols, lchnk)
+      end if
+      if (ixcldliq > 0) then
+        if ( cnst_cam_outfld(ixcldliq) ) then
+          call outfld (dmetendnam(ixcldliq), tmp_cldliq, pcols, lchnk)
+        end if
+      end if
+      if (ixcldice > 0) then
+        if ( cnst_cam_outfld(ixcldice) ) then
+          call outfld (dmetendnam(ixcldice), tmp_cldice, pcols, lchnk)
+        end if
+      end if
     end if
 
     ! Total physics tendency for moisture and other tracers
@@ -1897,21 +2033,27 @@ contains
       ftem3(:ncol,:pver) = (state%q(:ncol,:pver,       1) - qini     (:ncol,:pver) )*rtdt
       call outfld (ptendnam(       1), ftem3, pcols, lchnk)
     end if
-    if ( cnst_cam_outfld(ixcldliq) ) then
-      ftem3(:ncol,:pver) = (state%q(:ncol,:pver,ixcldliq) - cldliqini(:ncol,:pver) )*rtdt
-      call outfld (ptendnam(ixcldliq), ftem3, pcols, lchnk)
+    if (ixcldliq > 0) then
+      if (cnst_cam_outfld(ixcldliq) ) then
+        ftem3(:ncol,:pver) = (state%q(:ncol,:pver,ixcldliq) - cldliqini(:ncol,:pver) )*rtdt
+        call outfld (ptendnam(ixcldliq), ftem3, pcols, lchnk)
+      end if
     end if
-    if ( cnst_cam_outfld(ixcldice) ) then
-      ftem3(:ncol,:pver) = (state%q(:ncol,:pver,ixcldice) - cldiceini(:ncol,:pver) )*rtdt
-      call outfld (ptendnam(ixcldice), ftem3, pcols, lchnk)
+    if (ixcldice > 0) then
+      if ( cnst_cam_outfld(ixcldice) ) then
+        ftem3(:ncol,:pver) = (state%q(:ncol,:pver,ixcldice) - cldiceini(:ncol,:pver) )*rtdt
+        call outfld (ptendnam(ixcldice), ftem3, pcols, lchnk)
+      end if
     end if
 
   end subroutine diag_phys_tend_writeout_moist
 
 !#######################################################################
 
-  subroutine diag_phys_tend_writeout(state, pbuf,  tend, ztodt,               &
-       tmp_q, tmp_cldliq, tmp_cldice, qini, cldliqini, cldiceini)
+ !subroutine diag_phys_tend_writeout(state, pbuf,  tend, ztodt,               &
+ !     tmp_q,        tmp_cldliq, tmp_cldice, qini, cldliqini, cldiceini)
+  subroutine diag_phys_tend_writeout(state, pbuf,  tend, ztodt,  &
+       tmp_q, tmp_t, tmp_cldliq, tmp_cldice, qini, cldliqini, cldiceini, eflx, dsema)
 
     !---------------------------------------------------------------
     !
@@ -1927,15 +2069,20 @@ contains
     type(physics_tend ), intent(in)    :: tend
     real(r8),            intent(in)    :: ztodt                  ! physics timestep
     real(r8)           , intent(inout) :: tmp_q     (pcols,pver) ! As input, holds pre-adjusted tracers (FV)
+    real(r8)           , intent(inout) :: tmp_t     (pcols,pver) !tht: holds last physics_updated T (FV)
     real(r8),            intent(inout) :: tmp_cldliq(pcols,pver) ! As input, holds pre-adjusted tracers (FV)
     real(r8),            intent(inout) :: tmp_cldice(pcols,pver) ! As input, holds pre-adjusted tracers (FV)
     real(r8),            intent(in)    :: qini      (pcols,pver) ! tracer fields at beginning of physics
     real(r8),            intent(in)    :: cldliqini (pcols,pver) ! tracer fields at beginning of physics
     real(r8),            intent(in)    :: cldiceini (pcols,pver) ! tracer fields at beginning of physics
+    real(r8)           , intent(in), optional ::eflx (pcols    ) !tht: surface sensible heat flux assoc.with mass adj.
+    real(r8)           , intent(in), optional ::dsema(pcols    ) !tht: column enthalpy tendency assoc. with mass adj.
 
     !-----------------------------------------------------------------------
 
-    call diag_phys_tend_writeout_dry(state, pbuf, tend, ztodt)
+   !call diag_phys_tend_writeout_dry(state, pbuf, tend, ztodt)
+    call diag_phys_tend_writeout_dry(state, pbuf, tend, ztodt, tmp_t, eflx, dsema) !tht
+
     if (moist_physics) then
       call diag_phys_tend_writeout_moist(state, pbuf,  tend, ztodt,           &
            tmp_q, tmp_cldliq, tmp_cldice, qini, cldliqini, cldiceini)
@@ -1990,12 +2137,22 @@ contains
     !
     lchnk = state%lchnk
 
-    call cnst_get_ind('CLDLIQ', ixcldliq)
-    call cnst_get_ind('CLDICE', ixcldice)
+    call cnst_get_ind('CLDLIQ', ixcldliq, abort=.false.)
+    call cnst_get_ind('CLDICE', ixcldice, abort=.false.)
 
-    if ( cnst_cam_outfld(       1) ) call outfld (bpcnst(       1), state%q(1,1,       1), pcols, lchnk)
-    if ( cnst_cam_outfld(ixcldliq) ) call outfld (bpcnst(ixcldliq), state%q(1,1,ixcldliq), pcols, lchnk)
-    if ( cnst_cam_outfld(ixcldice) ) call outfld (bpcnst(ixcldice), state%q(1,1,ixcldice), pcols, lchnk)
+    if ( cnst_cam_outfld(       1) ) then
+      call outfld (bpcnst(       1), state%q(1,1,       1), pcols, lchnk)
+    end if
+    if (ixcldliq > 0) then
+      if (cnst_cam_outfld(ixcldliq)) then
+        call outfld (bpcnst(ixcldliq), state%q(1,1,ixcldliq), pcols, lchnk)
+      end if
+    end if
+    if (ixcldice > 0) then
+      if (cnst_cam_outfld(ixcldice)) then
+        call outfld (bpcnst(ixcldice), state%q(1,1,ixcldice), pcols, lchnk)
+      end if
+    end if
 
   end subroutine diag_state_b4_phys_write_moist
 

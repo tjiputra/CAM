@@ -10,7 +10,7 @@ module restart_dynamics
        dps, phis, dpsl, dpsm, omga, ptimelevels
   use scanslt,         only:  lammp, phimp, sigmp, qfcst
 #if ( defined BFB_CAM_SCAM_IOP )
-  use iop,             only: dqfx3sav,divq3dsav,divt3dsav,t2sav,betasav
+  use iop,             only: dqfx3sav,divq3dsav,divt3dsav,t2sav,betasav,fusav,fvsav
 #endif
   use cam_logfile,  only: iulog
   use spmd_utils,   only: masterproc
@@ -35,7 +35,7 @@ module restart_dynamics
      character(len=namlen) :: name
   end type restart_var_t
 #if ( defined BFB_CAM_SCAM_IOP )
-  integer, parameter :: restartvarcnt = 22
+  integer, parameter :: restartvarcnt = 24
 #else
   integer, parameter :: restartvarcnt = 17
 #endif
@@ -153,6 +153,12 @@ CONTAINS
 
     vcnt=vcnt+1
     call set_r_var('T2', 1, vcnt, v3=t2sav )
+
+    vcnt=vcnt+1
+    call set_r_var('FU', 1, vcnt, v3=fusav )
+
+    vcnt=vcnt+1
+    call set_r_var('FV', 1, vcnt, v3=fvsav )
 
     vcnt=vcnt+1
     call set_r_var('BETA', 1, vcnt, v1=betasav )

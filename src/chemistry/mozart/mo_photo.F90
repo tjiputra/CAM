@@ -120,7 +120,7 @@ contains
     use mo_jlong,      only : jlong_init
     use seasalt_model, only : sslt_names=>seasalt_names, sslt_ncnst=>seasalt_nbin
     use mo_jshort,     only : jshort_init
-    use mo_jeuv,       only : jeuv_init
+    use mo_jeuv,       only : jeuv_init, neuv
     use phys_grid,     only : get_ncols_p, get_rlat_all_p    
     use solar_data,    only : has_spectrum
     use photo_bkgrnd,  only : photo_bkgrnd_init
@@ -207,7 +207,7 @@ contains
        call endrun
     end if
     sht_indexer(:) = 0
-    allocate( euv_indexer(phtcnt),stat=astat )
+    allocate( euv_indexer(neuv),stat=astat )
     if( astat /= 0 ) then
        write(iulog,*) 'photo_inti: Failed to allocate euv_indexer; error = ',astat
        call endrun
@@ -323,7 +323,7 @@ contains
     !----------------------------------------------------------------------
     !        ... check that each photorate is in short or long datasets
     !----------------------------------------------------------------------
-    if( any( (abs(sht_indexer(:)) + abs(lng_indexer(:)) + abs(euv_indexer(:))) == 0 ) ) then
+    if( any( ( abs(sht_indexer(:)) + abs(lng_indexer(:)) ) == 0 ) ) then
        write(iulog,*) ' '
        write(iulog,*) 'photo_inti: the following photorate(s) are not in'
        write(iulog,*) '            either the short or long datasets'
@@ -858,9 +858,9 @@ contains
              !	... euv photorates do not include cloud effects ??
              !-----------------------------------------------------------------
              call jeuv( pver, sza, o_den, o2_den, n2_den,  zarg, euv_prates )
-             do m = 1,phtcnt
+             do m = 1,neuv
                 if( euv_indexer(m) > 0 ) then
-                   photos(i,:,m) = esfact * euv_prates(:,euv_indexer(m))
+                   photos(i,:,euv_indexer(m)) = esfact * euv_prates(:,m)
                 endif
              enddo
           endif
