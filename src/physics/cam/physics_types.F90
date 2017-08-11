@@ -1396,8 +1396,6 @@ end subroutine physics_ptend_copy
     real(r8) :: qf(pcols,pcnst), qtmp(pcols,pcnst), uf(pcols), vf(pcols) ! work arrays
 
     logical,parameter  :: hybrid_coord=.false. ! Flag for hybrid (=T) or lagrangian (=F) coord
-    logical,parameter  :: adjust_uv   =.false. ! adjust (U,V) ?
-    logical,parameter  :: ke_conserve =.false. ! conserve KE? if not, if adjust_uv=T -> conserve momentum
 
 !+tht 17.11.2015 option to use virtual temperature for T update
     logical, parameter :: l_virtual = .true.     ! convert T to T_v, run adjustment loop, then convert back
