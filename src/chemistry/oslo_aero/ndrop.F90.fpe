@@ -769,6 +769,7 @@ subroutine dropmixnuc( &
          mm = k - top_lev + 1 
          do m=1,nmodes
             if(.NOT. alert .and. &
+!tht is zero an allowed value for numberConcentration??
                ANY(numberConcentration(:ncol,k,m) .lt. 0.0_r8 ))then
                alert = .TRUE.
                lptr = k
@@ -2108,9 +2109,6 @@ subroutine dropmixnuc( &
    call ccncalc_oslo(state &
                     , pbuf &
                     , cs     &
-!+tht
-                    , hasAerosol &
-!-tht
                     , numberConcentration &
                     , volumeConcentration &
                     , hygroscopicity &
@@ -2865,9 +2863,6 @@ end subroutine ccncalc
 subroutine ccncalc_oslo(state &
                      , pbuf   &
                      , cs     &
-!+tht
-                     , hasAerosol &
-!-tht
                      , numberConcentration &
                      , volumeConcentration &
                      , hygroscopicity &
@@ -2891,9 +2886,6 @@ subroutine ccncalc_oslo(state &
 
    real(r8), intent(in)  :: cs(pcols,pver)       ! air density (kg/m3)
    real(r8), intent(out) :: ccn(pcols,pver,psat) ! number conc of aerosols activated at supersat (#/m3)
-!+tht
-   logical, intent(in)  :: hasAerosol(pcols, pver, nmodes)
-!-tht
    real(r8), intent(in) ::  numberConcentration(pcols,pver, nmodes) ! interstit+activated aerosol number conc (/m3)
    real(r8), intent(in) ::  volumeConcentration(pcols,pver,nmodes)  ! interstit+activated aerosol volume conc (m3/m3)
    real(r8), intent(in) ::  hygroscopicity(pcols,pver,nmodes)
@@ -2942,9 +2934,6 @@ subroutine ccncalc_oslo(state &
 
          do i=1,ncol
 
-!+tht
-          if (hasAerosol(i,k,m)) then
-!-tht
             !Curvature-parameter "A" in ARGI (eqn 5)
             a = surften_coef/tair(i,k)
 
@@ -2956,6 +2945,7 @@ subroutine ccncalc_oslo(state &
             !Numbe rmedian radius (power of three)
             !By definition of lognormal distribution
             amcube =(3._r8*volumeConcentration(i,k,m) & 
+!tht is zero an allowed value for numberConcentration??
                /(4._r8*pi*exp45logsig_var*numberConcentration(i,k,m)))  ! only if variable size dist
 
 
@@ -2982,11 +2972,6 @@ subroutine ccncalc_oslo(state &
                   +numberConcentration(i,k,m)&
                   *0.5_r8*(1._r8-erf(arg))
             end do
-!+tht
-          else
-            ccn(i,k,lsat)=0._r8
-          endif
-!-tht
          end do
       end do
    end do

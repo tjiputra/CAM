@@ -192,7 +192,7 @@ contains
     call addfld (apcnst(1), (/ 'lev' /), 'A','kg/kg',         trim(cnst_longname(1))//' (after physics)')
     if ( dycore_is('LR') .or. dycore_is('SE') ) then
       call addfld ('TFIX',   horiz_only, 'A','K/s',           'T fixer (T equivalent of Energy correction)')
-      call addfld ('EFIX',   horiz_only, 'A','W/m2',          'Energy fixer (Energy correction)')
+      call addfld ('EBREAK', horiz_only, 'A','W/m2',          'Global-mean energy-nonconservation (W/m2)')
       call addfld ('PTTEND_DME', (/ 'lev' /), 'A', 'K/s ', &
                    'T-tendency due to dry mass adjustment at the end of tphysac'    )
       call addfld ('IETEND_DME',  horiz_only, 'A','W/m2 ', &
@@ -329,7 +329,7 @@ contains
       call add_default (apcnst(1)   , history_budget_histfile_num, ' ')
       if ( dycore_is('LR') .or. dycore_is('SE') ) then
         call add_default ('TFIX    '  , history_budget_histfile_num, ' ')
-        call add_default ('EFIX    '  , history_budget_histfile_num, ' ') !+tht
+        call add_default ('EBREAK  '  , history_budget_histfile_num, ' ') !+tht
         call add_default ('PTTEND_DME', history_budget_histfile_num, ' ') !+tht
         call add_default ('IETEND_DME', history_budget_histfile_num, ' ') !+tht
         call add_default ('EFLX    '  , history_budget_histfile_num, ' ') !+tht
@@ -1922,7 +1922,7 @@ contains
       call outfld('TFIX', ftem2, pcols, lchnk   )
      !+tht
       ftem2(:ncol)  = tedif_glob/ztodt
-      call outfld('EFIX', ftem2, pcols, lchnk   )
+      call outfld('EBREAK', ftem2, pcols, lchnk   )
      !-tht
       ftem3(:ncol,:pver)  = tend%dtdt(:ncol,:pver) - heat_glob/cpair
     else
