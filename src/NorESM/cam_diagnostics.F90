@@ -308,6 +308,8 @@ contains
 #ifdef DIRIND
     call addfld ('AOD_VIS ',horiz_only, 'A','unitless','Aerosol optical depth at 0.442-0.625um') ! CAM4-Oslo: 0.35-0.64um
     call addfld ('ABSVIS  ',horiz_only, 'A','unitless','Aerosol absorptive optical depth at 0.442-0.625um') ! CAM4-Oslo: 0.35-0.64um
+   call addfld ('AODVVOLC ',horiz_only, 'A','unitless','CMIP6 volcanic aerosol optical depth at 0.442-0.625um') ! CAM4-Oslo: 0.35-0.64um
+   call addfld ('ABSVVOLC ',horiz_only, 'A','unitless','CMIP6 volcanic aerosol absorptive optical depth at 0.442-0.625um') ! CAM4-Oslo: 0.35-0.64um
     call addfld ('CAODVIS ',horiz_only, 'A','unitless','Clear air aerosol optical depth')  
     call addfld ('CABSVIS ',horiz_only, 'A','unitless','Clear air aerosol absorptive optical depth')
     call addfld ('CLDFREE ',horiz_only, 'A','unitless','Cloud free fraction wrt CAODVIS and CABSVIS')
@@ -638,6 +640,8 @@ contains
 #ifdef DIRIND
    call add_default ('AOD_VIS ', 1, ' ')
    call add_default ('ABSVIS  ', 1, ' ')
+   call add_default ('AODVVOLC', 1, ' ')
+   call add_default ('ABSVVOLC', 1, ' ')
    call add_default ('DAYFOC  ', 1, ' ')
    call add_default ('CAODVIS ', 1, ' ')
    call add_default ('CABSVIS ', 1, ' ')

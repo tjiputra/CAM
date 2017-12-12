@@ -45,7 +45,7 @@ use error_messages,      only: handle_err
 use perf_mod,            only: t_startf, t_stopf
 use cam_logfile,         only: iulog
 #ifdef DIRIND
-use prescribed_volcaero, only: has_prescribed_volcaero
+use prescribed_volcaero, only: has_prescribed_volcaero, has_prescribed_volcaero_cmip6, solar_bands, terrestrial_bands
 use pmxsub_mod,      only: pmxsub
 #endif
 
@@ -414,7 +414,6 @@ subroutine radiation_init(pbuf2d)
       cosp_cnt(begchunk:endchunk) = 0     
    end if
 
-
    call addfld('TOT_CLD_VISTAU',  (/ 'lev' /), 'A',   '1', 'Total gbx cloud extinction visible sw optical depth', &
                                                        sampling_seq='rad_lwsw', flag_xyfill=.true.)
    call addfld('TOT_ICLD_VISTAU', (/ 'lev' /), 'A',  '1', 'Total in-cloud extinction visible sw optical depth', &
@@ -712,11 +711,14 @@ subroutine radiation_tend( &
     use opttab,           only: nbands, eps
     use constituents,     only: pcnst
     use oslo_control,     only: oslo_getopts
+    use physics_buffer,   only: pbuf_get_index
 #endif
 
 #ifdef DIRIND
     real(r8) flnt_tmp(pcols)                    ! Net outgoing lw flux at model top for AIE calculations
     real(r8) volc_fraction_coarse               ! Fraction of volcanic aerosols going to coarse mode
+    integer :: band
+    character(len=3) :: c3
 #endif
 
    type(physics_state), intent(in), target :: state
@@ -741,6 +743,7 @@ subroutine radiation_tend( &
 
 #ifdef DIRIND
     real(r8), pointer, dimension(:,:) :: rvolcmmr ! Read in stratospheric volcanoes aerosol mmr  
+    real(r8), pointer, dimension(:,:) :: volcopt  ! Read in stratospheric volcano SW optical parameter (CMIP6) 
 #endif
    real(r8) :: calday          ! current calendar day
    real(r8) :: delta           ! Solar declination angle  in radians
@@ -858,6 +861,11 @@ subroutine radiation_tend( &
     real(r8) :: per_tau_w_f(pcols,0:pver,nswbands) ! aerosol forward scattered fraction * w * tau
     real(r8) :: per_lw_abs (pcols,pver,nlwbands)   ! aerosol absorption optics depth (LW)
     integer ns                          ! spectral loop index
+    real(r8) :: volc_ext_sun(pcols,pver,nswbands) ! volcanic aerosol extinction for solar bands, CMIP6
+    real(r8) :: volc_omega_sun(pcols,pver,nswbands) ! volcanic aerosol SSA for solar bands, CMIP6
+    real(r8) :: volc_g_sun(pcols,pver,nswbands) ! volcanic aerosol g for solar bands, CMIP6
+    real(r8) :: volc_ext_earth(pcols,pver,nlwbands) ! volcanic aerosol extinction for terrestrial bands, CMIP6
+    real(r8) :: volc_omega_earth(pcols,pver,nlwbands) ! volcanic aerosol SSA for terrestrial bands, CMIP6
 #endif
 
    real(r8) :: fns(pcols,pverp)     ! net shortwave flux
@@ -1131,13 +1139,53 @@ subroutine radiation_tend( &
 !TEST
 !cak+  Calculate CAM5-Oslo/NorESM2 aerosol optical parameters  
 ! (move to aer_rad_props.F90? No, then it cannot be called for night-time calculations...)
+!
+!     Volcanic optics for solar (SW) bands        
+   do band=1, solar_bands
+     volc_ext_sun(1:ncol,1:pver,band)=0.0_r8
+     volc_omega_sun(1:ncol,1:pver,band)=0.999_r8
+     volc_g_sun(1:ncol,1:pver,band)=0.5_r8
+   enddo
+   if (has_prescribed_volcaero_cmip6) then
+       do band=1, solar_bands
+         write(c3,'(i3)') band
+          volc_idx = pbuf_get_index('ext_sun'//trim(adjustl(c3))) 
+          call pbuf_get_field(pbuf, volc_idx,  volcopt,      start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
+          volc_ext_sun(1:ncol,1:pver,band)=volcopt(1:ncol,1:pver)
+          volc_idx = pbuf_get_index('omega_sun'//trim(adjustl(c3))) 
+          call pbuf_get_field(pbuf, volc_idx,  volcopt,      start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
+          volc_omega_sun(1:ncol,1:pver,band)=volcopt(1:ncol,1:pver)
+          volc_idx = pbuf_get_index('g_sun'//trim(adjustl(c3))) 
+          call pbuf_get_field(pbuf, volc_idx,  volcopt,      start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
+          volc_g_sun(1:ncol,1:pver,band)=volcopt(1:ncol,1:pver)
+       enddo
+    endif
+!  Volcanic optics for terrestrial (LW) bands (g is not used here)       
+   do band=1, terrestrial_bands
+     volc_ext_earth(1:ncol,1:pver,band)=0.0_r8
+     volc_omega_earth(1:ncol,1:pver,band)=0.999_r8
+   enddo
+   if (has_prescribed_volcaero_cmip6) then
+       do band=1, terrestrial_bands
+         write(c3,'(i3)') band
+          volc_idx = pbuf_get_index('ext_earth'//trim(adjustl(c3))) 
+          call pbuf_get_field(pbuf, volc_idx,  volcopt,      start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
+          volc_ext_earth(1:ncol,1:pver,band)=volcopt(1:ncol,1:pver)
+
+          volc_idx = pbuf_get_index('omega_earth'//trim(adjustl(c3))) 
+          call pbuf_get_field(pbuf, volc_idx,  volcopt,      start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
+          volc_omega_earth(1:ncol,1:pver,band)=volcopt(1:ncol,1:pver)
+       enddo
+    endif
+
           call pmxsub(lchnk, ncol, 10.0_r8*state%pint, state%pmid,  &
                       coszrs, state, state%t, qdirind, Nnatk, &
                       per_tau, per_tau_w, per_tau_w_g, per_tau_w_f, &
-                      per_lw_abs, & 
+                      per_lw_abs, &
+                      volc_ext_sun, volc_omega_sun, volc_g_sun, & 
+                      volc_ext_earth, volc_omega_earth, & 
 #ifdef AEROCOM
                       aodvis, absvis, dod440, dod550, dod870, abs550, abs550alt)
-!                      aodvis, absvis, dod550, dod870, abs550, abs550alt)
 #else
                       aodvis, absvis)
 #endif

@@ -8,6 +8,8 @@ contains
 
 subroutine pmxsub(lchnk, ncol, pint, pmid, coszrs, state, t, qm1, Nnatk, &
                   per_tau, per_tau_w, per_tau_w_g, per_tau_w_f, per_lw_abs, & 
+                  volc_ext_sun, volc_omega_sun, volc_g_sun, &
+                  volc_ext_earth, volc_omega_earth, & 
 #ifdef AEROCOM
                   aodvis, absvis, dod440, dod550, dod870, abs550, abs550alt)
 #else
@@ -55,6 +57,12 @@ subroutine pmxsub(lchnk, ncol, pint, pmid, coszrs, state, t, qm1, Nnatk, &
    real(r8), intent(in) :: pmid(pcols,pver)       ! Model level pressures (Pa)
    real(r8), intent(in) :: t(pcols,pver)          ! Model level temperatures (K)
    real(r8), intent(in) :: qm1(pcols,pver,pcnst)  ! Specific humidity and tracers (kg/kg)
+   real(r8), intent(in) :: volc_ext_sun(pcols,pver,nbands) ! volcanic aerosol extinction for solar bands, CMIP6
+   real(r8), intent(in) :: volc_omega_sun(pcols,pver,nbands) ! volcanic aerosol SSA for solar bands, CMIP6
+   real(r8), intent(in) :: volc_g_sun(pcols,pver,nbands) ! volcanic aerosol g for solar bands, CMIP6
+   real(r8), intent(in) :: volc_ext_earth(pcols,pver,nlwbands) ! volcanic aerosol extinction for terrestrial bands, CMIP6
+   real(r8), intent(in) :: volc_omega_earth(pcols,pver,nlwbands) ! volcanic aerosol SSA for terrestrial bands, CMIP6
+   real(r8) batotsw13(pcols,pver), batotlw01(pcols,pver)  ! for testing bare
 !
 ! Input-output arguments
 
@@ -71,6 +79,7 @@ subroutine pmxsub(lchnk, ncol, pint, pmid, coszrs, state, t, qm1, Nnatk, &
 !  Note that aodvis and absvis output should be devided by dayfoc to give physical (A)AOD values  
    real(r8), intent(out) :: aodvis(pcols)             ! AOD vis
    real(r8), intent(out) :: absvis(pcols)             ! AAOD vis
+
 !
 !---------------------------Local variables-----------------------------
 !
@@ -78,6 +87,8 @@ subroutine pmxsub(lchnk, ncol, pint, pmid, coszrs, state, t, qm1, Nnatk, &
    integer iloop
    logical  daylight(pcols)        ! SW calculations also at (polar) night in interpol* if daylight=.true. 
 
+   real(r8) aodvisvolc(pcols)      ! AOD vis for CMIP6 volcanic aerosol
+   real(r8) absvisvolc(pcols)      ! AAOD vis for CMIP6 volcanic aerosol
    real(r8) rhum(pcols,pver)       ! (trimmed) relative humidity for the aerosol calculations
    real(r8) deltah_km(pcols,pver)  ! Layer thickness, unit km
    real(r8) deltah, airmass(pcols,pver) 
@@ -103,6 +114,8 @@ subroutine pmxsub(lchnk, ncol, pint, pmid, coszrs, state, t, qm1, Nnatk, &
    real(r8) kalw(pcols,pver,0:nmodes,nlwbands)
    real(r8) balw(pcols,pver,0:nmodes,nlwbands)
    logical  lw_on   ! LW calculations are performed in interpol* if true
+   real(r8) volc_balw(pcols,0:pver,nlwbands) ! volcanic aerosol absorption coefficient for terrestrial bands, CMIP6
+
 #ifdef COLTST4INTCONS 
 !-3   real(r8) bekc1(pcols,pver), bekc2(pcols,pver), bekc3(pcols,pver), bekc4(pcols,pver), & 
    real(r8) bekc1(pcols,pver), bekc2(pcols,pver), bekc4(pcols,pver), & 
@@ -385,8 +398,7 @@ subroutine pmxsub(lchnk, ncol, pint, pmid, coszrs, state, t, qm1, Nnatk, &
       real(r8) cxs(pcols,pver), cxstot(pcols,pver), akcxs(pcols) 
 #endif  
 !-
-
-
+      
 !
 !-------------------------------------------------------------------------
 !
@@ -680,7 +692,8 @@ enddo ! iloop
          enddo  
        enddo
 
-!!! AeroCom Phase III: adding asymmetry factor for dry aerosol, wavelength band 4 only: 
+!!! AeroCom Phase III: adding asymmetry factor for dry aerosol, wavelength band 4 only
+!!! (and with no CMIP6 volcnic contribution)
       ib=4
       do k=1,pver
        do icol=1,ncol
@@ -860,6 +873,28 @@ enddo ! iloop
         enddo
        enddo
       enddo
+!      Adding also the volcanic contribution (CMIP6), which is using a CMIP6
+!      band numbering identical to the AeroTab numbering (unlike CAM) both
+!      for SW and LW. I.e., no remapping is required here.
+!   Info from CMIP_CAM6_radiation_v3.nc
+! wl1_sun = 0.2, 0.263158, 0.344828, 0.441501, 0.625, 0.77821, 1.24224, 
+!    1.2987, 1.62602, 1.94175, 2.15054, 2.5, 3.07692, 3.84615 ;
+! wl2_sun = 0.263158, 0.344828, 0.441501, 0.625, 0.77821, 1.24224, 1.2987, 
+!    1.62602, 1.94175, 2.15054, 2.5, 3.07692, 3.84615, 12.1951 ;
+! wl1_earth = 3.07692, 3.84615, 4.20168, 4.44444, 4.80769, 5.55556, 6.75676, 
+!    7.19424, 8.47458, 9.25926, 10.2041, 12.1951, 14.2857, 15.873, 20, 28.5714 ;
+! wl2_earth = 3.84615, 4.20168, 4.44444, 4.80769, 5.55556, 6.75676, 7.19424, 
+!    8.47458, 9.25926, 10.2041, 12.1951, 14.2857, 15.873, 20, 28.5714, 1000 ;
+      do ib=1,nbands
+         betot(1:ncol,1:pver,ib) = betot(1:ncol,1:pver,ib) &
+             + volc_ext_sun(1:ncol,1:pver,ib)
+         ssatot(1:ncol,1:pver,ib) = ssatot(1:ncol,1:pver,ib) &
+             + volc_ext_sun(1:ncol,1:pver,ib)*volc_omega_sun(1:ncol,1:pver,ib)
+         asymtot(1:ncol,1:pver,ib) = asymtot(1:ncol,1:pver,ib) &
+             + volc_ext_sun(1:ncol,1:pver,ib)*volc_omega_sun(1:ncol,1:pver,ib) &
+              *volc_g_sun(1:ncol,1:pver,ib)
+      enddo
+!     and then calculate the total bulk optical parameters
       do ib=1,nbands
        do k=1,pver
         do icol=1,ncol
@@ -868,8 +903,8 @@ enddo ! iloop
                            /(betot(icol,k,ib)*ssatot(icol,k,ib)+eps)
         end do
        enddo
-      enddo
-
+     enddo
+         
 !------------------------------------------------------------------------------------------------
 ! Replace CAM5 standard aerosol optics with CAM5-Oslo optics (except top layer: no aerosol)
 ! Remapping from AeroTab to CAM5 SW bands, see p. 167 in the CAM5.0 description:
@@ -948,7 +983,16 @@ enddo ! iloop
         enddo
        enddo
       enddo
-!     Remapping of LW wavelength bands from AeroTab to CAM5
+
+!     Adding also the volcanic contribution (CMIP6), which is also using
+!     AeroTab band numbering, so that a remapping is required here 
+      do ib=1,nlwbands
+        volc_balw(1:ncol,1:pver,ib) = volc_ext_earth(:ncol,1:pver,ib) &
+                              *(1.0_r8-volc_omega_earth(:ncol,1:pver,ib))
+        batotlw(1:ncol,1:pver,ib)=batotlw(1:ncol,1:pver,ib)+volc_balw(1:ncol,1:pver,ib)
+      enddo     
+
+!     Remapping of LW wavelength bands from AeroTab to CAM5 
       do ib=1,nlwbands
        do i=1,ncol
         do k=1,pver
@@ -1062,11 +1106,10 @@ enddo ! iloop
 !           dayfoc < 1 when looping only over gridcells with daylight 
           if(daylight(icol)) then
             dayfoc(icol,k) = 1.0_r8
-!cak+ with the new bands in CAM5, band 4 is now at ca 0.5 um (0.442-0.625)
+!     with the new bands in CAM5, band 4 is now at ca 0.5 um (0.442-0.625)
             ssavis(icol,k) = ssatot(icol,k,4)
             asymmvis(icol,k) = asymtot(icol,k,4)
             extvis(icol,k) = betot(icol,k,4)
-!cak-
           endif 
         enddo
       end do
@@ -1084,6 +1127,8 @@ enddo ! iloop
 !          akocc(icol)=0.0_r8
           aodvis(icol)=0.0_r8
           absvis(icol)=0.0_r8
+          aodvisvolc(icol)=0.0_r8
+          absvisvolc(icol)=0.0_r8
 #ifdef COLTST4INTCONS 
           taukc0(icol)=0.0_r8
           taukc1(icol)=0.0_r8
@@ -1102,18 +1147,26 @@ enddo ! iloop
           taukc14(icol)=0.0_r8
 #endif
        enddo
-
+       
         do icol=1,ncol
+         if(daylight(icol)) then
          do k=1,pver
 !         Layer thickness, unit km, and layer airmass, unit kg/m2
           deltah=deltah_km(icol,k)
           airmass(icol,k)=1.e3_r8*deltah*rhoda(icol,k)
-!          Optical depths at ca. 550 nm (0.442-0.625um) 
+!          Optical depths at ca. 550 nm (0.442-0.625um) all aerosols
           aodvis(icol)=aodvis(icol)+betotvis(icol,k)*deltah
           absvis(icol)=absvis(icol)+batotvis(icol,k)*deltah
+!          Optical depths at ca. 550 nm (0.442-0.625um) CMIP6 volcanic aerosol
+          aodvisvolc(icol)=aodvisvolc(icol)+volc_ext_sun(icol,k,4)*deltah
+          absvisvolc(icol)=absvisvolc(icol)+volc_ext_sun(icol,k,4) &
+                                *(1.0_r8-volc_omega_sun(icol,k,4))*deltah
 #ifdef COLTST4INTCONS 
 !         To check internal consistency of these AOD calculations,make
-!         sure that sum_i(taukc_i)=aodvis (tested to be ok on 7/1-2016). 
+!         sure that sum_i(taukc_i)=aodvis (tested to be ok on 7/1-2016).
+!         Note that this will not be the case when CMIP6 volcanic forcing
+!         as optical properties are included, since this comes "on top of"
+!         the mixtures 0-14 below.          
           taukc0(icol) =taukc0(icol) +bekc0(icol,k)*deltah
           taukc1(icol) =taukc1(icol) +bekc1(icol,k)*deltah
           taukc2(icol) =taukc2(icol) +bekc2(icol,k)*deltah
@@ -1128,6 +1181,7 @@ enddo ! iloop
           taukc14(icol)=taukc14(icol)+bekc14(icol,k)*deltah
 #endif
          end do  ! k
+         endif   ! daylight         
         end do   ! icol
       
 !       Extinction and absorption for 0.55 um for the total aerosol, and AODs 
@@ -1138,6 +1192,8 @@ enddo ! iloop
 !        call outfld('AODVIS  ',aodvis ,pcols,lchnk)
         call outfld('AOD_VIS ',aodvis ,pcols,lchnk)
         call outfld('ABSVIS  ',absvis ,pcols,lchnk)
+        call outfld('AODVVOLC',aodvisvolc ,pcols,lchnk)
+        call outfld('ABSVVOLC',absvisvolc ,pcols,lchnk)
 #ifdef COLTST4INTCONS 
         call outfld('TAUKC0  ',taukc0 ,pcols,lchnk)
         call outfld('TAUKC1  ',taukc1 ,pcols,lchnk)
@@ -2287,6 +2343,21 @@ enddo ! iloop
 !       condensed water loading (mg/m2)
         call outfld('DAERH2O ',daerh2o ,pcols,lchnk)
 !       number concentrations (1/cm3)
+        call outfld('NNAT_0  ',nnat_0 ,pcols,lchnk)
+        call outfld('NNAT_1  ',nnat_1 ,pcols,lchnk)
+        call outfld('NNAT_2  ',nnat_2 ,pcols,lchnk)
+!=0        call outfld('NNAT_3  ',nnat_3 ,pcols,lchnk)
+        call outfld('NNAT_4  ',nnat_4 ,pcols,lchnk)
+        call outfld('NNAT_5  ',nnat_5 ,pcols,lchnk)
+        call outfld('NNAT_6  ',nnat_6 ,pcols,lchnk)
+        call outfld('NNAT_7  ',nnat_7 ,pcols,lchnk)
+        call outfld('NNAT_8  ',nnat_8 ,pcols,lchnk)
+        call outfld('NNAT_9  ',nnat_9 ,pcols,lchnk)
+        call outfld('NNAT_10 ',nnat_10,pcols,lchnk)
+!=0        call outfld('NNAT_11 ',nnat_11,pcols,lchnk)
+        call outfld('NNAT_12 ',nnat_12,pcols,lchnk)
+!=0        call outfld('NNAT_13 ',nnat_13,pcols,lchnk)
+        call outfld('NNAT_14 ',nnat_14,pcols,lchnk)
         call outfld('AIRMASS ',airmass,pcols,lchnk)
 !c_er3d 
 !       effective dry radii (um) in each layer
