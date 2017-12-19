@@ -1690,7 +1690,8 @@ if (($nl->get_value('prescribed_strataero_feedback') =~ /$TRUE/io)
 }
 # check for inadvertent setting of both old and new prescribed volcanoes
 if ( (defined $nl->get_value('prescribed_volcaero_file')) and 
-     (defined $nl->get_value('prescribed_strataero_file')) ) {
+     (defined $nl->get_value('prescribed_strataero_file')) and 
+     (length $nl->get_value('prescribed_strataero_file') > 3) ) {
     die "Cannot set both prescribed_volcaero_file and prescribed_strataero_file \n";
 }
 if (defined $nl->get_value('prescribed_strataero_file')) {

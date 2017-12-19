@@ -437,9 +437,9 @@ end subroutine aero_model_init
     integer :: i,k
 
    !Get air density
-    do k=1,top_lev,pver
+    do k=1,pver
        do i=1,ncol
-          rho_air(i,k) = pmid(i,k)/temp(i,k)*287.04_r8
+          rho_air(i,k) = pmid(i,k)/(temp(i,k)*287.04_r8)
        end do
     end do
     !    
