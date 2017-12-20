@@ -114,8 +114,8 @@ else
     use_case_string=""
 fi
 
-## modify the # of tasks/threads for restart if not testing fv decomposition and not a cosp run
-if grep -ic npr_yz ${CAM_SCRIPTDIR}/nl_files/$nl_file > /dev/null || grep -ic cosp ${CAM_SCRIPTDIR}/config_files/$1 > /dev/null; then
+## modify the # of tasks/threads for restart if not a cosp run
+if grep -ic cosp ${CAM_SCRIPTDIR}/config_files/$1 > /dev/null; then
     echo "TER.sh: will not modify tasks/threads for restart"
     factor=1
 else
@@ -153,7 +153,6 @@ echo "TER.sh: restarting sequential ccsm; output in ${CAM_TESTDIR}/${test_name}/
 echo "TER.sh: call to build-namelist:"
 echo "        env OMP_NUM_THREADS=${CAM_THREADS} ${cfgdir}/build-namelist -test -runtype continue \
     -config ${CAM_TESTDIR}/TCB.$1/config_cache.xml \
-    -infile ${CAM_SCRIPTDIR}/nl_files/$nl_file \
     -infile ${CAM_TESTDIR}/${test_name}/$nl_file \
     -namelist \"&seq_timemgr_inparm stop_n=${restart_length} stop_option=\'$stop_option\' $decomp_str $history_output /\""  
 

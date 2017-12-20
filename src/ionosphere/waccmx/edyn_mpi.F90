@@ -3,13 +3,13 @@ module edyn_mpi
   use cam_logfile   ,only: iulog
   use cam_abortutils,only: endrun
 
-  use edyn_geogrid  ,only: nlon,nlat,nlev
-  use edyn_maggrid  ,only: nmlon,nmlonp1,nmlat,nmlath,nmlev  ! note nmlev is not a parameter
+  use edyn_geogrid  ,only: nlon,nlat
+  use edyn_maggrid  ,only: nmlonp1,nmlat,nmlath,nmlev  ! note nmlev is not a parameter
   use spmd_utils    ,only: masterproc
   use mpi	    ,only: mpi_comm_size, mpi_comm_rank, MPI_PROC_NULL, mpi_comm_split, &
 			   MPI_INTEGER, MPI_STATUS_SIZE, mpi_wait, &
 			   MPI_REAL8, MPI_SUCCESS, MPI_SUM, &
-			   mpi_wtime, MPI_Comm_rank
+			   MPI_Comm_rank
 
   implicit none
   private
@@ -137,7 +137,7 @@ module edyn_mpi
     integer, intent(in) :: lonndx0,lonndx1,latndx0,latndx1,levndx0,levndx1, ntaski_in,ntaskj_in
 !
 ! Local:
-    integer :: i,j,n,irank,ier,tidrow,nj,ni,ncells
+    integer :: i,j,n,irank,ier,tidrow,nj,ni
 !
 ! Define all task structures with current task values
 ! (redundant for alltoall):
@@ -201,11 +201,10 @@ module edyn_mpi
 
       nj = lat1-lat0+1 ! number of latitudes for this task
       ni = lon1-lon0+1 ! number of longitudes for this task
-      ncells = nj*ni   ! total number of grid cells for this task
 !
 ! Report my stats to stdout:
 !     write(iulog,"(/,'mytid=',i3,' mytidi,j=',2i3,' lat0,1=',2i3,' (',i2,') lon0,1=',2i3,' (',i2,') ncells=',i4)") &
-!       mytid,mytidi,mytidj,lat0,lat1,nj,lon0,lon1,ni,ncells
+!       mytid,mytidi,mytidj,lat0,lat1,nj,lon0,lon1,ni
 !
 ! Define all task structures with current task values
 ! (redundant for alltoall):
@@ -388,7 +387,7 @@ module edyn_mpi
 !   to all tasks (directly passing mpi derived data types is reportedly
 !   not stable, or not available until MPI 2.x).
 !
-    integer :: n,ier,i
+    integer :: n,ier
     integer,parameter :: len_task_type = 17 ! see type task above
     integer,allocatable,save :: &
       itasks_send(:,:), & ! send buffer
@@ -533,28 +532,13 @@ module edyn_mpi
     real(r8),intent(out) :: fout(mlon0:mlon1,nmlev,nf)
 !
 ! Local:
-    real(r8),allocatable,save :: & ! mpi buffers
-      sndbuf(:,:,:),             & ! mxmaglon,nmlev,nf
-      rcvbuf(:,:,:)                ! mxmaglon,nmlev,nf
+    real(r8) :: & ! mpi buffers
+      sndbuf(mxmaglon,nmlev,nf),             & ! mxmaglon,nmlev,nf
+      rcvbuf(mxmaglon,nmlev,nf)                ! mxmaglon,nmlev,nf
     integer :: i,j,n,itask,ier,len,jlateq,ireqsend,ireqrecv
     integer :: irstat(MPI_STATUS_SIZE)      ! mpi receive status
     logical :: have_eq
-!
-! Allocate buffers once per run:
-    if (.not.allocated(sndbuf)) then
-      allocate(sndbuf(mxmaglon,nmlev,nf),stat=ier)
-      if (ier /= 0) then
-        write(iulog,"('>>> mp_mageq: error allocating sndbuf')")
-        call endrun('mp_mageq')
-      endif
-    endif
-    if (.not.allocated(rcvbuf)) then
-      allocate(rcvbuf(mxmaglon,nmlev,nf),stat=ier)
-      if (ier /= 0) then
-        write(iulog,"('>>> mp_mageq: error allocating rcvbuf')")
-        call endrun('mp_mageq')
-      endif
-    endif
+
     sndbuf = 0._r8
     rcvbuf = 0._r8
     len = mxmaglon*nmlev*nf
@@ -626,14 +610,7 @@ module edyn_mpi
 !
 ! Local:
     integer :: j,ier,len,jlateq
-    real(r8),allocatable,save :: sndbuf(:,:,:)
-
-!
-! Allocate buffers once per run:
-    if (.not.allocated(sndbuf)) then
-      allocate(sndbuf(nmlonp1,2,nf),stat=ier)
-      if (ier /= 0) call endrun('mp_mageq_jpm1 error allocating sndbuf')
-    endif
+    real(r8) :: sndbuf(nmlonp1,2,nf)
 
     sndbuf = 0._r8
     feq_jpm1 = 0._r8
@@ -684,20 +661,14 @@ module edyn_mpi
 !
 ! Local:
     integer :: j,ier,len,jlateq
-    real(r8),allocatable,save :: sndbuf(:,:,:)
     integer,parameter :: mxnf=6
+
+    real(r8) :: sndbuf(nmlonp1,-3:3,mxnf)
 
     if (nf > mxnf) then
       write(iulog,"('>>> mp_mageq_jpm3: nf=',i4,' but cannot be called with greater than mxnf=',i4)") &
         nf,mxnf
       call endrun('mp_mageq_jpm3')
-    endif
-!
-! Allocate buffers once per run (max number of fields):
-    if (.not.allocated(sndbuf)) then
-      allocate(sndbuf(nmlonp1,-3:3,mxnf),stat=ier)
-      if (ier /= 0) &
-        call endrun('mp_mageq_jpm3 error allocating sndbuf')
     endif
  
     sndbuf = 0._r8
@@ -745,8 +716,7 @@ module edyn_mpi
 !   3: j = jnpole-1 (npole-1)
 !   4: j = jnpole-2 (npole-2)
 ! This can be called with different number of fields nf, but cannot
-! be called w/ > mxnf fields. Buffers are allocated once per run for
-! mxnf fields, then passed and processed for nf fields.
+! be called w/ > mxnf fields. 
 !
 ! Args:
     integer,intent(in) :: ilon0,ilon1,ilat0,ilat1,nglblon,jspole,jnpole,nf
@@ -754,20 +724,14 @@ module edyn_mpi
     real(r8),intent(out) :: fpole_jpm2(nglblon,4,nf)
 !
 ! Local:
-    integer :: j,k,ier,len
-    real(r8),allocatable,save :: sndbuf(:,:,:)
+    integer :: j,ier,len
     integer,parameter :: mxnf=6
+    real(r8) :: sndbuf(nglblon,4,mxnf)
 
     if (nf > mxnf) then
       write(iulog,"('>>> mp_magpole_2d: nf=',i4,' but cannot be called with greater than mxnf=',i4)") &
         nf,mxnf
       call endrun('mp_magpole_2d')
-    endif
-!
-! Allocate the max number of fields, only once per run:
-    if (.not.allocated(sndbuf)) then
-      allocate(sndbuf(nglblon,4,mxnf),stat=ier)
-      if (ier /= 0) call endrun('mp_magpole_2d: error allocating sndbuf')
     endif
 
     sndbuf = 0._r8
@@ -804,8 +768,7 @@ module edyn_mpi
 !   3: j = jnpole-1 (npole-1)
 !   4: j = jnpole-2 (npole-2)
 ! This can be called with different number of fields nf, but cannot
-! be called w/ > mxnf fields. Buffers are allocated once per run for
-! mxnf fields, then passed and processed for nf fields.
+! be called w/ > mxnf fields. 
 !
 ! Args:
   integer,intent(in) :: ilon0,ilon1,ilat0,ilat1,nglblon,&
@@ -815,19 +778,13 @@ module edyn_mpi
 !
 ! Local:
   integer :: j,k,ier,len
-  real(r8),allocatable,save :: sndbuf(:,:,:,:)
   integer,parameter :: mxnf=6
+  real(r8) :: sndbuf(nglblon,4,nlev,mxnf)
 
   if (nf > mxnf) then
     write(iulog,"('>>> mp_magpole_3d: nf=',i4,' but cannot be called with greater than mxnf=',i4)") &
       nf,mxnf
     call endrun('mp_magpole_3d')
-  endif
-!
-! Allocate the max number of fields, only once per run:
-  if (.not.allocated(sndbuf)) then
-    allocate(sndbuf(nglblon,4,nlev,mxnf),stat=ier)
-    if (ier /= 0) call endrun('mp_magpole_3d: error allocating sndbuf')
   endif
 
   sndbuf = 0._r8
@@ -866,8 +823,7 @@ module edyn_mpi
 !   1: j = jspole (spole)
 !   2: j = jnpole (npole)
 ! This can be called with different number of fields nf, but cannot
-! be called w/ > mxnf fields. Buffers are allocated once per run for
-! mxnf fields, then passed and processed for nf fields.
+! be called w/ > mxnf fields.
 !
 ! Args:
     integer,intent(in) :: ilon0,ilon1,ilat0,ilat1,nglblon, jspole,jnpole,nf
@@ -875,23 +831,8 @@ module edyn_mpi
     real(r8),intent(out) :: fpoles(nglblon,2,nf)
 !
 ! Local:
-    integer :: j,k,ier,len
-    real(r8),allocatable, save :: sndbuf(:,:,:)
-    integer :: mxnf
-
-    mxnf = nmlev
-    if (nf > mxnf) then
-      write(iulog,"('>>> mp_magpoles: nf=',i4,' but cannot be called with greater than mxnf=',i4)") &
-        nf,mxnf
-      call endrun('mp_magpoles')
-    endif
-!
-! Allocate the max number of fields, only once per run:
-    if (.not.allocated(sndbuf)) then
-      allocate(sndbuf(nglblon,2,mxnf),stat=ier)
-      if (ier /= 0) &
-        call endrun('mp_magpoles: error allocating sndbuf')
-    endif
+    integer :: j,ier,len
+    real(r8) :: sndbuf(nglblon,2,nf)
 
     sndbuf = 0._r8
     fpoles = 0._r8
@@ -917,7 +858,8 @@ module edyn_mpi
 !-----------------------------------------------------------------------
   integer function getpe(ix,jx)
     integer,intent(in) :: ix,jx
-    integer :: it,itask
+    integer :: it
+
     getpe = -1
     do it=0,ntask-1
       if ((tasks(it)%lon0 <= ix .and. tasks(it)%lon1 >= ix).and.&
@@ -1032,7 +974,7 @@ module edyn_mpi
   use edyn_maggrid,only: gmlat
 !
 ! Local:
-    integer :: ier,i,j,js,jn,itask,jj
+    integer :: ier,j,js,jn,itask,jj
 !
 ! nsend_south(ntask): number of lats in south to send north
 ! nrecv_north(ntask): number of lats in north to recv from south
@@ -1110,7 +1052,7 @@ module edyn_mpi
     real(r8),intent(inout) :: f(mlon0:mlon1,mlat0:mlat1,nf)
 !
 ! Local:
-    integer :: i,j,n,len,itask,ifld,ier,nmlons
+    integer :: j,n,len,itask,ifld,ier,nmlons
     real(r8) :: sndbuf(mxmaglon,mxmaglat,nf,0:ntask-1)
     real(r8) :: rcvbuf(mxmaglon,mxmaglat,nf,0:ntask-1)
     integer :: jsend(0:ntask-1),jrecv(0:ntask-1)
@@ -1198,7 +1140,7 @@ module edyn_mpi
     real(r8),intent(inout) :: f(mlon0:mlon1,mlat0:mlat1,nf)
 !
 ! Local:
-    integer :: j,ier,idest,isrc,len,ireqsend,ireqrecv,ifld,msgtag
+    integer :: j,ier,idest,isrc,len,ireqsend,ireqrecv,msgtag
     real(r8) :: sndbuf(mxmaglat,nf),rcvbuf(mxmaglat,nf)
     integer  :: irstat(MPI_STATUS_SIZE)      ! mpi receive status
 
@@ -1255,7 +1197,7 @@ module edyn_mpi
     real(r8),intent(inout) :: fmsub(mlon0-1:mlon1+1,mlat0-1:mlat1+1,nf)
 !
 ! Local:
-    integer :: i,j,ifld,west,east,north,south,len,isend0,isend1, &
+    integer :: ifld,west,east,north,south,len,isend0,isend1, &
       irecv0,irecv1,ier,nmlats,istat(MPI_STATUS_SIZE,4),ireq(4),nmlons
     real(r8),dimension(mlat1-mlat0+1,nf)::sndlon0,sndlon1,rcvlon0,rcvlon1
     real(r8),dimension((mlon1+1)-(mlon0-1)+1,nf) :: &
@@ -1377,7 +1319,7 @@ module edyn_mpi
 
   end subroutine mp_mag_halos
 !-----------------------------------------------------------------------
-  subroutine mp_geo_halos(fmsub,lev0,lev1,lon0,lon1,lat0,lat1,nf,polesign)
+  subroutine mp_geo_halos(fmsub,lev0,lev1,lon0,lon1,lat0,lat1,nf)
 !
 ! Exchange halo/ghost points between geographic grid subdomains for nf fields.
 ! Two halo points are set in both lon and lat dimensions.
@@ -1387,10 +1329,10 @@ module edyn_mpi
 ! Args:
       integer,intent(in) :: lev0,lev1,lon0,lon1,lat0,lat1,nf
       type(array_ptr_type) :: fmsub(nf) ! (lev0:lev1,lon0-2:lon1+2,lat0-2:lat1+2)
-      real(r8),intent(in) :: polesign(nf)
+
 !
 ! Local:
-      integer :: k,i,j,ifld,west,east,north,south,len,isend0,isend1, &
+      integer :: k,i,ifld,west,east,north,south,len,isend0,isend1, &
         irecv0,irecv1,ier,nlats,istat(MPI_STATUS_SIZE,4),ireq(4),nlons
       real(r8),dimension(lev0:lev1,2,lat1-lat0+1,nf) :: &
         sndlon0,sndlon1,rcvlon0,rcvlon1
@@ -1550,39 +1492,28 @@ module edyn_mpi
     real(r8),intent(out) :: fmglb(nmlonp1,nmlat,nf)
 !
 ! Local:
-    integer :: len,i,j,ifld,ier,itask,i0,i1,j0,j1
+    integer :: len,i,j,ifld,ier
     real(r8),dimension(nmlonp1,nmlat,nf) :: sndbuf
-    real(r8),dimension(nmlonp1,nmlat,nf,0:ntask-1) :: rcvbuf
 
-!   if (mpi_timing) starttime = mpi_wtime()
     sndbuf = 0._r8
-    rcvbuf = 0._r8
+    fmglb = 0._r8
+
     len = nmlonp1*nmlat*nf
 !
 ! Load send buffer with my subdomain:
     do ifld=1,nf
-      do j=mlat0,mlat1
-        sndbuf(mlon0:mlon1,j,ifld) = fmsub(:,j,ifld)
-      enddo
+       do j=mlat0,mlat1
+          do i=mlon0, mlon1
+             sndbuf(i,j,ifld) = fmsub(i,j,ifld)
+          enddo
+       enddo
     enddo
+
 !
-! Gather to root:
-    call mpi_gather(sndbuf,len,MPI_REAL8,rcvbuf,len,MPI_REAL8,0, &
-      mpi_comm_edyn,ier)
+! Gather to root by using scalable reduce method:
+
+    call mpi_reduce(sndbuf, fmglb, len, MPI_REAL8, MPI_SUM, 0, mpi_comm_edyn, ier )
     if (ier /= 0) call handle_mpi_err(ier,'mp_gather_edyn: mpi_gather to root')
-!
-! Root task unpack from receive buffer:
-    if (mytid==0) then
-      do itask=0,ntask-1
-        do ifld=1,nf
-          i0 = tasks(itask)%mlon0 ; i1 = tasks(itask)%mlon1
-          j0 = tasks(itask)%mlat0 ; j1 = tasks(itask)%mlat1
-          do j=j0,j1
-            fmglb(i0:i1,j,ifld) = rcvbuf(i0:i1,j,ifld,itask)
-          enddo ! j=mlat0,mlat1
-        enddo ! ifld=1,nf
-      enddo ! itask=0,ntask-1
-    endif ! root task
 
   end subroutine mp_gather_edyn
 !-----------------------------------------------------------------------
@@ -1634,28 +1565,12 @@ module edyn_mpi
     integer :: jhave(mxneed),njhave,wid
     integer :: peersneed(mxneed,0:nmagtaskj-1)
     integer :: jneedall (mxneed,0:nmagtaskj-1)
-    real(r8),allocatable :: sndbuf(:,:,:,:)
-    real(r8),allocatable :: rcvbuf(:,:,:)
-    real(r8),allocatable :: buffer(:)
+    real(r8) :: sndbuf(mxmaglon+2,mxneed,nf,sndbuf_cntr_max)
+    real(r8) :: rcvbuf(mxmaglon+2,mxneed,nf)
+    real(r8) :: buffer((mxmaglon+2)*mxneed*nf*sndbuf_cntr_max)
     integer :: irstat(MPI_STATUS_SIZE)          ! mpi receive status
     integer :: isstat(MPI_STATUS_SIZE,sndbuf_cntr_max) !mpi_ibsend wait status
     integer :: ibsend_requests(sndbuf_cntr_max) !array of ibsend requests
-
-    if (.not.allocated(sndbuf)) then
-      allocate(sndbuf(mxmaglon+2,mxneed,nf,sndbuf_cntr_max),stat=ier) ! +2 for single halos
-      if (ier /= 0) &
-        call endrun('mp_mag_jslot: error allocating sndbuf')
-    endif
-    if (.not.allocated(rcvbuf)) then
-      allocate(rcvbuf(mxmaglon+2,mxneed,nf),stat=ier)
-      if (ier /= 0) &
-        call endrun('mp_mag_jslot: error allocating rcvbuf')
-    endif
-    if (.not.allocated(buffer)) then
-      allocate(buffer((mxmaglon+2)*mxneed*nf*sndbuf_cntr_max),stat=ier)
-      if (ier /= 0) &
-        call endrun('mp_mag_jslot: error allocating buffer')
-    endif
 
     sndbuf = 0._r8
     rcvbuf = 0._r8
@@ -1776,7 +1691,7 @@ module edyn_mpi
 ! On entry f(k0:k1,i0:i1,j0:j1,nflds) is defined for current task.
 ! On exit f(k0:k1,nlonp4,j0:j1,nflds) is defined for task with mytidi==0.
 !
-    use edyn_geogrid, only: nlon
+
 !
 ! Args:
 !
@@ -1787,7 +1702,7 @@ module edyn_mpi
 ! Local:
 !
     integer :: irstat(MPI_STATUS_SIZE)      ! mpi receive status
-    integer :: i,k,j,n,nlons,nlats,nlonrecv,nlevs,len,idest,isrc,ier, &
+    integer :: j,n,nlons,nlonrecv,nlevs,len,idest,isrc,ier, &
                                         isend,irecv,itask,lonrecv0,lonrecv1,mtag
     real(r8) :: &
       sndbuf(k0:k1,mxlon,mxlat+4,nflds), & ! send buffer
@@ -1797,7 +1712,6 @@ module edyn_mpi
 !
     nlons = i1-i0+1
     nlevs = k1-k0+1
-    nlats = j1-j0+1
 
     sndbuf = 0._r8 
     rcvbuf = 0._r8
@@ -1859,7 +1773,7 @@ module edyn_mpi
 ! Local:
 !
     integer :: irstat(MPI_STATUS_SIZE)      ! mpi receive status
-    integer :: i,k,j,n,nlevs,nlons,nlats,nlonsend,len,idest,isrc,ier, &
+    integer :: j,n,nlevs,nlons,nlonsend,len,idest,isrc,ier, &
                isend,irecv,itask,lonsend0,lonsend1,mtag
     real(r8) :: &
       sndbuf(k0:k1,mxlon,mxlat+4,nflds), & ! send buffer
@@ -1869,7 +1783,6 @@ module edyn_mpi
 !
     nlons = i1-i0+1
     nlevs = k1-k0+1
-    nlats = j1-j0+1
 
     sndbuf = 0._r8 ; rcvbuf = 0._r8
     len = nlevs*mxlon*(mxlat+4)*nflds ! +4 is for when this is called from mp_pole_halos
@@ -1952,119 +1865,7 @@ module edyn_mpi
       endif
     enddo
   end function ixfind
-!-----------------------------------------------------------------------
-  subroutine mp_gather2root(fsub,ilon0,ilon1,ilat0,ilat1,&
-    fglb,nglblon,nglblat,nlev,geo,iprint)
-!
-! Args:
-    integer,intent(in)   :: ilon0,ilon1,ilat0,ilat1,nglblon,nglblat,nlev,iprint
-    real(r8),intent(in)  :: fsub(ilon0:ilon1,ilat0:ilat1,nlev)
-    real(r8),intent(out) :: fglb(nglblon,nglblat,nlev)
-    logical,intent(in)   :: geo
-!
-! Local:
-    integer :: len,i,j,ier,i0,i1,i1m,j0,j1,jm,itask,nlons
-    real(r8),allocatable,save :: sndbuf(:,:,:)
-    real(r8),allocatable,save :: rcvbuf(:,:,:,:)
-!
-! btf 6/7/15: allocate/deallocate at every call, since nlev could
-! change between calls (2d field, 3d field, etc), see deallocate at end.
-!
-!   if (.not.allocated(sndbuf)) then
-      allocate ( sndbuf(max(mxlon,mxmaglon),max(mxlat,mxmaglat),nlev),stat=ier)
-      if (ier /= 0) &
-        call endrun('mp_gather2root error allocating sndbuf')
-!   endif
-!   if (.not.allocated(rcvbuf)) then
-      allocate ( rcvbuf(max(mxlon,mxmaglon),max(mxlat,mxmaglat),nlev,0:ntask-1),stat=ier)
-      if (ier /= 0) &
-        call endrun('mp_gather2root error allocating rcvbuf')
-!   endif
-    len = max(mxlon,mxmaglon)*max(mxlat,mxmaglat)*nlev
 
-    if (geo) then
-      nlons=tasks(mytid)%nlons
-    else
-      nlons=tasks(mytid)%nmaglons
-    endif 
-
-    sndbuf = 0._r8
-    rcvbuf = 0._r8
-    do j=ilat0,ilat1
-      sndbuf(1:nlons,j-ilat0+1,:) = fsub(ilon0:ilon1,j,:)
-    enddo
-
-    if (iprint > 0) then
-      write(iulog,"('mp_gather2root: geo=',l1,' ilon0,1=',2i4,' ilat0,1=',2i4,'" &
-                //" nglblon,lat=',2i4,' nlev=',i4,' min,max sndbuf=',2e12.4)") &
-      geo,ilon0,ilon1,ilat0,ilat1,nglblon,nglblat,nlev, &
-      minval(sndbuf(ilon0:ilon1,ilat0:ilat1,1:nlev)),     &
-      maxval(sndbuf(ilon0:ilon1,ilat0:ilat1,1:nlev))
-    endif
-!
-! Gather to root task:
-
-
-    call mpi_gather(sndbuf,len,MPI_REAL8,rcvbuf,len,MPI_REAL8,0, &
-      mpi_comm_edyn,ier)
-
-    if (ier /= 0) call handle_mpi_err(ier,'mp_gather2root')
-!
-! Root task unpack from receive buffer:
-    if (masterproc) then
-
-       do itask=0,ntask-1
-          if (geo) then
-             i0 = tasks(itask)%lon0 ; i1 = tasks(itask)%lon1
-             i1m = i1 - i0 + 1
-             j0 = tasks(itask)%lat0 ; j1 = tasks(itask)%lat1
-          else
-             i0 = tasks(itask)%mlon0 ; i1 = tasks(itask)%mlon1
-             i1m = i1 - i0 + 1
-             j0 = tasks(itask)%mlat0 ; j1 = tasks(itask)%mlat1
-          endif
-          do j=j0,j1
-             jm = j - j0 + 1
-             fglb(i0:i1,j,:) = rcvbuf(1:i1m,jm,:,itask)
-          enddo
-       enddo
-       if (iprint > 0) then
-          write(iulog,"('mp_gather2root: min,max fglb=',2e12.4)") &
-               minval(fglb),maxval(fglb)
-       endif
-    endif
-    deallocate(rcvbuf)
-    deallocate(sndbuf)
-  end subroutine mp_gather2root
-!-----------------------------------------------------------------------
-  subroutine mp_scatter_2d(fsub,ilon0,ilon1,ilat0,ilat1,fglb,nglblon,nglblat,nf)
-!
-! Scatter global input field(s) to subdomains:
-!
-    integer,intent(in) :: ilon0,ilon1,ilat0,ilat1,nglblon,nglblat
-    integer,intent(in) :: nf ! number of fields
-    real(r8),intent(in)  :: fglb(nglblon,nglblat,nf)         ! global input fields
-    real(r8),intent(out) :: fsub(ilon0:ilon1,ilat0:ilat1,nf) ! output on subdomains
-!
-! Local:
-    integer :: ier,len,i,j,n
-
-! Broadcast global fields:
-    len = nglblat*nglblon*nf
-    call mpi_bcast(fglb,len,MPI_REAL8,0,mpi_comm_edyn,ier)
-    if (ier /= 0) &
-      call handle_mpi_err(ier,'mp_scatter_2d: bcast global fglb')
-!
-! Define subdomains:
-    do n=1,nf
-      do j=ilat0,ilat1
-        do i=ilon0,ilon1
-          fsub(i,j,n) = fglb(i,j,n)
-        enddo
-      enddo
-    enddo
-
-  end subroutine mp_scatter_2d
 !-----------------------------------------------------------------------
   subroutine setpoles(f,k0,k1,i0,i1,j0,j1)
 !
@@ -2189,7 +1990,7 @@ module edyn_mpi
 !
 ! Local variables
 !
-    integer :: i,j,k,n,ifield
+    integer :: i,j,k,ifield
     integer :: midpoint            ! middle point of longitude dimension
     real(r8) :: flons(nlon)        ! fields at global longitudes
     type(array_ptr_type) :: pglblon(nfields) ! pglblon(n)%ptr(k0:k1,nlon,j0:j1)

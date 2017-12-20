@@ -467,6 +467,12 @@ if ($print>=2) {
 # Start with the driver component.  These settings are communicated by the driver to
 # all subcomponents.
 
+####################################
+# namelist group: cime_driver_inst #
+####################################
+
+add_default($nl, 'ninst_driver', 'val'=>'1');
+
 ######################################
 # namelist group: seq_cplflds_inparm #
 ######################################
@@ -1641,18 +1647,28 @@ if ( $nl->get_value('modal_strat_sulfate')=~ /$TRUE/io and
 # stratospheric aerosols are needed for heterogeneous chemistry as well as radiation feedback
 my $het_chem = chem_has_species($cfg, 'N2O5');
 
+# Default for CAM6, is that prescribed_strataero_3modes is TRUE, but allow user to override
+my $prescribed_strataero_3modes = $FALSE;
+if ($phys =~ /cam6/) { 
+   $prescribed_strataero_3modes = $TRUE;
+}
+if (defined $nl->get_value('prescribed_strataero_3modes')) {
+   $prescribed_strataero_3modes = $nl->get_value('prescribed_strataero_3modes');
+} 
+
 # determine if prescribed stratospheric aerosol data is needed
 if ( ($het_chem) || ($nl->get_value('prescribed_strataero_feedback') =~ /$TRUE/io ) ){
     if ( ($carma ne 'sulfate') && !($nl->get_value('modal_strat_sulfate') =~ /$TRUE/io) ) { # if no prognostic stratospheric aerosols
+
         unless (defined $nl->get_value('prescribed_strataero_type')) {
             add_default($nl, 'prescribed_strataero_type','val'=>'CYCLICAL');
             my %valhash = ('val'=>'2000');
-            if ($nl->get_value('prescribed_strataero_3modes') =~ /$TRUE/io) {%valhash = ('val'=>'1990')}
+            if ($prescribed_strataero_3modes =~ /$TRUE/io) {%valhash = ('val'=>'1990')}
             add_default($nl, 'prescribed_strataero_cycle_yr', %valhash );
         }
         unless (defined $nl->get_value('prescribed_strataero_file')) {
             my %verhash ;
-            if ($nl->get_value('prescribed_strataero_3modes') =~ /$TRUE/io) {%verhash = ('ver'=>'3modes')}
+            if ($prescribed_strataero_3modes =~ /$TRUE/io) {%verhash = ('ver'=>'3modes')}
             add_default($nl, 'prescribed_strataero_file', %verhash );
             add_default($nl, 'prescribed_strataero_datapath', %verhash );
         }
@@ -1661,7 +1677,7 @@ if ( ($het_chem) || ($nl->get_value('prescribed_strataero_feedback') =~ /$TRUE/i
 # add to rad_climate the contributions from stratospheric aerosols if feedback is switched on
 if (($nl->get_value('prescribed_strataero_feedback') =~ /$TRUE/io) 
  || ($nl->get_value('carma_rad_feedback') =~ /$TRUE/io)) {
-    if ($nl->get_value('prescribed_strataero_3modes') =~ /$TRUE/io) {
+    if ($prescribed_strataero_3modes =~ /$TRUE/io) {
         my $rel_filepath = get_default_value("VOLC_MMR1");
         my $abs_filepath = set_abs_filepath($rel_filepath, $inputdata_rootdir);
         $radval .= "," . quote_string("N:VOLC_MMR1:" . $abs_filepath);
@@ -2575,22 +2591,28 @@ if ($chem eq 'trop_mam4' or $chem eq 'waccm_sc_mam4') {
     my %species;
 
     # Surface emission datasets:
-    %species = ('dms_ot_srf_file'    => 'DMS',
-                'dms_bb_srf_file'    => 'DMS',
-                'so2_an_srf_file'    => 'SO2',
-                'so2_bb_srf_file'    => 'SO2',
-                'so4_a1_an_srf_file' => 'so4_a1',
-                'so4_a2_an_srf_file' => 'so4_a2',
-                'num_a1_an_srf_file' => 'num_a1',
-                'num_a1_sh_srf_file' => 'num_a1',
-                'num_a2_an_srf_file' => 'num_a2',
-                'bc_a4_an_srf_file'  => 'bc_a4',
-                'num_a4_bc_srf_file' => 'num_a4',
-                'num_a4_oc_srf_file' => 'num_a4',
-                'pom_a4_an_srf_file' => 'pom_a4',
-                'soag_an_srf_file'   => 'SOAG',
-                'soag_bg_srf_file'   => 'SOAG',
-                'soag_bb_srf_file'   => 'SOAG',
+    %species = ('dms_ot_srf_file'     => 'DMS',
+                'dms_bb_srf_file'     => 'DMS',
+                'so2_ag_sh_file'      => 'SO2',
+                'so2_an_srf_file'     => 'SO2',
+                'so2_bb_srf_file'     => 'SO2',
+                'so4_a1_an_srf_file'  => 'so4_a1',
+                'so4_a1_bb_srf_file'  => 'so4_a1',
+                'so4_a2_an_srf_file'  => 'so4_a2',
+                'num_a1_sh_srf_file'  => 'num_a1',
+                'num_a1_bb_srf_file'  => 'num_a1',
+                'num_a2_an_srf_file'  => 'num_a2',
+                'bc_a4_an_srf_file'   => 'bc_a4',
+                'bc_a4_bb_srf_file'   => 'bc_a4',
+                'num_a4_bc_srf_file'  => 'num_a4',
+                'num_a4_oc_srf_file'  => 'num_a4',
+                'num_a4_bb_srf_file'  => 'num_a4',
+                'num_pom_bb_srf_file' => 'num_a4',
+                'pom_a4_an_srf_file'  => 'pom_a4',
+                'pom_a4_bb_srf_file'  => 'pom_a4',
+                'soag_an_srf_file'    => 'SOAG',
+                'soag_bg_srf_file'    => 'SOAG',
+                'soag_bb_srf_file'    => 'SOAG',
                );
     my %verhash = ('ver'=>'cam6');
     my $first = 1;
@@ -2612,22 +2634,14 @@ if ($chem eq 'trop_mam4' or $chem eq 'waccm_sc_mam4') {
     }
 
     # Vertical emission datasets:
-    %species = ('so2_cv_ext_file'    => 'SO2',
-                'so2_ac_ext_file'    => 'SO2',
-                'bc_a4_ac_ext_file'  => 'bc_a4',
-                'bc_a4_bb_ext_file'  => 'bc_a4',
-                'pom_a4_bb_ext_file' => 'pom_a4',
+    %species = ('h2o_ch4ox_ext_file' => 'H2O',
+                'so2_cv_ext_file'    => 'SO2',
                 'so4_a1_an_ext_file' => 'so4_a1',
-                'so4_a1_bb_ext_file' => 'so4_a1',
                 'so4_a1_cv_ext_file' => 'so4_a1',
                 'so4_a2_cv_ext_file' => 'so4_a2',
                 'num_a1_an_ext_file' => 'num_a1',
-                'num_a1_bb_ext_file' => 'num_a1',
                 'num_a1_cv_ext_file' => 'num_a1',
                 'num_a2_cv_ext_file' => 'num_a2',
-                'num_bc_a4_ac_ext_file'  => 'num_a4',
-                'num_bc_a4_bb_ext_file'  => 'num_a4',
-                'num_pom_a4_bb_ext_file' => 'num_a4',                
                );
 
 
@@ -3092,7 +3106,7 @@ if ($cfg->get('microphys') =~ /^mg/) {
 }
 
     my $mg_ver = $nl->get_value('micro_mg_version');
-    my $do_sb = $mg_ver >= 2 ? '.true' : '.false';
+    my $do_sb = $mg_ver >= 2 ? '.true.' : '.false.';
     add_default($nl, 'micro_do_sb_physics', 'val'=>$do_sb);
 
 # Ice nucleation options
@@ -3953,7 +3967,8 @@ foreach my $name (@nl_groups) { $nl_group{$name} = ''; }
 # Remove the group names from %nl_group as they are written.  
 
 # Driver
-@comp_groups = qw(seq_cplflds_inparm seq_cplflds_userspec ccsm_pes seq_infodata_inparm seq_timemgr_inparm prof_inparm pio_default_inparm);
+@comp_groups = qw(cime_driver_inst seq_cplflds_inparm seq_cplflds_userspec ccsm_pes
+    seq_infodata_inparm seq_timemgr_inparm prof_inparm pio_default_inparm);
 $outfile = "$opts{'dir'}/drv_in";
 if ($cam_build) {
     $nl->write($outfile, 'groups'=>\@comp_groups);
@@ -4243,6 +4258,12 @@ sub fv_decomp_set{
     my $nlat = $cfg->get('nlat');
     my $nlev = $cfg->get('nlev');
     my ($ny, $nz);
+
+    # die if bad input
+    if ($ntasks < 1) {
+        die "$ProgName - ERROR: fv_decomp_set: bad input: ntasks=$ntasks.\n" .
+            "  -ntask argument to build-namelist is wrong.";
+    }
 
     NZ: for ($nz = 1; $nz <= $nlev; ++$nz) {
 

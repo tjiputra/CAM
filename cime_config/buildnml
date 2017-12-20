@@ -141,6 +141,8 @@ def buildnml(case, caseroot, compname):
         # -----------------------------------------------------
 
         ntasks = int(NTASKS_ATM) / ninst
+# waiting for cime to implement this
+#        ntasks = int(case.get_value("NTASKS_PER_INST_ATM"))
 
         buildnl_opts = ["-ntasks", str(ntasks), "-csmdata", din_loc_root,
                         "-infile", os.path.join(camconf, "namelist")]

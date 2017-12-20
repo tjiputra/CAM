@@ -5,7 +5,7 @@
 <start_ymd>20000101</start_ymd>
 
 <!--Species IC -->
-<ncdata dyn="fv"  hgrid="1.9x2.5" >atm/waccm/ic/f.c54120.FXSD.f19_f19.cam.i.2000-01-01-00000_c170510.nc</ncdata>
+<ncdata dyn="fv"  hgrid="1.9x2.5" >atm/waccm/ic/f.c54137.FXSD.f19_f19.001.cam.i.2000-01-01-00000_c170817.nc</ncdata>
 
 <lght_no_prd_factor>1.0</lght_no_prd_factor>
 
@@ -69,7 +69,7 @@
 <srf_emis_type>'INTERP_MISSING_MONTHS'</srf_emis_type>
 
 <!-- turn on clm MEGAN VOC emis -->
-<megan_factors_file>atm/cam/chem/trop_mozart/emis/megan21_emis_factors_78pft_c20161108.nc</megan_factors_file>
+<megan_factors_file>atm/cam/chem/trop_mozart/emis/megan21_emis_factors_c20120313.nc</megan_factors_file>
 <megan_mapped_emisfctrs>.false.</megan_mapped_emisfctrs>
 <megan_specifier>
  'CH2O = formaldehyde',
@@ -104,7 +104,7 @@
 	 'TCLY', 'TOTH', 'UIONTEND', 'VIONTEND', 'DTCORE', 'CLDLIQ', 'CLDICE', 'CONCLD', 'FRONTGF:I', 
 	 'BTAUE', 'BTAUW', 'BTAUN', 'BTAUS', 'TAUE', 'TAUW', 'TAUN', 'TAUS', 'TAUGWX', 'TAUGWY', 'TAUX', 'TAUY', 
 	 'SNOWHLND', 'SNOWHICE', 'ICEFRAC', 'FSDSC', 'SFNO', 'SFCO', 'SFCH2O', 'CFC11STAR', 'TROPP_FD',
-         'KVH', 'KVM', 'KVT', 'Qbkgndtot'
+         'KVH', 'KVM', 'KVT', 'Qbkgndtot', 'Z3GM', 'OpDens', 'EDens'
 </fincl1>
 <!-- Instantaneous every hour --> 
 <fincl2>  
@@ -115,14 +115,15 @@
 <fincl3>  
          'Z3', 'T', 'TIon', 'TElec', 'e', 'U', 'V', 'OMEGA', 'UI', 'VI', 'WI', 'ElecColDens', 'PHIM2D', 'PS', 
          'EDYN_ZIGM11_PED', 'EDYN_ZIGM2_HAL', 'ED1', 'ED2', 'O', 'O2', 'H', 'NO', 'CO2', 'N', 'O1D', 
-	 'Op2P', 'Op2D', 'Op', 'Np', 'N2p', 'O2p', 'NOp', 'QJOULE', 'SIGMAHAL', 'SIGMAPED', 'SolIonRate_Tot'
+	 'Op2P', 'Op2D', 'Op', 'Np', 'N2p', 'O2p', 'NOp', 'QJOULE', 'SIGMAHAL', 'SIGMAPED', 'SolIonRate_Tot',
+	 'Z3GM', 'OpDens', 'EDens'
 </fincl3>
 <!-- Average every day --> 
 <fincl4>  
          'Z3', 'T', 'TIon', 'TElec', 'e', 'U', 'V', 'OMEGA', 'UI', 'VI', 'WI', 'ElecColDens', 'PHIM2D', 'PS', 
          'EDYN_ZIGM11_PED', 'EDYN_ZIGM2_HAL', 'ED1', 'ED2', 'O', 'O2', 'H', 'NO', 'CO2', 'N', 'QRS_TOT', 
 	 'QO3', 'QCO2', 'QNO', 'QO3P', 'QHC2S', 'QJOULE', 'QEN', 'QIN', 'QEI', 'EKGW', 'TTGW', 'UTGW_TOTAL', 
-	 'SolIonRate_Tot'
+	 'SolIonRate_Tot', 'Z3GM', 'OpDens', 'EDens'
 </fincl4>
 <!-- Average every 5 days --> 
 <fincl5>  
@@ -178,6 +179,5 @@
 <bnd_topo hgrid="1.9x2.5">atm/cam/topo/USGS-gtopo30_1.9x2.5_remap_c050602.nc</bnd_topo>
 <rk_strat_polstrat_rhmin>1.200D0</rk_strat_polstrat_rhmin>
 <history_clubb>.false.</history_clubb> 
-<trop_cloud_top_press>0.D0</trop_cloud_top_press>
 
 </namelist_defaults>

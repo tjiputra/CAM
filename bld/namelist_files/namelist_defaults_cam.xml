@@ -115,6 +115,7 @@
 <ncdata dyn="fv"  hgrid="1.9x2.5"   nlev="81"  waccmx="1"  ic_ymd="20000101" >atm/waccm/ic/WAX3548T08CO_2003top_f2000.waccm_0017bottom_L81_c110906.nc</ncdata>
 <ncdata dyn="fv"  hgrid="4x5"       nlev="81"  waccmx="1"  ic_ymd="20000101" >atm/waccm/ic/WAX3548T08CO_2003top_f2000.waccm_0017bottom_4x5_L81_c160630.nc</ncdata>
 <ncdata dyn="fv"  hgrid="10x15"     nlev="81"  waccmx="1"  ic_ymd="20000101" >atm/waccm/ic/WAX3548T08CO_2003top_f2000.waccm_0017bottom_10x15_L81_c141027.nc</ncdata>
+<ncdata dyn="fv"  hgrid="4x5"       nlev="126" waccmx="1"  ic_ymd="101" aquaplanet="1">atm/waccm/ic/waccmx_aqua_4x5_L126_c170705.nc</ncdata>
 
 <ncdata dyn="eul" hgrid="512x1024"  nlev="26"              ic_ymd="101" >atm/cam/inic/gaus/T341clim01.cam2.i.0024-01-01-00000.nc</ncdata>
 <ncdata dyn="eul" hgrid="256x512"   nlev="26"              ic_ymd="101" >atm/cam/inic/gaus/cami_0000-01-01_256x512_L26_c030918.nc</ncdata>
@@ -651,40 +652,39 @@
 
 <!-- CAM6 emissions -->
 
-<dms_ot_srf_file    ver="cam6">atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_DMS_other_surface_1750-2015_0.9x1.25_c20170322.nc</dms_ot_srf_file>
-<dms_bb_srf_file    ver="cam6">atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_DMS_bb_surface_1750-2015_0.9x1.25_c20170322.nc</dms_bb_srf_file>
-<so2_an_srf_file    ver="cam6">atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_SO2_anthro-all_surface_1750-2015_0.9x1.25_c20170426.nc</so2_an_srf_file>
-<so2_bb_srf_file    ver="cam6">atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_SO2_bb_surface_1750-2015_0.9x1.25_c20170322.nc</so2_bb_srf_file>
-<so4_a1_an_srf_file ver="cam6">atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_so4_a1_anthro_surface_1750-2015_0.9x1.25_c20170322.nc</so4_a1_an_srf_file>
-<so4_a2_an_srf_file ver="cam6">atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_so4_a2_anthro_surface_1750-2015_0.9x1.25_c20170322.nc</so4_a2_an_srf_file>
-<num_a1_an_srf_file ver="cam6">atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_num_so4_a1_anthro_surface_1750-2015_0.9x1.25_c20170322.nc</num_a1_an_srf_file>
-<num_a1_sh_srf_file ver="cam6">atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_num_so4_a1_ship_surface_1750-2015_0.9x1.25_c20170322.nc</num_a1_sh_srf_file>
-<num_a2_an_srf_file ver="cam6">atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_num_so4_a2_anthro_surface_1750-2015_0.9x1.25_c20170322.nc</num_a2_an_srf_file>
-<bc_a4_an_srf_file  ver="cam6">atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_bc_a4_anthro_surface_1750-2015_0.9x1.25_c20170322.nc</bc_a4_an_srf_file>
-<num_a4_bc_srf_file ver="cam6">atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_num_bc_a4_anthro_surface_1750-2015_0.9x1.25_c20170322.nc</num_a4_bc_srf_file>
-<num_a4_oc_srf_file ver="cam6">atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_num_pom_a4_bb_surface_1750-2015_0.9x1.25_c20170509.nc</num_a4_oc_srf_file>
-<pom_a4_an_srf_file ver="cam6">atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_pom_a4_anthro_surface_1750-2015_0.9x1.25_c20170322.nc</pom_a4_an_srf_file>
-<soag_an_srf_file   ver="cam6">atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_SOAGx1.5_anthro_surface_1750-2015_0.9x1.25_c20170322.nc</soag_an_srf_file>
-<soag_bg_srf_file   ver="cam6">atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_SOAGx1.5_biogenic_surface_1750-2015_0.9x1.25_c20170322.nc</soag_bg_srf_file>
-<soag_bb_srf_file   ver="cam6">atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_SOAGx1.5_bb_surface_1750-2015_0.9x1.25_c20170322.nc</soag_bb_srf_file>
+<dms_ot_srf_file     ver="cam6">atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_DMS_other_surface_1750-2015_0.9x1.25_c20170322.nc</dms_ot_srf_file>
+<dms_bb_srf_file     ver="cam6">atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_DMS_bb_surface_1750-2015_0.9x1.25_c20170322.nc</dms_bb_srf_file>
+<so2_ag_sh_file      ver="cam6">atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_SO2_anthro-ag-ship-res_surface_1750-2015_0.9x1.25_c20170616.nc</so2_ag_sh_file>
+<so2_an_srf_file     ver="cam6">atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_SO2_anthro-ene_surface_1750-2015_0.9x1.25_c20170616.nc</so2_an_srf_file>
+<so2_bb_srf_file     ver="cam6">atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_SO2_bb_surface_1750-2015_0.9x1.25_c20170322.nc</so2_bb_srf_file>
+<so4_a1_an_srf_file  ver="cam6">atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_so4_a1_anthro-ag-ship_surface_1750-2015_0.9x1.25_c20170616.nc</so4_a1_an_srf_file>
+<so4_a1_bb_srf_file  ver="cam6">atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_so4_a1_bb_surface_1750-2015_0.9x1.25_c20170322.nc</so4_a1_bb_srf_file>
+<so4_a2_an_srf_file  ver="cam6">atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_so4_a2_anthro-res_surface_1750-2015_0.9x1.25_c20170616.nc</so4_a2_an_srf_file>
+<num_a1_sh_srf_file  ver="cam6">atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_num_so4_a1_anthro-ag-ship_surface_1750-2015_0.9x1.25_c20170616.nc</num_a1_sh_srf_file>
+<num_a2_an_srf_file  ver="cam6">atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_num_so4_a2_anthro-res_surface_1750-2015_0.9x1.25_c20170616.nc</num_a2_an_srf_file>
+<bc_a4_an_srf_file   ver="cam6">atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_bc_a4_anthro_surface_1750-2015_0.9x1.25_c20170608.nc</bc_a4_an_srf_file>
+<num_a4_bc_srf_file  ver="cam6">atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_num_bc_a4_anthro_surface_1750-2015_0.9x1.25_c20170608.nc</num_a4_bc_srf_file>
+<pom_a4_an_srf_file  ver="cam6">atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_pom_a4_anthro_surface_1750-2015_0.9x1.25_c20170608.nc</pom_a4_an_srf_file>
+<num_a4_oc_srf_file  ver="cam6">atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_num_pom_a4_anthro_surface_1750-2015_0.9x1.25_c20170608.nc</num_a4_oc_srf_file>
+<num_a1_bb_srf_file  ver="cam6">atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_num_so4_a1_bb_surface_1750-2015_0.9x1.25_c20170322.nc</num_a1_bb_srf_file>
+<bc_a4_bb_srf_file   ver="cam6">atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_bc_a4_bb_surface_1750-2015_0.9x1.25_c20170322.nc</bc_a4_bb_srf_file>
+<num_a4_bb_srf_file  ver="cam6">atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_num_bc_a4_bb_surface_1750-2015_0.9x1.25_c20170322.nc</num_a4_bb_srf_file>
+<pom_a4_bb_srf_file  ver="cam6">atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_pom_a4_bb_surface_1750-2015_0.9x1.25_c20170322.nc</pom_a4_bb_srf_file>
+<num_pom_bb_srf_file ver="cam6">atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_num_pom_a4_bb_surface_1750-2015_0.9x1.25_c20170509.nc</num_pom_bb_srf_file>
+<soag_an_srf_file    ver="cam6">atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_SOAGx1.5_anthro_surface_1750-2015_0.9x1.25_c20170608.nc</soag_an_srf_file>
+<soag_bg_srf_file    ver="cam6">atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_SOAGx1.5_biogenic_surface_1750-2015_0.9x1.25_c20170322.nc</soag_bg_srf_file>
+<soag_bb_srf_file    ver="cam6">atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_SOAGx1.5_bb_surface_1750-2015_0.9x1.25_c20170322.nc</soag_bb_srf_file>
 
-<h2o_ch4ox_ext_file ver="cam6">atm/cam/chem/emis/elev/H2O_emission_CH4_oxidationx2_elev_1850-2100_CCMI_RCP6_0_c160219.nc</h2o_ch4ox_ext_file>
-<so2_cv_ext_file    ver="cam6">atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_SO2_contvolcano_vertical_1750-2100_0.9x1.25_c20170322.nc</so2_cv_ext_file>
-<so2_ac_ext_file    ver="cam6">atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_SO2_aircraft_vertical_1750-2015_0.9x1.25_c20170322.nc</so2_ac_ext_file>
-<bc_a4_ac_ext_file  ver="cam6">atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_bc_a4_aircraft_vertical_1750-2015_0.9x1.25_c20170322.nc</bc_a4_ac_ext_file>
-<bc_a4_bb_ext_file  ver="cam6">atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_bc_a4_bb_ar5vertical_1750-2015_0.9x1.25_c20170505.nc</bc_a4_bb_ext_file>
-<pom_a4_bb_ext_file ver="cam6">atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_pom_a4_bb_ar5vertical_1750-2015_0.9x1.25_c20170505.nc</pom_a4_bb_ext_file>
-<so4_a1_an_ext_file ver="cam6">atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_so4_a1_anthro_vertical_1750-2015_0.9x1.25_c20170322.nc</so4_a1_an_ext_file>
-<so4_a1_bb_ext_file ver="cam6">atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_so4_a1_bb_ar5vertical_1750-2015_0.9x1.25_c20170505.nc</so4_a1_bb_ext_file >
-<so4_a1_cv_ext_file ver="cam6">atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_so4_a1_contvolcano_vertical_1750-2100_0.9x1.25_c20170322.nc</so4_a1_cv_ext_file>
-<so4_a2_cv_ext_file ver="cam6">atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_so4_a2_contvolcano_vertical_1750-2100_0.9x1.25_c20170322.nc</so4_a2_cv_ext_file>
-<num_a1_an_ext_file ver="cam6">atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_num_so4_a1_anthro_vertical_1750-2015_0.9x1.25_c20170322.nc</num_a1_an_ext_file>
-<num_a1_bb_ext_file ver="cam6">atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_num_so4_a1_bb_ar5vertical_1750-2015_0.9x1.25_c20170505.nc</num_a1_bb_ext_file>
-<num_a1_cv_ext_file ver="cam6">atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_num_so4_a1_contvolcano_vertical_1750-2100_0.9x1.25_c20170322.nc</num_a1_cv_ext_file>
-<num_a2_cv_ext_file ver="cam6">atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_num_so4_a2_contvolcano_vertical_1750-2100_0.9x1.25_c20170322.nc</num_a2_cv_ext_file>
-<num_bc_a4_ac_ext_file ver="cam6">atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_num_bc_a4_aircraft_vertical_1750-2015_0.9x1.25_c20170322.nc</num_bc_a4_ac_ext_file>
-<num_bc_a4_bb_ext_file ver="cam6">atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_num_bc_a4_bb_ar5vertical_1750-2015_0.9x1.25_c20170505.nc</num_bc_a4_bb_ext_file>
-<num_pom_a4_bb_ext_file ver="cam6">atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_num_pom_a4_bb_ar5vertical_1750-2015_0.9x1.25_c20170509.nc</num_pom_a4_bb_ext_file>
+
+<h2o_ch4ox_ext_file    ver="cam6">atm/cam/chem/emis/elev/H2O_emission_CH4_oxidationx2_elev_1850-2100_CCMI_RCP6_0_c160219.nc</h2o_ch4ox_ext_file>
+<so2_cv_ext_file       ver="cam6">atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_SO2_contvolcano_vertical_850-5000_0.9x1.25_c20170724.nc</so2_cv_ext_file>
+<so4_a1_cv_ext_file    ver="cam6">atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_so4_a1_contvolcano_vertical_850-5000_0.9x1.25_c20170724.nc</so4_a1_cv_ext_file>
+<num_a1_cv_ext_file    ver="cam6">atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_num_a1_so4_contvolcano_vertical_850-5000_0.9x1.25_c20170724.nc</num_a1_cv_ext_file>
+<so4_a2_cv_ext_file    ver="cam6">atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_so4_a2_contvolcano_vertical_850-5000_0.9x1.25_c20170724.nc</so4_a2_cv_ext_file>
+<num_a2_cv_ext_file    ver="cam6">atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_num_a2_so4_contvolcano_vertical_850-5000_0.9x1.25_c20170724.nc</num_a2_cv_ext_file>
+<so4_a1_an_ext_file    ver="cam6">atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_so4_a1_anthro-ene_vertical_1750-2015_0.9x1.25_c20170616.nc</so4_a1_an_ext_file>
+<num_a1_an_ext_file    ver="cam6">atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_num_so4_a1_anthro-ene_vertical_1750-2015_0.9x1.25_c20170616.nc</num_a1_an_ext_file>
+
 
 
 <!-- without forest fires and grass fires sources -->
@@ -742,8 +742,8 @@
 <prescribed_strataero_datapath                         >atm/waccm/sulf</prescribed_strataero_datapath>
 <prescribed_strataero_file                  phys="cam6">CESM_1849_2100_sad_V3_c160211.nc</prescribed_strataero_file>
 <prescribed_strataero_datapath              phys="cam6">atm/cam/volc</prescribed_strataero_datapath>
-<prescribed_strataero_file     ver="3modes" phys="cam6">f.e15.FSDW5.f09_f09.beta02_waccm.cam5_4.03.volc_PrescribedMAM_19891231-2000_zm_5day_c170216.nc</prescribed_strataero_file>
-<prescribed_strataero_datapath ver="3modes" phys="cam6">atm/cam/volc</prescribed_strataero_datapath>
+<prescribed_strataero_file     ver="3modes" phys="cam6">ozone_strataero_CAM6chem_1849-2014_zm_5day_c170924.nc</prescribed_strataero_file>
+<prescribed_strataero_datapath ver="3modes" phys="cam6">atm/cam/ozone</prescribed_strataero_datapath>
 
 <!-- sulfate data -->
 <sulf_file>atm/waccm/sulf/sulfate.ar5_camchem_c130304.nc</sulf_file>

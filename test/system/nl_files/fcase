@@ -4,4 +4,5 @@
  nhtfrq=9,9,9,9,9,9
  start_ymd = 10101
  inithist='ENDOFRUN'
+ aqua_planet_sst=3
  /

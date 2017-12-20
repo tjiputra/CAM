@@ -1,2 +1,0 @@
-./xmlchange CLM_BLDNML_OPTS="-bgc bgc -crop -irrig=.true."
-./xmlchange CISM_OBSERVED_IC="FALSE"

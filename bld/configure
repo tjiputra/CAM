@@ -2824,7 +2824,6 @@ sub write_filepath
 
     if ($clubb_sgs eq '1') {
        print $fh "$camsrcdir/cam/src/physics/clubb\n";
-       print $fh "$camsrcdir/cam/src/physics/silhs\n";
     }
 
     # Superparameterization
@@ -2938,6 +2937,7 @@ sub write_filepath
         print $fh "$cam_root/cime/src/share/RandNum/src/dsfmt_f03\n";
         print $fh "$cam_root/cime/src/share/RandNum/src/kissvec\n";
         print $fh "$cam_root/cime/src/share/RandNum/src/mt19937\n";
+        print $fh "$cam_root/cime/src/components/data_comps/dshare\n";
 
         # GPTL and timing code
 #        print $fh "$cam_root/cime/src/externals/pio2/src/gptl\n";

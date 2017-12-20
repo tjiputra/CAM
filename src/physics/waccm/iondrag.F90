@@ -29,7 +29,7 @@ module iondrag
   !-------------------------------------------------------------------------------
 
   use shr_kind_mod ,only: r8 => shr_kind_r8
-  use ppgrid       ,only: pcols, pver
+  use ppgrid       ,only: pcols, pver, begchunk, endchunk
   use cam_history  ,only: addfld, add_default, outfld, horiz_only
   use physics_types,only: physics_state, physics_ptend, physics_ptend_init
   
@@ -41,6 +41,7 @@ module iondrag
   use spmd_utils,       only: masterproc
 
   use phys_control, only: waccmx_is
+  use cam_abortutils,only: endrun
 
   implicit none
 
@@ -56,6 +57,7 @@ module iondrag
   public :: iondrag_calc             ! ion drag tensors lxx,lyy,lxy,lyx
   public :: iondrag_readnl
   public :: iondrag_timestep_init
+  public :: iondrag_inidat
   public :: do_waccm_ions
 
   interface iondrag_calc
@@ -180,6 +182,8 @@ module iondrag
        0.68491E-01_r8, 0.87521E-01_r8, 0.11196E+00_r8, 0.14320E+00_r8, 0.18295E+00_r8, &
        0.23321E+00_r8, 0.29631E+00_r8/
 
+  logical :: ionvels_read_from_file = .false.
+
 contains
 
 !==============================================================================     
@@ -215,8 +219,7 @@ contains
 
     use namelist_utils,  only: find_group_name
     use units,           only: getunit, freeunit
-    use mpishorthand
-    use cam_abortutils,  only: endrun
+    use spmd_utils, only: mpicom, masterprocid, mpicom, mpi_character, mpi_logical
 
     character(len=*), intent(in) :: nlfile  ! filepath for file containing namelist input
 
@@ -241,12 +244,10 @@ contains
 
     end if
 
-#ifdef SPMD
-   call mpibcast (efield_lflux_file, len(efield_lflux_file), mpichar, 0, mpicom)
-   call mpibcast (efield_hflux_file, len(efield_hflux_file), mpichar, 0, mpicom)
-   call mpibcast (efield_wei96_file, len(efield_wei96_file), mpichar, 0, mpicom)
-   call mpibcast (empirical_ion_velocities, 1, mpilog, 0, mpicom)
-#endif
+    call mpi_bcast (efield_lflux_file, len(efield_lflux_file), mpi_character, masterprocid, mpicom, ierr)
+    call mpi_bcast (efield_hflux_file, len(efield_hflux_file), mpi_character, masterprocid, mpicom, ierr)
+    call mpi_bcast (efield_wei96_file, len(efield_wei96_file), mpi_character, masterprocid, mpicom, ierr)
+    call mpi_bcast (empirical_ion_velocities, 1, mpi_logical,  masterprocid, mpicom, ierr)
 
   end subroutine iondrag_readnl
 
@@ -372,7 +373,7 @@ contains
     call addfld('VIONTEND',(/ 'lev' /),'A','M/S2','v-tendency due to ion drag')
 
 !
-! Indices to 3d ion drifts calculated by edynamo:
+! Indices to 3d ion drifts :
     ui_idx = pbuf_get_index('UI')
     vi_idx = pbuf_get_index('VI')
     wi_idx = pbuf_get_index('WI')
@@ -465,13 +466,8 @@ contains
     if (empirical_ion_velocities) then
       call addfld('UI',(/ 'lev' /),'I','m/s', 'UI Zonal empirical ExB drift from exbdrift')
       call addfld('VI',(/ 'lev' /),'I','m/s', 'VI Meridional empirical ExB drift from exbdrift')
-      call addfld('WI',(/ 'lev' /),'I','m/s', 'WI Meridional empirical ExB drift from exbdrift')
-    else
-      call addfld('UI',(/ 'lev' /),'I','m/s', 'UI Zonal ion drift from edynamo') 
-      call addfld('VI',(/ 'lev' /),'I','m/s', 'VI Meridional ion drift from edynamo')
-      call addfld('WI',(/ 'lev' /),'I','m/s', 'WI Meridional ion drift from edynamo')
+      call addfld('WI',(/ 'lev' /),'I','m/s', 'WI Vertical empirical ExB drift from exbdrift')
     endif
-
 
   end subroutine ions_init
 
@@ -781,7 +777,7 @@ contains
     ! calculate empirical ExB drift velocities if not using edynamo drifts
     ! (if edynamo calculated the drifts, then they are already in pbuf%ui, etc.)
     !-------------------------------------------------------------------------------
-    if (empirical_ion_velocities .or. is_first_step()) then
+    if (empirical_ion_velocities .or. (is_first_step().and..not.ionvels_read_from_file)) then
       call t_startf ( 'exbdrift_ion_vels' )
       call exbdrift_ion_vels( lchnk, ncol, pbuf)
       call t_stopf  ( 'exbdrift_ion_vels' )
@@ -1243,9 +1239,11 @@ contains
 ! (use_dynamo_drifts==true). See addfld calls in this source file.
 ! If empirical, the drifts will be 2d (i.e., redundant in the vertical dimension)
 !
-    call outfld ( 'UI', ui, pcols, lchnk )
-    call outfld ( 'VI', vi, pcols, lchnk )
-    call outfld ( 'WI', wi, pcols, lchnk )
+    if (empirical_ion_velocities) then
+       call outfld ( 'UI', ui, pcols, lchnk )
+       call outfld ( 'VI', vi, pcols, lchnk )
+       call outfld ( 'WI', wi, pcols, lchnk )
+    endif
 
     call outfld ( 'UIONTEND', dui, pcols, lchnk )      ! u ion drag tendency
     call outfld ( 'VIONTEND', dvi, pcols, lchnk )      ! v ion drag tendency
@@ -1349,5 +1347,69 @@ contains
     call outfld ( 'QJOULE', qout, pcols, lchnk )
 
   end subroutine jouleheat_tend
+
+!==============================================================================
+
+  subroutine iondrag_inidat(ncid_ini, pbuf2d)
+
+    use pio,      only: file_desc_t
+    use ncdio_atm,only: infld
+    use infnan,   only: nan, assignment(=)
+    use cam_grid_support, only : cam_grid_check, cam_grid_id, cam_grid_get_dim_names
+    use physics_buffer, only : pbuf_set_field
+
+   ! args
+    type(file_desc_t), intent(inout)   :: ncid_ini    ! Initial condition file id
+    type(physics_buffer_desc), pointer :: pbuf2d(:,:) ! Physics buffer
+
+   ! local vars
+    real(r8), pointer :: ui_tmp(:,:,:)
+    real(r8), pointer :: vi_tmp(:,:,:)
+    real(r8), pointer :: wi_tmp(:,:,:)
+    real(r8) :: nanval
+    integer  :: grid_id
+    character(len=4) :: dim1name, dim2name
+    character(len=*), parameter :: subname='iondrag_inidat'
+    logical :: found_ui, found_vi, found_wi
+
+    allocate(ui_tmp(pcols,pver,begchunk:endchunk))
+    allocate(vi_tmp(pcols,pver,begchunk:endchunk))
+    allocate(wi_tmp(pcols,pver,begchunk:endchunk))
+
+    grid_id = cam_grid_id('physgrid')
+    if (.not. cam_grid_check(grid_id)) then
+      call endrun(trim(subname)//': Internal error, no "physgrid" grid')
+    end if
+    call cam_grid_get_dim_names(grid_id, dim1name, dim2name)
+
+    call infld( 'UI',ncid_ini,dim1name, 'lev', dim2name, 1, pcols, 1, pver, begchunk, endchunk, &
+         ui_tmp, found_ui, gridname='physgrid')
+    call infld( 'VI',ncid_ini,dim1name, 'lev', dim2name, 1, pcols, 1, pver, begchunk, endchunk, &
+         vi_tmp, found_vi, gridname='physgrid')
+    call infld( 'WI',ncid_ini,dim1name, 'lev', dim2name, 1, pcols, 1, pver, begchunk, endchunk, &
+         wi_tmp, found_wi, gridname='physgrid')
+
+    ionvels_read_from_file = found_ui .and. found_vi .and. found_wi
+
+    ui_idx = pbuf_get_index('UI')
+    vi_idx = pbuf_get_index('VI')
+    wi_idx = pbuf_get_index('WI')
+
+    if (ionvels_read_from_file) then
+       call pbuf_set_field(pbuf2d, ui_idx, ui_tmp)
+       call pbuf_set_field(pbuf2d, vi_idx, vi_tmp)
+       call pbuf_set_field(pbuf2d, wi_idx, wi_tmp)
+    else
+       nanval=nan
+       call pbuf_set_field(pbuf2d, ui_idx, nanval)
+       call pbuf_set_field(pbuf2d, vi_idx, nanval)
+       call pbuf_set_field(pbuf2d, wi_idx, nanval)
+    endif
+
+    deallocate( ui_tmp )
+    deallocate( vi_tmp )
+    deallocate( wi_tmp )
+
+  end subroutine iondrag_inidat
 
 end module iondrag

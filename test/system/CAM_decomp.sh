@@ -56,6 +56,8 @@ else
 
 		if grep -ic 'chem waccm' ${CAM_SCRIPTDIR}/config_files/$1 > /dev/null; then
 		    levs=66
+		elif grep -ic cam6 ${CAM_SCRIPTDIR}/config_files/$1 > /dev/null; then
+		    levs=32
 		elif grep -ic cam4 ${CAM_SCRIPTDIR}/config_files/$1 > /dev/null; then
 		    levs=26
 		elif grep -ic cam3 ${CAM_SCRIPTDIR}/config_files/$1 > /dev/null; then

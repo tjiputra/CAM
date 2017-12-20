@@ -330,6 +330,9 @@ subroutine spmd_readnl(nlfilename)
    nprxy_y = npr_yz(4)
    npes_yz = npr_y*npr_z
    npes_xy = nprxy_x*nprxy_y
+   if (npes_yz < 1) then
+      call endrun(sub//': ERROR: yz domain decomposition must have at least 1 subdomain')
+   endif
    if (npes_yz > npes) then
       call endrun(sub//': ERROR: incorrect yz domain decomposition')
    endif

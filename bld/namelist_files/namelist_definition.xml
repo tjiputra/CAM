@@ -3646,14 +3646,6 @@ mass mixing ratio constituents.
 Default: .false.
 </entry>
 
-<!-- Hydrostatic pressure work in mass adjustment -->
-<entry id="dme_energy_adjust" type="logical"  category="NorESM"
-       group="phys_ctl_nl" valid_values="" >
-Switch to use appropriate energy adjustment in dry-mass adjustment at the
-end of tphysac. 
-Default: .false.
-</entry>
-
 <!-- Diagnostics -->
 
 <entry id="history_amwg" type="logical"  category="diagnostics"
@@ -5295,7 +5287,7 @@ Default: false
 <entry id="prescribed_strataero_3modes" type="logical" category="cam_chem"
        group="camexp" valid_values="" >
 If true the prescribed stratospheric aerosols have three distribution modes.
-Default: false
+Default: true for CAM6, otherwise false
 </entry>
 
 <entry id="prescribed_strataero_use_chemtrop" type="logical" category="aerosol"
@@ -6394,7 +6386,12 @@ Default: "."
 
 
 <!-- ========================================================================================  -->
-<!-- CPL7 Driver -->
+<!-- CIME Driver -->
+
+<entry id="ninst_driver" type="integer"  category="driver"
+       group="cime_driver_inst" valid_values="1" >
+Default: 1
+</entry>
 
 <!-- coupler fields -->
 
