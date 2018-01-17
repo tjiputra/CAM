@@ -1,14 +1,5 @@
-
-
-
-
-
-
-
       module m_spc_id
-
       implicit none
-
       integer, parameter :: id_SO2 = 1
       integer, parameter :: id_H2SO4 = 2
       integer, parameter :: id_DMS = 3
@@ -38,6 +29,5 @@
       integer, parameter :: id_SOA_SV = 27
       integer, parameter :: id_monoterp = 28
       integer, parameter :: id_isoprene = 29
-
-
+      integer, parameter :: id_H2O = 30
       end module m_spc_id

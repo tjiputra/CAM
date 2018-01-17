@@ -353,7 +353,7 @@ module oplus
 ! mp_geo_halos first arg:
 !     type(array_ptr_type) :: fmsub(nf) ! (lev0:lev1,lon0-2:lon1+2,lat0-2:lat1+2)
 !
-    call mp_geo_halos(ptrs,1,nlev,i0,i1,j0,j1,nfields,polesign)
+    call mp_geo_halos(ptrs,1,nlev,i0,i1,j0,j1,nfields)
 !
 ! Set latitude halo points over the poles (this does not change the poles).
 ! (the 2nd halo over the poles will not actually be used (assuming lat loops
@@ -593,7 +593,7 @@ module oplus
     ptrs(4)%ptr => tp ; ptrs(5)%ptr => opnm_smooth
     polesign = 1._r8
 
-    call mp_geo_halos (ptrs,1,nlev,i0,i1,j0,j1,5,polesign)
+    call mp_geo_halos (ptrs,1,nlev,i0,i1,j0,j1,5)
     call mp_pole_halos(ptrs,1,nlev,i0,i1,j0,j1,5,polesign)
 
     deallocate(ptrs,polesign)
@@ -676,7 +676,7 @@ module oplus
 !
     allocate(ptrs(1))
     ptrs(1)%ptr => bdotdh_opj
-    call mp_geo_halos (ptrs,1,nlev,i0,i1,j0,j1,1,(/1._r8/))
+    call mp_geo_halos (ptrs,1,nlev,i0,i1,j0,j1,1)
     call mp_pole_halos(ptrs,1,nlev,i0,i1,j0,j1,1,(/1._r8/))
     deallocate(ptrs)
 !

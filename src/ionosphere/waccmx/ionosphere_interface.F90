@@ -278,6 +278,18 @@ contains
 
     endif op_transport
 
+    if (ionos_edyn_active) then
+       call addfld ('UI',(/ 'lev' /),'I','m/s', 'UI Zonal ion drift from edynamo') 
+       call addfld ('VI',(/ 'lev' /),'I','m/s', 'VI Meridional ion drift from edynamo')
+       call addfld ('WI',(/ 'lev' /),'I','m/s', 'WI Vertical ion drift from edynamo')
+       call addfld ('UI&IC', (/ 'lev' /), 'I','m/s', 'Zonal ion drift velocity')
+       call addfld ('VI&IC', (/ 'lev' /), 'I','m/s', 'Meridional ion drift velocity')
+       call addfld ('WI&IC', (/ 'lev' /), 'I','m/s', 'Vertical ion drift velocity')
+       call add_default ('UI&IC', 0, ' ')
+       call add_default ('VI&IC', 0, ' ')
+       call add_default ('WI&IC', 0, ' ')
+    endif
+
   end subroutine ionosphere_init
 
   !--------------------------------------------------------------------------------
@@ -342,6 +354,7 @@ contains
     use physics_types,  only: physics_state
     use physics_buffer, only: physics_buffer_desc
     use dyn_comp,       only: dyn_import_t
+    use cam_history,    only: outfld, write_inithist
 
     ! - pull some fields from pbuf and dyn_in
     ! - invoke ionosphere/electro-dynamics coupling
@@ -411,6 +424,7 @@ contains
     real(r8), allocatable :: ti_blck(:,:,:)
     real(r8), allocatable :: te_blck(:,:,:)
     real(r8), allocatable :: zi_blck(:,:,:)
+    real(r8), allocatable :: zm_blck(:,:,:)
     real(r8), allocatable :: ui_blck(:,:,:)
     real(r8), allocatable :: vi_blck(:,:,:)
     real(r8), allocatable :: wi_blck(:,:,:)
@@ -431,6 +445,7 @@ contains
        allocate( ti_blck(grid%ifirstxy:grid%ilastxy, grid%jfirstxy:grid%jlastxy, grid%km) )
        allocate( te_blck(grid%ifirstxy:grid%ilastxy, grid%jfirstxy:grid%jlastxy, grid%km) )
        allocate( zi_blck(grid%ifirstxy:grid%ilastxy, grid%jfirstxy:grid%jlastxy, grid%km) )
+       allocate( zm_blck(grid%ifirstxy:grid%ilastxy, grid%jfirstxy:grid%jlastxy, grid%km) )
        allocate( ui_blck(grid%ifirstxy:grid%ilastxy, grid%jfirstxy:grid%jlastxy, grid%km) )
        allocate( vi_blck(grid%ifirstxy:grid%ilastxy, grid%jfirstxy:grid%jlastxy, grid%km) )
        allocate( wi_blck(grid%ifirstxy:grid%ilastxy, grid%jfirstxy:grid%jlastxy, grid%km) )
@@ -511,6 +526,7 @@ contains
                    vi_blck(lons(i),lats(i),k) = vi_phys(i,k)
                    wi_blck(lons(i),lats(i),k) = wi_phys(i,k)
                    zi_blck(lons(i),lats(i),k)    = phys_state(lchnk)%zi(i,k)
+                   zm_blck(lons(i),lats(i),k)    = phys_state(lchnk)%zm(i,k)
                    omega_blck(lons(i),lats(i),k) = phys_state(lchnk)%omega(i,k)
                    tn_blck(lons(i),lats(i),k)    = phys_state(lchnk)%t(i,k)
                 enddo
@@ -560,7 +576,7 @@ contains
 
        else ! phys2blcks_local
 
-          tsize = 10
+          tsize = 11
 
           nSIons = 0
           if (sIndxOp > 0)  then 
@@ -631,11 +647,12 @@ contains
                    cbuffer(cpter(i,k)+2) = te_phys(i,k)
                    cbuffer(cpter(i,k)+3) = ti_phys(i,k)
                    cbuffer(cpter(i,k)+4) = phys_state(lchnk)%zi(i,k)
-                   cbuffer(cpter(i,k)+5) = ui_phys(i,k)
-                   cbuffer(cpter(i,k)+6) = vi_phys(i,k)
-                   cbuffer(cpter(i,k)+7) = wi_phys(i,k)
-                   cbuffer(cpter(i,k)+8) = phys_state(lchnk)%omega(i,k)
-                   cbuffer(cpter(i,k)+9) = phys_state(lchnk)%t(i,k)
+                   cbuffer(cpter(i,k)+5) = phys_state(lchnk)%zm(i,k)
+                   cbuffer(cpter(i,k)+6) = ui_phys(i,k)
+                   cbuffer(cpter(i,k)+7) = vi_phys(i,k)
+                   cbuffer(cpter(i,k)+8) = wi_phys(i,k)
+                   cbuffer(cpter(i,k)+9) = phys_state(lchnk)%omega(i,k)
+                   cbuffer(cpter(i,k)+10) = phys_state(lchnk)%t(i,k)
 
                    if (sIndxO2p > 0)cbuffer(cpter(i,k)+ibuffO2p) = mmrPO2p_phys(i,k)
                    if (sIndxNOp > 0)cbuffer(cpter(i,k)+ibuffNOp) = mmrPNOp_phys(i,k)
@@ -667,11 +684,12 @@ contains
                    te_blck(i,j,k)         = bbuffer(bpter(ib,k)+2)
                    ti_blck(i,j,k)         = bbuffer(bpter(ib,k)+3)
                    zi_blck(i,j,k)         = bbuffer(bpter(ib,k)+4)
-                   ui_blck(i,j,k)         = bbuffer(bpter(ib,k)+5)
-                   vi_blck(i,j,k)         = bbuffer(bpter(ib,k)+6)
-                   wi_blck(i,j,k)         = bbuffer(bpter(ib,k)+7)
-                   omega_blck(i,j,k)      = bbuffer(bpter(ib,k)+8)
-                   tn_blck(i,j,k)         = bbuffer(bpter(ib,k)+9)
+                   zm_blck(i,j,k)         = bbuffer(bpter(ib,k)+5)
+                   ui_blck(i,j,k)         = bbuffer(bpter(ib,k)+6)
+                   vi_blck(i,j,k)         = bbuffer(bpter(ib,k)+7)
+                   wi_blck(i,j,k)         = bbuffer(bpter(ib,k)+8)
+                   omega_blck(i,j,k)      = bbuffer(bpter(ib,k)+9)
+                   tn_blck(i,j,k)         = bbuffer(bpter(ib,k)+10)
 
                    if (sIndxO2p > 0) o2pmmr_blck(i,j,k) = bbuffer(bpter(ib,k)+ibuffO2p)
                    if (sIndxNOp > 0) nopmmr_blck(i,j,k) = bbuffer(bpter(ib,k)+ibuffNOp)
@@ -719,6 +737,7 @@ contains
           do j=jfirstxy,jlastxy
              do i=ifirstxy,ilastxy
                 zi_blck(i,j,k) = zi_blck(i,j,k)+phis(i,j)/gravit ! phis is redundant in k
+                zm_blck(i,j,k) = zm_blck(i,j,k)+phis(i,j)/gravit ! phis is redundant in k
              enddo
           enddo
        enddo
@@ -727,7 +746,7 @@ contains
 
        if (iam < grid%npes_xy) then 
           ! waccmx ionosphere electro-dynamics -- transports O+ and provides updates to ion drift velocities
-          call d_pie_coupling(omega_blck,pexy,zi_blck,wuxy,wvxy,tn_blck,                        &
+          call d_pie_coupling(omega_blck,pexy,zi_blck,zm_blck,wuxy,wvxy,tn_blck,                        &
                sigma_ped_blck,sigma_hall_blck,te_blck,ti_blck,                      &
                o2mmr_blck,o1mmr_blck,h1mmr_blck,o2pmmr_blck,nopmmr_blck,n2pmmr_blck, &
                opmmr_blck,opmmrtm1_blck,ui_blck,vi_blck,wi_blck,                                &
@@ -773,6 +792,18 @@ contains
                    if (sIndxOp > 0) mmrPOp_phys(i,k) = opmmr_blck(ic,jc,k)
                 end do
              end do
+
+             if (ionos_edyn_active) then
+                call outfld ( 'UI', ui_phys, pcols, lchnk )
+                call outfld ( 'VI', vi_phys, pcols, lchnk )
+                call outfld ( 'WI', wi_phys, pcols, lchnk )
+                if (write_inithist()) then
+                   call outfld ( 'UI&IC', ui_phys, pcols, lchnk )
+                   call outfld ( 'VI&IC', vi_phys, pcols, lchnk )
+                   call outfld ( 'WI&IC', wi_phys, pcols, lchnk )
+                endif
+             endif
+
           end do chnk_loop1
 
        else ! blcks2phys_local
@@ -839,6 +870,17 @@ contains
                    endif
                 end do ! k=1,km
              end do ! i=1,ncol
+
+             if (ionos_edyn_active) then
+                call outfld ( 'UI', ui_phys, pcols, lchnk )
+                call outfld ( 'VI', vi_phys, pcols, lchnk )
+                call outfld ( 'WI', wi_phys, pcols, lchnk )
+                if (write_inithist()) then
+                   call outfld ( 'UI&IC', ui_phys, pcols, lchnk )
+                   call outfld ( 'VI&IC', vi_phys, pcols, lchnk )
+                   call outfld ( 'WI&IC', wi_phys, pcols, lchnk )
+                endif
+             endif
 
           end do chnk_loop2
 

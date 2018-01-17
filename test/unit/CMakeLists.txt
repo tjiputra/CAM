@@ -17,13 +17,11 @@ set(SHAREROOT ${CESMROOT}/cime/src/share)
 # Add share code to source list.
 include_directories(${SHAREROOT}/include ${SHAREROOT}/util)
 add_subdirectory(${SHAREROOT}/util csm_share)
+add_subdirectory(${SHAREROOT}/unit_test_stubs/util csm_share_stubs)
 
 # CAM physics.
 add_subdirectory(${CAMROOT}src/physics/cam physics_cam)
 add_subdirectory(${CAMROOT}src/utils utils_cam)
-
-# Stub/mock modules.
-add_subdirectory(mock)
 
 # Build part of csm_share as a library.
 add_library(csm_share ${share_sources})

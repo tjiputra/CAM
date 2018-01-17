@@ -2341,6 +2341,7 @@ subroutine dyn_run(ptop, ndt, te0, dyn_state, dyn_in, dyn_out, rc)
             trans_pexy: if (met_fix_mass .or. high_alt) then
 
                if (grid%twod_decomp .eq. 1) then
+                 if (grid%iam .lt. grid%npes_yz) then
 #if defined( SPMD )
                   call mp_sendirr( grid%commxy, grid%pexy_to_pe%SendDesc,                    &
                                   grid%pexy_to_pe%RecvDesc, pexy, pe,                       &
@@ -2349,6 +2350,7 @@ subroutine dyn_run(ptop, ndt, te0, dyn_state, dyn_in, dyn_out, rc)
                                   grid%pexy_to_pe%RecvDesc, pexy, pe,                       &
                                   modc=grid%modc_dynrun )
 #endif
+                 endif
                else
 !$omp parallel do private(i,j,k)
                   do j = jfirst, jlast

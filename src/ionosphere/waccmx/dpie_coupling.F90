@@ -5,7 +5,9 @@ module dpie_coupling
 !
   use shr_kind_mod    ,only: r8 => shr_kind_r8
   use cam_logfile     ,only: iulog
-  use cam_history     ,only: outfld ! CAM routine to output fields to history files
+  use cam_history     ,only: outfld
+  use cam_history     ,only: addfld, horiz_only
+  use cam_history_support, only: fillvalue
   use cam_abortutils  ,only: endrun
   use spmd_utils      ,only: masterproc
   use savefield_waccm ,only: savefld_waccm
@@ -28,8 +30,6 @@ contains
 !----------------------------------------------------------------------
   subroutine d_pie_init( edyn_active_in, oplus_xport_in )
 
-    use cam_history, only: addfld
-
     logical, intent(in) :: edyn_active_in, oplus_xport_in
 
     ionos_edyn_active = edyn_active_in
@@ -43,14 +43,9 @@ contains
     call addfld ('DPIE_VN   ',(/ 'lev' /), 'I', 'cm/s    ','DPIE_VN'   , gridname='fv_centers')
     call addfld ('DPIE_WN   ',(/ 'lev' /), 'I', 'cm/s    ','DPIE_WN'   , gridname='fv_centers')
     call addfld ('DPIE_OM   ',(/ 'lev' /), 'I', 's-1     ','DPIE_OM'   , gridname='fv_centers')
-    call addfld ('DPIE_ZHT  ',(/ 'lev' /), 'I', 'cm      ','DPIE_ZHT (geometric height)', gridname='fv_centers')
+    call addfld ('DPIE_ZHT  ',(/ 'lev' /), 'I', 'cm      ','DPIE_ZHT (geometric height,simple)', gridname='fv_centers')
     call addfld ('DPIE_ZGI  ',(/ 'lev' /), 'I', 'cm      ','DPIE_ZGI (geopotential height on interfaces)', gridname='fv_centers')
     call addfld ('DPIE_BARM ',(/ 'lev' /), 'I', '        ','DPIE_BARM' , gridname='fv_centers')
-    call addfld ('DPIE_PED  ',(/ 'lev' /), 'I', 'S/m     ','DPIE_PED'  , gridname='fv_centers')
-    call addfld ('DPIE_HALL ',(/ 'lev' /), 'I', 'S/m     ','DPIE_HALL' , gridname='fv_centers')
-    call addfld ('DPIE_UI   ',(/ 'lev' /), 'I','         ','DPIE_UI'   , gridname='fv_centers')
-    call addfld ('DPIE_VI   ',(/ 'lev' /), 'I','         ','DPIE_VI'   , gridname='fv_centers')
-    call addfld ('DPIE_WI   ',(/ 'lev' /), 'I','         ','DPIE_WI'   , gridname='fv_centers')
     call addfld ('DPIE_O2   ',(/ 'lev' /), 'I', 'mmr     ','DPIE_O2'   , gridname='fv_centers')
     call addfld ('DPIE_O    ',(/ 'lev' /), 'I', 'mmr     ','DPIE_O'    , gridname='fv_centers')
     call addfld ('DPIE_N2   ',(/ 'lev' /), 'I', 'mmr     ','DPIE_N2'   , gridname='fv_centers')
@@ -61,20 +56,24 @@ contains
     call addfld ('DPIE_O2P',(/ 'lev' /), 'I', 'm^3','DPIE_O2P(dpie input)', gridname='fv_centers')
     call addfld ('DPIE_NOP',(/ 'lev' /), 'I', 'm^3','DPIE_NOP(dpie input)', gridname='fv_centers')
     call addfld ('DPIE_N2P',(/ 'lev' /), 'I', 'm^3','DPIE_N2P(dpie input)', gridname='fv_centers')
-    call addfld ('DPIE_OP' ,(/ 'lev' /), 'I', 'm^3','DPIE_OP (dpie input)', gridname='fv_centers')
-    call addfld ('DPIE_NE' ,(/ 'lev' /), 'I', 'm^3','DPIE_NE (sum of O2+,NO+,N2+,O+)', gridname='fv_centers')
 
     call addfld ('OPLUS',   (/ 'lev' /), 'I', 'cm^3','O+ (oplus_xport output)', gridname='fv_centers')
-    call addfld ('WACCM_OP'   ,(/ 'lev' /), 'I', 'mmr'  ,'WACCM_OP (dpie output)', gridname='fv_centers')
     call addfld ('WACCM_UI'   ,(/ 'lev' /), 'I', 'm/s'  ,'WACCM_UI (dpie output)', gridname='fv_centers')
     call addfld ('WACCM_VI'   ,(/ 'lev' /), 'I', 'm/s'  ,'WACCM_VI (dpie output)', gridname='fv_centers')
     call addfld ('WACCM_WI'   ,(/ 'lev' /), 'I', 'm/s'  ,'WACCM_WI (dpie output)', gridname='fv_centers')
-    call addfld ('WACCM_NE'   ,(/ 'lev' /), 'I', 'm^3'  ,'WACCM_NE (dpie output)', gridname='fv_centers')
+ 
+    call addfld ('HMF2'       , horiz_only , 'I', 'km'  ,'Height of the F2 Layer'      , gridname='fv_centers')
+    call addfld ('NMF2'       , horiz_only , 'I', 'cm-3','Peak Density of the F2 Layer', gridname='fv_centers')
 
+    call addfld ('Z3GM'   ,(/ 'lev' /), 'I', 'm'   ,'Geometric height'                        , gridname='fv_centers')
+    call addfld ('Z3GMI  ',(/ 'lev' /), 'I', 'm' ,'Geometric height (Interfaces)', gridname='fv_centers')
+    call addfld ('OpDens' ,(/ 'lev' /), 'I', 'cm^3','O+ Number Density'                       , gridname='fv_centers')
+    call addfld ('EDens'  ,(/ 'lev' /), 'I', 'cm^3','e Number Density (sum of O2+,NO+,N2+,O+)', gridname='fv_centers')
+ 
   end subroutine d_pie_init
 
 !-----------------------------------------------------------------------
-  subroutine d_pie_coupling(omega,pe,zgi,u,v,tn,    &
+  subroutine d_pie_coupling(omega,pe,zgi,zgpmid,u,v,tn,    &
     sigma_ped,sigma_hall,te,ti,o2mmr,o1mmr,h1mmr,o2pmmr,          &
     nopmmr,n2pmmr,opmmr,opmmrtm1,ui,vi,wi,                                     &
     rmassO2,rmassO1,rmassH,rmassN2,rmassO2p, rmassNOp,rmassN2p,rmassOp, &
@@ -89,7 +88,7 @@ contains
     use edyn_geogrid, only: nlev, nilev
     use shr_const_mod,only:      &
       grav   => shr_const_g,     &   ! gravitational constant (m/s^2)
-      kboltz => shr_const_boltz      ! Boltzmann constant
+      kboltz => shr_const_boltz      ! Boltzmann constant (J/K/molecule)
     use time_manager, only: get_nstep
     use time_manager, only: get_curr_date
     use mag_parms,    only: get_mag_parms
@@ -105,7 +104,6 @@ contains
     use edyn_solve,    only: pfrac    ! NH fraction of potential (nmlonp1,nmlat0)
     use ref_pres,      only: pref_mid
     use edyn_esmf,     only: edyn_esmf_update
-
 !
 ! Args:
 !
@@ -118,6 +116,7 @@ contains
     real(r8),intent(in) :: omega  (i0:i1,j0:j1,nlev)    ! pressure velocity on midpoints (Pa/s) (i,k,j)
     real(r8),intent(in) :: pe     (i0:i1,nilev,j0:j1)   ! interface pressure (Pa)  (note i,k,j dims)
     real(r8),intent(in) :: zgi    (i0:i1,j0:j1,nlev)    ! geopotential height (on interfaces) (m)
+    real(r8),intent(in) :: zgpmid (i0:i1,j0:j1,nlev)    ! geopotential height (on midpoints) (m)
     real(r8),intent(in) :: u      (i0:i1,j0:j1,nlev)    ! U-wind (m/s)
     real(r8),intent(in) :: v      (i0:i1,j0:j1,nlev)    ! V-wind (m/s)
     real(r8),intent(in) :: tn     (i0:i1,j0:j1,nlev)    ! neutral temperature (K)
@@ -148,6 +147,7 @@ contains
 ! Local:
 !
     integer :: i,j,k
+    integer :: kx                  ! Vertical index at peak of F2 layer electron density
     integer :: nstep
     integer :: nfields             ! Number of fields for multi-field calls
     integer :: iyear,imo,iday,tod  ! tod is time-of-day in seconds
@@ -159,13 +159,14 @@ contains
 
     real(r8), parameter :: n2min = 1.e-6_r8  ! lower limit of N2 mixing ratios
     real(r8), parameter :: small = 1.e-25_r8 ! for fields not currently available
-    real(r8) :: zht  (i0:i1,j0:j1,nlev) ! geometric height (m) 
+    real(r8) :: zht  (i0:i1,j0:j1,nlev) ! geometric height (m) (Simple method - interfaces)
+    real(r8) :: zhtmid(i0:i1,j0:j1,nlev)! geometric height (m) (Simple method - midpoints)
     real(r8) :: wn   (i0:i1,j0:j1,nlev) ! vertical velocity (from omega)
     real(r8) :: mbar (i0:i1,j0:j1,nlev) ! mean molecular weight
     real(r8) :: n2mmr(i0:i1,j0:j1,nlev) ! N2 mass mixing ratio (for oplus)
     real(r8) :: pmid_inv(nlev)          ! inverted reference pressure at midpoints (Pa)
     real(r8) :: pmid(i0:i1,nlev,j0:j1)  ! pressure at midpoints (Pa) (global i,j)
-    real(r8) :: re = 6.370e6_r8            ! earth radius (m)
+    real(r8) :: re = 6.370e6_r8         ! earth radius (m)
 
     real(r8),dimension(i0:i1,j0:j1,nlev) :: & ! ion number densities (m^3)
       o2p,nop,n2p,op,ne, optm1
@@ -226,7 +227,13 @@ contains
       swden         ! Solar wind density in #/cm3
     real(r8) :: sunlons(nglblat)
     real(r8) :: ctpoten_weimer ! Cross-tail potential from Weimer model
-!
+    real(r8) :: nmf2  (i0:i1,j0:j1) ! Electron number density at F2 peak (m-3 converted to cm-3)
+    real(r8) :: hmf2  (i0:i1,j0:j1) ! Height of electron number density F2 peak (m converted to km)
+    real(r8) :: &
+      height(3),    &  ! Surrounding heights when locating electron density F2 peak
+      nde(3)           ! Surround densities when locating electron density F2 peak
+    real(r8) h12,h22,h32,deltx,atx,ax,btx,bx,ctx,cx ! Variables used for weighting when locating F2 peak
+! 
     logical :: do_integrals
 !
 ! Pointers for multiple-field calls:
@@ -261,16 +268,22 @@ contains
     do k=1,nlev
       pmid(i0:i1,k,j0:j1) = 0.5_r8*(pe(i0:i1,k,j0:j1)+pe(i0:i1,k+1,j0:j1))
     enddo
-!
-! Convert geopotential z to geometric height zht (m):
-!
-!   zht = z/grav                ! geopotential height (grav is in m/s^2)
-!   zht = zht * (1._r8+zht/re)  ! geometric height
+   
+    !---------------------------------------------------------------
+    ! Convert geopotential z to geometric height zht (m):
+    !---------------------------------------------------------------
 
-    zht(:,:,1:nlev) = zgi(:,:,1:nlev) * (1._r8+zgi(:,:,1:nlev)/re) ! geometric height (interfaces)
-!
-! Convert virtual potential temperature to temperature and compute mean molecular weight:
-!
+    zht(:,:,1:nlev) = zgi(:,:,1:nlev) * (1._r8 + zgi(:,:,1:nlev) / re) ! geometric height (interfaces)
+
+    !---------------------------------------------------------------
+    ! Need geometric height on midpoints for output
+    !---------------------------------------------------------------
+
+    zhtmid(:,:,1:nlev) = zgpmid(:,:,1:nlev) *(1._r8 + zgpmid(:,:,1:nlev) / re ) 
+    
+    !------------------------------------------------------------------------------------------
+    ! Convert virtual potential temperature to temperature and compute mean molecular weight:
+    !------------------------------------------------------------------------------------------
     do k=1,nlev
       do j=j0,j1
         do i=i0,i1
@@ -280,20 +293,26 @@ contains
         enddo
       enddo
     enddo
-!
-! Save input omega (Pa/s) and mbar.
+   
+    !-----------------------------------------------------------------------------------------------
+    ! Save analytically derived geometric height on interfaces and midpoints, omega (Pa/s) and mbar.
+    !-----------------------------------------------------------------------------------------------
     do j=j0,j1
+      call outfld('Z3GMI'    ,zht(i0:i1,j,1:nlev),i1-i0+1,j)
+      call outfld('Z3GM'     ,zhtmid(i0:i1,j,1:nlev),i1-i0+1,j)
       call outfld('DPIE_OMEGA',omega(i0:i1,j,1:nlev),i1-i0+1,j)
       call outfld('DPIE_MBAR' ,mbar (i0:i1,j,1:nlev),i1-i0+1,j)
     enddo
-!
-! Calculate vertical neutral wind velocity wn(i,j,k).
-! (omega is input Pa/s, grav is m/s^2, tn and mbar are calculated above)
-!
+
+    !---------------------------------------------------------------
+    ! Calculate vertical neutral wind velocity wn(i,j,k).
+    ! (omega is input Pa/s, grav is m/s^2, tn and mbar are calculated above)
+    !---------------------------------------------------------------
     call calc_wn(tn,omega,pmid,mbar,grav,wn,i0,i1,j0,j1,nlev) ! wn is output (m/s)
-!
-! Convert from mmr to number densities (m^3):
-!
+
+    !---------------------------------------------------------------
+    ! Convert from mmr to number densities (m^3):
+    !---------------------------------------------------------------
     do k=1,nlev
       do j=j0,j1
         do i=i0,i1
@@ -317,31 +336,70 @@ contains
       call outfld('DPIE_O2P',o2p(i0:i1,j,1:nlev),i1-i0+1,j)
       call outfld('DPIE_NOP',nop(i0:i1,j,1:nlev),i1-i0+1,j)
       call outfld('DPIE_N2P',n2p(i0:i1,j,1:nlev),i1-i0+1,j)
-      call outfld('DPIE_OP' ,op (i0:i1,j,1:nlev),i1-i0+1,j)
+      call outfld('OpDens'  ,op (i0:i1,j,1:nlev)/1.E6_r8,i1-i0+1,j)
       do k=1,nlev
         do i=i0,i1
           ne(i,j,k) = o2p(i,j,k)+nop(i,j,k)+n2p(i,j,k)+op(i,j,k)
         enddo
       enddo
-      call outfld('DPIE_NE' ,ne (i0:i1,j,1:nlev),i1-i0+1,j)
+      call outfld('EDens'   ,ne (i0:i1,j,1:nlev)/1.E6_r8,i1-i0+1,j)
     enddo ! j=j0,j1
 
+    !-------------------------------------------------------------------------------
+    !  Derive diagnostics nmF2 and hmF2 for output based on TIE-GCM algorithm
+    !------------------------------------------------------------------------------- 
+    jloop: do j=j0,j1
+      iloop: do i=i0,i1
+
+        kx = 0
+        kloop: do k=2,nlev 
+          if (ne(i,j,k) >= ne(i,j,k-1) .and. ne(i,j,k) >= ne(i,j,k+1)) then
+            kx = k
+            exit kloop
+          endif
+        enddo kloop
+
+        if (kx==0) then
+          hmf2(i,j) = fillvalue
+          nmf2(i,j) = fillvalue 
+          exit iloop
+        endif
+
+        height = (/zht(i,j,kx+1),zht(i,j,kx),zht(i,j,kx-1)/)
+        nde = (/ne(i,j,kx+1),ne(i,j,kx),ne(i,j,kx-1)/)
+
+        h12 = height(1)*height(1)
+        h22 = height(2)*height(2)
+        h32 = height(3)*height(3)
+
+        deltx=h12*height(2)+h22*height(3)+h32*height(1)-h32*height(2)-h12*height(3)-h22*height(1)
+        atx=nde(1)*height(2)+nde(2)*height(3)+nde(3)*height(1)-height(2)*nde(3)-height(3)*nde(1)-height(1)*nde(2)
+        ax=atx/deltx
+
+        btx=h12*nde(2)+h22*nde(3)+h32*nde(1)-h32*nde(2)-h12*nde(3)-h22*nde(1)
+        bx=btx/deltx
+        ctx=h12*height(2)*nde(3)+h22*height(3)*nde(1)+h32*height(1)*nde(2)-h32*height(2)*nde(1)- &
+          h12*height(3)*nde(2)-h22*height(1)*nde(3)
+        cx=ctx/deltx
+
+        hmf2(i,j)=-(bx/(2._r8*ax)) * 1.E-03_r8
+        nmf2(i,j)=-((bx*bx-4._r8*ax*cx)/(4._r8*ax)) * 1.E-06_r8
+
+      enddo iloop ! i=i0,i1
+
+      call outfld('HMF2',hmf2(i0:i1,j),i1-i0+1,j)
+      call outfld('NMF2',nmf2(i0:i1,j),i1-i0+1,j)
+
+    enddo jloop
 !
 ! Save fields to waccm history:
 ! (must be transformed from (i,j,k) to (k,i,j))
 !
     do j=j0,j1
       do i=i0,i1
-!        ped_kij (:,i,j) = sigma_ped(i,j,:)
-!        hall_kij(:,i,j) = sigma_hall(i,j,:)
-!        op_kij  (:,i,j) = op(i,j,:)
         opmmr_kij(:,i,j) = opmmr(i,j,:)
       enddo
     enddo
-!
-!   call savefld_waccm(ped_kij  ,'SIGMA_PED' ,nlev,i0,i1,j0,j1)
-!   call savefld_waccm(hall_kij ,'SIGMA_HALL',nlev,i0,i1,j0,j1)
-!   call savefld_waccm(op_kij   ,'DPIE_OP'   ,nlev,i0,i1,j0,j1) ! m^3
    call savefld_waccm(opmmr_kij,'DPIE_OPMMR',nlev,i0,i1,j0,j1) ! mmr
 !
 ! O+ loss rates:
@@ -463,11 +521,6 @@ contains
     call savefld_waccm(edyn_zht  ,'DPIE_ZHT' ,nlev,i0,i1,j0,j1)  ! geometric height (cm)
     call savefld_waccm(edyn_zgi  ,'DPIE_ZGI' ,nlev,i0,i1,j0,j1) ! geopotential height on interfaces (cm)
     call savefld_waccm(edyn_mbar ,'DPIE_BARM',nlev,i0,i1,j0,j1)  ! mean mass
-    call savefld_waccm(edyn_ped  ,'DPIE_PED' ,nlev,i0,i1,j0,j1)  ! pedersen conductivity
-    call savefld_waccm(edyn_hall ,'DPIE_HALL',nlev,i0,i1,j0,j1)  ! hall conductivity
-    call savefld_waccm(edyn_ui   ,'DPIE_UI'  ,nlev,i0,i1,j0,j1)  ! zonal ion drift (cm/s)
-    call savefld_waccm(edyn_vi   ,'DPIE_VI'  ,nlev,i0,i1,j0,j1)  ! meridional ion drift (cm/s)
-    call savefld_waccm(edyn_wi   ,'DPIE_WI'  ,nlev,i0,i1,j0,j1)  ! vertical ion drift (cm/s)
     call savefld_waccm(edyn_o2   ,'DPIE_O2'  ,nlev,i0,i1,j0,j1)  ! cm^3
     call savefld_waccm(edyn_o1   ,'DPIE_O'   ,nlev,i0,i1,j0,j1)  ! cm^3
     call savefld_waccm(edyn_n2   ,'DPIE_N2'  ,nlev,i0,i1,j0,j1)  ! cm^3
@@ -615,7 +668,7 @@ contains
       polesign = 1._r8
       polesign(4:5) = -1._r8 ! un,vn
      
-      call mp_geo_halos(ptrs,1,nlev,i0,i1,j0,j1,nfields,polesign)
+      call mp_geo_halos(ptrs,1,nlev,i0,i1,j0,j1,nfields)
       !
       ! Set latitude halo points over the poles (this does not change the poles).
       ! (the 2nd halo over the poles will not actually be used (assuming lat loops
@@ -666,22 +719,6 @@ contains
     if (ionos_oplus_xport) then
       call savefld_waccm(op_out,'OPLUS',nlev,i0,i1,j0,j1) ! cm^3
 !
-! Save electron density Ne for diagnostics (m^3):
-      do k=1,nlev
-        do j=j0,j1
-          do i=i0,i1
-            edyn_ne(k,i,j) = op_out(k,i,j)*1.e6_r8 + o2p(i,j,k) + nop(i,j,k) + n2p(i,j,k)
-          enddo
-        enddo
-      enddo
-      call savefld_waccm(edyn_ne,'WACCM_NE',nlev,i0,i1,j0,j1) ! m^3
-!
-! Update O+ at time-1 (optm1 is module data in waccm format)
-!
-!      do k=1,nlev
-!        optm1(i0:i1,j0:j1,k) = opnm_out(k,i0:i1,j0:j1)*1.e6_r8 ! cm^3 to m^3
-!      enddo
-!
 ! Pass new O+ for current and previous time step back to physics (convert from cm^3 to m^3 and back to mmr).
 !
       do k=1,nlev
@@ -695,9 +732,7 @@ contains
           enddo
         enddo
       enddo
-!
-! Save transported O+ to waccm history (mmr):
-      call savefld_waccm(op_out,'WACCM_OP',nlev,i0,i1,j0,j1) ! mmr
+
     endif ! ionos_oplus_xport
 !
 ! Convert ion drifts from cm/s to m/s for WACCM physics and history files.

@@ -11,6 +11,7 @@ module waccmx_phys_intr
   use ion_electron_temp, only: ion_electron_temp_inidat
   use ion_electron_temp, only: ion_electron_temp_timestep_init
   use ion_electron_temp, only: ion_electron_temp_tend
+  use iondrag, only: iondrag_inidat
 #endif
 
   implicit none
@@ -62,13 +63,14 @@ contains
   !------------------------------------------------------------------------------
   subroutine waccmx_phys_ion_elec_temp_inidat(ncid_ini,pbuf2d)
 
-    use pio,              only : file_desc_t
+    use pio, only : file_desc_t
 
     type(file_desc_t), intent(inout)   :: ncid_ini      ! Initial condition file id
     type(physics_buffer_desc), pointer :: pbuf2d(:,:)   ! Physics buffer
 
 #ifdef WACCMX_PHYS
     call ion_electron_temp_inidat(ncid_ini,pbuf2d)
+    call iondrag_inidat(ncid_ini,pbuf2d)
 #endif
   end subroutine waccmx_phys_ion_elec_temp_inidat
 

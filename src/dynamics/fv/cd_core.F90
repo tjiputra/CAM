@@ -229,7 +229,7 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
    integer :: npes_yz
 
    integer i, j, k, ml
-   integer js1g1, js2g0, js2g1, jn2g1  ,js4g0,jn3g0 !+tht 04.07.2017
+   integer js1g1, js2g0, js2g1, jn2g1  ,js4g0,jn3g0
    integer jn2g0, jn1g1
    integer iord , jord
 
@@ -454,10 +454,8 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
       jn2g0  = min(jm-1,jlast)
       jn1g1  = min(jm,jlast+1)
       jn2g1 = min(jm-1,jlast+1)
-!+tht 04.07.2017
       js4g0  = max(4,jfirst)
       jn3g0  = min(jm-2,jlast)
-!-tht 04.07.2017
 
       if ( abs(grid%dt0-dt) > D0_1 ) then
 
@@ -1348,8 +1346,7 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
 
 !$omp parallel do private(i, j, k) 
             do k = kfirst, klast
-              !do j = js2g0, jlast
-               do j = js4g0, jn3g0 !tht 04.07.2017
+               do j = js4g0, jn3g0
                   do i = 1, im !+++++++++++++++++++++++++++++++++++++++++++++
                      uc(i,j,k) = uc(i,j,k) + ddus(j,k) !  APPLY AM CORRECTION
                   enddo        !+++++++++++++++++++++++++++++++++++++++++++++

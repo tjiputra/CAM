@@ -5303,7 +5303,7 @@ Default: false
 <entry id="prescribed_strataero_3modes" type="logical" category="cam_chem"
        group="camexp" valid_values="" >
 If true the prescribed stratospheric aerosols have three distribution modes.
-Default: false
+Default: true for CAM6, otherwise false
 </entry>
 
 <entry id="prescribed_strataero_use_chemtrop" type="logical" category="aerosol"
@@ -6402,7 +6402,12 @@ Default: "."
 
 
 <!-- ========================================================================================  -->
-<!-- CPL7 Driver -->
+<!-- CIME Driver -->
+
+<entry id="ninst_driver" type="integer"  category="driver"
+       group="cime_driver_inst" valid_values="1" >
+Default: 1
+</entry>
 
 <!-- coupler fields -->
 

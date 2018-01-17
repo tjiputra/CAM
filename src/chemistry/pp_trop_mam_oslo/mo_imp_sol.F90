@@ -1,21 +1,11 @@
-
-
-
-
-
-
-
 module mo_imp_sol
-
   use shr_kind_mod, only : r8 => shr_kind_r8
   use chem_mods, only : clscnt4, gas_pcnst, clsmap
   use cam_logfile, only : iulog
-
   implicit none
   private
   public :: imp_slv_inti, imp_sol
   save
-
   real(r8), parameter :: rel_err = 1.e-3_r8
   real(r8), parameter :: high_rel_err = 1.e-4_r8
   !-----------------------------------------------------------------------
@@ -23,32 +13,23 @@ module mo_imp_sol
   !-----------------------------------------------------------------------
   integer, parameter :: itermax = 11
   integer, parameter :: cut_limit = 5
-
-
   real(r8), parameter :: small = 1.e-40_r8
-
   real(r8) :: epsilon(clscnt4)
   logical :: factor(itermax)
-
 contains
-
   subroutine imp_slv_inti
     !-----------------------------------------------------------------------
     ! ... Initialize the implict solver
     !-----------------------------------------------------------------------
     use mo_chem_utls, only : get_spc_ndx
-
     implicit none
-
     !-----------------------------------------------------------------------
     ! ... Local variables
     !-----------------------------------------------------------------------
     integer :: m, ox_ndx, o3a_ndx
     real(r8) :: eps(gas_pcnst)
-
     factor(:) = .true.
     eps(:) = rel_err
-
     ox_ndx = get_spc_ndx( 'OX' )
     if( ox_ndx < 1 ) then
        ox_ndx = get_spc_ndx( 'O3' )
@@ -123,9 +104,7 @@ contains
     do m = 1,clscnt4
        epsilon(m) = eps(clsmap(m,4))
     end do
-
   end subroutine imp_slv_inti
-
   subroutine imp_sol( base_sol, reaction_rates, het_rates, extfrc, delt, &
                       ncol,nlev, lchnk, prod_out, loss_out )
     !-----------------------------------------------------------------------
@@ -134,7 +113,6 @@ contains
     ! this source is meant for small l1 cache machines such as
     ! the intel pentium and itanium cpus
     !-----------------------------------------------------------------------
-
     use chem_mods, only : rxntot, extcnt, nzcnt, permute, cls_rxt_cnt
     use mo_tracname, only : solsym
     use mo_lin_matrix, only : linmat
@@ -145,9 +123,7 @@ contains
     use mo_indprd, only : indprd
     use time_manager, only : get_nstep
     use perf_mod, only : t_startf, t_stopf
-
     implicit none
-
     !-----------------------------------------------------------------------
     ! ... dummy args
     !-----------------------------------------------------------------------
@@ -155,15 +131,12 @@ contains
     integer, intent(in) :: nlev
     integer, intent(in) :: lchnk ! chunk id
     real(r8), intent(in) :: delt ! time step (s)
-
     real(r8), intent(in) :: reaction_rates(ncol,nlev,max(1,rxntot)) ! rxt rates (1/cm^3/s)
     real(r8), intent(in) :: extfrc(ncol,nlev,max(1,extcnt)) ! external in-situ forcing (1/cm^3/s)
     real(r8), intent(in) :: het_rates(ncol,nlev,max(1,gas_pcnst)) ! washout rates (1/s)
     real(r8), intent(inout) :: base_sol(ncol,nlev,gas_pcnst) ! species mixing ratios (vmr)
-
     real(r8), intent(out) :: prod_out(ncol,nlev,max(1,clscnt4))
     real(r8), intent(out) :: loss_out(ncol,nlev,max(1,clscnt4))
-
     !-----------------------------------------------------------------------
     ! ... local variables
     !-----------------------------------------------------------------------
@@ -193,7 +166,6 @@ contains
     logical :: convergence
     logical :: frc_mask, iter_conv
     logical :: converged(max(1,clscnt4))
-
     solution(:) = 0._r8
     !-----------------------------------------------------------------------
     ! ... class independent forcing
@@ -208,7 +180,6 @@ contains
     end if
     level_loop : do lev = 1,nlev
        column_loop : do i = 1,ncol
-
           !-----------------------------------------------------------------------
           ! ... transfer from base to local work arrays
           !-----------------------------------------------------------------------
@@ -411,12 +382,10 @@ contains
              j = clsmap(k,4)
              m = permute(k,4)
              base_sol(i,lev,j) = solution(m)
-
              ! output diagnostics
              prod_out(i,lev,k) = prod(k) + ind_prd(i,lev,k)
              loss_out(i,lev,k) = loss(k)
           end do cls_loop
-
        end do column_loop
     end do level_loop
   end subroutine imp_sol

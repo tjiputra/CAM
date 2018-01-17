@@ -393,7 +393,7 @@ endif
 
 ifeq ($(FC_TYPE),intel)
 
-  CPPDEF        += -DCPRINTEL $(CONTIGUOUS_FLAG)
+  CPPDEF        += -DCPRINTEL $(NO_CONTIGUOUS_FLAG)
   CFLAGS        += -std=gnu99
   FC_FLAGS      := -ftz -convert big_endian -fp-model source \
                    -qno-opt-dynamic-align -assume realloc_lhs -xHost

@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 
-<config_pes>
+<config_pes version="2.0">
 
   <grid name="any">
     <mach name="any">
@@ -227,8 +227,8 @@
   <grid name="a%ne16" >
     <mach name="yellowstone|pronghorn">
       <pes pesize="any" compset="any">
-        <PES_PER_NODE>16</PES_PER_NODE>
-        <MAX_TASKS_PER_NODE>16</MAX_TASKS_PER_NODE>
+        <MAX_MPITASKS_PER_NODE>16</MAX_MPITASKS_PER_NODE>
+        <MAX_TASKS_PER_NODE>32</MAX_TASKS_PER_NODE>
 	<comment>none</comment>
 	<ntasks>
 	  <ntasks_atm>630</ntasks_atm> 
@@ -266,8 +266,8 @@
   <grid name="a%ne30" >
     <mach name="yellowstone|pronghorn">
       <pes pesize="any" compset="any">
-        <PES_PER_NODE>16</PES_PER_NODE>
-        <MAX_TASKS_PER_NODE>16</MAX_TASKS_PER_NODE>
+        <MAX_MPITASKS_PER_NODE>16</MAX_MPITASKS_PER_NODE>
+        <MAX_TASKS_PER_NODE>32</MAX_TASKS_PER_NODE>
 	<comment>none</comment>
 	<ntasks>
 	  <ntasks_atm>900</ntasks_atm> 
@@ -523,8 +523,8 @@
   <grid name="a%ne120">
     <mach name="yellowstone|pronghorn">
       <pes pesize="any" compset="any">
-        <PES_PER_NODE>16</PES_PER_NODE>
-        <MAX_TASKS_PER_NODE>16</MAX_TASKS_PER_NODE>
+        <MAX_MPITASKS_PER_NODE>16</MAX_MPITASKS_PER_NODE>
+        <MAX_TASKS_PER_NODE>32</MAX_TASKS_PER_NODE>
 	<comment>none</comment>
 	<ntasks>
 	  <ntasks_atm>7680</ntasks_atm> 
@@ -599,8 +599,8 @@
   <grid name="a%T31">
     <mach name="yellowstone|pronghorn">
       <pes pesize="any" compset="any">
-        <PES_PER_NODE>16</PES_PER_NODE>
-        <MAX_TASKS_PER_NODE>16</MAX_TASKS_PER_NODE>
+        <MAX_MPITASKS_PER_NODE>32</MAX_MPITASKS_PER_NODE>
+        <MAX_TASKS_PER_NODE>32</MAX_TASKS_PER_NODE>
 	<comment>none</comment>
 	<ntasks>
 	  <ntasks_atm>-1</ntasks_atm> 
@@ -784,18 +784,18 @@
     </mach>
   </grid>
   <grid name="a%1.9x2.5">
-    <mach name="pleiades-wes">
+    <mach name="pleiades-bro">
       <pes pesize="any" compset="any">
 	<comment>none</comment>
 	<ntasks>
-	  <ntasks_atm>96</ntasks_atm> 
-	  <ntasks_lnd>96</ntasks_lnd>           
-	  <ntasks_rof>96</ntasks_rof> 
-	  <ntasks_ice>96</ntasks_ice> 
-	  <ntasks_ocn>96</ntasks_ocn> 
-	  <ntasks_glc>96</ntasks_glc> 
-	  <ntasks_wav>96</ntasks_wav> 
-	  <ntasks_cpl>96</ntasks_cpl> 
+	  <ntasks_atm>224</ntasks_atm> 
+	  <ntasks_lnd>224</ntasks_lnd>           
+	  <ntasks_rof>224</ntasks_rof> 
+	  <ntasks_ice>224</ntasks_ice> 
+	  <ntasks_ocn>224</ntasks_ocn> 
+	  <ntasks_glc>224</ntasks_glc> 
+	  <ntasks_wav>224</ntasks_wav> 
+	  <ntasks_cpl>224</ntasks_cpl> 
 	</ntasks>
 	<nthrds>
 	  <nthrds_atm>1</nthrds_atm> 
@@ -862,14 +862,14 @@
       <pes pesize="any" compset="any">
 	<comment>none</comment>
 	<ntasks>
-	  <ntasks_atm>128</ntasks_atm> 
-	  <ntasks_lnd>128</ntasks_lnd>           
-	  <ntasks_rof>128</ntasks_rof> 
-	  <ntasks_ice>128</ntasks_ice> 
-	  <ntasks_ocn>128</ntasks_ocn> 
-	  <ntasks_glc>128</ntasks_glc> 
-	  <ntasks_wav>128</ntasks_wav> 
-	  <ntasks_cpl>128</ntasks_cpl> 
+	  <ntasks_atm>192</ntasks_atm> 
+	  <ntasks_lnd>192</ntasks_lnd>           
+	  <ntasks_rof>192</ntasks_rof> 
+	  <ntasks_ice>192</ntasks_ice> 
+	  <ntasks_ocn>192</ntasks_ocn> 
+	  <ntasks_glc>192</ntasks_glc> 
+	  <ntasks_wav>192</ntasks_wav> 
+	  <ntasks_cpl>192</ntasks_cpl> 
 	</ntasks>
 	<nthrds>
 	  <nthrds_atm>1</nthrds_atm> 
@@ -899,14 +899,14 @@
       <pes pesize="any" compset="any">
 	<comment>none</comment>
 	<ntasks>
-	  <ntasks_atm>180</ntasks_atm> 
-	  <ntasks_lnd>180</ntasks_lnd>           
-	  <ntasks_rof>180</ntasks_rof> 
-	  <ntasks_ice>180</ntasks_ice> 
-	  <ntasks_ocn>180</ntasks_ocn> 
-	  <ntasks_glc>180</ntasks_glc> 
-	  <ntasks_wav>180</ntasks_wav> 
-	  <ntasks_cpl>180</ntasks_cpl> 
+	  <ntasks_atm>240</ntasks_atm> 
+	  <ntasks_lnd>240</ntasks_lnd>           
+	  <ntasks_rof>240</ntasks_rof> 
+	  <ntasks_ice>240</ntasks_ice> 
+	  <ntasks_ocn>240</ntasks_ocn> 
+	  <ntasks_glc>240</ntasks_glc> 
+	  <ntasks_wav>240</ntasks_wav> 
+	  <ntasks_cpl>240</ntasks_cpl> 
 	</ntasks>
 	<nthrds>
 	  <nthrds_atm>1</nthrds_atm> 
@@ -934,7 +934,7 @@
   <grid name="a%0.9x1.25">
     <mach name="cheyenne">
       <pes pesize="any" compset="any">
-        <PES_PER_NODE>36</PES_PER_NODE>
+        <MAX_MPITASKS_PER_NODE>36</MAX_MPITASKS_PER_NODE>
         <MAX_TASKS_PER_NODE>36</MAX_TASKS_PER_NODE>
         <comment>none</comment>
         <ntasks>
@@ -973,18 +973,18 @@
   <grid name="a%1.9x2.5">
     <mach name="cheyenne">
       <pes pesize="any" compset="_CAM40%WX">
-        <PES_PER_NODE>36</PES_PER_NODE>
+        <MAX_MPITASKS_PER_NODE>12</MAX_MPITASKS_PER_NODE>
         <MAX_TASKS_PER_NODE>36</MAX_TASKS_PER_NODE>
 	<comment>none</comment>
 	<ntasks>
-	  <ntasks_atm>72</ntasks_atm>
-	  <ntasks_lnd>72</ntasks_lnd>
-	  <ntasks_rof>72</ntasks_rof>
-	  <ntasks_ice>72</ntasks_ice>
-	  <ntasks_ocn>72</ntasks_ocn>
-	  <ntasks_glc>72</ntasks_glc>
-	  <ntasks_wav>72</ntasks_wav>
-	  <ntasks_cpl>72</ntasks_cpl>
+	  <ntasks_atm>144</ntasks_atm>
+	  <ntasks_lnd>144</ntasks_lnd>
+	  <ntasks_rof>144</ntasks_rof>
+	  <ntasks_ice>144</ntasks_ice>
+	  <ntasks_ocn>144</ntasks_ocn>
+	  <ntasks_glc>144</ntasks_glc>
+	  <ntasks_wav>144</ntasks_wav>
+	  <ntasks_cpl>144</ntasks_cpl>
 	</ntasks>
 	<nthrds>
 	  <nthrds_atm>3</nthrds_atm>
@@ -1013,8 +1013,8 @@
   <grid name="a%1.9x2.5">
     <mach name="yellowstone|pronghorn">
       <pes pesize="any" compset="any">
-        <PES_PER_NODE>16</PES_PER_NODE>
-        <MAX_TASKS_PER_NODE>16</MAX_TASKS_PER_NODE>
+        <MAX_MPITASKS_PER_NODE>16</MAX_MPITASKS_PER_NODE>
+        <MAX_TASKS_PER_NODE>32</MAX_TASKS_PER_NODE>
 	<comment>none</comment>
 	<ntasks>
 	  <ntasks_atm>192</ntasks_atm> 
@@ -1048,7 +1048,7 @@
 	</rootpe>
       </pes>
       <pes pesize="any" compset="_CAM\d+%WC(S|T|C|M)">
-        <PES_PER_NODE>16</PES_PER_NODE>
+        <MAX_MPITASKS_PER_NODE>16</MAX_MPITASKS_PER_NODE>
         <MAX_TASKS_PER_NODE>32</MAX_TASKS_PER_NODE>
 	<comment>none</comment>
 	<ntasks>
@@ -1083,7 +1083,7 @@
 	</rootpe>
       </pes>
       <pes pesize="any" compset="_CAM40%WX">
-        <PES_PER_NODE>16</PES_PER_NODE>
+        <MAX_MPITASKS_PER_NODE>16</MAX_MPITASKS_PER_NODE>
         <MAX_TASKS_PER_NODE>32</MAX_TASKS_PER_NODE>
 	<comment>none</comment>
 	<ntasks>
@@ -1268,20 +1268,18 @@
     </mach>
   </grid>
   <grid name="a%0.9x1.25">
-    <mach name="yellowstone|pronghorn">
+    <mach name="yellowstone">
       <pes pesize="any" compset="any">
-        <PES_PER_NODE>16</PES_PER_NODE>
-        <MAX_TASKS_PER_NODE>16</MAX_TASKS_PER_NODE>
 	<comment>none</comment>
 	<ntasks>
-	  <ntasks_atm>720</ntasks_atm> 
-	  <ntasks_lnd>720</ntasks_lnd>           
-	  <ntasks_rof>720</ntasks_rof> 
-	  <ntasks_ice>720</ntasks_ice> 
-	  <ntasks_ocn>720</ntasks_ocn> 
-	  <ntasks_glc>720</ntasks_glc> 
-	  <ntasks_wav>720</ntasks_wav> 
-	  <ntasks_cpl>720</ntasks_cpl> 
+	  <ntasks_atm>-64</ntasks_atm> 
+	  <ntasks_lnd>-64</ntasks_lnd>           
+	  <ntasks_rof>-64</ntasks_rof> 
+	  <ntasks_ice>-64</ntasks_ice> 
+	  <ntasks_ocn>-64</ntasks_ocn> 
+	  <ntasks_glc>-64</ntasks_glc> 
+	  <ntasks_wav>-64</ntasks_wav> 
+	  <ntasks_cpl>-64</ntasks_cpl> 
 	</ntasks>
 	<nthrds>
 	  <nthrds_atm>2</nthrds_atm> 
@@ -1310,8 +1308,8 @@
     <mach name="yellowstone">
       <pes pesize="any" compset="_(CAM50|CAM60)%WC(C|S)">
 	<comment>none</comment>
-        <PES_PER_NODE>16</PES_PER_NODE>
-        <MAX_TASKS_PER_NODE>16</MAX_TASKS_PER_NODE>
+        <MAX_MPITASKS_PER_NODE>8</MAX_MPITASKS_PER_NODE>
+        <MAX_TASKS_PER_NODE>32</MAX_TASKS_PER_NODE>
 	<ntasks>
 	  <ntasks_atm>256</ntasks_atm> 
 	  <ntasks_lnd>256</ntasks_lnd>           
@@ -1345,8 +1343,8 @@
       </pes>
       <pes pesize="any" compset="_(CAM50|CAM60)%(CCTS|WCTS)">
 	<comment>none</comment>
-        <PES_PER_NODE>16</PES_PER_NODE>
-        <MAX_TASKS_PER_NODE>16</MAX_TASKS_PER_NODE>
+        <MAX_MPITASKS_PER_NODE>8</MAX_MPITASKS_PER_NODE>
+        <MAX_TASKS_PER_NODE>32</MAX_TASKS_PER_NODE>
 	<ntasks>
 	  <ntasks_atm>512</ntasks_atm> 
 	  <ntasks_lnd>512</ntasks_lnd>           
@@ -1382,7 +1380,7 @@
     <mach name="cheyenne">
       <pes pesize="any" compset="_(CAM50|CAM60)%(CC|WC)">
 	<comment>none</comment>
-        <PES_PER_NODE>36</PES_PER_NODE>
+        <MAX_MPITASKS_PER_NODE>9</MAX_MPITASKS_PER_NODE>
         <MAX_TASKS_PER_NODE>36</MAX_TASKS_PER_NODE>
 	<ntasks>
 	  <ntasks_atm>288</ntasks_atm> 

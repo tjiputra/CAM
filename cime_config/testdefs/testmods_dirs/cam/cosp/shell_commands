@@ -3,3 +3,4 @@ if [[ $CAM_CONFIG_OPTS != *"-cosp"* ]]; then
   ./xmlchange -append CAM_CONFIG_OPTS="-cosp"
 fi
 ./xmlchange ROF_NCPL=\$ATM_NCPL
+./xmlchange GLC_NCPL=\$ATM_NCPL
