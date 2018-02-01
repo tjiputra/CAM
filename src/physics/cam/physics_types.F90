@@ -1159,7 +1159,7 @@ end subroutine physics_ptend_copy
          if (present(eflx) .and. present(ent_tnd).and. present(ohf_adjust) &
              .and. present(ocnfrac) .and. present(sst) .and. present(ts)) then
            call physics_dme_adjust_THT(state, tend, qini, dt, eflx, ent_tnd, ohf_adjust, ocnfrac, sst, ts)
-        else if (present(eflx)) then 
+        else if (present(eflx)) then
            call physics_dme_adjust_THT(state, tend, qini, dt, eflx) 
         else
            call physics_dme_adjust_THT(state, tend, qini, dt) 
@@ -1400,6 +1400,7 @@ end subroutine physics_ptend_copy
 !+tht 17.11.2015 option to use virtual temperature for T update
     logical, parameter :: l_virtual = .true.     ! convert T to T_v, run adjustment loop, then convert back
     real(r8) :: tp(pcols,pver)                   ! work array for T/Tv
+    real(r8) :: enth(pcols,pver)                 ! work array for total enthalpy
     real(r8) :: rr(pcols)                        ! dry/moist R
 
     real(r8), parameter :: Tcond = 291.16_r8   ! 18C= preindustrial global average SST
@@ -1455,7 +1456,8 @@ end subroutine physics_ptend_copy
     state%ps(:ncol) = state%pint(:ncol,1)
     do k = 1, pver
    ! specific enthalpy before adjustment
-       state%s(:ncol,k)=      tp(:ncol,k)*cpairv(:ncol,k,lchnk)  &
+!      state%s(:ncol,k)=      tp(:ncol,k)*cpairv(:ncol,k,lchnk)  &
+       enth   (:ncol,k)=      tp(:ncol,k)*cpairv(:ncol,k,lchnk)  &
                         +0.5_r8*(state%u(:ncol,k)**2 + state%v(:ncol,k)**2) 
    ! Dp'/Dp
        mdq    (:ncol,k)= state%q(:ncol,k,1) - qini(:ncol,k) ! only water-vapor mass change considered 
@@ -1527,7 +1529,8 @@ end subroutine physics_ptend_copy
 
      ! adjust specific enthalpy
        if (hybrid_coord .and. k.gt.1) then    ! remapping flux from previous interface, /Dp"
-         te (:ncol) =  .5_r8*(state%s(:ncol,k)+state%s(:ncol,k-1))*edot(:ncol)/pdel_new(:ncol) 
+!        te (:ncol) =  .5_r8*(state%s(:ncol,k)+state%s(:ncol,k-1))*edot(:ncol)/pdel_new(:ncol) 
+         te (:ncol) =  .5_r8*(enth   (:ncol,k)+enth   (:ncol,k-1))*edot(:ncol)/pdel_new(:ncol)
        else
          te (:ncol) = 0._r8
        endif 
@@ -1535,7 +1538,8 @@ end subroutine physics_ptend_copy
      ! lagrangian pressure change at mid-level
        pdot(:ncol) = pdot(:ncol) + .5_r8*state%pdel(:ncol,k)*mdq(:ncol,k)
      ! enthalpy change by hydrost. pressure work in full adjustment
-       te  (:ncol) = te(:ncol) + state%s(:ncol,k)/(fdq(:ncol)/(1._r8+mdq(:ncol,k)))           & ! te *(Dp'/Dp")
+!      te  (:ncol) = te(:ncol) + state%s(:ncol,k)/(fdq(:ncol)/(1._r8+mdq(:ncol,k)))           & ! te *(Dp'/Dp")
+       te  (:ncol) = te(:ncol) + enth   (:ncol,k)/(fdq(:ncol)/(1._r8+mdq(:ncol,k)))           & ! te *(Dp'/Dp")
                     + rairv(:ncol,k,lchnk)*rr(:ncol)*state%t(:ncol,k)/state%pmid(:ncol,k)     & ! alpha (use Tv)
                      *pdot(:ncol)/fdq(:ncol)                                                  & ! *dp*(Dp/Dp")
                     -(.5_r8*(state%zi(:ncol,k+1)+state%zi(:ncol,k))-state%zm(:ncol,k))*gravit & ! probably =0.
@@ -1581,7 +1585,8 @@ end subroutine physics_ptend_copy
          htx (:ncol) = htx(:ncol) + &
                        pdel_new(:ncol)/(state%ps(:ncol)-state%pint(:ncol,k)) &
                       * mdq(:ncol,k)/fdq(:ncol) & 
-                      *(condeps(:ncol)-(state%s(:ncol,k)+gravit*state%zm(:ncol,k))) 
+!                     *(condeps(:ncol)-(state%s(:ncol,k)+gravit*state%zm(:ncol,k)))
+                      *(condeps(:ncol)-(enth   (:ncol,k)+gravit*state%zm(:ncol,k))) 
         ! local heating would be just:
         !htx (:ncol) =  mdq(:ncol,k)/fdq(:ncol) & 
         !             *(condeps(:ncol)-(state%s(:ncol,k)+gravit*state%zm(:ncol,k))) 
@@ -1591,7 +1596,8 @@ end subroutine physics_ptend_copy
 
        if (hybrid_coord .and. k.lt.pver) then ! remapping flux from next interface, /Dp"
         edot(:ncol) = pdot(:ncol) - hybi(k+1)*(state%ps(:ncol)-ps_old(:ncol))
-        te  (:ncol) = te(:ncol) - .5_r8*(state%s(:ncol,k)+state%s(:ncol,k+1))*edot(:ncol)/pdel_new(:ncol)
+!       te  (:ncol) = te(:ncol) - .5_r8*(state%s(:ncol,k)+state%s(:ncol,k+1))*edot(:ncol)/pdel_new(:ncol)
+        te  (:ncol) = te(:ncol) - .5_r8*(enth   (:ncol,k)+enth   (:ncol,k+1))*edot(:ncol)/pdel_new(:ncol)
        endif
 
        if (hybrid_coord .and. k.lt.pver) then ! remapping flux from next interface, /Dp"
@@ -1645,7 +1651,9 @@ end subroutine physics_ptend_copy
 
   ! update T 
     do k = 1, pver
-      state%t(:ncol,k) = tp(:ncol,k) /((1._r8+rcp*state%q(:ncol,k,1))/(1._r8+state%q(:ncol,k,1))) 
+      enth     (:ncol,k) = state%t(:ncol,k) ! use enth as work array
+      state%t  (:ncol,k) = tp(:ncol,k) /((1._r8+rcp*state%q(:ncol,k,1))/(1._r8+state%q(:ncol,k,1))) 
+      tend%dtdt(:ncol,k) = tend%dtdt(:ncol,k) + (state%t(:ncol,k) - enth(:ncol,k))/dt
     enddo
 
   ! diagnose total internal enthalpy change: will *not* match EFLX if RCP.ne.1
@@ -1665,8 +1673,8 @@ end subroutine physics_ptend_copy
 
   ! update original dry static energy
     do k = 1, pver
-      state%s(:ncol,k) = state%t(:ncol,k  )*cpairv(:ncol,k,lchnk) &
-                        + gravit*state%zm(:ncol,k) + state%phis(:ncol)
+      state%s  (:ncol,k) = state%t(:ncol,k  )*cpairv(:ncol,k,lchnk) &
+                          + gravit*state%zm(:ncol,k) + state%phis(:ncol)
     enddo
 
   ! update dry pressure (OK after set_dry_to_wet was called in tphysac).
