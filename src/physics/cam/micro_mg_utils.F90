@@ -392,7 +392,10 @@ elemental subroutine size_dist_param_liq_line(props, qcic, ncic, rho, pgam, lamc
      props_loc = props
 
      ! Get pgam from fit to observations of martin et al. 1994
-     pgam = 0.0005714_r8*1.e-6_r8*ncic*rho + 0.2714_r8
+!++ag
+!     pgam = 0.0005714_r8*1.e-6_r8*ncic*rho + 0.2714_r8
+     pgam = 1.0_r8 - 0.7_r8 * exp(-0.008_r8*1.e-6_r8*ncic*rho)
+!--ag
      pgam = 1._r8/(pgam**2) - 1._r8
      pgam = max(pgam, 2._r8)
 
@@ -442,7 +445,11 @@ subroutine size_dist_param_liq_vect(props, qcic, ncic, rho, pgam, lamc, mgncol)
         ! arguments.)
         props_loc = props
         ! Get pgam from fit to observations of martin et al. 1994
-        pgam(i) = 0.0005714_r8*1.e-6_r8*ncic(i)*rho(i) + 0.2714_r8
+!++ag
+        pgam(i) = 1.0_r8 - 0.7_r8 * exp(-0.008_r8*1.e-6_r8*ncic(i)*rho(i))
+
+!        pgam(i) = 0.0005714_r8*1.e-6_r8*ncic(i)*rho(i) + 0.2714_r8
+!--ag
         pgam(i) = 1._r8/(pgam(i)**2) - 1._r8
         pgam(i) = max(pgam(i), 2._r8)
      endif
@@ -723,7 +730,7 @@ subroutine kk2000_liq_autoconversion(microp_uniform, qcic, &
         ! switch for sub-columns, don't include sub-grid qc
 
         prc(i) = prc_coef(i) * &
-             1350._r8 * qcic(i)**2.47_r8 * (ncic(i)*1.e-6_r8*rho(i))**(-1.79_r8)
+             0.01_r8 * 1350._r8 * qcic(i)**2.47_r8 * (ncic(i)*1.e-6_r8*rho(i))**(-1.1_r8)
         nprc(i) = prc(i) * (1._r8/droplet_mass_25um)
         nprc1(i) = prc(i)*ncic(i)/qcic(i)
 
