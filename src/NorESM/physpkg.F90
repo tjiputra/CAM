@@ -2163,7 +2163,8 @@ contains
                 !      input for microphysics              
                 call physics_update(state, ptend, ztodt, tend)
                 call check_energy_chng(state, tend, "clubb_tend", nstep, ztodt, &
-                     cam_in%lhf(:ncol)/latvap/cld_macmic_num_steps, &
+!                    cam_in%lhf(:ncol)/latvap/cld_macmic_num_steps, & ! beta07
+                     cam_in%cflx(:ncol,1)/cld_macmic_num_steps, &     ! beta08
                      flx_cnd(:ncol)/cld_macmic_num_steps, &
                      det_ice(:ncol)/cld_macmic_num_steps, &
                      flx_heat(:ncol)/cld_macmic_num_steps)
