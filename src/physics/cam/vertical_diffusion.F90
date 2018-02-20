@@ -216,10 +216,13 @@ subroutine vd_register()
   call pbuf_add_field('kvt', 'physpkg', dtype_r8, (/pcols,pverp/), kvt_idx)
 
 
+  if (eddy_scheme /= 'CLUBB_SGS') then
+     call pbuf_add_field('kvh',      'global', dtype_r8, (/pcols, pverp/), kvh_idx)
+  end if
+
+  call pbuf_add_field('kvm',      'global', dtype_r8, (/pcols, pverp/), kvm_idx )
   call pbuf_add_field('pblh',     'global', dtype_r8, (/pcols/),        pblh_idx)
   call pbuf_add_field('tke',      'global', dtype_r8, (/pcols, pverp/), tke_idx)
-  call pbuf_add_field('kvh',      'global', dtype_r8, (/pcols, pverp/), kvh_idx)
-  call pbuf_add_field('kvm',      'global', dtype_r8, (/pcols, pverp/), kvm_idx )
   call pbuf_add_field('turbtype', 'global', dtype_i4, (/pcols, pverp/), turbtype_idx)
   call pbuf_add_field('smaw',     'global', dtype_r8, (/pcols, pverp/), smaw_idx)
 
@@ -594,6 +597,10 @@ subroutine vertical_diffusion_init(pbuf2d)
   dragblj_idx = pbuf_get_index('dragblj')
   taubljx_idx = pbuf_get_index('taubljx')
   taubljy_idx = pbuf_get_index('taubljy')
+
+  if (eddy_scheme == 'CLUBB_SGS') then
+     kvh_idx = pbuf_get_index('kvh')
+  end if
 
   ! Initialization of some pbuf fields
   if (is_first_step()) then
@@ -993,8 +1000,10 @@ subroutine vertical_diffusion_tend( &
 
      call calc_ustar( ncol, state%t(:ncol,pver), state%pmid(:ncol,pver), &
           cam_in%wsx(:ncol), cam_in%wsy(:ncol), rrho(:ncol), ustar(:ncol))
-!    call calc_obklen( ncol, th(:ncol,pver), thvs(:ncol), cam_in%lhf(:ncol)/latvap, & ! beta07
-     call calc_obklen( ncol, th(:ncol,pver), thvs(:ncol), cam_in%cflx(:ncol,1), &     ! beta08
+!++ag Use actual qflux, not lhf/latvap
+!     call calc_obklen( ncol, th(:ncol,pver), thvs(:ncol), cam_in%lhf(:ncol)/latvap, &  ! beta07
+     call calc_obklen( ncol, th(:ncol,pver), thvs(:ncol), cam_in%cflx(:ncol,1), &       ! beta08
+!--ag
           cam_in%shf(:ncol), rrho(:ncol), ustar(:ncol),  &
           khfs(:ncol), kqfs(:ncol), kbfs(:ncol), obklen(:ncol))
 
