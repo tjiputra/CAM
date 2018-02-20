@@ -651,6 +651,13 @@ end subroutine macrop_driver_readnl
 
   call pbuf_get_field(pbuf, cmfmc_sh_idx, cmfmc_sh)
 
+  ! check that qcwat and tcwat were initialized; if not then do it now.
+  if (qcwat(1,1) == huge(1._r8)) then
+     qcwat(:ncol,:) = state%q(:ncol,:,1)
+  end if
+  if (tcwat(1,1) == huge(1._r8)) then
+     tcwat(:ncol,:) = state%t(:ncol,:)
+  end if
 
   ! Initialize convective detrainment tendency
 
