@@ -62,7 +62,7 @@ subroutine pmxsub(lchnk, ncol, pint, pmid, coszrs, state, t, qm1, Nnatk, &
    real(r8), intent(in) :: volc_g_sun(pcols,pver,nbands) ! volcanic aerosol g for solar bands, CMIP6
    real(r8), intent(in) :: volc_ext_earth(pcols,pver,nlwbands) ! volcanic aerosol extinction for terrestrial bands, CMIP6
    real(r8), intent(in) :: volc_omega_earth(pcols,pver,nlwbands) ! volcanic aerosol SSA for terrestrial bands, CMIP6
-   real(r8) batotsw13(pcols,pver), batotlw01(pcols,pver)  ! for testing bare
+!  real(r8) batotsw13(pcols,pver), batotlw01(pcols,pver)  ! for testing bare
 !
 ! Input-output arguments
 
