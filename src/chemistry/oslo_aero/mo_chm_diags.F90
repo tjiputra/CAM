@@ -397,7 +397,11 @@ contains
           unit_basename = 'kg'
        endif
 
+#ifndef OSLO_AERO
        if ( any( aer_species == m ) ) then
+#else
+       if ( any( aer_species == m ) .or. isAerosol(n) ) then
+#endif
           call addfld( spc_name,   (/ 'lev' /), 'A', unit_basename//'/kg ', trim(attr)//' concentration')
           call addfld( trim(spc_name)//'_SRF', horiz_only, 'A', unit_basename//'/kg', trim(attr)//" in bottom layer")
        else
@@ -510,7 +514,7 @@ contains
   end subroutine chm_diags_inti
 
   subroutine chm_diags( lchnk, ncol, vmr, mmr, rxt_rates, invariants, depvel, depflx, mmr_tend, pdel, pmid, ltrop, &
-                        wetdepflx, nhx_nitrogen_flx, noy_nitrogen_flx )
+                        wetdepflx, nhx_nitrogen_flx, noy_nitrogen_flx, pbuf)
     !--------------------------------------------------------------------
     !	... utility routine to output chemistry diagnostic variables
     !--------------------------------------------------------------------
@@ -710,8 +714,7 @@ contains
          cloudTracerIndex = getCloudTracerIndexDirect(n)
          if(cloudTracerIndex > 0)then
             cloudTracerName = getCloudTracerName(n)
-! djlo - temporary switched off
-!           call pbuf_get_field(pbuf, cloudTracerIndex, cloudTracerField ) 
+            call pbuf_get_field(pbuf, cloudTracerIndex, cloudTracerField ) 
             call outfld ( trim(cloudTracerName),cloudTracerField,pcols,lchnk)
 
             !Treat column burden (cloud tracer)

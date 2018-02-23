@@ -1139,7 +1139,7 @@ contains
     call chm_diags( lchnk, ncol, vmr(:ncol,:,:), mmr_new(:ncol,:,:), &
                     reaction_rates(:ncol,:,:), invariants(:ncol,:,:), depvel(:ncol,:),  sflx(:ncol,:), &
                     mmr_tend(:ncol,:,:), pdel(:ncol,:), pmid(:ncol,:), troplev(:ncol), wetdepflx_diag(:ncol,:), &
-                    nhx_nitrogen_flx(:ncol), noy_nitrogen_flx(:ncol) )
+                    nhx_nitrogen_flx(:ncol), noy_nitrogen_flx(:ncol), pbuf )
 
     call rate_diags_calc( reaction_rates(:,:,:), vmr(:,:,:), invariants(:,:,indexm), ncol, lchnk )
 !
