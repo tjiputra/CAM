@@ -287,6 +287,7 @@ begin
 ; Defining color scales for each load variable
 if (var .eq. "C_SO2" .or.  var .eq. "C_SO4") then
  digg=(/0.1,0.2,0.3,0.5,1,2,3,5,10,20/)                      ; C_SO2 & C_SO4
+; else if (var .eq. "C_BC") then
  else if (var .eq. "C_BC") then
   digg=(/0.03,0.05,0.1,0.2,0.3,0.5,1,2,3,5/)                 ; C_BC
   else if (var .eq. "C_POM" .or. var .eq. "C_SS") then

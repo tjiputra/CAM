@@ -29,6 +29,8 @@ begin
                                          ; 4 => all-sky OM AOD
                                          ; 5 => all-sky SS AOD
                                          ; 6 => all-sky DU AOD
+                                         ; 7 => clear-sky ABS
+                                         ; 8 => all-sky ABS
   end if
  if (.not. isvar("format")) then        ; is format on command line?
   format = "ps"
@@ -98,6 +100,18 @@ begin
  varname="Dust AOD"                 ; variable name used in text string:
  AOD_I=(/(f1_I[:]->D550_DU)/)/((/(f1_I[:]->DAYFOC)/)+small)     ; variable to be plotted from I
  AOD_II=(/(f1_II[:]->D550_DU)/)/((/(f1_II[:]->DAYFOC)/)+small)  ; variable to be plotted from II
+ else if (plot_type.eq.7) then
+ var="ABS550AL"                       ; name of main input-variable and plot                    
+ varname="All-sky ABS"                      ; variable name used in text string:
+ AOD_I=(/(f1_I[:]->ABS550AL)/)/((/(f1_I[:]->DAYFOC)/)+small)     ; variable to be plotted from I
+ AOD_II=(/(f1_II[:]->ABS550AL)/)/((/(f1_II[:]->DAYFOC)/)+small)  ; variable to be plotted from II
+ else if (plot_type.eq.8) then
+ var="CABS550A"                       ; name of main input-variable and plot                    
+ varname="Clear-sky ABS"                      ; variable name used in text string:
+ AOD_I=(/(f1_I[:]->CABS550A)/)/((/(f1_I[:]->CLDFREE)/)+small)/((/(f1_I[:]->DAYFOC)/)+small)     ; variable to be plotted from I
+ AOD_II=(/(f1_II[:]->CABS550A)/)/((/(f1_II[:]->CLDFREE)/)+small)/((/(f1_II[:]->DAYFOC)/)+small)  ; variable to be plotted from II
+ end if
+ end if
  end if
  end if
  end if
@@ -136,6 +150,9 @@ if (var .eq. "DOD550" .or.  var .eq. "CDOD550" .or. var .eq. "D550_DU") then
   digg=(/0.005,0.01,0.02,0.03,0.04,0.05,0.07,0.1,0.15,0.2/)              ; SO4, POM, SS
    else if (var .eq. "D550_BC") then
     digg=(/0.0005,0.001,0.002,0.003,0.004,0.005,0.007,0.01,0.015,0.02/)  ; BC
+     else if (var .eq. "ABS550AL" .or. var .eq. "CABS550A") then
+     digg=(/0.0005,0.001,0.002,0.003,0.005,0.01,0.015,0.02,0.03,0.05/)  ; ABS
+    end if
    end if
  end if
 end if
@@ -180,6 +197,7 @@ end if
   res@tmYRMode             = "Automatic"
   res@cnInfoLabelOn        = False
   res@cnLevelSelectionMode      = "ExplicitLevels"       ; manual levels
+
 ;  res@cnFillColors   = (/3,4,5,6,7,8,9,0,10,11,12,13,14,15,16/)   ; gir hvitt midt i ?
 ;  res@cnFillColors   = (/2,3,4,5,6,7,8,9,10,11,12,13,14,15,16/) 
   res@cnFillColors   = (/3,5,6,8,9,10,11,12,13,14,15,16/) 

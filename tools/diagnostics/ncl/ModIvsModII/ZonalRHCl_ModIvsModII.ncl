@@ -28,6 +28,7 @@ begin
                                      ; 4 => RHW     Relative humidity RHW
                                      ; 5 => CDNC    Cloud droplet number concentration
                                      ; 6 => REFFL   Cloud droplet effective radius
+                                     ; 7 => ICNC    Ice crystal number concentration
 ; *************************************************************************
  end if
  if (.not. isvar("format")) then        ; is format on command line?
@@ -103,6 +104,17 @@ begin
   var_I=(/(f1_I[:]->AREL)/)/((/(f1_I[:]->FREQL)/)+small) ; variable to be plotted from II 
  end if
  var_II=(/(f1_II[:]->AREL)/)/((/(f1_II[:]->FREQL)/)+small) ; variable to be plotted from II 
+ else if (plot_type.eq.7) then
+ var="ICNC"                      ; name of plot
+ varname="ICNC"                  ; variable name used in text string
+ plot_name="ICNC_Zonal"          ; name of the plot/figure
+ if(ModI.eq."CAM4-Oslo") then
+  var_I=(/(f1_I[:]->CDNC)/)*0.0                            ; variable to be plotted from I
+ else
+  var_I=1.e-6*(/(f1_I[:]->AWNI)/)/((/(f1_I[:]->FREQI)/)+small)   ; variable to be plotted from II  
+ end if
+ var_II=1.e-6*(/(f1_II[:]->AWNI)/)/((/(f1_II[:]->FREQI)/)+small) ; variable to be plotted from II 
+ end if
  end if
  end if
  end if
@@ -148,7 +160,7 @@ if (var.eq."CLOUD") then
          else if (var .eq. "REFFL") then
           digg=(/0.1,0.5,1,1.5,2,3,5,10,15,20/)
          else
-          digg=(/0.0,1.0/)                         ; Replace with error message
+           digg=(/0.0005,0.001,0.01,0.02,0.03,0.05,.1,.2,.3,.5/)
          end if
        end if
       end if
@@ -278,6 +290,13 @@ else if (var .eq. "REFFL") then
  else
   res@tiMainString  = "REFFL (AREL/FREQL) (~F33~m~F21~m)"
  end if
+else if (var .eq. "ICNC") then
+ if(ModI.eq."CAM4-Oslo") then
+  res@tiMainString  = "ICNC (N/A)"
+ else
+  res@tiMainString  = "ICNC (AWNI/FREQI) (cm~S~-3~N~)"
+ end if
+end if
 end if
 end if
 end if
@@ -310,6 +329,9 @@ else if (var .eq. "CDNC") then
   res2@tiMainString  = "CDNC (AWNC/FREQL) (cm~S~-3~N~)"
 else if (var .eq. "REFFL") then
   res2@tiMainString  = "REFFL (AREL/FREQL) (~F33~m~F21~m)"
+else if (var .eq. "ICNC") then
+  res2@tiMainString  = "ICNC (AWNI/FREQI) (cm~S~-3~N~)"
+end if
 end if
 end if
 end if

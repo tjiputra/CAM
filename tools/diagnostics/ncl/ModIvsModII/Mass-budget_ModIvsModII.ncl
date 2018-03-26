@@ -88,7 +88,7 @@ begin
 
 
  if (plot_type.eq.-1) then
- var="DMS"                                ; is skipped due to missing msga variables in CAM5-Oslo       
+ var="DMS"
  varname="DMS"
  if(ModI.eq."CAM4-Oslo") then
    emis_I=(/(f1_I[:]->EMI_DMS)/)
@@ -128,37 +128,62 @@ begin
    ; GS_SO2 = Prod_from_DMS + 3d_emis - wet-dep - oh-loss ==> rewrite this eqn to get the terms we need
    ; Note the SOA formed is supposed to be MSA which is factor 3 larger mole-weight than S
 
-   emis_I=(/(f1_I[:]->SFSO2)/)/1.998 + (/(f1_I[:]->SO2_CLXF)/)/1.998
-
+   if(GdepI .eq. "Neu") then
+     emis_I=(/(f1_I[:]->SFSO2)/)/1.998 + (/(f1_I[:]->SO2_XFRC_COL)/)/1.998
+   else
+     emis_I=(/(f1_I[:]->SFSO2)/)/1.998 + (/(f1_I[:]->SO2_CLXF)/)/1.998
+   end if
+   
    sour_I = emis_I + so2_formed_from_dms_as_s_I
 
    load_I=(/f1_I[:]->cb_SO2/)/1.998
    wet_I=-(/f1_I[:]->WD_A_SO2/)/1.998
 
-   sink_I=-(/f1_I[:]->WD_A_SO2/)/1.998 \   ;kg/m2/sec (positive in output file)
+   if(GdepI .eq. "Neu") then
+ sink_I= -(/f1_I[:]->WD_A_SO2/)/1.998 \   ;kg/m2/sec (positive in output file)
           -(/f1_I[:]->DF_SO2/)/1.998 \     ;kg/m2/sec (positive in output file)  
           +(/f1_I[:]->AQ_SO2/)/1.998 \     ;kg/m2/ses (negative in output file)
-          +(/f1_I[:]->GS_SO2/)/1.998 - (/f1_I[:]->SO2_CLXF/)/1.998 - so2_formed_from_dms_as_s_I  ; net chemical loss (gas phase)
-
-   chlossg_I = (/f1_I[:]->GS_SO2/)/1.998 - (/f1_I[:]->SO2_CLXF/)/1.998 \ 
+          +(/f1_I[:]->GS_SO2/)/1.998 - (/f1_I[:]->SO2_XFRC_COL/)/1.998 - so2_formed_from_dms_as_s_I  ; net chemical loss (gas phase)
+ chlossg_I = (/f1_I[:]->GS_SO2/)/1.998 - (/f1_I[:]->SO2_XFRC_COL/)/1.998 \ 
+            - so2_formed_from_dms_as_s_I  ; net chemical loss (gas phase)
+   else
+ sink_I=-(/f1_I[:]->WD_A_SO2/)/1.998 \   ;kg/m2/sec (positive in output file)
+          -(/f1_I[:]->DF_SO2/)/1.998 \     ;kg/m2/sec (positive in output file)  
+          +(/f1_I[:]->AQ_SO2/)/1.998 \     ;kg/m2/ses (negative in output file)
+          +(/f1_I[:]->GS_SO2/)/1.998 - (/f1_I[:]->SO2_CLXF/)/1.998 - so2_formed_from_dms_as_s_I + (/f1_I[:]->WD_A_SO2/)/1.998  ; net chemical loss (gas phase)
+ chlossg_I = (/f1_I[:]->GS_SO2/)/1.998 - (/f1_I[:]->SO2_CLXF/)/1.998 \ 
             - so2_formed_from_dms_as_s_I + (/f1_I[:]->WD_A_SO2/)/1.998  ; net chemical loss (gas phase)
+   end if
 
    chloss_I = chlossg_I + (/f1_I[:]->AQ_SO2/)/1.998                     ; net chemical loss (gas and wet-phase)
 
  end if
- emis_II=(/(f1_II[:]->SFSO2)/)/1.998 + (/(f1_II[:]->SO2_CLXF)/)/1.998
 
- sour_II=emis_II + so2_formed_from_dms_as_s_II
+   if(GdepI .eq. "Neu") then
+     emis_II=(/(f1_II[:]->SFSO2)/)/1.998 + (/(f1_II[:]->SO2_XFRC_COL)/)/1.998
+   else
+     emis_II=(/(f1_II[:]->SFSO2)/)/1.998 + (/(f1_II[:]->SO2_CLXF)/)/1.998
+   end if
+
+sour_II=emis_II + so2_formed_from_dms_as_s_II
 
  load_II=(/f1_II[:]->cb_SO2/)/1.998
  wet_II=-(/f1_II[:]->WD_A_SO2/)/1.998
+   if(GdepII .eq. "Neu") then
  sink_II= -(/f1_II[:]->WD_A_SO2/)/1.998 \   ;kg/m2/sec (positive in output file)
           -(/f1_II[:]->DF_SO2/)/1.998 \     ;kg/m2/sec (positive in output file)  
           +(/f1_II[:]->AQ_SO2/)/1.998 \     ;kg/m2/ses (negative in output file)
-          +(/f1_II[:]->GS_SO2/)/1.998 - (/f1_II[:]->SO2_CLXF/)/1.998 - so2_formed_from_dms_as_s_II; net chemical loss (gas phase)
-
+          +(/f1_II[:]->GS_SO2/)/1.998 - (/f1_II[:]->SO2_XFRC_COL/)/1.998 - so2_formed_from_dms_as_s_II  ; net chemical loss (gas phase)
+ chlossg_II = (/f1_II[:]->GS_SO2/)/1.998 - (/f1_II[:]->SO2_XFRC_COL/)/1.998 \ 
+            - so2_formed_from_dms_as_s_II  ; net chemical loss (gas phase)
+   else
+ sink_II= -(/f1_II[:]->WD_A_SO2/)/1.998 \   ;kg/m2/sec (positive in output file)
+          -(/f1_II[:]->DF_SO2/)/1.998 \     ;kg/m2/sec (positive in output file)  
+          +(/f1_II[:]->AQ_SO2/)/1.998 \     ;kg/m2/ses (negative in output file)
+          +(/f1_II[:]->GS_SO2/)/1.998 - (/f1_II[:]->SO2_CLXF/)/1.998 - so2_formed_from_dms_as_s_II + (/f1_II[:]->WD_A_SO2/)/1.998  ; net chemical loss (gas phase)
  chlossg_II = (/f1_II[:]->GS_SO2/)/1.998 - (/f1_II[:]->SO2_CLXF/)/1.998 \ 
-            - so2_formed_from_dms_as_s_II   ; net chemical loss (gas phase)
+            - so2_formed_from_dms_as_s_II + (/f1_II[:]->WD_A_SO2/)/1.998  ; net chemical loss (gas phase)
+   end if
 
  chloss_II = chlossg_II + (/f1_II[:]->AQ_SO2/)/1.998                     ; net chemical loss (gas and wet-phase)
  else if (plot_type.eq.1) then
@@ -172,11 +197,23 @@ begin
    sink_I=(/f1_I[:]->WET_SO4/)+(/f1_I[:]->DRY_SO4/)
  else
    
-    emis_I= (/(f1_I[:]->SFSO4_PR)/)/3.06 + (/(f1_I[:]->SO4_PR_CLXF)/)/3.06
+   if(GdepI .eq. "Neu") then
+     emis_I= (/(f1_I[:]->SFSO4_PR)/)/3.06 + (/(f1_I[:]->SO4_PR_XFRC_COL)/)/3.06
+   else
+     emis_I= (/(f1_I[:]->SFSO4_PR)/)/3.06 + (/(f1_I[:]->SO4_PR_CLXF)/)/3.06
+   end if
 
-    sour_I=emis_I + (/(f1_I[:]->GS_H2SO4)/)/3.06 + (/(f1_I[:]->WD_A_H2SO4)/)/3.06  \ ; gas phase H2SO4 production
+   if(GdepI .eq. "Neu") then
+  sour_I=emis_I + (/(f1_I[:]->GS_H2SO4)/)/3.06 \ ; gas phase H2SO4 production
+                  + (/f1_I[:]->AQ_SO4_A2_OCW/)/3.59 \ ; aq phase H2SO4 production
+                  + (/f1_I[:]->AQ_H2SO4/)/3.06      ; some of the aq phase prod is just cond of gas phase
+
+    else
+  sour_I=emis_I + (/(f1_I[:]->GS_H2SO4)/)/3.06 + (/(f1_I[:]->WD_A_H2SO4)/)/3.06  \ ; gas phase H2SO4 production
                      + (/f1_I[:]->AQ_SO4_A2_OCW/)/3.59\ ; aq phase H2SO4 production
                      + (/f1_I[:]->AQ_H2SO4/)/3.06      ; some of the aq phase prod is just cond of gas phase
+   end if
+
 
     load_I=(/(f1_I[:]->cb_SO4_A1)/)/3.06 + (/(f1_I[:]->cb_SO4_A2)/)/3.59 + (/(f1_I[:]->cb_SO4_AC)/)/3.06 \
           + (/(f1_I[:]->cb_SO4_NA)/)/3.06 + (/(f1_I[:]->cb_SO4_PR)/)/3.06  \
@@ -198,11 +235,21 @@ begin
    
  end if
 
- emis_II= (/(f1_II[:]->SFSO4_PR)/)/3.06 + (/(f1_II[:]->SO4_PR_CLXF)/)/3.06
+   if(GdepII .eq. "Neu") then
+    emis_II= (/(f1_II[:]->SFSO4_PR)/)/3.06 + (/(f1_II[:]->SO4_PR_XFRC_COL)/)/3.06
+   else
+    emis_II= (/(f1_II[:]->SFSO4_PR)/)/3.06 + (/(f1_II[:]->SO4_PR_CLXF)/)/3.06
+   end if
 
- sour_II=emis_II + (/(f1_II[:]->GS_H2SO4)/)/3.06 + (/(f1_II[:]->WD_A_H2SO4)/)/3.06  \ ; gas phase H2SO4 production
+   if(GdepII .eq. "Neu") then
+ sour_II=emis_II + (/(f1_II[:]->GS_H2SO4)/)/3.06 \ ; gas phase H2SO4 production
                   + (/f1_II[:]->AQ_SO4_A2_OCW/)/3.59 \ ; aq phase H2SO4 production
                   + (/f1_II[:]->AQ_H2SO4/)/3.06      ; some of the aq phase prod is just cond of gas phase
+   else
+ sour_II=emis_II + (/(f1_II[:]->GS_H2SO4)/)/3.06 + (/(f1_II[:]->WD_A_H2SO4)/)/3.06  \ ; gas phase H2SO4 production
+                 + (/f1_II[:]->AQ_SO4_A2_OCW/)/3.59 \ ; aq phase H2SO4 production
+                 + (/f1_II[:]->AQ_H2SO4/)/3.06      ; some of the aq phase prod is just cond of gas phase
+   end if
 
  load_II=(/(f1_II[:]->cb_SO4_A1)/)/3.06 + (/(f1_II[:]->cb_SO4_A2)/)/3.59 + (/(f1_II[:]->cb_SO4_AC)/)/3.06 \
        + (/(f1_II[:]->cb_SO4_NA)/)/3.06 + (/(f1_II[:]->cb_SO4_PR)/)/3.06  \
@@ -217,7 +264,7 @@ begin
  
  dry_II=(/f1_II[:]->SO4_A1DDF/)/3.06 + (/f1_II[:]->SO4_A2DDF/)/3.59 + (/f1_II[:]->SO4_ACDDF/)/3.06  \
       + (/f1_II[:]->SO4_NADDF/)/3.06 + (/f1_II[:]->SO4_PRDDF/)/3.06   \
-      + (/f1_II[:]->SO4_A1_OCWDDF/)/3.06 + (/f1_II[:]->SO4_A2_OCWDDF/)/3.59 + (/f1_II[:]->SO4_AC_OCWDDF/)/3.06 \
+      + (/f1_II[:]->SO4_A1_OCWDDF/)/3.06 + (/f1_II[:]->SO4_A2_OCWDDF/)/3.59 + (/f1_II[:]->SO4_AC_OCWDDF/) /3.06 \
       + (/f1_II[:]->SO4_NA_OCWDDF/)/3.06 + (/f1_II[:]->SO4_PR_OCWDDF/)/3.06
 
  sink_II=wet_II-dry_II
@@ -232,29 +279,30 @@ begin
    wet_I=(/f1_I[:]->WET_BC/)
    sink_I=(/f1_I[:]->WET_BC/)+(/f1_I[:]->DRY_BC/)
  else
-   emis_I=(/(f1_I[:]->SFBC_A)/) + (/(f1_I[:]->SFBC_AC)/) + (/(f1_I[:]->SFBC_AX)/) \
-       + (/(f1_I[:]->SFBC_AI)/) + (/(f1_I[:]->SFBC_NI)/) + (/(f1_I[:]->SFBC_N)/)  \
-       + (/(f1_I[:]->BC_AX_CLXF)/) + (/(f1_I[:]->BC_NI_CLXF)/) + (/(f1_I[:]->BC_N_CLXF)/)
-
+  if(GdepII .eq. "Neu") then
+   emis_I=(/(f1_I[:]->SFBC_A)/) + (/(f1_I[:]->SFBC_AC)/) + (/(f1_I[:]->SFBC_AX)/) + (/(f1_I[:]->SFBC_AI)/) + (/(f1_I[:]->SFBC_NI)/) + (/(f1_I[:]->SFBC_N)/) + (/(f1_I[:]->BC_AX_XFRC_COL)/) + (/(f1_I[:]->BC_NI_XFRC_COL)/) + (/(f1_I[:]->BC_N_XFRC_COL)/)
+  else
+   emis_I=(/(f1_I[:]->SFBC_A)/) + (/(f1_I[:]->SFBC_AC)/) + (/(f1_I[:]->SFBC_AX)/) + (/(f1_I[:]->SFBC_AI)/) + (/(f1_I[:]->SFBC_NI)/) + (/(f1_I[:]->SFBC_N)/) + (/(f1_I[:]->BC_AX_CLXF)/) + (/(f1_I[:]->BC_NI_CLXF)/) + (/(f1_I[:]->BC_N_CLXF)/)
+  end if
    sour_I=emis_I
 
-   load_I=(/(f1_I[:]->cb_BC)/) + (/(f1_I[:]->cb_BC_A_OCW)/) + (/(f1_I[:]->cb_BC_AC_OCW)/) \
-   + (/(f1_I[:]->cb_BC_AI_OCW)/) + (/(f1_I[:]->cb_BC_NI_OCW)/) + (/(f1_I[:]->cb_BC_N_OCW)/)
+   load_I=(/(f1_I[:]->cb_BC)/) + (/(f1_I[:]->cb_BC_A_OCW)/) + (/(f1_I[:]->cb_BC_AC_OCW)/) + (/(f1_I[:]->cb_BC_AI_OCW)/) + (/(f1_I[:]->cb_BC_NI_OCW)/) + (/(f1_I[:]->cb_BC_N_OCW)/)
 
-   wet_I=(/f1_I[:]->BC_ASFWET/) + (/f1_I[:]->BC_ACSFWET/) + (/f1_I[:]->BC_AXSFWET/) \
-       + (/f1_I[:]->BC_AISFWET/) + (/f1_I[:]->BC_NISFWET/) + (/f1_I[:]->BC_NSFWET/) \
-       + (/f1_I[:]->BC_A_OCWSFWET/) + (/f1_I[:]->BC_AC_OCWSFWET/) + (/f1_I[:]->BC_AI_OCWSFWET/)\
-       + (/f1_I[:]->BC_NI_OCWSFWET/) + (/f1_I[:]->BC_N_OCWSFWET/)
+   wet_I=(/f1_I[:]->BC_ASFWET/) + (/f1_I[:]->BC_ACSFWET/) + (/f1_I[:]->BC_AXSFWET/) + (/f1_I[:]->BC_AISFWET/) + (/f1_I[:]->BC_NISFWET/) + (/f1_I[:]->BC_NSFWET/) \
+   + (/f1_I[:]->BC_A_OCWSFWET/) + (/f1_I[:]->BC_AC_OCWSFWET/) + (/f1_I[:]->BC_AI_OCWSFWET/) + (/f1_I[:]->BC_NI_OCWSFWET/) + (/f1_I[:]->BC_N_OCWSFWET/)
 
-   dry_I=(/f1_I[:]->BC_ADDF/) + (/f1_I[:]->BC_ACDDF/) + (/f1_I[:]->BC_AXDDF/) \
-       + (/f1_I[:]->BC_AIDDF/) + (/f1_I[:]->BC_NIDDF/) + (/f1_I[:]->BC_NDDF/) \
-       + (/f1_I[:]->BC_A_OCWDDF/) + (/f1_I[:]->BC_AC_OCWDDF/) + (/f1_I[:]->BC_AI_OCWDDF/) \
-       + (/f1_I[:]->BC_NI_OCWDDF/) + (/f1_I[:]->BC_N_OCWDDF/)
+   dry_I=(/f1_I[:]->BC_ADDF/) + (/f1_I[:]->BC_ACDDF/) + (/f1_I[:]->BC_AXDDF/) + (/f1_I[:]->BC_AIDDF/) + (/f1_I[:]->BC_NIDDF/) + (/f1_I[:]->BC_NDDF/) \
+       + (/f1_I[:]->BC_A_OCWDDF/) + (/f1_I[:]->BC_AC_OCWDDF/) + (/f1_I[:]->BC_AI_OCWDDF/) + (/f1_I[:]->BC_NI_OCWDDF/) + (/f1_I[:]->BC_N_OCWDDF/)
 
    sink_I=wet_I-dry_I
  end if
+  if(GdepII .eq. "Neu") then
+ emis_II=(/(f1_II[:]->SFBC_A)/) + (/(f1_II[:]->SFBC_AC)/) + (/(f1_II[:]->SFBC_AX)/) + (/(f1_II[:]->SFBC_AI)/) + (/(f1_II[:]->SFBC_NI)/) + (/(f1_II[:]->SFBC_N)/) + (/(f1_II[:]->BC_AX_XFRC_COL)/) + (/(f1_II[:]->BC_NI_XFRC_COL)/) + (/(f1_II[:]->BC_N_XFRC_COL)/)
+  else
  emis_II=(/(f1_II[:]->SFBC_A)/) + (/(f1_II[:]->SFBC_AC)/) + (/(f1_II[:]->SFBC_AX)/) + (/(f1_II[:]->SFBC_AI)/) + (/(f1_II[:]->SFBC_NI)/) + (/(f1_II[:]->SFBC_N)/) + (/(f1_II[:]->BC_AX_CLXF)/) + (/(f1_II[:]->BC_NI_CLXF)/) + (/(f1_II[:]->BC_N_CLXF)/)
- sour_II=emis_II
+  end if
+
+sour_II=emis_II
 
  load_II=(/(f1_II[:]->cb_BC)/) + (/(f1_II[:]->cb_BC_A_OCW)/) + (/(f1_II[:]->cb_BC_AC_OCW)/) + (/(f1_II[:]->cb_BC_AI_OCW)/) + (/(f1_II[:]->cb_BC_NI_OCW)/) + (/(f1_II[:]->cb_BC_N_OCW)/)
 
@@ -287,7 +335,12 @@ begin
 
    MSAProd_I = 0.0*terpeneLoss_I
 
-   emis_I=(/(f1_I[:]->SFOM_AI)/) + (/(f1_I[:]->SFOM_AC)/) + (/(f1_I[:]->SFOM_NI)/) +  (/f1_I[:]->OM_NI_CLXF/)
+   if(GdepII .eq. "Neu") then
+    emis_I=(/(f1_I[:]->SFOM_AI)/) + (/(f1_I[:]->SFOM_AC)/) + (/(f1_I[:]->SFOM_NI)/) +  (/f1_I[:]->OM_NI_XFRC_COL/)
+   else
+    emis_I=(/(f1_I[:]->SFOM_AI)/) + (/(f1_I[:]->SFOM_AC)/) + (/(f1_I[:]->SFOM_NI)/) +  (/f1_I[:]->OM_NI_CLXF/)
+   end if
+
    sour_I=emis_I + SOAProd_I 
 
    load_I=(/(f1_I[:]->cb_OM)/) \ 
@@ -313,7 +366,12 @@ begin
 
  MSAProd_II = 0.0*terpeneLoss_II
 
- emis_II=(/(f1_II[:]->SFOM_AI)/) + (/(f1_II[:]->SFOM_AC)/) + (/(f1_II[:]->SFOM_NI)/) +  (/f1_II[:]->OM_NI_CLXF/)
+  if(GdepII .eq. "Neu") then
+   emis_II=(/(f1_II[:]->SFOM_AI)/) + (/(f1_II[:]->SFOM_AC)/) + (/(f1_II[:]->SFOM_NI)/) +  (/f1_II[:]->OM_NI_XFRC_COL/)
+  else
+    emis_I=(/(f1_I[:]->SFOM_AI)/) + (/(f1_I[:]->SFOM_AC)/) + (/(f1_I[:]->SFOM_NI)/) +  (/f1_I[:]->OM_NI_CLXF/)
+  end if
+
  sour_II=emis_II + SOAProd_II
 
  load_II=(/(f1_II[:]->cb_OM)/) \ 
@@ -537,7 +595,7 @@ print(var+" total sources     (Tg/yr)             = "+sprintf("%4.3f",sourave_I)
 print(var+" total sink        (Tg/yr)             = "+sprintf("%4.3f",sinkave_I)+", "+sprintf("%4.3f",sinkave_II))
 print(var+" burden            (Tg)                = "+sprintf("%4.3f",loadave_I)+", "+sprintf("%4.3f",loadave_II))
 if (plot_type.ne.-1) then
-print(var+" wet deposition     (% of sinks)        = "+sprintf("%4.3f",wetdeppave_I)+", "+sprintf("%4.3f",wetdeppave_II))
+print(var+" wet depostion     (% of sinks)        = "+sprintf("%4.3f",wetdeppave_I)+", "+sprintf("%4.3f",wetdeppave_II))
 end if
 print(var+" lifetime          (d)                 = "+sprintf("%4.3f",lifetimeave_I)+", "+sprintf("%4.3f",lifetimeave_II))
 if (plot_type.eq.-1.or.plot_type.eq.0) then

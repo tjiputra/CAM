@@ -31,6 +31,7 @@ begin
                                      ; 6 => Column integrated cloud droplet concentration, a
                                      ; 7 => Column integrated cloud droplet concentration, b
                                      ; 8 => Precipitation
+                                     ; 9 => U10
 ; *************************************************************************
  end if 
  if (.not. isvar("format")) then        ; is format on command line?
@@ -127,6 +128,14 @@ begin
  varname="Precipitation"             ; variable name used in text string:
  met_I=8.64e7*((/(f1_I[:]->PRECC)/)+(/(f1_I[:]->PRECL)/)) ; variable to be plotted from I 
  met_II=8.64e7*((/(f1_II[:]->PRECC)/)+(/(f1_II[:]->PRECL)/)) ; variable to be plotted from II 
+ else if (plot_type.eq.9) then
+ var="U10"                   ; name of plot
+ varname="10m wind"          ; variable name used in text string:
+ met_I=(/(f1_I[:]->U10)/)   ; variable to be plotted from I 
+ met_II=(/(f1_II[:]->U10)/) ; variable to be plotted from II 
+; met_I=(/(f1_I[:]->U10)/)*(/(f1_I[:]->U10)/)*(/(f1_I[:]->U10)/)  ; variable to be plotted from I 
+; met_II=(/(f1_II[:]->U10)/)*(/(f1_II[:]->U10)/)*(/(f1_II[:]->U10)/) ; variable to be plotted from II 
+ end if
  end if
  end if
  end if
@@ -168,10 +177,13 @@ if (var.eq."CLDTOT".or.var.eq."CLDLOW".or.var.eq."CLDMED".or.var.eq."CLDHGH") th
     else if (var .eq. "CDNUMC1" .or. var .eq. "CDNUMC2") then
       digg=(/0.1,0.2,0.3,0.5,1,2,4,6,8,10/)
       else if (var .eq. "PRECIP") then
-;        digg=(/0.05,0.1,0.2,0.3,0.5,1,1.5,2,2.5,3/)
         digg=(/0.05,0.1,0.25,0.5,1,1.5,2,3,5,10/)
-      else
-       digg=(/0.0,1.0/)                         ; Replace with error message
+         else if (var .eq. "U10") then
+          digg=(/0.5,1.,2.,3.,4.,5.0,7.5,10.0,12.5,15./)
+;          digg=(/0.1,1.,5.,10.,50.,100.,500.,1000.,5000.,10000./)
+         else
+          digg=(/0.0,1.0/)                         ; Replace with error message
+        end if
       end if
     end if
    end if
@@ -239,8 +251,11 @@ else if (var .eq. "CDNUMC2") then
  end if
 else if (var .eq. "PRECIP") then
   res@gsnRightString   = "avg = "+sprintf("%5.2f",(sum(dim_avg_n(met_Ia,0))/area1))+" (mm day~S~-1~N~)"
+else if (var .eq. "U10") then
+  res@gsnRightString   = "avg = "+sprintf("%5.2f",(sum(dim_avg_n(met_Ia,0))/area1))+" (m s~S~-1~N~)"
  else
   res@gsnRightString   = "avg = "+sprintf("%5.2f",(sum(dim_avg_n(met_Ia,0))/area1))
+end if
 end if
 end if
 end if
@@ -254,9 +269,12 @@ if (var .eq. "TGCLDLWP" .or.  var .eq. "TGCLDIWP") then
 else if (var .eq. "CDNUMC1" .or. var .eq. "CDNUMC2") then
   res@gsnRightString   = "(CDNUMC) avg = "+sprintf("%5.2f",(sum(dim_avg_n(met_IIa,0))/area1))+" (10~S~6~N~ cm~S~-2~N~)"
 else if (var .eq. "PRECIP") then
-  res@gsnRightString   = "avg = "+sprintf("%5.2f",(sum(dim_avg_n(met_Ia,0))/area1))+" (mm day~S~-1~N~)"
+  res@gsnRightString   = "avg = "+sprintf("%5.2f",(sum(dim_avg_n(met_IIa,0))/area1))+" (mm day~S~-1~N~)"
+else if (var .eq. "U10") then
+  res@gsnRightString   = "avg = "+sprintf("%5.2f",(sum(dim_avg_n(met_IIa,0))/area1))+" (m s~S~-1~N~)"
  else
   res@gsnRightString  = "avg = "+sprintf("%5.2f",(sum(dim_avg_n(met_IIa,0))/area1))
+end if
 end if
 end if
 end if

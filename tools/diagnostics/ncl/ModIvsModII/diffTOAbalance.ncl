@@ -72,9 +72,14 @@ begin
  
  if (plot_type.eq.0) then
  var="dDOD550"                                              ; name of plot
+
  varname="Anthropogenic AOD at 550nm"                       ; variable name used in text string:
- forc_I=(/(f1PD_I[:]->DOD550)/)-(/(f1PI_I[:]->DOD550)/)     ; variable to be plotted from I
- forc_II=(/(f1PD_II[:]->DOD550)/)-(/(f1PI_II[:]->DOD550)/)
+; forc_I=(/(f1PD_I[:]->DOD550)/)-(/(f1PI_I[:]->DOD550)/)     ; variable to be plotted from I
+; forc_II=(/(f1PD_II[:]->DOD550)/)-(/(f1PI_II[:]->DOD550)/)
+
+ forc_I=(/(f1PD_II[:]->FSNT)/)-(/(f1PD_II[:]->FLNT)/)-((/(f1PD_I[:]->FSNT)/)-(/(f1PD_I[:]->FLNT)/))
+ forc_II=(/(f1PD_II[:]->FSNT)/)-(/(f1PD_II[:]->FLNT)/)-((/(f1PD_I[:]->FSNT)/)-(/(f1PD_I[:]->FLNT)/))
+
  else if (plot_type.eq.1) then
  var="dABS550" 
  varname="Anthropogenic ABS at 550nm"
@@ -226,7 +231,9 @@ end if
 
 ; Defining color scales for each forcing variable
 if (var .eq. "dDOD550") then
- digg=(/-0.2,-.05,0,0.01,0.02,0.03,0.05,0.1,0.2,0.3/)
+; digg=(/-0.2,-.05,0,0.01,0.02,0.03,0.05,0.1,0.2,0.3/)
+ digg=(/-10,-5,-2.5,-1,-0.5,0,0.5,1,2.5,5,10/)
+
  else if (var .eq. "dABS550") then
   digg=(/-.01,0,0.001,0.002,0.003,0.005,0.01,0.02,0.03/)
   else if (var .eq. "dCDNUMC2") then

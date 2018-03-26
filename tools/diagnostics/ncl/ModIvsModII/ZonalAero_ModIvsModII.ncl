@@ -11,6 +11,8 @@ begin
 ; has to be divided by DAYFOC (which is a bit cumbersome due to the 
 ; different number of dimensions, 3d divided by 2d). 
 
+; !!!!! Try changing to p-coordinates by use of vinth2p function in ncl !!!!!
+
 ; Model independent constants
  g=9.80665
  pi=3.1415926
@@ -28,7 +30,7 @@ begin
                                      ; 2 => DUST   Dust mass mixing ratio
                                      ; 3 => SS     Sea-salt mass mixing ratio
                                      ; 4 => BC     BC mass mixing ratio
-                                     ; 5 => POM    POM mass mixing ratio
+                                     ; 5 => OM     OM mass mixing ratio
                                      ; 6 => SO4    SO4 mass mixing ratio
                                      ; 7 => SO2    SO2 mass mixing ratio
 ; *************************************************************************
@@ -115,9 +117,9 @@ var_I = addfiles_GetVar(f1_I,all_files_I,"BC_A") + addfiles_GetVar(f1_I,all_file
  var_II = addfiles_GetVar(f1_II,all_files_II,"BC_A") + addfiles_GetVar(f1_II,all_files_II,"BC_AC") + addfiles_GetVar(f1_II,all_files_II,"BC_AX") + addfiles_GetVar(f1_II,all_files_II,"BC_AI") + addfiles_GetVar(f1_II,all_files_II,"BC_NI") + addfiles_GetVar(f1_II,all_files_II,"BC_N") + addfiles_GetVar(f1_II,all_files_II,"BC_A_OCW") + addfiles_GetVar(f1_II,all_files_II,"BC_AC_OCW") + addfiles_GetVar(f1_II,all_files_II,"BC_AI_OCW") + addfiles_GetVar(f1_II,all_files_II,"BC_NI_OCW") + addfiles_GetVar(f1_II,all_files_II,"BC_N_OCW")
  var_II = var_II*1.e12
  else if (plot_type.eq.5) then
- var="POM"                          ; name of main input-variable 
- varname="POM"                      ; variable name used in text string
- plot_name="POM_Zonal"              ; name of the plot/figure
+ var="OM"                          ; name of main input-variable 
+ varname="OM"                      ; variable name used in text string
+ plot_name="OM_Zonal"              ; name of the plot/figure
  if(ModI.eq."CAM4-Oslo") then
    var_I = addfiles_GetVar(f1_I,all_files_I,"OM_AI") + addfiles_GetVar(f1_I,all_files_I,"OM_AC") + addfiles_GetVar(f1_I,all_files_I,"OM_NI") 
    var_I = var_I*1.e12
@@ -198,7 +200,7 @@ if (var .eq. "WAK") then
    digg=(/0.6,0.62,0.64,0.68,0.7,0.72,0.74,0.76,0.78/)
    else if (var .eq. "DST" .or. var .eq. "SS") then
     digg=(/25,50,100,250,500,1000,2500,5000,10000,25000/)
-     else if (var .eq. "BC" .or. var .eq. "POM" .or. var .eq. "SO4" .or. var .eq. "SO2") then
+     else if (var .eq. "BC" .or. var .eq. "OM" .or. var .eq. "SO4" .or. var .eq. "SO2") then
       digg=(/2.5,5,10,25,50,100,250,500,1000,2500/)
        else
        digg=(/0.0,1.0/)                         ; Replace with error message
@@ -303,8 +305,8 @@ else if (var .eq. "SS") then
   res@tiMainString  = "Sea-salt (ng kg~S~-1~N~)"
 else if (var .eq. "BC") then
   res@tiMainString  = "BC (ng kg~S~-1~N~)"
-else if (var .eq. "POM") then
-  res@tiMainString  = "POM (ng kg~S~-1~N~)"
+else if (var .eq. "OM") then
+  res@tiMainString  = "OM (ng kg~S~-1~N~)"
 else if (var .eq. "SO4") then
   res@tiMainString  = "SO4 (ng S kg~S~-1~N~)"
 else if (var .eq. "SO2") then
@@ -330,8 +332,8 @@ else if (var .eq. "SS") then
   res2@tiMainString  = "Sea-salt (ng kg~S~-1~N~)"
 else if (var .eq. "BC") then
   res2@tiMainString  = "BC (ng kg~S~-1~N~)"
-else if (var .eq. "POM") then
-  res2@tiMainString  = "POM (ng kg~S~-1~N~)"
+else if (var .eq. "OM") then
+  res2@tiMainString  = "OM (ng kg~S~-1~N~)"
 else if (var .eq. "SO4") then
   res2@tiMainString  = "SO4 (ng S kg~S~-1~N~)"
 else if (var .eq. "SO2") then
