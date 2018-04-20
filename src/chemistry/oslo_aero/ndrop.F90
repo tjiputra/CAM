@@ -2653,6 +2653,14 @@ subroutine activate_modal(wbar, sigw, wdiab, wminf, wmaxf, tair, rhoair,  &
          do m=1,nmode
             eta(m)=etafactor1*etafactor2(m)
             zeta(m)=twothird*sqrtalw*aten/sqrtg
+#ifdef OSLO_AERO
+            if(present(lnsigman))then
+               f1_var(m)          = 0.5_r8*exp(2.5_r8*lnsigman(m)*lnsigman(m))
+               f2_var(m)          = 1._r8 + 0.25_r8*lnsigman(m)
+            else
+               call endrun("Problem with variable std. dev single updraft")
+             endif
+#endif
          enddo
 
          call maxsat(zeta,eta,nmode,smc,smax &
