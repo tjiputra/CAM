@@ -525,7 +525,7 @@ contains
     use phys_grid,    only : get_area_all_p, pcols
     use commondefinitions
     use aerosoldef,   only : getCloudTracerIndexDirect, getCloudTracerName &
-                           , aerosolType
+                           , aerosolType, isAerosol
     use physics_buffer,    only : pbuf_get_field, pbuf_get_index
     use physics_buffer, only : physics_buffer_desc
 #endif
@@ -698,6 +698,11 @@ contains
        if ( any ( toth_species == m ) ) then
           vmr_toth(:ncol,:) = vmr_toth(:ncol,:) +  wgt * vmr(:ncol,:,m)
        endif
+
+#if defined OSLO_AERO
+       spc_name = trim(solsym(m))
+       call cnst_get_ind(spc_name, n, abort=.false.)
+#endif
        
 #ifndef OSLO_AERO
        if ( any( aer_species == m ) ) then
@@ -712,8 +717,6 @@ contains
        endif
 
 #if defined OSLO_AERO
-       spc_name = trim(solsym(m))
-       call cnst_get_ind(spc_name, n, abort=.false.)
        if(n > 0) then
          cloudTracerIndex = getCloudTracerIndexDirect(n)
          if(cloudTracerIndex > 0)then
