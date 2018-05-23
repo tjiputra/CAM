@@ -699,7 +699,11 @@ contains
           vmr_toth(:ncol,:) = vmr_toth(:ncol,:) +  wgt * vmr(:ncol,:,m)
        endif
        
+#ifndef OSLO_AERO
        if ( any( aer_species == m ) ) then
+#else
+       if ( any( aer_species == m ) .or. isAerosol(n) ) then
+#endif
           call outfld( solsym(m), mmr(:ncol,:,m), ncol ,lchnk )
           call outfld( trim(solsym(m))//'_SRF', mmr(:ncol,pver,m), ncol ,lchnk )
        else
