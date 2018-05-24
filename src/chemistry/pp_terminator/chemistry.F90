@@ -178,7 +178,17 @@ contains
 
     call addfld ( 'CLy', (/'lev'/), 'A', 'mole/mole', 'CLy mixing ratio' )
     call add_default ( 'CLy',   1, ' ')
+    !
+    ! terminator diagnostics (DCMIP2016)
+    !
+    call addfld ( 'iCLy', horiz_only, 'A','mole/mole','Average mass-weighted column-integrated CLy mixing ratio')
+    call add_default ( 'iCLy',   1, ' ')
 
+    call addfld ( 'iCL', horiz_only, 'A','mole/mole','Average mass-weighted column-integrated CL mixing ratio')
+    call add_default ( 'iCL',   1, ' ')
+
+    call addfld ( 'iCL2', horiz_only, 'A','mole/mole','Average mass-weighted column-integrated CL2 mixing ratio')
+    call add_default ( 'iCL2',   1, ' ')
   end subroutine chem_init
 
 !===============================================================================
@@ -198,7 +208,7 @@ contains
     use physics_buffer,   only: physics_buffer_desc
     use cam_history,      only: outfld
     use camsrfexch,       only: cam_in_t, cam_out_t
-
+    use cam_history,      only: hist_fld_active
     !-----------------------------------------------------------------------
     !
     ! Arguments:
@@ -221,6 +231,8 @@ contains
     real(r8) :: cl2(pcols,pver)
     real(r8) :: new_cl (pcols,pver)
     real(r8) :: new_cl2(pcols,pver)
+
+    real(r8) :: integrated(pcols)
 
     integer :: ncol,lchnk, i
     logical :: lq(pcnst)
@@ -281,7 +293,21 @@ contains
     call outfld('CLy', cly, pcols, lchnk )
     call outfld ( species(1), cl (:ncol,:) + dt * cl_f (:ncol,:), ncol, lchnk )
     call outfld ( species(2), cl2(:ncol,:) + dt * cl2_f(:ncol,:), ncol, lchnk )
-
+    !
+    ! terminator diagnostics (DCMIP2016)
+    !
+    if ( hist_fld_active('iCL')) then
+      integrated(:ncol) = SUM(state%pdeldry(:ncol,:)*cl(:ncol,:),DIM=2)/SUM(state%pdeldry(:ncol,:),DIM=2)
+      call outfld('iCL', integrated, pcols, lchnk )
+    end if
+    if ( hist_fld_active('iCL2')) then
+      integrated(:ncol) = SUM(state%pdeldry(:ncol,:)*cl2(:ncol,:),DIM=2)/SUM(state%pdeldry(:ncol,:),DIM=2)
+      call outfld('iCL2', integrated, pcols, lchnk )
+    end if
+    if ( hist_fld_active('iCLy')) then
+      integrated(:ncol) = SUM(state%pdeldry(:ncol,:)*cly(:ncol,:),DIM=2)/SUM(state%pdeldry(:ncol,:),DIM=2)
+      call outfld('iCLy', integrated, pcols, lchnk )
+    end if
     return
   end subroutine chem_timestep_tend
 

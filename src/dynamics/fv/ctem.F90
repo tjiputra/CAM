@@ -57,7 +57,7 @@ contains
 !	... local variables
 !-------------------------------------------------------------
     real(r8), parameter :: hscale = 7000._r8          ! pressure scale height
-    real(r8), parameter :: navp   = 1.e35_r8
+    real(r8), parameter :: navp   = 1.e35_r8 !+tht use this only for T, missing winds are set to zero
     
     real(r8) :: pinterp
     real(r8) :: w(grid%ifirstxy:grid%ilastxy,plev,grid%jfirstxy:grid%jlastxy)          ! vertical velocity
@@ -301,19 +301,24 @@ lat_loop3 : &
        do k = ip_b+1, plevp
           if( has_zm(k,j) ) then
              rdiv(k)   = 1._r8/count( ip_gm1g(:,j) >= k )
+!+tht define zonal mean winds taking zero for below-ground value
+             u2d(k,j)   = um(k) * rplon
+             v2d(k,j)   = vm(k) * rplon
+             w2d(k,j)   = wm(k) * rplon
+!-tht
              um(k)     = um(k) * rdiv(k)
              vm(k)     = vm(k) * rdiv(k)
              wm(k)     = wm(k) * rdiv(k)
              thm(k)    = thm(k) * rdiv(k)
-             u2d(k,j)  = um(k)
-             v2d(k,j)  = vm(k)
+            !u2d(k,j)  = um(k) !+tht c'd out
+            !v2d(k,j)  = vm(k) !+tht c'd out
              th2d(k,j) = thm(k)
-             w2d(k,j)  = wm(k)
+            !w2d(k,j)  = wm(k) !+tht c'd out
           else
-             u2d(k,j)  = navp
-             v2d(k,j)  = navp
+             u2d(k,j)  = 0._r8 ! navp
+             v2d(k,j)  = 0._r8 ! navp
              th2d(k,j) = navp
-             w2d(k,j)  = navp
+             w2d(k,j)  = 0._r8 ! navp
           end if
        end do
 
@@ -411,10 +416,10 @@ lat_loop3 : &
              uw(k,j)  = uw(k,j) * rdiv(k)
              uv(k,j)  = uv(k,j) * rdiv(k)
           else
-             vth(k,j) = navp
-             wth(k,j) = navp
-             uw(k,j)  = navp
-             uv(k,j)  = navp
+             vth(k,j) = 0._r8 ! navp
+             wth(k,j) = 0._r8 ! navp
+             uw(k,j)  = 0._r8 ! navp
+             uv(k,j)  = 0._r8 ! navp
           end if
        end do
 
@@ -543,6 +548,13 @@ lat_loop3 : &
 !-------------------------------------------------------------
 ! primary tapes: 3D fields
 !-------------------------------------------------------------
+    call add_default ('VTHzm', 1, ' ')
+    call add_default ('WTHzm', 1, ' ')
+    call add_default ('UVzm' , 1, ' ')
+    call add_default ('UWzm' , 1, ' ')
+    call add_default ('TH' , 1, ' ')
+    call add_default ('MSKtem',1, ' ')
+
     if (history_waccm) then
        call add_default ('MSKtem',7, ' ')
        call add_default ('VTHzm', 7, ' ')

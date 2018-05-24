@@ -2,20 +2,20 @@ module physconst
 
 ! Physical constants.  Use csm_share values whenever available.
 
-use shr_kind_mod,   only: r8 => shr_kind_r8
-use shr_const_mod,  only: shr_const_g,      shr_const_stebol, shr_const_tkfrz,  &
-                          shr_const_mwdair, shr_const_rdair,  shr_const_mwwv,   &
-                          shr_const_latice, shr_const_latvap, shr_const_cpdair, &
-                          shr_const_rhofw,  shr_const_cpwv,   shr_const_rgas,   &
-                          shr_const_karman, shr_const_pstd,   shr_const_rhodair,&
-                          shr_const_avogad, shr_const_boltz,  shr_const_cpfw,   &
-                          shr_const_rwv,    shr_const_zvir,   shr_const_pi,     &
-                          shr_const_rearth, shr_const_sday,   shr_const_cday,   &
-                          shr_const_spval,  shr_const_omega,  shr_const_cpvir,  &
-                          shr_const_tktrip
-use shr_flux_mod,   only: shr_flux_adjust_constants
-use ppgrid,         only: pcols, pver, pverp, begchunk, endchunk
-use cam_abortutils, only: endrun
+   use shr_kind_mod,   only: r8 => shr_kind_r8
+   use shr_const_mod,  only: shr_const_g,      shr_const_stebol, shr_const_tkfrz,  &
+                             shr_const_mwdair, shr_const_rdair,  shr_const_mwwv,   &
+                             shr_const_latice, shr_const_latvap, shr_const_cpdair, &
+                             shr_const_rhofw,  shr_const_cpwv,   shr_const_rgas,   &
+                             shr_const_karman, shr_const_pstd,   shr_const_rhodair,&
+                             shr_const_avogad, shr_const_boltz,  shr_const_cpfw,   &
+                             shr_const_rwv,    shr_const_zvir,   shr_const_pi,     &
+                             shr_const_rearth, shr_const_sday,   shr_const_cday,   &
+                             shr_const_spval,  shr_const_omega,  shr_const_cpvir,  &
+                             shr_const_tktrip, shr_const_cpice
+   use shr_flux_mod,   only: shr_flux_adjust_constants
+   use ppgrid,         only: pcols, pver, pverp, begchunk, endchunk
+   use cam_abortutils, only: endrun
 use constituents,   only: pcnst
 
 implicit none
@@ -33,6 +33,7 @@ real(r8), public, parameter :: avogad      = shr_const_avogad     ! Avogadro's n
 real(r8), public, parameter :: boltz       = shr_const_boltz      ! Boltzman's constant (J/K/molecule)
 real(r8), public, parameter :: cday        = shr_const_cday       ! sec in calendar day ~ sec
 real(r8), public, parameter :: cpliq       = shr_const_cpfw       ! specific heat of fresh h2o (J/K/kg)
+real(r8), public, parameter :: cpice       = shr_const_cpice      ! specific heat of ice (J/K/kg)
 real(r8), public, parameter :: karman      = shr_const_karman     ! Von Karman constant
 real(r8), public, parameter :: latice      = shr_const_latice     ! Latent heat of fusion (J/kg)
 real(r8), public, parameter :: latvap      = shr_const_latvap     ! Latent heat of vaporization (J/kg)
@@ -40,7 +41,7 @@ real(r8), public, parameter :: pi          = shr_const_pi         ! 3.14...
 real(r8), public, parameter :: pstd        = shr_const_pstd       ! Standard pressure (Pascals)
 real(r8), public, parameter :: r_universal = shr_const_rgas       ! Universal gas constant (J/K/kmol)
 real(r8), public, parameter :: rhoh2o      = shr_const_rhofw      ! Density of liquid water (STP)
-real(r8), public, parameter :: spval       = shr_const_spval      !special value 
+real(r8), public, parameter :: spval       = shr_const_spval      !special value
 real(r8), public, parameter :: stebol      = shr_const_stebol     ! Stefan-Boltzmann's constant (W/m^2/K^4)
 real(r8), public, parameter :: h2otrip     = shr_const_tktrip     ! Triple point temperature of water (K)
 
@@ -79,12 +80,12 @@ real(r8), public, protected :: ra         = 1._r8/shr_const_rearth ! reciprocal 
 real(r8), public, protected :: omega      = shr_const_omega        ! earth rot ~ rad/sec
 real(r8), public, protected :: rh2o       = shr_const_rwv          ! Water vapor gas constant ~ J/K/kg
 real(r8), public, protected :: rair       = shr_const_rdair        ! Dry air gas constant     ~ J/K/kg
-real(r8), public, protected :: epsilo     = shr_const_mwwv/shr_const_mwdair   ! ratio of h2o to dry air molecular weights 
+real(r8), public, protected :: epsilo     = shr_const_mwwv/shr_const_mwdair   ! ratio of h2o to dry air molecular weights
 real(r8), public, protected :: zvir       = shr_const_zvir         ! (rh2o/rair) - 1
 real(r8), public, protected :: cpvir      = shr_const_cpvir        ! CPWV/CPDAIR - 1.0
 real(r8), public, protected :: rhodair    = shr_const_rhodair      ! density of dry air at STP  ~ kg/m^3
 real(r8), public, protected :: cappa      = (shr_const_rgas/shr_const_mwdair)/shr_const_cpdair  ! R/Cp
-real(r8), public, protected :: ez         ! Coriolis expansion coeff -> omega/sqrt(0.375)   
+real(r8), public, protected :: ez         ! Coriolis expansion coeff -> omega/sqrt(0.375)
 real(r8), public, protected :: Cpd_on_Cpv = shr_const_cpdair/shr_const_cpwv
 
 !---------------  Variables below here are for WACCM-X -----------------------
@@ -112,7 +113,7 @@ subroutine physconst_readnl(nlfile)
    use cam_logfile,     only: iulog
 
    character(len=*), intent(in) :: nlfile  ! filepath for file containing namelist input
-   
+
    ! Local variables
    integer :: unitn, ierr
    character(len=*), parameter :: subname = 'physconst_readnl'
@@ -147,8 +148,8 @@ subroutine physconst_readnl(nlfile)
    call mpibcast(rearth,      1,  mpir8,   0, mpicom)
    call mpibcast(tmelt,       1,  mpir8,   0, mpicom)
 #endif
-      
-   newg     =  gravit .ne. shr_const_g 
+
+   newg     =  gravit .ne. shr_const_g
    newsday  =  sday   .ne. shr_const_sday
    newmwh2o =  mwh2o  .ne. shr_const_mwwv
    newcpwv  =  cpwv   .ne. shr_const_cpwv
@@ -156,7 +157,7 @@ subroutine physconst_readnl(nlfile)
    newcpair =  cpair  .ne. shr_const_cpdair
    newrearth=  rearth .ne. shr_const_rearth
    newtmelt =  tmelt  .ne. shr_const_tkfrz
-      
+
    if (newg .or. newsday .or. newmwh2o .or. newcpwv .or. newmwdry .or. newrearth .or. newtmelt) then
       if (masterproc) then
          write(iulog,*)'****************************************************************************'
@@ -173,18 +174,18 @@ subroutine physconst_readnl(nlfile)
          if (newtmelt)   write(iulog,*)'***       TMELT     ',shr_const_tkfrz,tmelt,'***'
          write(iulog,*)'****************************************************************************'
       end if
-      rga         = 1._r8/gravit 
+      rga         = 1._r8/gravit
       ra          = 1._r8/rearth
       omega       = 2.0_R8*pi/sday
       cpvir       = cpwv/cpair - 1._r8
-      epsilo      = mwh2o/mwdry      
-         
+      epsilo      = mwh2o/mwdry
+
       !  rair and rh2o have to be defined before any of the variables that use them
-         
+
       rair        = r_universal/mwdry
-      rh2o        = r_universal/mwh2o  
-         
-      cappa       = rair/cpair       
+      rh2o        = r_universal/mwh2o
+
+      cappa       = rair/cpair
       rhodair     = pstd/(rair*tmelt)
       zvir        =  (rh2o/rair)-1.0_R8
       ez          = omega / sqrt(0.375_r8)
@@ -192,13 +193,13 @@ subroutine physconst_readnl(nlfile)
 
       ! Adjust constants in shr_flux_mod.
       call shr_flux_adjust_constants(zvir=zvir, cpvir=cpvir, gravit=gravit)
-         
+
    else
       ez          = omega / sqrt(0.375_r8)
    end if
-      
+
 end subroutine physconst_readnl
-    
+
 !===============================================================================
 
 subroutine physconst_init()
@@ -209,7 +210,7 @@ subroutine physconst_init()
    real(r8) :: o2_mw, o_mw, h_mw, n_mw
 
    !-------------------------------------------------------------------------------
-   !  Allocate constituent dependent properties 
+   !  Allocate constituent dependent properties
    !-------------------------------------------------------------------------------
    allocate( cpairv(pcols,pver,begchunk:endchunk), &
              rairv(pcols,pver,begchunk:endchunk),  &
@@ -218,10 +219,10 @@ subroutine physconst_init()
              kmvis(pcols,pverp,begchunk:endchunk), &
              kmcnd(pcols,pverp,begchunk:endchunk), stat=ierr )
    if ( ierr /= 0 ) call endrun('physconst: allocate failed in physconst_init')
-    
+
    !-------------------------------------------------------------------------------
-   !  Initialize constituent dependent properties 
-   !-------------------------------------------------------------------------------    
+   !  Initialize constituent dependent properties
+   !-------------------------------------------------------------------------------
    cpairv(:pcols,:pver,begchunk:endchunk) = cpair
    rairv(:pcols,:pver,begchunk:endchunk) = rair
    cappav(:pcols,:pver,begchunk:endchunk) = rair/cpair
@@ -252,9 +253,9 @@ subroutine physconst_init()
 end subroutine physconst_init
 
 !===============================================================================
-  
+
   subroutine physconst_update(mmr, t, lchnk, ncol)
-  
+
 !-----------------------------------------------------------------------
 ! Update the physics "constants" that vary
 !-----------------------------------------------------------------------
@@ -277,7 +278,7 @@ end subroutine physconst_init
     !--------------------------------------------
     ! Set constants needed for updates
     !--------------------------------------------
-    dof1 = 5._r8 
+    dof1 = 5._r8
     dof2 = 7._r8
     kv1  = 4.03_r8
     kv2  = 3.42_r8
@@ -323,7 +324,7 @@ end subroutine physconst_init
            mmrn2 = 1._r8-mmro-mmro2
            mbarvi = .5_r8*(mbarv(i,k-1,lchnk)+mbarv(i,k,lchnk))
            tint = .5_r8*(t(i,k-1)+t(i,k))
- 
+
            kmvis(i,k,lchnk) = (kv1*mmro2*o2_mwi+        &
                                kv2*mmrn2*n2_mwi+        &
                                kv3*mmro*o_mwi)*mbarvi*  &
@@ -401,15 +402,3 @@ end subroutine physconst_init
    end subroutine physconst_calc_kappav
 
 end module physconst
-
-
-
-
-
-
-
-
-
-
-
-

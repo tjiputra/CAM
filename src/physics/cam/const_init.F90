@@ -54,7 +54,6 @@ CONTAINS
     ! Local variables
     logical, allocatable           :: mask_use(:)
     character(len=max_chars)       :: name
-    integer                        :: i
     logical                        :: verbose_use
     logical                        :: notfound_use
 

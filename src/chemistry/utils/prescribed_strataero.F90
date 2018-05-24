@@ -52,7 +52,7 @@ module prescribed_strataero
 
   ! These variables are settable via the namelist (with longer names)
   character(len=32)  :: specifier(7) = ' '
-  character(len=256) :: filename = ''
+  character(len=256) :: filename = 'NONE'
   character(len=256) :: filelist = ''
   character(len=256) :: datapath = ''
   character(len=32)  :: data_type = 'SERIAL'
@@ -139,7 +139,7 @@ subroutine prescribed_strataero_readnl(nlfile)
 
 #ifdef SPMD
    ! Broadcast namelist variables
-   call mpibcast(prescribed_strataero_specifier,len(prescribed_strataero_specifier)*2, mpichar, 0, mpicom)
+   call mpibcast(prescribed_strataero_specifier,len(prescribed_strataero_specifier)*7, mpichar, 0, mpicom)
    call mpibcast(prescribed_strataero_file,     len(prescribed_strataero_file),        mpichar, 0, mpicom)
    call mpibcast(prescribed_strataero_filelist, len(prescribed_strataero_filelist),    mpichar, 0, mpicom)
    call mpibcast(prescribed_strataero_datapath, len(prescribed_strataero_datapath),    mpichar, 0, mpicom)
@@ -163,7 +163,7 @@ subroutine prescribed_strataero_readnl(nlfile)
    fixed_tod  = prescribed_strataero_fixed_tod
 
    ! Turn on prescribed volcanics if user has specified an input dataset.
-   if (len_trim(filename) > 0 ) has_prescribed_strataero = .true.
+   if (len_trim(filename) > 0 .and. filename.ne.'NONE') has_prescribed_strataero = .true.
 
 end subroutine prescribed_strataero_readnl
 
@@ -226,7 +226,9 @@ end subroutine prescribed_strataero_readnl
           rad_fld_no = 4
           sad_fld_no = 7
        else
-          print*,' pbuf add mmr_name = '//trim(mmr_name)
+          if (masterproc) then
+             write(iulog, *) ' pbuf add mmr_name = '//trim(mmr_name)
+          end if
           call pbuf_add_field(mmr_name, 'physpkg', dtype_r8,(/pcols,pver/), mmr_ndx1)
           call pbuf_add_field(rad_name, 'physpkg', dtype_r8,(/pcols,pver/), rad_ndx1)
           call pbuf_add_field(sad_name, 'physpkg', dtype_r8,(/pcols,pver/), sad_ndx)

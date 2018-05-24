@@ -46,7 +46,7 @@ contains
      use shr_kind_mod,    only : r8 => shr_kind_r8, i8 => shr_kind_i8
      use pmgrid,          only : plev, plat, plevp, plon
      use cam_history,     only : outfld
-     use constituents,    only : pcnst, cnst_get_ind
+     use constituents,    only : pcnst, cnst_get_ind, cnst_name
      use physconst,       only : rair, cpair, gravit, rga
      use scammod,         only : divq,divq3d,divt,divu,divt3d,divu3d,have_divv, &
                                  divv,divv3d,have_aldif,have_aldir,have_asdif,have_asdir, &
@@ -59,9 +59,10 @@ contains
                                  scm_relax_tau_sec,scm_relax_tau_top_sec,scm_relax_top_p, &
                                  scm_relaxation,scm_use_obs_qv,scm_use_obs_t,scm_use_obs_uv,scm_zadv_q,scm_zadv_t, &
                                  scm_zadv_uv,tdiff,tobs,uobs,use_3dfrc,use_camiop,vertdivq, &
-                                 vertdivt,vertdivu,vertdivv,vobs,wfld 
-     use time_manager,    only : get_curr_calday, get_nstep, get_step_size
-     use cam_abortutils,  only : endrun
+                                 vertdivt,vertdivu,vertdivv,vobs,wfld,qinitobs,scm_relax_fincl
+     use time_manager,     only : get_curr_calday, get_nstep, get_step_size, is_first_step
+     use cam_abortutils,   only : endrun
+     use string_utils,     only: to_upper
 
      implicit none
 
@@ -125,7 +126,7 @@ contains
      real(r8) tfcst(plev)             ! (       tfcst - t3m2 ) / ztodt = Tendency of T by the sum of 'physics' + 'SLT/EUL/XXX vertical advection' [ K/s ]
      real(r8) ufcst(plev)             ! (       ufcst - u3m2 ) / ztodt = Tendency of u by the sum of 'physics' + 'SLT/EUL/XXX vertical advection' [ m/s/s ] 
      real(r8) vfcst(plev)             ! (       vfcst - u3m2 ) / ztodt = Tendency of v by the sum of 'physics' + 'SLT/EUL/XXX vertical advection' [ m/s/s ]
-
+     logical scm_fincl_empty
    ! ----------------------------------------------- !
    ! Centered Eulerian vertical advective tendencies !
    ! ----------------------------------------------- !
@@ -169,7 +170,7 @@ contains
      real(r8) rycept ! [optional] y-intercept for linear relaxtion profile
 
 !+++ BPM check what we have:
-     if (masterproc) write(iulog,*) 'SCAM FORECAST REPORT: ' ,  &
+     if (masterproc .and. is_first_step()) write(iulog,*) 'SCAM FORECAST REPORT: ' ,  &
           'have_divq     ',  have_divq      ,  &
           'have_divt     ',  have_divt      ,  &
           'have_divq3d   ',  have_divq3d    ,  &
@@ -204,6 +205,10 @@ contains
           'have_asdir    ',  have_asdir     ,  &
           'have_asdif    ',  have_asdif     ,  &
           'use_camiop    ',  use_camiop     ,  &
+          'use_obs_uv    ',  scm_use_obs_uv     ,  &
+          'use_obs_qv    ',  scm_use_obs_qv     ,  &
+          'use_obs_T     ',  scm_use_obs_T      ,  &
+          'relaxation    ',  scm_relaxation     ,  &
           'use_3dfrc     ',  use_3dfrc
      
      !---BPM
@@ -486,6 +491,16 @@ contains
      rslope = (scm_relax_top_p - scm_relax_bot_p)/(scm_relax_tau_top_sec - scm_relax_tau_bot_sec)
      rycept = scm_relax_tau_top_sec - (rslope*scm_relax_top_p)
   endif
+
+  !    prepare scm_relax_fincl for comparison in scmforecast.F90
+  scm_fincl_empty=.true.
+  do i=1,pcnst
+     if (len_trim(scm_relax_fincl(i)) > 0) then
+        scm_fincl_empty=.false.
+        scm_relax_fincl(i)=trim(to_upper(scm_relax_fincl(i)))
+     end if
+  end do
+
   do k = 1, plev
      if( scm_relaxation ) then
         if ( pmidm1(k).le.scm_relax_bot_p.and.pmidm1(k).ge.scm_relax_top_p ) then ! inside layer
@@ -506,13 +521,18 @@ contains
            relax_v(k)      = -  ( vfcst(k)     - vobs(k) )    / rtau(k)         
            relax_q(k,1)    = -  ( qfcst(1,k,1) - qobs(k) )    / rtau(k)
            do m = 2, pcnst
-              relax_q(k,m) = -  ( qfcst(1,k,m) - 0._r8   )    / rtau(k)
+              relax_q(k,m) = -  ( qfcst(1,k,m) - qinitobs(k,m)   )    / rtau(k)
            enddo
-           tfcst(k)        =      tfcst(k)     + relax_T(k)   * ztodt
-           ufcst(k)        =      ufcst(k)     + relax_u(k)   * ztodt
-           vfcst(k)        =      vfcst(k)     + relax_v(k)   * ztodt
+           if (scm_fincl_empty .or. ANY(scm_relax_fincl(:).eq.'T')) &
+                tfcst(k)        =      tfcst(k)     + relax_T(k)   * ztodt
+           if (scm_fincl_empty .or.ANY(scm_relax_fincl(:).eq.'U')) &
+                ufcst(k)        =      ufcst(k)     + relax_u(k)   * ztodt
+           if (scm_fincl_empty .or. ANY(scm_relax_fincl(:).eq.'V')) &
+                vfcst(k)        =      vfcst(k)     + relax_v(k)   * ztodt
            do m = 1, pcnst
-              qfcst(1,k,m) =      qfcst(1,k,m) + relax_q(k,m) * ztodt
+              if (scm_fincl_empty .or. ANY(scm_relax_fincl(:) .eq. trim(to_upper(cnst_name(m)))) ) then
+                 qfcst(1,k,m) =      qfcst(1,k,m) + relax_q(k,m) * ztodt
+              end if
            enddo
         end if
      endif

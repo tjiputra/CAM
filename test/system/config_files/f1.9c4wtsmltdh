@@ -2,7 +2,7 @@
 -chem waccm_tsmlt
 -age_of_air_trcs
 -dyn fv
--res 1.9x2.5
+-hgrid 1.9x2.5
 -debug
 -phys cam4
 -s

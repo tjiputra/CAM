@@ -13,7 +13,7 @@
       use chem_mods,     only : phtcnt, rxt_tag_cnt, rxt_tag_lst, rxt_tag_map
       use chem_mods,     only : pht_alias_lst, pht_alias_mult
       use chem_mods,     only : extfrc_lst, inv_lst, slvd_lst
-      use chem_mods,     only : enthalpy_cnt, cph_enthalpy, cph_rid
+      use chem_mods,     only : enthalpy_cnt, cph_enthalpy, cph_rid, num_rnts, rxntot
       use cam_abortutils,only : endrun
       use mo_tracname,   only : solsym
       use chem_mods,     only : frc_from_dataset
@@ -98,11 +98,11 @@
          write(iulog,*) 'set_sim_dat: failed to allocate rxt_tag_map; error = ',ios
          call endrun
       end if
-      rxt_tag_lst(:rxt_tag_cnt) = (/ 'jh2o2                           ', 'ch4_loss                        ', &
-                                     'n2o_loss                        ', 'cfc11_loss                      ', &
-                                     'cfc12_loss                      ', 'lyman_alpha                     ', &
-                                     'usr_HO2_HO2                     ', 'usr_SO2_OH                      ', &
-                                     'usr_DMS_OH                      ' /)
+      rxt_tag_lst(     1:     9) = (/ 'jh2o2                           ', 'ch4_loss                        ', &
+                                      'n2o_loss                        ', 'cfc11_loss                      ', &
+                                      'cfc12_loss                      ', 'lyman_alpha                     ', &
+                                      'usr_HO2_HO2                     ', 'usr_SO2_OH                      ', &
+                                      'usr_DMS_OH                      ' /)
       rxt_tag_map(:rxt_tag_cnt) = (/    1,   2,   3,   4,   5,   6,   7,   9,  11 /)
       if( allocated( pht_alias_lst ) ) then
          deallocate( pht_alias_lst )
@@ -124,6 +124,13 @@
       pht_alias_lst(:,2) = (/ '                ' /)
       pht_alias_mult(:,1) = (/ 1._r8 /)
       pht_alias_mult(:,2) = (/ 1._r8 /)
+      allocate( num_rnts(rxntot-phtcnt),stat=ios )
+      if( ios /= 0 ) then
+         write(iulog,*) 'set_sim_dat: failed to allocate num_rnts; error = ',ios
+         call endrun
+      end if
+      num_rnts(:) = (/      1,     1,     1,     1,     1,     2,     2,     2,     2,     2, &
+                            2 /)
 
       end subroutine set_sim_dat
 

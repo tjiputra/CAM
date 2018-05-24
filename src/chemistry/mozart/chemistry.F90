@@ -72,7 +72,7 @@ module chemistry
   character(len=shr_kind_cl) :: xs_short_file = 'xs_short_file'
   character(len=shr_kind_cl) :: xs_long_file = 'xs_long_file'
   character(len=shr_kind_cl) :: electron_file = 'electron_file'
-  character(len=shr_kind_cl) :: euvac_file = ' '
+  character(len=shr_kind_cl) :: euvac_file = 'NONE'
 
   ! solar / geomag data
 
@@ -134,7 +134,7 @@ module chemistry
   logical :: chem_step = .true.
   logical :: is_active = .false.
 
-  character(len=32) :: chem_name = 'UNSET'
+  character(len=32) :: chem_name = 'NONE'
   logical :: chem_rad_passive = .false.
   
   ! for MEGAN emissions
@@ -353,8 +353,7 @@ end function chem_is
     use mo_drydep,        only: drydep_srf_file
     use noy_ubc,          only: noy_ubc_readnl
     use mo_sulf,          only: sulf_readnl
-    use mo_solar_parms,   only: solar_parms_readnl
-
+    use species_sums_diags,only: species_sums_readnl
 
    ! args
 
@@ -675,7 +674,7 @@ end function chem_is
    call mo_apex_readnl(nlfile)
    call noy_ubc_readnl(nlfile)
    call sulf_readnl(nlfile)
-   call solar_parms_readnl(nlfile)
+   call species_sums_readnl(nlfile)
 
   endsubroutine chem_readnl
 
@@ -1142,7 +1141,6 @@ end function chem_is_active
     use tracer_srcs,       only : tracer_srcs_adv
     use mo_ghg_chem,       only : ghg_chem_timestep_init
 
-    use mo_solar_parms,    only : solar_parms_timestep_init
     use mo_aurora,         only : aurora_timestep_init
     use mo_photo,          only : photo_timestep_init
     use linoz_data,        only : linoz_data_adv
@@ -1218,11 +1216,6 @@ end function chem_is_active
        call ghg_chem_timestep_init(phys_state)
     endif
     
-    !-----------------------------------------------------------------------
-    ! Set solar parameters
-    !-----------------------------------------------------------------------
-    call solar_parms_timestep_init
-
     !-----------------------------------------------------------------------
     ! Set up aurora
     !-----------------------------------------------------------------------

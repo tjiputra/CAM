@@ -111,6 +111,16 @@ subroutine timemgr_init( &
    ref_date   = TimeSetymd(ref_ymd, ref_tod, "ref_date")
    curr_date  = TimeSetymd(curr_ymd, curr_tod, "curr_date")
 
+   ! In order that an initial run start with nstep=0 (which is the criteria
+   ! for the is_first_step() function to return true), the current time
+   ! must be the same as the start time.  To allow the driver to be doing a
+   ! continue run and at the same time force CAM into an initial run mode
+   ! this code forces the start time to equal the current time, even though
+   ! that may not be true for the data received from the driver.
+   if (initial_run) then
+      start_date = curr_date
+   end if
+
    ! Initialize ESMF clock
    call initialize_clock(start_date, ref_date, curr_date, stop_date)
 

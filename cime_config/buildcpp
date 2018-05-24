@@ -62,7 +62,7 @@ def buildcpp(case):
 
     # if need to build - then construct configure command
     config_opts = ["-s", "-fc_type", compiler, "-ccsm_seq",
-                   "-dyn", cam_dycore, "-res", atm_grid,
+                   "-dyn", cam_dycore, "-hgrid", atm_grid,
                    "-usr_src", os.path.join(caseroot, "SourceMods", "src.cam")]
     
     if nlev:
@@ -77,7 +77,7 @@ def buildcpp(case):
     else:
         config_opts.append("-spmd")
 
-    if int(nthrds_atm) == 1 or pts_mode:
+    if int(nthrds_atm) == 1:
         config_opts.append("-nosmp")
     else:
         config_opts.append("-smp")

@@ -79,7 +79,7 @@
 !------------------------------------------------------------------------------            
 
       use mo_util,        only : rebin
-      use solar_data,  only : data_nbins=>nbins, data_we => we, data_etf => sol_etf
+      use solar_irrad_data,  only : data_nbins=>nbins, data_we => we, data_etf => sol_etf
 
       implicit none
 
@@ -497,9 +497,8 @@
 !	... set etfphot if required
 !---------------------------------------------------------------
 
-      use time_manager,   only : is_end_curr_day
       use mo_util,        only : rebin
-      use solar_data,     only : data_nbins=>nbins, data_we => we, data_etf => sol_etf
+      use solar_irrad_data,     only : data_nbins=>nbins, data_we => we, data_etf => sol_etf
 
       implicit none
 

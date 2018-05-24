@@ -5,24 +5,20 @@
   <description modifier_mode="*">
   <!--
     ===============
-      CAM 
+      CAM
     ===============
    -->
-    <desc atm="CAM60[%CCTS][%PORT][%RCO2][%WCCM][%WCMD][%WCSC][%WCTS]"      >CAM cam6 physics:</desc>
-
-    <desc atm="CAM50[%CCTS][%CLB][%PORT][%RCO2][%WCSC][%WCTS]"              >CAM cam5 physics:</desc>
-    <desc atm="CAM40[%PORT][%RCO2][%TMOZ][%WXIE]"                           >CAM cam4 physics:</desc>
-    <desc atm="CAM[%ADIAB][%DABIP04][%DCTBM][%HS94][%KESSLER][%RCO2][%SPCAMS][%SPCAMCLBS][%SPCAMM][%SPCAMCLBM]"               >CAM simplified and non-versioned physics :</desc>
+    <desc atm="CAM60[%CCTS][%PORT][%RCO2][%SCAM][%WCCM][%WCMD][%WCSC][%WCTS]"      >CAM cam6 physics:</desc>
+    <desc atm="CAM50[%CCTS][%CLB][%PORT][%RCO2][%SCAM][%WCSC][%WCTS]"              >CAM cam5 physics:</desc>
+    <desc atm="CAM40[%PORT][%RCO2][%SCAM][%TMOZ][%WXIE]"                           >CAM cam4 physics:</desc>
+    <desc atm="CAM[%ADIAB][%DABIP04][%DCTBM][%HS94][%KESSLER][%RCO2][%SPCAMS][%SPCAMCLBS][%SPCAMM][%SPCAMCLBM]">CAM simplified and non-versioned physics :</desc>
 
   <!--
     ===============
      SINGLE COLUMN CAM
     ===============
    -->
-    <desc atm="AR95_CAM40%SCAM" >CAM stand-alone single column CAM ARM95 IOP test case:</desc>
-    <desc atm="AR95_CAM50%SCAM" >CAM stand-alone single column CAM ARM95 IOP test case:</desc>
-    <desc atm="AR97_CAM40%SCAM" >CAM stand-alone single column CAM ARM97 IOP test case:</desc>
-    <desc atm="AR97_CAM50%SCAM" >CAM stand-alone single column CAM ARM97 IOP test case:</desc>
+    <desc atm="CAM[456]0%SCAM"  >CAM stand-alone single column mode -- need to define usermods directory with IOP settings:</desc>
     <desc atm="SDYN_CAM"        >CAM winds and temperature nudged towards prescribed meteorology:</desc>
   <!--
     ===============
@@ -62,7 +58,7 @@
 
   <!--
     ===============
-     PORT   
+     PORT
     ===============
    -->
     <desc option="PORT"         >CAM Parallel Offline Radiation Tool:</desc>
@@ -92,7 +88,7 @@
     <default_value>fv</default_value>
     <values match="last">
       <value grid="a%T[1-9]" >eul</value>
-      <value grid="a%ne[1-9]">se</value>
+      <value grid="a%ne[0-9]">se</value>
     </values>
     <group>build_component_cam</group>
     <file>env_build.xml</file>
@@ -137,6 +133,7 @@
       <value compset="SDYN_CAM.*%WX">-nlev 145</value>
 
       <!-- Simple models -->
+      <value compset="_CAM%HS94" grid="(%ne[0-9])|(%[0-9.]+x)">-analytic_ic</value>
       <value compset="_CAM%ADIAB">-phys adiabatic</value>
       <value compset="_CAM%DABIP04">-phys adiabatic</value>
       <value compset="_CAM%DCTBM">-phys held_suarez -chem terminator -analytic_ic</value>
@@ -202,6 +199,7 @@
       <value compset="HIST_CAM60%WCTS"   >waccm_tsmlt_hist_cam6</value>
       <value compset="HIST_CAM60%WCSC"   >waccm_sc_hist_cam6</value>
       <value compset="HIST_CAM60%WCCM"   >waccm_ma_hist_cam6</value>
+      <value compset="HIST_CAM60%WCMD"   >waccm_ma_hist_cam6</value>
       <value compset="HIST_CAM60%CCTS"   >hist_trop_strat_vbs_cam6</value>
 
       <value compset="PIPD_CAM50"        >1850-PD_cam5</value>
@@ -224,13 +222,13 @@
       <value compset="SDYN_CAM60%WCMD"   >sd_waccm_ma_cam6</value>
       <value compset="SDYN_CAM60%CCTS"   >sd_trop_strat_vbs_cam6</value>
 
-      <value compset="AR95_CAM[45]"      >scam_arm95</value>
-      <value compset="AR97_CAM[45]"      >scam_arm97</value>
-
       <value compset="2000_CAM%DABIP04"  >dabi_p2004</value>
       <value compset="CAM%HS94"          >held_suarez_1994</value>
       <value compset="CAM%DCTBM"         >dctest_baro_moist</value>
       <value compset="CAM%KESSLER"       >dctest_baro_kessler</value>
+
+      <!-- SCAM defaults to ARM97, all other IOPs are in usermods_dirs -->
+      <value compset="CAM[456]0%SCAM"    >scam_arm97</value>
     </values>
     <group>run_component_cam</group>
     <file>env_run.xml</file>
@@ -254,6 +252,9 @@
     <values match="last" modifier="additive">
       <value compset="_CAM.*%RCO2"> scenario_ghg=&apos;RAMP_CO2_ONLY&apos;ramp_co2_annual_rate=1 </value>
       <value compset="_BGC%BDRD"> co2_cycle_rad_passive=.true. </value>
+      <value grid="a%0.9x1.25_l%0.9x1.25_oi%0.9x1.25_r%r05_g%null_w%null_m%gx1v7" compset="SDYN_CAM60%(WCTS|WCCM|WCMD)_CLM50%BGC-CROP_CICE%PRES_DOCN%DOM_MOSART_SGLC_SWAV">
+         ncdata='$DIN_LOC_ROOT/cesm2_init/f.e20.FWSD.f09_f09_mg17.262/2005-01-01/f.e20.FWSD.f09_f09_mg17.262.cam.i.2005-01-01-00000.nc'
+      </value>
     </values>
     <group>run_component_cam</group>
     <file>env_run.xml</file>
@@ -269,14 +270,10 @@
     <valid_values></valid_values>
     <default_value></default_value>
     <values match="last">
-    <value compset="1850_CAM60_CLM50%BGC" grid="a%0.9x1.25_l%0.9x1.25_oi%gx1v7_r%r05_g%gland4_w%ww3a_m%gx1v7">$SRCROOT/components/cam/cime_config/usermods_dirs/1850</value>
-    <value compset="1850_CAM60_CLM50%BGC" grid="a%0.9x1.25_l%0.9x1.25_oi%gx1v7_r%r05_g%gland4_w%null_m%gx1v7">$SRCROOT/components/cam/cime_config/usermods_dirs/1850</value>
-    <value compset="2000_CAM60_CLM50%BGC">$SRCROOT/components/cam/cime_config/usermods_dirs/f2000</value>
-    <value compset="HIST_CAM60_CLM50%BGC">$SRCROOT/components/cam/cime_config/usermods_dirs/fhist</value>
-
     <value compset="DOCN%AQP">$SRCROOT/components/cam/cime_config/usermods_dirs/aquap</value>
     <value compset="DOCN%SOMAQP">$SRCROOT/components/cam/cime_config/usermods_dirs/aquap</value>
     <value compset="_CAM40%WX.*_CLM40">$SRCROOT/components/cam/cime_config/usermods_dirs/waccmx</value>
+    <value compset="CAM[456]0%SCAM" >$SRCROOT/components/cam/cime_config/usermods_dirs/scam_mandatory</value>
     </values>
     <group>run_component_cam</group>
     <file>env_case.xml</file>

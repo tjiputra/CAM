@@ -5,7 +5,7 @@ module cam_comp
 !
 ! This interface layer is CAM specific, i.e., it deals entirely with CAM
 ! specific data structures.  It is the layer above this, either atm_comp_mct
-! or atm_comp_esmf, which translates between CAM and either MCT or ESMF 
+! or atm_comp_esmf, which translates between CAM and either MCT or ESMF
 ! data structures in order to interface with the driver/coupler.
 !
 !-----------------------------------------------------------------------
@@ -22,7 +22,7 @@ use runtime_opts,      only: read_namelist
 use time_manager,      only: timemgr_init, get_step_size, &
                              get_nstep, is_first_step, is_first_restart_step
 
-use camsrfexch,        only: cam_out_t, cam_in_t     
+use camsrfexch,        only: cam_out_t, cam_in_t
 use ppgrid,            only: begchunk, endchunk
 use physics_types,     only: physics_state, physics_tend
 use dyn_comp,          only: dyn_import_t, dyn_export_t
@@ -53,18 +53,18 @@ type(physics_tend ),       pointer :: phys_tend(:) => null()
 type(physics_buffer_desc), pointer :: pbuf2d(:,:) => null()
 
 real(r8) :: dtime_phys         ! Time step for physics tendencies.  Set by call to
-                               ! stepon_run1, then passed to the phys_run* 
+                               ! stepon_run1, then passed to the phys_run*
 
 !-----------------------------------------------------------------------
 contains
 !-----------------------------------------------------------------------
 
 subroutine cam_init(EClock, &
-   caseid, ctitle, start_type, brnch_retain_casename, &
-   aqua_planet, &
-   single_column, scmlat, scmlon, &
-   eccen, obliqr, lambm0, mvelpp,  &
-   perpetual_run, perpetual_ymd, &
+   caseid, ctitle, start_type, dart_mode,       &
+   brnch_retain_casename, aqua_planet,          &
+   single_column, scmlat, scmlon,               &
+   eccen, obliqr, lambm0, mvelpp,               &
+   perpetual_run, perpetual_ymd, model_doi_url, &
    cam_out, cam_in)
 
    !-----------------------------------------------------------------------
@@ -100,6 +100,7 @@ subroutine cam_init(EClock, &
    character(len=cl), intent(in) :: caseid                ! case ID
    character(len=cl), intent(in) :: ctitle                ! case title
    character(len=cs), intent(in) :: start_type            ! start type: initial, restart, or branch
+   logical,           intent(in) :: dart_mode             ! enables DART mode
    logical,           intent(in) :: brnch_retain_casename ! Flag to allow a branch to use the same
                                                           ! caseid as the run being branched from.
    logical,           intent(in) :: aqua_planet           ! Flag to run model in "aqua planet" mode
@@ -115,6 +116,7 @@ subroutine cam_init(EClock, &
 
    logical,           intent(in) :: perpetual_run    ! true => perpetual mode enabled
    integer,           intent(in) :: perpetual_ymd    ! Perpetual date (YYYYMMDD)
+   character(len=cl), intent(in) :: model_doi_url    ! CESM model DOI
 
    type(cam_out_t),   pointer    :: cam_out(:)       ! Output from CAM to surface
    type(cam_in_t) ,   pointer    :: cam_in(:)        ! Merged input state to CAM
@@ -137,7 +139,7 @@ subroutine cam_init(EClock, &
 
    ! Initializations using data passed from coupler.
    call cam_ctrl_init( &
-      caseid, ctitle, start_type,  &
+      caseid, ctitle, start_type, dart_mode,       &
       aqua_planet, brnch_retain_casename)
 
    call cam_ctrl_set_orbit(eccen, obliqr, lambm0, mvelpp)
@@ -205,7 +207,7 @@ subroutine cam_init(EClock, &
    call offline_driver_init()
 
    if (single_column) call scm_intht()
-   call intht()
+   call intht(model_doi_url)
 
 end subroutine cam_init
 
@@ -220,7 +222,7 @@ subroutine cam_run1(cam_in, cam_out)
 !            physics (before surface model updates).
 !
 !-----------------------------------------------------------------------
-   
+
    use physpkg,          only: phys_run1
    use stepon,           only: stepon_run1
    use ionosphere_interface,only: ionosphere_run1
@@ -272,7 +274,7 @@ subroutine cam_run2( cam_out, cam_in )
 !            between physics to dynamics.
 !
 !-----------------------------------------------------------------------
-   
+
    use physpkg,          only: phys_run2
    use stepon,           only: stepon_run2
    use ionosphere_interface, only: ionosphere_run2
@@ -302,7 +304,7 @@ subroutine cam_run2( cam_out, cam_in )
    call t_stopf  ('stepon_run2')
 
    !
-   ! Ion transport 
+   ! Ion transport
    !
    call t_startf('ionosphere_run2')
    call ionosphere_run2( phys_state, dyn_in, pbuf2d )
@@ -365,6 +367,8 @@ subroutine cam_run4( cam_out, cam_in, rstwr, nlend, &
 !-----------------------------------------------------------------------
    use cam_history,      only: wshist, wrapup
    use cam_restart,      only: cam_write_restart
+   use qneg_module,      only: qneg_print_summary
+   use time_manager,     only: is_last_step
 
    type(cam_out_t), intent(inout)        :: cam_out(begchunk:endchunk)
    type(cam_in_t) , intent(inout)        :: cam_in(begchunk:endchunk)
@@ -402,6 +406,8 @@ subroutine cam_run4( cam_out, cam_in, rstwr, nlend, &
    call wrapup(rstwr, nlend)
    call t_stopf  ('cam_run4_wrapup')
 
+   call qneg_print_summary(is_last_step())
+
    call shr_sys_flush(iulog)
 
 end subroutine cam_run4
@@ -432,7 +438,6 @@ subroutine cam_final( cam_out, cam_in )
    integer :: nstep           ! Current timestep number.
    !-----------------------------------------------------------------------
 
-
    call phys_final( phys_state, phys_tend , pbuf2d)
    call stepon_final(dyn_in, dyn_out)
    call ionosphere_final()
@@ -444,9 +449,9 @@ subroutine cam_final( cam_out, cam_in )
    call hub2atm_deallocate(cam_in)
    call atm2hub_deallocate(cam_out)
 
-   ! This flush attempts to ensure that asynchronous diagnostic prints from all 
-   ! processes do not get mixed up with the "END OF MODEL RUN" message printed 
-   ! by masterproc below.  The test-model script searches for this message in the 
+   ! This flush attempts to ensure that asynchronous diagnostic prints from all
+   ! processes do not get mixed up with the "END OF MODEL RUN" message printed
+   ! by masterproc below.  The test-model script searches for this message in the
    ! output log to figure out if CAM completed successfully.
    call shr_sys_flush( 0 )       ! Flush all output to standard error
    call shr_sys_flush( iulog )   ! Flush all output to the CAM log file

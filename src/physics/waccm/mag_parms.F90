@@ -2,17 +2,29 @@
       module mag_parms
 
       use shr_kind_mod,   only : r8 => shr_kind_r8
-      use mo_solar_parms, only : solar_parms_get
+      use solar_parms_data, only : wkp=>solar_parms_kp, wf107=>solar_parms_f107
       use wei05sc,        only : ctpoten_weimer
+      use cam_abortutils, only : endrun
 
       implicit none
 
       private
       public :: get_mag_parms
+      public :: mag_parms_setopts
 
-      character(len=16), public, protected :: highlat_potential_model = 'heelis'
+      character(len=16), public, protected :: highlat_potential_model = 'none'
 
       contains
+
+      subroutine mag_parms_setopts( potential_model )
+        character(len=*), intent(in) :: potential_model
+
+        if ( .not.(trim(potential_model).eq.'heelis' .or. trim(potential_model).eq.'weimer') ) then
+          call endrun('mag_parms_setopts: potential_model must be heelis or weimer')
+        endif
+
+        highlat_potential_model = trim(potential_model)
+      end subroutine mag_parms_setopts
 
       subroutine get_mag_parms( by, bz, hpower, ctpoten )
 !---------------------------------------------------------------
@@ -29,13 +41,6 @@
       real(r8), optional, intent(out) :: hpower
       real(r8), optional, intent(out) :: ctpoten
 
-!---------------------------------------------------------------
-!       ... local variables
-!---------------------------------------------------------------
-      real(r8) :: wkp                                             ! wrk solar mag factor
-      real(r8) :: wf107                                           ! wrk solar mag factor
-
-      call solar_parms_get( kp_s = wkp, f107_s = wf107 )
       if( present( by ) ) then
          by  =  0._r8
       end if

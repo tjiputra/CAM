@@ -24,9 +24,9 @@ module mo_chm_diags
   integer :: id_cfc114,id_cfc115,id_hcfc141b,id_hcfc142b,id_h1202,id_h2402,id_ch2br2,id_chbr3
   integer :: id_hf,id_f,id_cof2,id_cofcl,id_ch3br
   integer :: id_br,id_bro,id_hbr,id_hobr,id_ch4,id_h2o,id_h2
-  integer :: id_o,id_o2,id_h
+  integer :: id_o,id_o2,id_h, id_h2o2, id_n2o
   integer :: id_co2,id_o3,id_oh,id_ho2,id_so4_a1,id_so4_a2,id_so4_a3
-
+  integer :: id_num_a2,id_num_a3,id_dst_a3,id_ncl_a3
   integer :: id_ndep,id_nhdep
 
   integer, parameter :: NJEUV = neuv
@@ -38,6 +38,7 @@ module mo_chm_diags
   integer :: clox_species(6), cloy_species(9), tcly_species(21)
   integer :: brox_species(4), broy_species(6), tbry_species(13)
   integer :: foy_species(4),  tfy_species(16)
+  integer :: hox_species(4)
   integer :: toth_species(3)
   integer :: sox_species(3)
   integer :: nhx_species(2)
@@ -63,6 +64,7 @@ contains
     use constituents, only : cnst_get_ind, cnst_longname
     use phys_control, only : phys_getopts
     use mo_drydep,    only : has_drydep
+    use species_sums_diags, only : species_sums_init
 
     integer :: j, k, m, n
     character(len=16) :: jname, spc_name, attr
@@ -111,6 +113,7 @@ contains
     id_no2     = get_spc_ndx( 'NO2' )
     id_no3     = get_spc_ndx( 'NO3' )
     id_n2o5    = get_spc_ndx( 'N2O5' )
+    id_n2o     = get_spc_ndx( 'N2O' )
     id_hno3    = get_spc_ndx( 'HNO3' )
     id_ho2no2  = get_spc_ndx( 'HO2NO2' )
     id_clono2  = get_spc_ndx( 'CLONO2' )
@@ -128,9 +131,14 @@ contains
     id_o3      = get_spc_ndx( 'O3' )
     id_oh      = get_spc_ndx( 'OH' )
     id_ho2     = get_spc_ndx( 'HO2' )
+    id_h2o2    = get_spc_ndx( 'H2O2' )
     id_so4_a1  = get_spc_ndx( 'so4_a1' )
     id_so4_a2  = get_spc_ndx( 'so4_a2' )
     id_so4_a3  = get_spc_ndx( 'so4_a3' )
+    id_num_a2  = get_spc_ndx( 'num_a2' )
+    id_num_a3  = get_spc_ndx( 'num_a3' )
+    id_dst_a3  = get_spc_ndx( 'dst_a3' )
+    id_ncl_a3  = get_spc_ndx( 'ncl_a3' )
 
     id_f       = get_spc_ndx( 'F' )
     id_hf      = get_spc_ndx( 'HF' )
@@ -231,6 +239,9 @@ contains
                      id_brono2, id_pan, id_onit, id_mpan, id_isopno3, id_onitr, id_nh4no3, &
                      id_honitr, id_alknit, id_isopnita, id_isopnitb, id_isopnooh, id_nc4ch2oh, &
                      id_nc4cho, id_noa, id_nterpooh, id_pbznit, id_terpnit /)
+!... HOX species
+    hox_species = (/ id_h, id_oh, id_ho2, id_h2o2 /)
+
 !... CLOY species
     clox_species = (/ id_cl, id_clo, id_hocl, id_cl2, id_cl2o2, id_oclo /)
     cloy_species = (/ id_cl, id_clo, id_hocl, id_cl2, id_cl2o2, id_oclo, id_hcl, id_clono2, id_brcl /)
@@ -276,6 +287,7 @@ contains
     call addfld( 'NOY',     (/ 'lev' /), 'A', 'mol/mol', &
                  'noy = total nitrogen (N+NO+NO2+NO3+2N2O5+HNO3+HO2NO2+ORGNOY+NH4NO3' )
     call addfld( 'NOY_SRF', horiz_only,  'A', 'mol/mol', 'surface noy volume mixing ratio' )
+    call addfld( 'HOX',     (/ 'lev' /), 'A', 'mol/mol', 'HOx (H+OH+HO2+2H2O2)' )
 
     call addfld( 'BROX',    (/ 'lev' /), 'A', 'mol/mol', 'brox (Br+BrO+BRCl+HOBr)' )
     call addfld( 'BROY',    (/ 'lev' /), 'A', 'mol/mol', 'total inorganic bromine (Br+BrO+HOBr+BrONO2+HBr+BrCl)' )
@@ -396,13 +408,25 @@ contains
           if (m==id_so4_a1) call add_default( spc_name, 8, ' ')
           if (m==id_so4_a2) call add_default( spc_name, 8, ' ')
           if (m==id_so4_a3) call add_default( spc_name, 8, ' ')
+
+          if (m==id_num_a2) call add_default( spc_name, 8, ' ')
+          if (m==id_num_a3) call add_default( spc_name, 8, ' ')
+          if (m==id_dst_a3) call add_default( spc_name, 8, ' ')
+          if (m==id_ncl_a3) call add_default( spc_name, 8, ' ')
+
        endif
        if ( history_scwaccm_forcing ) then
           if (m==id_co2) call add_default( spc_name, 8, ' ')
           if (m==id_h)   call add_default( spc_name, 8, ' ')
           if (m==id_no)  call add_default( spc_name, 8, ' ')
           if (m==id_o)   call add_default( spc_name, 8, ' ')
+          if (m==id_o2)  call add_default( spc_name, 8, ' ')
           if (m==id_o3)  call add_default( spc_name, 8, ' ')
+          if (m==id_h2o)    call add_default( spc_name, 1, ' ')
+          if (m==id_ch4 )   call add_default( spc_name, 1, ' ')
+          if (m==id_n2o )   call add_default( spc_name, 1, ' ')
+          if (m==id_cfc11 ) call add_default( spc_name, 1, ' ')
+          if (m==id_cfc12 ) call add_default( spc_name, 1, ' ')
        endif
 
     enddo
@@ -428,6 +452,8 @@ contains
        call add_default('wet_deposition_NHx_as_N', 1, ' ')
     endif
 
+    call species_sums_init()
+
   end subroutine chm_diags_inti
 
   subroutine chm_diags( lchnk, ncol, vmr, mmr, rxt_rates, invariants, depvel, depflx, mmr_tend, pdel, pmid, ltrop, &
@@ -438,6 +464,7 @@ contains
     
     use cam_history,  only : outfld
     use phys_grid,    only : get_area_all_p
+    use species_sums_diags, only : species_sums_output
 !
 ! CCMI
 !
@@ -476,6 +503,7 @@ contains
     real(r8), dimension(ncol,pver) :: mmr_noy, mmr_sox, mmr_nhx, net_chem
     real(r8), dimension(ncol)      :: df_noy, df_sox, df_nhx, do3chm_trp, do3chm_lms
     real(r8), dimension(ncol)      :: wd_noy, wd_nhx
+    real(r8), dimension(ncol,pver) :: vmr_hox
 
     real(r8) :: area(ncol), mass(ncol,pver)
     real(r8) :: wgt
@@ -485,6 +513,7 @@ contains
     !--------------------------------------------------------------------
     vmr_nox(:ncol,:) = 0._r8
     vmr_noy(:ncol,:) = 0._r8
+    vmr_hox(:ncol,:) = 0._r8
     vmr_clox(:ncol,:) = 0._r8
     vmr_cloy(:ncol,:) = 0._r8
     vmr_tcly(:ncol,:) = 0._r8
@@ -537,7 +566,7 @@ contains
        endif
 
 !... counting chlorine and bromines, etc... (and total H2 species)
-       if ( m == id_ch4 .or. m == id_n2o5 .or. m == id_cfc12 .or. m == id_cl2 .or. m == id_cl2o2  ) then
+       if ( m == id_ch4 .or. m == id_n2o5 .or. m == id_cfc12 .or. m == id_cl2 .or. m == id_cl2o2 .or. m==id_h2o2  ) then
           wgt = 2._r8
        elseif (m == id_cfc114 .or. m == id_hcfc141b .or. m == id_h1202 .or. m == id_h2402 .or. m == id_ch2br2 ) then
           wgt = 2._r8
@@ -588,6 +617,10 @@ contains
 !...HOY
        if ( any ( toth_species == m ) ) then
           vmr_toth(:ncol,:) = vmr_toth(:ncol,:) +  wgt * vmr(:ncol,:,m)
+       endif
+!...HOx
+       if ( any( hox_species == m ) ) then
+          vmr_hox(:ncol,:) = vmr_hox(:ncol,:) +  wgt * vmr(:ncol,:,m)
        endif
        
        if ( any( aer_species == m ) ) then
@@ -666,6 +699,7 @@ contains
 
     call outfld( 'NOX',  vmr_nox  (:ncol,:), ncol, lchnk )
     call outfld( 'NOY',  vmr_noy  (:ncol,:), ncol, lchnk )
+    call outfld( 'HOX',  vmr_hox  (:ncol,:), ncol, lchnk )
     call outfld( 'NOY_SRF',  vmr_noy(:ncol,pver),  ncol, lchnk )
     call outfld( 'CLOX', vmr_clox (:ncol,:), ncol, lchnk )
     call outfld( 'CLOY', vmr_cloy (:ncol,:), ncol, lchnk )
@@ -784,6 +818,8 @@ contains
        end do
        call outfld( 'PJNO', wrk, ncol, lchnk )
     endif
+
+    call species_sums_output(vmr, mmr, ncol, lchnk)
 
   end subroutine chm_diags
 

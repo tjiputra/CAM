@@ -49,7 +49,7 @@
       integer  :: astat
       character(len=256) :: locfn
 
-      euvac_on = len_trim(euvac_file)>0
+      euvac_on = len_trim(euvac_file)>0 .and. euvac_file.ne.'NONE'
       if (.not.euvac_on) return
 
 !-----------------------------------------------------------------------

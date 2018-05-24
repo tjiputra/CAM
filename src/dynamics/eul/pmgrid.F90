@@ -4,7 +4,7 @@ module pmgrid
 
    implicit none
 
-   public 
+   public
 
    integer, parameter :: plon   = PLON                     ! number of longitudes
    integer, parameter :: plev   = PLEV                     ! number of vertical levels
@@ -25,5 +25,5 @@ module pmgrid
    parameter (endirow  = plat/2)
    parameter (numlats  = plat)
 #endif
-end module pmgrid
 
+end module pmgrid

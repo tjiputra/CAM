@@ -7,6 +7,8 @@ module fill_module
 
  use shr_kind_mod, only: r8 => shr_kind_r8
  use cam_logfile,  only: iulog
+ use cam_abortutils, only: endrun
+
 
 #ifdef NO_R16
    integer,parameter :: r16= selected_real_kind(12) ! 8 byte real
@@ -16,7 +18,7 @@ module fill_module
 
 !
 ! !PUBLIC MEMBER FUNCTIONS:
-      public filew, fillxy, fillz, filns, pfix
+      public filew, fillxy, fillz, filns, pfix, fill_readnl
 
 !
 ! !DESCRIPTION:
@@ -36,12 +38,47 @@ module fill_module
 !-----------------------------------------------------------------------
 
 private
+
 real(r8), parameter ::  D0_0                    =  0.0_r8
 real(r8), parameter ::  D0_5                    =  0.5_r8
 real(r8), parameter ::  D1_0                    =  1.0_r8
 real(r8), parameter ::  D1_5                    =  1.5_r8
 
+character(len=8)   :: print_filew_warn       =  'off'
+
 contains
+
+subroutine fill_readnl(nlfile)
+  use namelist_utils,  only: find_group_name
+  use units,           only: getunit, freeunit
+  use spmd_utils,      only: mpicom, mstrid=>masterprocid, mpi_character, masterproc
+  ! File containing namelist input.
+  character(len=*), intent(in) :: nlfile
+
+  ! Local variables
+  integer :: unitn, ierr
+  character(len=*), parameter :: sub = 'fill_readnl'
+
+  namelist /fill_nl/ print_filew_warn
+
+  if (masterproc) then
+     unitn = getunit()
+     open( unitn, file=trim(nlfile), status='old' )
+     call find_group_name(unitn, 'fill_nl', status=ierr)
+     if (ierr == 0) then
+        read(unitn, fill_nl, iostat=ierr)
+        if (ierr /= 0) then
+           call endrun(sub // ':: ERROR reading namelist fill_nl')
+        end if
+     end if
+     close(unitn)
+     call freeunit(unitn)
+  end if
+
+  call mpi_bcast(print_filew_warn, len(print_filew_warn), mpi_character, mstrid, mpicom, ierr)
+  if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: print_filew_warn")
+
+end subroutine fill_readnl
 
 !-----------------------------------------------------------------------
 !BOP
@@ -194,7 +231,7 @@ contains
           endif
        enddo
 
-       if ( qmin < D0_0 ) then
+       if (( qmin < D0_0 ) .and. print_filew_warn == "full") then
           write(iulog,*) ' filew failed, worst i, j, qtmp, q = ', imin, jmin, qtmp(jmin,imin), q(imin,jmin)
        end if
 

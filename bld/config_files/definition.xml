@@ -65,9 +65,6 @@ Switch to turn on CLUBB_SGS package: 0 => no, 1 => yes
 <entry id="unicon" valid_values="0,1" value="0">
 Switch to turn on UNICON package: 0 => off, 1 => on
 </entry>
-<entry id="clubb_do_deep" valid_values="0,1" value="0">
-Switch to turn on/off CLUBB_SGS using clubb to calculate deep: 0 => no, 1 => yes
-</entry>
 <entry id="clubb_do_adv" valid_values="0,1" value="0">
 Switch to turn on/off advecting CLUBB moments: 0 => no, 1 => yes
 </entry>
@@ -144,7 +141,7 @@ This option only supported for the Eulerian dycore.
 </entry>
 <entry id="hgrid" value="">
 Horizontal grid specifier.  The recognized values depend on
-the dynamics type and are contained in the config_horiz_grid.xml file.
+the dynamics type and are contained in the horiz_grid.xml file.
 </entry>
 <entry id="nlon" value="1">
 Number of unique longitude points in rectangular lat/lon grid.
@@ -157,6 +154,9 @@ Number of elements along one edge of a cubed sphere grid.
 </entry>
 <entry id="csnp" value="1">
 Number of points on each edge of the elements in a cubed sphere grid.
+</entry>
+<entry id="npg" value="0">
+Number of physics grid cells on each edge of the elements in a cubed sphere grid.
 </entry>
 <entry id="nlev" value="0">
 Number of vertical levels.

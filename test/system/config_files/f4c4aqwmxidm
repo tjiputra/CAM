@@ -5,6 +5,6 @@
 -waccmx
 -ionosphere wxi
 -dyn fv
--res 4x5
+-hgrid 4x5
 -debug
 -s

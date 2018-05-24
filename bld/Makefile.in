@@ -328,8 +328,12 @@ ifeq ($(UNAMES),Linux)
 CPPDEF += -DLINUX
 
 ifeq ($(SMP),TRUE)
-  # THREADED_OMP is used by the timing library
-  CPPDEF += -DTHREADED_OMP
+  # THREADED_PTHREADS and THREADED_OMP are used by the timing library
+  ifeq ($(FC_TYPE), nag)
+    CPPDEF += -DTHREADED_PTHREADS
+  else
+    CPPDEF += -DTHREADED_OMP
+  endif
 endif
 
 CFLAGS = $(cpp_path) $(CPPDEF)
@@ -395,13 +399,13 @@ ifeq ($(FC_TYPE),intel)
 
   CPPDEF        += -DCPRINTEL $(NO_CONTIGUOUS_FLAG)
   CFLAGS        += -std=gnu99
-  FC_FLAGS      := -ftz -convert big_endian -fp-model source \
+  FC_FLAGS      := -ftz -convert big_endian -fp-model source -no-fma \
                    -qno-opt-dynamic-align -assume realloc_lhs -xHost
   FC_FLAGS_O3OPT:= $(FC_FLAGS)
   FC_FLAGS_NOOPT:= -ftz -convert big_endian -O0
   FREEFLAGS     := 
   FIXEDFLAGS    := -fixed -132
-  LDFLAGS       := -static-intel -liomp5
+  LDFLAGS       :=
 
   ifeq ($(DEBUG),TRUE)
     FC_DEBUG       := -check all -check noarg_temp_created -fpe0 -g -traceback

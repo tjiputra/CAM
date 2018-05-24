@@ -157,8 +157,7 @@ module clubb_intr
     qist_idx, &         ! Physical in-cloud IWC
     dp_frac_idx, &      ! deep convection cloud fraction
     sh_frac_idx, &      ! shallow convection cloud fraction
-    kvh_idx, &          ! CLUBB eddy diffusivity on thermo levels
-    kvm_idx, &          ! CLUBB eddy diffusivity on mom levels
+    kvh_idx, &          ! Eddy diffusivity of heat/moisture on interface levels
     pblh_idx, &         ! PBL pbuf
     icwmrdp_idx, &      ! In cloud mixing ratio for deep convection
     tke_idx, &          ! turbulent kinetic energy
@@ -251,7 +250,6 @@ module clubb_intr
     call pbuf_add_field('pblh',       'global', dtype_r8, (/pcols/),                    pblh_idx)
     call pbuf_add_field('tke',        'global', dtype_r8, (/pcols, pverp/),             tke_idx)
     call pbuf_add_field('kvh',        'global', dtype_r8, (/pcols, pverp/),             kvh_idx)
-    call pbuf_add_field('kvm',        'global', dtype_r8, (/pcols, pverp/),             kvm_idx)
     call pbuf_add_field('tpert',      'global', dtype_r8, (/pcols/),                    tpert_idx)
     call pbuf_add_field('AST',        'global', dtype_r8, (/pcols,pver,dyn_time_lvls/),    ast_idx)
     call pbuf_add_field('AIST',       'global', dtype_r8, (/pcols,pver,dyn_time_lvls/),    aist_idx)
@@ -885,7 +883,7 @@ end subroutine clubb_init_cnst
     call addfld ('CMELIQ',           (/ 'lev' /),  'A', 'kg/kg/s',  'Rate of cond-evap of liq within the cloud')
 
     call addfld ('QSATFAC',          (/ 'lev' /),  'A', '-', 'Subgrid cloud water saturation scaling factor')
-    call addfld ('KVH_CLUBB',        (/ 'ilev' /), 'A', 'm2/s',      'Vertical Diffusivity')
+    call addfld ('KVH_CLUBB',        (/ 'ilev' /), 'A', 'm2/s', 'CLUBB vertical diffusivity of heat/moisture on interface levels')
  
     !  Initialize statistics, below are dummy variables
     dum1 = 300._r8
@@ -1035,6 +1033,7 @@ end subroutine clubb_init_cnst
    use camsrfexch,     only: cam_in_t
    use time_manager,   only: is_first_step   
    use cam_abortutils, only: endrun
+   use cam_logfile,    only: iulog
    use tropopause,     only: tropopause_findChemTrop
       
 #ifdef CLUBB_SGS
@@ -1207,7 +1206,7 @@ end subroutine clubb_init_cnst
    real(r8) :: rtphmp_zt(pverp+1-top_lev,hydromet_dim)
    real(r8) :: thlphmp_zt (pverp+1-top_lev,hydromet_dim)
    real(r8) :: bflx22                           ! Variable for buoyancy flux for pbl            [K m/s]
-   real(r8) :: khzm_out(pverp+1-top_lev)        ! eddy diffusivity on momentum grids            [m^2/s]
+   real(r8) :: khzm_out(pverp+1-top_lev)        ! Eddy diffusivity of heat/moisture on momentum (i.e. interface) levels  [m^2/s]
    real(r8) :: khzt_out(pverp+1-top_lev)        ! eddy diffusivity on thermo grids              [m^2/s]
    real(r8) :: qclvar_out(pverp+1-top_lev)      ! cloud water variance                          [kg^2/kg^2]
    real(r8) :: qclvar(pcols,pverp)              ! cloud water variance                          [kg^2/kg^2]
@@ -1294,8 +1293,7 @@ end subroutine clubb_init_cnst
    real(r8), pointer, dimension(:,:) :: qist     ! Physical in-stratus IWC                      [kg/kg]
    real(r8), pointer, dimension(:,:) :: deepcu   ! deep convection cloud fraction               [fraction]
    real(r8), pointer, dimension(:,:) :: shalcu   ! shallow convection cloud fraction            [fraction]    
-   real(r8), pointer, dimension(:,:) :: khzt     ! eddy diffusivity on thermo levels            [m^2/s]
-   real(r8), pointer, dimension(:,:) :: khzm     ! eddy diffusivity on momentum levels          [m^2/s]
+   real(r8), pointer, dimension(:,:) :: khzm     ! CLUBB's eddy diffusivity of heat/moisture on momentum (i.e. interface) levels          [m^2/s]
    real(r8), pointer, dimension(:) :: pblh     ! planetary boundary layer height                [m]
    real(r8), pointer, dimension(:,:) :: tke      ! turbulent kinetic energy                     [m^2/s^2]
    real(r8), pointer, dimension(:,:) :: dp_icwmr ! deep convection in cloud mixing ratio        [kg/kg]
@@ -1332,6 +1330,8 @@ end subroutine clubb_init_cnst
    integer :: nlev
 
    intrinsic :: max
+
+   character(len=*), parameter :: subr='clubb_tend_cam'
 
 #endif
    det_s(:)   = 0.0_r8
@@ -1426,7 +1426,6 @@ end subroutine clubb_init_cnst
    call pbuf_get_field(pbuf, relvar_idx,  relvar)
    call pbuf_get_field(pbuf, dp_frac_idx, deepcu)
    call pbuf_get_field(pbuf, sh_frac_idx, shalcu)
-   call pbuf_get_field(pbuf, kvm_idx,     khzt)
    call pbuf_get_field(pbuf, kvh_idx,     khzm)
    call pbuf_get_field(pbuf, pblh_idx,    pblh)
    call pbuf_get_field(pbuf, icwmrdp_idx, dp_icwmr)
@@ -1478,7 +1477,7 @@ end subroutine clubb_init_cnst
    
    if (mod(hdtime,dtime) .ne. 0) then
      dtime = hdtime/2._r8
-     do while (dtime .gt. 300._r8) 
+     do while (dtime .gt. clubb_timestep) 
        dtime = dtime/2._r8
      end do
    endif   
@@ -1487,9 +1486,26 @@ end subroutine clubb_init_cnst
    !    into each other, have model throw a fit.  
 
    if (mod(hdtime,dtime) .ne. 0) then
-     call endrun('clubb_tend_cam:  CLUBB time step and HOST time step NOT compatible')
+     call endrun(subr//':  CLUBB time step and HOST time step NOT compatible')
    endif
    
+   ! Since CLUBB has only been scientifically validated for a 5 minute timestep
+   ! (the default value of clubb_timestep), we have decided to error out if the
+   ! final value of dtime is less than clubb_timestep.  Thus to use a non-validated
+   ! value for dtime the user will need to explicitly change the value of clubb_timestep
+   ! in the namelist, or comment this check.
+   if (dtime < clubb_timestep) then
+      if (masterproc) then
+         write(iulog,*) subr//':ERROR: The computed CLUBB timestep = ', dtime
+         write(iulog,*) subr//':ERROR: The namelist CLUBB timestep = ', clubb_timestep
+         write(iulog,*) '  The only validated value for the clubb timestep is 300 seconds.'
+         write(iulog,*) '  To run at any other value the namelist variable clubb_timestep must be set.'
+         write(iulog,*) '  Also consider adjusting the namelist variable cld_macmic_num_steps which'
+         write(iulog,*) '  determines the macro/micro substepping.'
+      end if
+      call endrun(subr//': computed CLUBB time step is less than clubb_timestep')
+   end if
+
    !  determine number of timesteps CLUBB core should be advanced, 
    !  host time step divided by CLUBB time step  
    nadv = max(hdtime/dtime,1._r8)
@@ -1753,7 +1769,7 @@ end subroutine clubb_init_cnst
       
       !  Surface fluxes provided by host model
       wpthlp_sfc = cam_in%shf(i)/(cpair*rho_ds_zm(1))       ! Sensible heat flux
-      wprtp_sfc  = cam_in%lhf(i)/(latvap*rho_ds_zm(1))      ! Latent heat flux
+      wprtp_sfc  = cam_in%cflx(i,1)/rho_ds_zm(1)            ! Moisture flux  (check rho)
       upwp_sfc   = cam_in%wsx(i)/rho_ds_zm(1)               ! Surface meridional momentum flux
       vpwp_sfc   = cam_in%wsy(i)/rho_ds_zm(1)               ! Surface zonal momentum flux  
       
@@ -1969,7 +1985,6 @@ end subroutine clubb_init_cnst
           zt_out(i,pverp-k+1)       = zt_g(k)
           zi_out(i,pverp-k+1)       = zi_g(k)
           khzm(i,pverp-k+1) = khzm_out(k)
-          khzt(i,pverp-k+1) = khzt_out(k)
           qclvar(i,pverp-k+1)       = min(1._r8,qclvar_out(k))
 
           do ixind=1,edsclr_dim
@@ -1990,7 +2005,6 @@ end subroutine clubb_init_cnst
       zt_out(i,:top_lev-1) = 0._r8
       zi_out(i,:top_lev-1) = 0._r8
       khzm(i,:top_lev-1) = 0._r8
-      khzt(i,:top_lev-1) = 0._r8
       qclvar(i,:top_lev-1) = 2._r8
 
       ! enforce zero tracer tendencies above the top_lev level -- no change
@@ -2107,7 +2121,8 @@ end subroutine clubb_init_cnst
       te_b(i) = se_b(i) + ke_b(i) + (latvap+latice)*wv_b(i)+latice*wl_b(i)
       
       ! Take into account the surface fluxes of heat and moisture
-      te_b(i) = te_b(i)+(cam_in%shf(i)+(cam_in%lhf(i)/latvap)*(latvap+latice))*hdtime      
+      !  Use correct qflux from cam_in, not lhf/latvap as was done previously
+      te_b(i) = te_b(i)+(cam_in%shf(i)+cam_in%cflx(i,1)*(latvap+latice))*hdtime      
 
       ! Compute the disbalance of total energy, over depth where CLUBB is active
       se_dis = (te_a(i) - te_b(i))/(state1%pint(i,pverp)-state1%pint(i,clubbtop+1))
@@ -2186,7 +2201,7 @@ end subroutine clubb_init_cnst
 
    enddo  ! end column loop
 
-   call outfld('KVH_CLUBB', khzt, pcols, lchnk)
+   call outfld('KVH_CLUBB', khzm, pcols, lchnk)
 
    ! Add constant to ghost point so that output is not corrupted 
    if (clubb_do_adv) then
@@ -2360,7 +2375,7 @@ end subroutine clubb_init_cnst
    call outfld( 'DPDLFICE', ptend_loc%q(:,:,ixcldice), pcols, lchnk)
    
    temp2dp(:ncol,:pver) =  ptend_loc%s(:ncol,:pver)/cpair
-   call outfld( 'DPDLFT',   temp2d, pcols, lchnk)
+   call outfld( 'DPDLFT',   temp2dp, pcols, lchnk)
   
    call physics_ptend_sum(ptend_loc,ptend_all,ncol)
    call physics_update(state1,ptend_loc,hdtime)
@@ -2559,7 +2574,8 @@ end subroutine clubb_init_cnst
    ! diagnose surface friction and obukhov length (inputs to diagnose PBL depth)
    call calc_ustar( ncol, state1%t(1:ncol,pver), state1%pmid(1:ncol,pver), cam_in%wsx(1:ncol), cam_in%wsy(1:ncol), &
                     rrho(1:ncol), ustar2(1:ncol))
-   call calc_obklen( ncol, th(1:ncol,pver), thv(1:ncol,pver), cam_in%lhf(1:ncol)/latvap, cam_in%shf(1:ncol), &
+   ! use correct qflux from coupler
+   call calc_obklen( ncol, th(1:ncol,pver), thv(1:ncol,pver), cam_in%cflx(1:ncol,1), cam_in%shf(1:ncol), &
                      rrho(1:ncol), ustar2(1:ncol), kinheat(1:ncol), kinwat(1:ncol), kbfs(1:ncol), &
                      obklen(1:ncol))
    

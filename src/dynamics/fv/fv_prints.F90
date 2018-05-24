@@ -45,7 +45,7 @@ CONTAINS
 !BOP
 ! !IROUTINE: fv_out --- Write out maxima and minima of dynamics state
 !
-! !INTERFACE: 
+! !INTERFACE:
   subroutine  fv_out( grid,   pk,    pt, ptop,       ps,                  &
                       tracer, delp,  pe, surf_state, phys_state,          &
                       ncdate, ncsec, full_phys  )
@@ -63,8 +63,8 @@ CONTAINS
     use mpishorthand, only: mpicom
 #endif
     use shr_reprosum_mod, only : shr_reprosum_calc, shr_reprosum_tolExceeded
-                              
-    use phys_gmean,    only : gmean
+
+    use gmean_mod,     only : gmean
 
     implicit none
 
@@ -130,7 +130,7 @@ CONTAINS
     real(r8), pointer :: qtmp(:,:,:)
     real(r8) :: htg(grid%ifirstxy:grid%ilastxy,grid%jfirstxy:grid%jlastxy)
     real(r8) :: rel_diff(2)
-    
+
     integer :: im, jm, km, ifirstxy, ilastxy, jfirstxy, jlastxy
     integer :: itot, jtot, ltot
 
@@ -212,7 +212,7 @@ CONTAINS
 #endif
 
 !
-! Calculate the vertically integrated heights 
+! Calculate the vertically integrated heights
 !
     htg(:,:) = D0_0
     apcon = D1_0/G_EARTH
@@ -246,7 +246,7 @@ CONTAINS
     if (iam == 0) write_warning = .true.
     exceeded = shr_reprosum_tolExceeded('fv_out', 1, write_warning, &
                                       iulog, rel_diff)
-    
+
     if (iam == 0) then
       htsum(1) = htsum(1) / (D2_0*im)
       write(iulog,*) 'Average Height (geopotential units) = ', htsum(1)
@@ -294,7 +294,7 @@ CONTAINS
 !BOP
 ! !IROUTINE: pmaxmin --- Find and print the maxima and minima of a field
 !
-! !INTERFACE: 
+! !INTERFACE:
   subroutine pmaxmin( qname, a, pmin, pmax, im, jm, fac, commun )
 
 ! !USES:
@@ -321,9 +321,9 @@ CONTAINS
 
 ! !DESCRIPTION:
 !
-!   Parallelized utility routine for computing/printing global 
-!   max/min from input lists of max/min's (usually for each latitude).  
-! 
+!   Parallelized utility routine for computing/printing global
+!   max/min from input lists of max/min's (usually for each latitude).
+!
 ! !REVISION HISTORY:
 !   00.03.01   Lin     Creation
 !   00.05.01   Mirin   Coalesce variables to minimize collective ops
@@ -381,7 +381,7 @@ CONTAINS
 !BOP
 ! !IROUTINE: pmaxmin2 --- Find and print the maxima and minima of 1-D array
 !
-! !INTERFACE: 
+! !INTERFACE:
   subroutine pmaxmin2( qname, qmin, qmax, nj, fac, commun )
 
 ! !USES:
@@ -403,11 +403,11 @@ CONTAINS
 
 ! !DESCRIPTION:
 !
-!   Parallelized utility routine for computing/printing global max/min from 
-!   input lists of max/min's (usually for each latitude). The primary purpose 
-!   is to allow for the original array and the input max/min arrays to be 
+!   Parallelized utility routine for computing/printing global max/min from
+!   input lists of max/min's (usually for each latitude). The primary purpose
+!   is to allow for the original array and the input max/min arrays to be
 !   distributed across nodes.
-! 
+!
 ! !REVISION HISTORY:
 !   00.10.01   Lin     Creation from pmaxmin
 !   01.03.26   Sawyer  Added ProTex documentation
@@ -439,4 +439,3 @@ CONTAINS
 !-----------------------------------------------------------------------
 
 end module fv_prints
-

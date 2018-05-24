@@ -27,6 +27,7 @@ module ion_electron_temp
   use cam_abortutils, only : endrun
   use mo_chem_utls,   only : get_spc_ndx                  ! Routine to get index of adv_mass array for short lived species
   use constituents,   only : cnst_get_ind, cnst_mw        ! Routines to get molecular weights for constituents
+  use solar_parms_data, only : f107=>solar_parms_f107     ! 10.7 cm solar flux
 
   implicit none
 
@@ -38,7 +39,6 @@ module ion_electron_temp
   ! PUBLIC: interfaces 
   !------------------------
   public :: ion_electron_temp_init     ! Initialization
-  public :: ion_electron_temp_timestep_init ! Time step initialization -- update F10.7
   public :: ion_electron_temp_register ! Registration of ionosphere variables in pbuf physics buffer
   public :: ion_electron_temp_inidat   ! Get fields from initial condition file into physics buffer
   public :: ion_electron_temp_tend     ! Calculate tendencies for extended model ionosphere
@@ -88,7 +88,6 @@ module ion_electron_temp
 
 ! private data
   real(r8) :: rMassOp ! O+ molecular weight kg/kmol  
-  real(r8) :: f107    ! 10.7 cm solar flux
 
 contains
 
@@ -171,17 +170,6 @@ contains
     endif
 
   end subroutine ion_electron_temp_init
-!==============================================================================     
-
-  subroutine ion_electron_temp_timestep_init
-    use mo_solar_parms,  only : solar_parms_get ! Routine to get solar parameters, i.e. f107
-
-    !--------------------------------------------------------------
-    !  Update F10.7 solar flux
-    !--------------------------------------------------------------
-    call solar_parms_get( f107_s = f107 )
-
-  end subroutine ion_electron_temp_timestep_init
 
 !==============================================================================     
 

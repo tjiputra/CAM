@@ -365,6 +365,7 @@ contains
     character(len=8) :: dim1name, dim2name
     integer :: ixcldice, ixcldliq
     integer                   :: grid_id  ! grid ID for data mapping
+
     nullify(tptr,tptr_2,tptr3d,tptr3d_2)
 
     fh_ini  => initial_file_get_id()
@@ -501,7 +502,8 @@ contains
              if (masterproc) write(iulog,*) trim(fieldname), ' initialized with Q'
              if(dycore_is('LR')) call polar_average(pver, tptr3d) 
           else
-             call endrun('  '//trim(subname)//' Error:  Q must be on Initial File')
+             if (masterproc) write(iulog,*) trim(fieldname), ' initialized to huge()'
+             tptr3d = huge(1.0_r8)
           end if
        end if
        do n = 1, dyn_time_lvls
@@ -593,8 +595,13 @@ contains
        if(.not.found) then
           call infld('T', fh_ini, dim1name, 'lev', dim2name, 1, pcols, 1, pver, begchunk, endchunk, &
                tptr3d, found, gridname='physgrid')
-          if(dycore_is('LR')) call polar_average(pver, tptr3d) 	
-          if (masterproc) write(iulog,*) trim(fieldname), ' initialized with T'
+          if (found) then
+             if(dycore_is('LR')) call polar_average(pver, tptr3d) 	
+             if (masterproc) write(iulog,*) trim(fieldname), ' initialized with T'
+          else
+             if (masterproc) write(iulog,*) trim(fieldname), ' initialized to huge()'
+             tptr3d = huge(1._r8)
+          end if
        end if
        do n = 1, dyn_time_lvls
           call pbuf_set_field(pbuf2d, m, tptr3d, (/1,1,n/),(/pcols,pver,1/))
@@ -725,6 +732,7 @@ contains
     use aer_rad_props,      only: aer_rad_props_init
     use subcol,             only: subcol_init
     use qbo,                only: qbo_init
+    use qneg_module,        only: qneg_init
     use iondrag,            only: iondrag_init, do_waccm_ions
 #if ( defined OFFLINE_DYN )
     use metdata,            only: metdata_phys_init
@@ -916,6 +924,9 @@ contains
        call modal_aero_wateruptake_init(pbuf2d)
 
     end if
+
+    ! Initialize qneg3 and qneg4
+    call qneg_init()
 
   end subroutine phys_init
 
@@ -1232,7 +1243,7 @@ contains
     use aero_model,         only: aero_model_drydep
     use carma_intr,         only: carma_emission_tend, carma_timestep_tend
     use carma_flags_mod,    only: carma_do_aerosol, carma_do_emission
-    use check_energy,       only: check_energy_chng
+    use check_energy,       only: check_energy_chng, calc_te_and_aam_budgets
     use check_energy,       only: check_tracers_data, check_tracers_init, check_tracers_chng
     use time_manager,       only: get_nstep
     use cam_abortutils,     only: endrun
@@ -1246,6 +1257,8 @@ contains
     use perf_mod
     use flux_avg,           only: flux_avg_run
     use unicon_cam,         only: unicon_cam_org_diags
+    use cam_history,        only: hist_fld_active
+    use qneg_module,        only: qneg4
 
     !
     ! Arguments
@@ -1286,6 +1299,10 @@ contains
     real(r8) :: tmp_q     (pcols,pver) ! tmp space
     real(r8) :: tmp_cldliq(pcols,pver) ! tmp space
     real(r8) :: tmp_cldice(pcols,pver) ! tmp space
+    real(r8) :: tmp_trac  (pcols,pver,pcnst) ! tmp space
+    real(r8) :: tmp_pdel  (pcols,pver) ! tmp space
+    real(r8) :: tmp_t     (pcols,pver) !+tht tmp space
+    real(r8) :: tmp_ps    (pcols)      ! tmp space
 
     ! physics buffer fields for total energy and mass adjustment
     integer itim_old, ifld
@@ -1296,6 +1313,10 @@ contains
     real(r8), pointer, dimension(:,:) :: cldiceini
     real(r8), pointer, dimension(:,:) :: dtcore
     real(r8), pointer, dimension(:,:) :: ast     ! relative humidity cloud fraction 
+
+    !tht: variables for dme_energy_adjust 
+    real(r8):: eflx(pcols), dsema(pcols)
+    logical, parameter:: ohf_adjust =.true.  ! condensates have surface specific enthalpy
 
     !-----------------------------------------------------------------------
     lchnk = state%lchnk
@@ -1493,6 +1514,7 @@ contains
     endif
 
     call physics_update(state, ptend, ztodt, tend)
+    call calc_te_and_aam_budgets(state, 'pAP')
 
     !---------------------------------------------------------------------------------
     ! Enforce charge neutrality after O+ change from ionos_tend
@@ -1530,15 +1552,41 @@ contains
     !
     ! FV: convert dry-type mixing ratios to moist here because physics_dme_adjust
     !     assumes moist. This is done in p_d_coupling for other dynamics. Bundy, Feb 2004.
-    if ( dycore_is('LR') .or. dycore_is('SE')) call set_dry_to_wet(state)    ! Physics had dry, dynamics wants moist
+    if ( dycore_is('LR')) call set_dry_to_wet(state)    ! Physics had dry, dynamics wants moist
 
     ! Scale dry mass and energy (does nothing if dycore is EUL or SLD)
     call cnst_get_ind('CLDLIQ', ixcldliq)
     call cnst_get_ind('CLDICE', ixcldice)
+    tmp_t     (:ncol,:pver) = state%t(:ncol,:pver) !+tht
     tmp_q     (:ncol,:pver) = state%q(:ncol,:pver,1)
     tmp_cldliq(:ncol,:pver) = state%q(:ncol,:pver,ixcldliq)
     tmp_cldice(:ncol,:pver) = state%q(:ncol,:pver,ixcldice)
-    call physics_dme_adjust(state, tend, qini, ztodt)
+    ! For 'SE', physics_dme_adjust is called for energy diagnostic purposes only.  So, save off tracers
+    if (dycore_is('SE').and.hist_fld_active('SE_pAM').or.hist_fld_active('KE_pAM').or.hist_fld_active('WV_pAM').or.&
+         hist_fld_active('WL_pAM').or.hist_fld_active('WI_pAM')) then
+      tmp_trac(:ncol,:pver,:pcnst) = state%q(:ncol,:pver,:pcnst)
+      tmp_pdel(:ncol,:pver)        = state%pdel(:ncol,:pver)
+      tmp_ps(:ncol)                = state%ps(:ncol)
+      !
+      ! pint, lnpint,rpdel are altered by dme_adjust but not used for tendencies in dynamics of SE
+      ! we do not reset them to pre-dme_adjust values
+      !
+      if (dycore_is('SE')) call set_dry_to_wet(state)
+      call physics_dme_adjust(state, tend, qini, ztodt)
+      call calc_te_and_aam_budgets(state, 'pAM')
+      ! Restore pre-"physics_dme_adjust" tracers
+      state%q(:ncol,:pver,:pcnst) = tmp_trac(:ncol,:pver,:pcnst)
+      state%pdel(:ncol,:pver)     = tmp_pdel(:ncol,:pver)
+      state%ps(:ncol)             = tmp_ps(:ncol)    
+    end if
+
+!+tht
+   !if (dycore_is('LR')) call physics_dme_adjust(state, tend, qini, ztodt)
+    if (dycore_is('LR')) &
+     call physics_dme_adjust(state, tend, qini, ztodt, eflx, dsema, &
+                             ohf_adjust, cam_in%ocnfrac, cam_in%sst, cam_in%ts)
+!-tht
+
 !!!   REMOVE THIS CALL, SINCE ONLY Q IS BEING ADJUSTED. WON'T BALANCE ENERGY. TE IS SAVED BEFORE THIS
 !!!   call check_energy_chng(state, tend, "drymass", nstep, ztodt, zero, zero, zero, zero)
 
@@ -1559,8 +1607,12 @@ contains
        endif
     endif
 
-    call diag_phys_tend_writeout (state, pbuf,  tend, ztodt, tmp_q, tmp_cldliq, tmp_cldice, &
-         qini, cldliqini, cldiceini)
+!+tht
+   !call diag_phys_tend_writeout (state, pbuf,  tend, ztodt, tmp_q, tmp_cldliq, tmp_cldice, &
+   !     qini, cldliqini, cldiceini)
+     call diag_phys_tend_writeout (state, pbuf,  tend, ztodt, tmp_q, tmp_t, tmp_cldliq, tmp_cldice, &
+          qini, cldliqini, cldiceini, eflx, dsema) 
+!-tht
 
     call clybry_fam_set( ncol, lchnk, map2chm, state%q, pbuf )
 
@@ -1618,6 +1670,7 @@ contains
     use convect_shallow, only: convect_shallow_tend
     use check_energy,    only: check_energy_chng, check_energy_fix, check_energy_timestep_init
     use check_energy,    only: check_tracers_data, check_tracers_init, check_tracers_chng
+    use check_energy,    only: calc_te_and_aam_budgets
     use dycore,          only: dycore_is
     use aero_model,      only: aero_model_wetdep
     use carma_intr,      only: carma_wetdep_tend, carma_timestep_tend
@@ -1633,6 +1686,7 @@ contains
     use cam_abortutils,  only: endrun
     use subcol,          only: subcol_gen, subcol_ptend_avg
     use subcol_utils,    only: subcol_ptend_copy, is_subcol_on
+    use qneg_module,     only: qneg3
 
     ! Arguments
 
@@ -1801,12 +1855,14 @@ contains
     !===================================================
     call t_startf('energy_fixer')
 
+    call calc_te_and_aam_budgets(state, 'pBF')
     if (dycore_is('LR') .or. dycore_is('SE'))  then
        call check_energy_fix(state, ptend, nstep, flx_heat)
        call physics_update(state, ptend, ztodt, tend)
        call check_energy_chng(state, tend, "chkengyfix", nstep, ztodt, zero, zero, zero, flx_heat)
        call outfld( 'EFIX', flx_heat    , pcols, lchnk   )
     end if
+    call calc_te_and_aam_budgets(state, 'pBP')
     ! Save state for convective tendency calculations.
     call diag_conv_tend_ini(state, pbuf)
 
@@ -1830,7 +1886,6 @@ contains
     !
     !===================================================
     ! Dry adjustment
-    ! This code block is not a good example of interfacing a parameterization
     !===================================================
     call t_startf('dry_adjustment')
 
@@ -1989,8 +2044,8 @@ contains
                   cam_in%ts,       cam_in%sst,     zdu,              &
                   pbuf,            det_s,          det_ice)
 
-             !  Since we "added" the reserved liquid back in this routine, we need 
-             !    to account for it in the energy checker
+             ! Since we "added" the reserved liquid back in this routine, we need 
+             ! to account for it in the energy checker
              flx_cnd(:ncol) = -1._r8*rliq(:ncol) 
              flx_heat(:ncol) = det_s(:ncol)
 
@@ -2012,29 +2067,32 @@ contains
              !    CLUBB call (PBL, shallow convection, macrophysics)
              ! =====================================================  
    
-             call clubb_tend_cam(state,ptend,pbuf,cld_macmic_ztodt,&
+             call clubb_tend_cam(state, ptend, pbuf, cld_macmic_ztodt,&
                 cmfmc, cam_in, macmic_it, cld_macmic_num_steps, & 
                 dlf, det_s, det_ice)
 
-                !  Since we "added" the reserved liquid back in this routine, we need 
-                !    to account for it in the energy checker
-                flx_cnd(:ncol) = -1._r8*rliq(:ncol) 
-                flx_heat(:ncol) = cam_in%shf(:ncol) + det_s(:ncol)
+             ! Since we "added" the reserved liquid back in this routine, we need 
+             ! to account for it in the energy checker
+             flx_cnd(:ncol) = -1._r8*rliq(:ncol) 
+             flx_heat(:ncol) = cam_in%shf(:ncol) + det_s(:ncol)
 
-                ! Unfortunately, physics_update does not know what time period
-                ! "tend" is supposed to cover, and therefore can't update it
-                ! with substeps correctly. For now, work around this by scaling
-                ! ptend down by the number of substeps, then applying it for
-                ! the full time (ztodt).
-                call physics_ptend_scale(ptend, 1._r8/cld_macmic_num_steps, ncol)
-                !    Update physics tendencies and copy state to state_eq, because that is 
-                !      input for microphysics              
-                call physics_update(state, ptend, ztodt, tend)
-                call check_energy_chng(state, tend, "clubb_tend", nstep, ztodt, &
-                     cam_in%lhf(:ncol)/latvap/cld_macmic_num_steps, &
-                     flx_cnd(:ncol)/cld_macmic_num_steps, &
-                     det_ice(:ncol)/cld_macmic_num_steps, &
-                     flx_heat(:ncol)/cld_macmic_num_steps)
+             ! Unfortunately, physics_update does not know what time period
+             ! "tend" is supposed to cover, and therefore can't update it
+             ! with substeps correctly. For now, work around this by scaling
+             ! ptend down by the number of substeps, then applying it for
+             ! the full time (ztodt).
+             call physics_ptend_scale(ptend, 1._r8/cld_macmic_num_steps, ncol)
+
+             ! Update physics tendencies and copy state to state_eq, because that is 
+             ! input for microphysics              
+             call physics_update(state, ptend, ztodt, tend)
+
+             ! Use actual qflux (not lhf/latvap) for consistency with surface fluxes and revised code
+             call check_energy_chng(state, tend, "clubb_tend", nstep, ztodt, &
+                cam_in%cflx(:ncol,1)/cld_macmic_num_steps, &
+                flx_cnd(:ncol)/cld_macmic_num_steps, &
+                det_ice(:ncol)/cld_macmic_num_steps, &
+                flx_heat(:ncol)/cld_macmic_num_steps)
  
           endif
 
@@ -2262,7 +2320,6 @@ subroutine phys_timestep_init(phys_state, cam_in, cam_out, pbuf2d)
   use mo_apex,             only: mo_apex_init
   use epp_ionization,      only: epp_ionization_active
   use iop_forcing,         only: scam_use_iop_srf
-  use waccmx_phys_intr,    only: waccmx_phys_ion_elec_temp_stepinit
 
   implicit none
 
@@ -2322,11 +2379,6 @@ subroutine phys_timestep_init(phys_state, cam_in, cam_out, pbuf2d)
   call qbo_timestep_init
 
   call iondrag_timestep_init()
-
-  !----------------------------------------------------------------------
-  ! update waccmx Te / Ti module
-  !----------------------------------------------------------------------
-  call waccmx_phys_ion_elec_temp_stepinit()
 
   call carma_timestep_init()
 

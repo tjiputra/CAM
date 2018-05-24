@@ -7,5 +7,7 @@
  nhtfrq=3,3,3,3,3,3
  inithist='ENDOFRUN'
  pbuf_global_allocate=.false.
- solar_parms_file = '$CSMDATA/atm/waccm/solar/wa_smed_quiet.nc'
- /
+ solar_parms_data_file = '$CSMDATA/atm/waccm/solar/wa_smed_quiet.nc'
+ ionos_xport_nsplit = 10
+ ionos_epotential_model='weimer'
+/

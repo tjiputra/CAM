@@ -63,7 +63,7 @@ if [ $6 = "build_only" ]; then
 fi
 
 echo "TEQ_ccsm.sh: starting b4b comparisons " 
-files_to_compare=`cd ${CAM_TESTDIR}/TSM_ccsm.$1.$2.$5; ls *.cam*.h*.nc`
+files_to_compare=`cd ${CAM_TESTDIR}/TSM_ccsm.$1.$2.$5; ls *.cam.h*.nc`
 if [ -z "${files_to_compare}" ]; then
     echo "TEQ_ccsm.sh: error locating files to compare"
     echo "FAIL.job${JOBID}" > TestStatus
@@ -75,8 +75,8 @@ all_comparisons_good="TRUE"
 # Compare history files
 for compare_file in ${files_to_compare}; do
 
-    mystring=${compare_file##*h0.[0-9][0-9][0-9][0-9]}
-    corresponding_file=`ls ${CAM_TESTDIR}/TSM.$3.$4.$5/*cam.h0*${mystring}*`
+    mystring=${compare_file##*cam.h}
+    corresponding_file=`ls ${CAM_TESTDIR}/TSM.$3.$4.$5/*cam.h${mystring}`
 
     ${CAM_SCRIPTDIR}/CAM_compare.sh \
 	${CAM_TESTDIR}/TSM_ccsm.$1.$2.$5/${compare_file} \

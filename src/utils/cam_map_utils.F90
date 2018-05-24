@@ -744,31 +744,6 @@ contains
       dsize(j + 1) = dsize(j) * filelens(j)
     end do
 
-!!XXgoldyXX:
-!goldy_debug = (iam == 1)
-if (goldy_debug) then
-   write(iulog, *) 'cam_filemap_get_filemap: mapind:',mapind,', srccnt =',srccnt
-   call shr_sys_flush(iulog)
-   write(iulog, *) 'cam_filemap_get_filemap: srclens:',srclens
-   call shr_sys_flush(iulog)
-   write(iulog, *) 'cam_filemap_get_filemap: filelens:',filelens
-   call shr_sys_flush(iulog)
-   write(iulog, *) 'cam_filemap_get_filemap: dsize:',dsize
-   call shr_sys_flush(iulog)
-   if (present(dest_in)) then
-     write(iulog, *) 'cam_filemap_get_filemap: dest_in:',dest_in
-   else
-     write(iulog, *) 'cam_filemap_get_filemap: dest:',this%dest
-   end if
-   call shr_sys_flush(iulog)
-   if (present(src_in)) then
-     write(iulog, *) 'cam_filemap_get_filemap: src_in:',src_in
-   else
-     write(iulog, *) 'cam_filemap_get_filemap: src:',this%src
-   end if
-   call shr_sys_flush(iulog)
-end if
-!!XXgoldyXX:
     ! src_ind maps each source dimension to the corresponding file dimension
     allocate(src_ind(srccnt))
     if (present(permutation_in)) then

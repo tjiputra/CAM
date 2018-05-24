@@ -1,9 +1,9 @@
 #!/bin/sh -f
 
-echo 
+echo
 
 if [ $# -ne 1 ]; then
-    echo "Invoke archive_baseline.sh -help for usage." 
+    echo "Invoke archive_baseline.sh -help for usage."
     exit 1
 fi
 
@@ -12,7 +12,7 @@ cat << EOF1
 NAME
 
 	archive_baseline.sh - archive pretag baselines to set locations on
-                              hobart and yellowstone.
+                              hobart and cheyenne.
 
 
 SYNOPSIS
@@ -33,7 +33,7 @@ BASELINE ARCHIVED LOCATION
 
 	hobart:     /fs/cgd/csm/models/atm/cam/pretag_bl/TAGNAME_pgi
 	              /fs/cgd/csm/models/atm/cam/pretag_bl/TAGNAME_nag
-        yellowstone:  /glade/p/cesm/cseg/models/atm/cam/pretag_bl/TAGNAME
+        cheyenne:  /glade/p/cesm/cseg/models/atm/cam/pretag_bl/TAGNAME
 
 
 
@@ -52,18 +52,18 @@ WORK FLOW
         Run the cam test suite.
         Make your trunk tag
 	archive_baseline.sh cam5_2_06
-        
+
 	Create a new sandbox.
         setenv CAM_FC PGI
 	setenv CAM_TESTDIR /scratch/cluster/fischer/cam5_2_07
         setenv BL_TESTDIR /fs/cgd/csm/models/atm/cam/pretag_bl/cam5_2_06_pgi
         Run the cam test suite.
         Make your trunk tag
-        archive_baseline.sh cam5_2_07	
-   
+        archive_baseline.sh cam5_2_07
+
 
 WARNING
-	
+
 	System changes can cause answer changes. So you may need to create new baselines
         if you are getting unexpected baseline failures.
 
@@ -89,29 +89,35 @@ case $hostname in
     test_file_list="tests_pretag_hobart_${CAM_FC,,}"
     baselinedir="/fs/cgd/csm/models/atm/cam/pretag_bl/$1_${CAM_FC,,}"
   ;;
-  ys*)
-    echo "server: yellowstone"
+
+  ch*)
+    echo "server: cheyenne"
     if [ -z "$CAM_FC" ]; then
       CAM_FC="INTEL"
     fi
-    if [ -z "$CESM_TESTDIR" ]; then
-      echo "ERROR: please set CESM_TESTDIR (test-root in the create_test)"
-      echo
-      exit 1
-    fi
-    test_file_list="tests_pretag_yellowstone"
+    test_file_list="tests_pretag_cheyenne"
     baselinedir="/glade/p/cesm/cseg/models/atm/cam/pretag_bl/$1"
   ;;
+
   * ) echo "ERROR: machine $hostname not currently supported"; exit 1 ;;
 esac
 
-echo " "
-echo "CESM Archiving to /glade/p/cesmdata/cseg/ccsm_baselines/$1"
-echo " "
-case $hostname in
-  ys*)
+if [ -n "$CESM_TESTDIR" ]; then
+
+    echo " "
+    case $hostname in
+	ch*)
+	    echo "CESM Archiving to /glade/p/cesmdata/cseg/cesm_baselines/$1"
+	    ;;
+
+	hobart)
+	    echo "CESM Archiving to /fs/cgd/csm/models/atm/cam/cesm_baselines/$1"
+	    ;;
+    esac
+    echo " "
+
     ../../../../cime/scripts/Tools/bless_test_results -p -t '' -c '' -r $CESM_TESTDIR -b $1 -f -s
-esac
+fi
 
 echo
 echo "Archiving to ${baselinedir}"
@@ -162,3 +168,16 @@ while read input_line; do
   done
 
 done < ${test_file_list}
+
+case $hostname in
+
+    ch* | hobart)
+	if [ -z "$CESM_TESTDIR" ]; then
+	    echo '***********************************************************************************'
+	    echo 'INFO: The aux_cam and test_cam tests were NOT archived'
+	    echo "INFO: Must set CESM_TESTDIR (test-root in the create_test) to archive aux_cam tests"
+	    echo '***********************************************************************************'
+	fi
+	;;
+
+esac

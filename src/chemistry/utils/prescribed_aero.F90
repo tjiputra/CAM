@@ -51,7 +51,7 @@ module prescribed_aero
 
   integer :: number_flds
 
-  character(len=256) :: filename = ' '
+  character(len=256) :: filename = 'NONE'
   character(len=256) :: filelist = ' '
   character(len=256) :: datapath = ' '
   character(len=32)  :: datatype = 'SERIAL'
@@ -261,7 +261,7 @@ subroutine prescribed_aero_readnl(nlfile)
    fixed_tod  = prescribed_aero_fixed_tod
 
    ! Turn on prescribed aerosols if user has specified an input dataset.
-   has_prescribed_aero = len_trim(filename) > 0 
+   has_prescribed_aero = len_trim(filename) > 0 .and. filename.ne.'NONE'
 
    if ( .not. has_prescribed_aero) return
 

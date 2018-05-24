@@ -41,7 +41,8 @@ module radheat
   logical :: nlte_use_mo = .true. ! Determines which constituents are used from NLTE calculations
                                   !  = .true. uses prognostic constituents
                                   !  = .false. uses constituents from prescribed dataset waccm_forcing_file
-
+  logical :: nlte_limit_co2 = .false. ! if true apply upper limit to co2 in the Formichev scheme 
+  
 ! Private variables for merging heating rates
   real(r8):: qrs_wt(pver)             ! merge weight for cam solar heating
   real(r8):: qrl_wt(pver)             ! merge weight for cam long wave heating
@@ -75,8 +76,8 @@ contains
 
     use namelist_utils,  only: find_group_name
     use units,           only: getunit, freeunit
-    use mpishorthand
     use cam_abortutils,  only: endrun
+    use spmd_utils,     only : mpicom, masterprocid, mpi_logical
 
     use waccm_forcing,   only: waccm_forcing_readnl
 
@@ -86,7 +87,7 @@ contains
     integer :: unitn, ierr
     character(len=*), parameter :: subname = 'radheat_readnl'
 
-    namelist /radheat_nl/ nlte_use_mo
+    namelist /radheat_nl/ nlte_use_mo, nlte_limit_co2
 
     if (masterproc) then
        unitn = getunit()
@@ -103,9 +104,8 @@ contains
 
     end if
 
-#ifdef SPMD
-    call mpibcast (nlte_use_mo,   1,                      mpilog,  0, mpicom)
-#endif
+    call mpi_bcast (nlte_use_mo,    1, mpi_logical, masterprocid, mpicom, ierr)
+    call mpi_bcast (nlte_limit_co2, 1, mpi_logical, masterprocid, mpicom, ierr)
 
     ! Have waccm_forcing read its namelist as well.
     call waccm_forcing_readnl(nlfile)
@@ -219,7 +219,7 @@ contains
     end if
 
     if (waccm_heating) then
-       call nlte_init(pref_mid, nlte_use_mo)
+       call nlte_init(pref_mid, nlte_use_mo, nlte_limit_co2)
     endif
 
 ! Add history variables to master field list

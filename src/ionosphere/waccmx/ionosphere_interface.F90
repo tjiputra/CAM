@@ -5,6 +5,8 @@ module ionosphere_interface
   use pmgrid,              only: plat, plon, plev
   use ppgrid,              only: pcols, pver
 
+  use dpie_coupling,       only: d_pie_init
+  use dpie_coupling,       only: d_pie_epotent
   use dpie_coupling,       only: d_pie_coupling         ! WACCM-X ionosphere/electrodynamics coupling
   use short_lived_species, only: slvd_index,slvd_pbf_ndx => pbf_idx ! Routines to access short lived species 
 
@@ -18,7 +20,6 @@ module ionosphere_interface
   use phys_grid,           only: chunk_to_block_send_pters, chunk_to_block_recv_pters, block_to_chunk_send_pters, &
                                  block_to_chunk_recv_pters
   use physconst,           only: gravit
-  use dpie_coupling,       only: d_pie_init
   use oplus,               only: oplus_init
   use edyn_init,           only: edynamo_init
   use pio,                 only: var_desc_t
@@ -71,10 +72,13 @@ module ionosphere_interface
   !  used in oplus transport, otherwise empirical ion drifts calculated in exbdrift (physics) will be used.
   !
   logical, public,  protected :: ionos_oplus_xport = .true.    ! if true, call sub oplus (based on tiegcm oplus.F)
+  integer, public,  protected :: ionos_xport_nsplit = 5        ! number of substeps for O+ transport per model time step
 
   real(r8), public, protected :: oplus_adiff_limiter = 1.5e+8_r8  ! limiter for ambipolar diffusion coefficient
   real(r8), public, protected :: oplus_shapiro_const = 0.03_r8    ! shapiro constant for spatial smoother
-  logical, public,  protected :: oplus_enforce_floor = .true.     ! switch to apply Stan's  floor
+  logical,  public, protected :: oplus_enforce_floor = .true.     ! switch to apply Stan's  floor
+
+  character(len=256) :: wei05_coefs_file = 'NONE' !'wei05sc.nc'
 
 contains
 
@@ -84,18 +88,21 @@ contains
 
     use namelist_utils, only: find_group_name
     use units,          only: getunit, freeunit
-    use spmd_utils,     only: mpicom, masterprocid, mpi_real8, mpi_logical
+    use spmd_utils,     only: mpicom, masterprocid, mpi_real8, mpi_logical, mpi_integer, mpi_character
     use cam_logfile,    only: iulog
     use spmd_utils,     only: masterproc
+    use mag_parms,      only: mag_parms_setopts
 
     character(len=*), intent(in) :: nlfile  ! filepath for file containing namelist input
 
     ! Local variables
     integer :: unitn, ierr
     character(len=*), parameter :: subname = 'ionosphere_readnl'
+    character(len=16) :: ionos_epotential_model = 'none'
 
-    namelist /ionosphere_nl/ ionos_xport_active, ionos_edyn_active, ionos_oplus_xport
+    namelist /ionosphere_nl/ ionos_xport_active, ionos_edyn_active, ionos_oplus_xport, ionos_xport_nsplit
     namelist /ionosphere_nl/ oplus_adiff_limiter, oplus_shapiro_const, oplus_enforce_floor
+    namelist /ionosphere_nl/ ionos_epotential_model, wei05_coefs_file
 
     ! Read namelist
     if (masterproc) then
@@ -116,7 +123,10 @@ contains
     call mpi_bcast(ionos_xport_active,  1, mpi_logical, masterprocid, mpicom, ierr)
     call mpi_bcast(ionos_edyn_active,   1, mpi_logical, masterprocid, mpicom, ierr)
     call mpi_bcast(ionos_oplus_xport,   1, mpi_logical, masterprocid, mpicom, ierr)
+    call mpi_bcast(ionos_xport_nsplit,  1, mpi_integer, masterprocid, mpicom, ierr)
     call mpi_bcast(oplus_adiff_limiter, 1, mpi_real8,   masterprocid, mpicom, ierr)
+    call mpi_bcast(ionos_epotential_model, len(ionos_epotential_model), mpi_character, masterprocid, mpicom, ierr)
+    call mpi_bcast(wei05_coefs_file, len(wei05_coefs_file), mpi_character, masterprocid, mpicom, ierr)
     call mpi_bcast(oplus_shapiro_const, 1, mpi_real8,   masterprocid, mpicom, ierr)
     call mpi_bcast(oplus_enforce_floor, 1, mpi_logical, masterprocid, mpicom, ierr)
 
@@ -125,11 +135,14 @@ contains
        write(iulog,*) 'ionosphere_readnl: ionos_xport_active  = ', ionos_xport_active
        write(iulog,*) 'ionosphere_readnl: ionos_edyn_active   = ', ionos_edyn_active
        write(iulog,*) 'ionosphere_readnl: ionos_oplus_xport   = ', ionos_oplus_xport
+       write(iulog,*) 'ionosphere_readnl: ionos_xport_nsplit  = ', ionos_xport_nsplit
+       write(iulog,*) 'ionosphere_readnl: ionos_epotential_model = ', trim(ionos_epotential_model)
        write(iulog,*) 'ionosphere_readnl: oplus_adiff_limiter = ', oplus_adiff_limiter
        write(iulog,*) 'ionosphere_readnl: oplus_shapiro_const = ', oplus_shapiro_const
        write(iulog,*) 'ionosphere_readnl: oplus_enforce_floor = ', oplus_enforce_floor
-
     endif
+
+    call mag_parms_setopts(ionos_epotential_model)
 
   end subroutine ionosphere_readnl
 
@@ -140,6 +153,7 @@ contains
     use mo_apex,        only: mo_apex_init1
     use cam_control_mod,only: initial_run
     use dyn_grid,       only: get_horiz_grid_d
+    use wei05sc,        only: weimer05_init
 
     use ref_pres,  only : & ! Hybrid level definitions:
       pref_mid,           & ! target alev(plev) midpoint levels coord
@@ -246,7 +260,7 @@ contains
           endif
        endif
 
-       call d_pie_init( ionos_edyn_active, ionos_oplus_xport )
+       call d_pie_init( ionos_edyn_active, ionos_oplus_xport, ionos_xport_nsplit )
        if ( grid%iam < grid%npes_xy ) then
           
           allocate(glon(plon))
@@ -289,6 +303,8 @@ contains
        call add_default ('VI&IC', 0, ' ')
        call add_default ('WI&IC', 0, ' ')
     endif
+
+    call weimer05_init(wei05_coefs_file)
 
   end subroutine ionosphere_init
 
@@ -344,6 +360,9 @@ contains
        deallocate( tmp )
 
     endif
+
+    ! set cross tail potential before physics -- aurora uses weimer derived potential
+    call d_pie_epotent()
 
   end subroutine ionosphere_run1
 

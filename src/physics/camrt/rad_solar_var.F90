@@ -5,8 +5,8 @@
 module rad_solar_var
 
   use shr_kind_mod ,  only : r8 => shr_kind_r8
-  use solar_data,     only : sol_irrad, we, nbins, do_spctrl_scaling, ssi_ref
-  use solar_data,     only : has_spectrum, has_ref_spectrum
+  use solar_irrad_data, only : sol_irrad, we, nbins, do_spctrl_scaling, ssi_ref
+  use solar_irrad_data, only : has_spectrum, has_ref_spectrum
   use cam_abortutils, only : endrun
 
   implicit none

@@ -5,9 +5,12 @@ module nlte_fomichev
 !
   use ppgrid,             only: pcols, pver, pverp
   use shr_kind_mod,       only: r8 => shr_kind_r8
-  use physconst,          only: r_universal, rearth, avogad, boltz
+  use physconst,          only: r_universal, rearth, avogad, boltz, pi
   use chem_surfvals,      only: chem_surfvals_get
-  use ref_pres,           only: pref_mid
+  use cam_abortutils,     only: endrun
+  use phys_grid,          only: get_rlon_p, get_rlat_p
+  use cam_logfile,        only: iulog
+  use spmd_utils,         only: masterproc
 
   implicit none
   private
@@ -969,12 +972,16 @@ module nlte_fomichev
 
       real(r8) :: o3pxfac(pver)      ! o3p cooling masking factors on WACCM vertical grids
 
+      logical :: apply_co2_limit = .false.
+      integer :: k1mb = 0
+      
 !================================================================================================
 contains
 !================================================================================================
 
-  subroutine nlte_fomichev_init ( co2_mwi, n2_mwi, o1_mwi, o2_mwi, o3_mwi, no_mwi )
+  subroutine nlte_fomichev_init ( co2_mwi, n2_mwi, o1_mwi, o2_mwi, o3_mwi, no_mwi, apply_co2_limit_in )
      use interpolate_data, only : lininterp
+     use ref_pres,         only : pref_edge, pref_mid
 
 !     
 !     Original version from Ray Roble
@@ -997,6 +1004,7 @@ contains
     real(r8), intent(in) :: co2_mwi                     ! CO2 molecular weight
     real(r8), intent(in) :: n2_mwi                      ! N2 molecular weight
     real(r8), intent(in) :: no_mwi                      ! NO molecular weight
+    logical,  intent(in) :: apply_co2_limit_in
 
     real(r8), parameter :: p0=5.e-5_r8 ! TIE-GCM reference pressure in Pa            
     integer, parameter :: tgcmlevs = 29
@@ -1005,6 +1013,19 @@ contains
     real(r8) :: xfac0(tgcmlevs)        ! masking factors on TIE-GCM pressure grids
     integer :: k
 
+    apply_co2_limit = apply_co2_limit_in
+    find_k1mb: do k = 1, pverp
+       ! Find 1 mbar (or 100 Pa) level.
+       if (pref_edge(k) > 100._r8) then
+          k1mb = k
+          exit find_k1mb
+       endif
+    end do find_k1mb
+    if (masterproc) then
+       write(iulog,'(a,l8)')  'nlte_fomichev_init: apply_co2_limit: ',apply_co2_limit
+       write(iulog,'(a,i6,g12.6)') 'nlte_fomichev_init: check CO2 mixing ratios above 1-mbar level: ',k1mb,pref_mid(k1mb)
+    endif
+    
 ! set molecular weights
     co2_mw = co2_mwi
     n2_mw = n2_mwi
@@ -1120,8 +1141,9 @@ contains
 
 !==================================================================================================
 
-      subroutine nlte_fomichev_calc (ncol,pmid,pint,t,xo2,xo,xo3,xn2,xco2,coolf,&
+      subroutine nlte_fomichev_calc (lchnk,ncol,pmid,pint,t,xo2,xo,xo3,xn2,xco2,coolf,&
                                      co2cool_out, o3cool_out, c2scool_out )
+         use time_manager,  only: get_nstep
 
 !
 !     author: F. Sassi (Dec, 1999)
@@ -1168,6 +1190,7 @@ implicit none
 
 !     Input variables
       integer, intent(in) :: ncol                          ! number of atmospheric columns
+      integer, intent(in) :: lchnk                         ! chunk identifier
 
       real(r8), intent(in) :: pmid(pcols,pver)             ! model pressure at mid-point
       real(r8), intent(in) :: pint(pcols,pverp)            ! model pressure at interfaces
@@ -1237,6 +1260,10 @@ implicit none
       integer k
       integer i
       integer kinv                     ! inverted vertical index (bottom up)
+      real(r8), parameter :: co2_limit = 720.e-6_r8
+      integer :: nstep
+      character(len=200) :: errmsg
+      real(r8) :: latdeg, londeg
 
 !----------------------------------------------------------------
 
@@ -1377,13 +1404,35 @@ implicit none
          kinv=pver-k+1
          do i=1,ncol
 !-----------------------------------------------------------------
-!     Convert mmr in vmr
+!     Convert mmr to vmr
 !-----------------------------------------------------------------
             vo2 (i,k) = xo2 (i,kinv) *mwair(i,k)/rmo2
             vo  (i,k) = xo  (i,kinv) *mwair(i,k)/rmo
             vo3 (i,k) = xo3 (i,kinv) *mwair(i,k)/rmo3
             vn2 (i,k) = xn2 (i,kinv) *mwair(i,k)/rmn2
             vco2(i,k) = xco2(i,kinv) *mwair(i,k)/rmco2
+
+! CGB - The Formichev scheme was not designed to support CO2 > 720 ppmv, so
+! limit the amount of CO2 used to 720 ppmv. This keeps the model stable, but
+! may yield an incorrect scientific result. It would be nice to extend this
+! routine to support higher CO2 values. Putting the limiter here means that
+! that the other constituents will have their proper mixing ratio caclulated
+! (i.e. the mwair is correct), but vco2 will be limited.  Abort the run if CO2
+! exceeds the limit at altitudes above 1 mbar unless apply_co2_limit=.true.
+
+            if (vco2(i,k)>co2_limit) then
+               nstep = get_nstep()
+               latdeg = get_rlat_p(lchnk,i)*180._r8/pi
+               londeg = get_rlon_p(lchnk,i)*180._r8/pi
+               write(errmsg,fmt='(a,i12,2(i6),g12.4,2(f8.2),g12.4)') &
+                     'nlte_fomichev_calc: CO2 has exceeded the limit: nstep,i,k,press(Pa),lon,lat,vco2(vmr)=',&
+                                     nstep,i,kinv, pmid(i,kinv), londeg, latdeg, vco2(i,k)
+               write(iulog,*) trim(errmsg)
+               if ((.not.apply_co2_limit) .and. (kinv<k1mb)) then
+                   call endrun(trim(errmsg))
+               endif
+            endif
+
 !-----------------------------------------------------------------
 !     Calculate mean air number density ( cm^(-3) )
 !
@@ -1397,8 +1446,14 @@ implicit none
 !-----------------------------------------------------------------
             ndenair(i,k) = presm(i,k)/(akbl*t(i,kinv))
          enddo
+
       enddo
 
+      ! apply the CO2 limiter for all levels and columns
+      where ( vco2(:ncol,:) > co2_limit )
+         vco2(:ncol,:) = co2_limit
+      end where
+      
 !-----------------------------------------------------------------
 !     Calculate CO2 vertical column above each level
 !     
@@ -1452,75 +1507,50 @@ implicit none
 
       do i=1,ncol
 
-!     Temperature
-         tf(i,1:nrfm)=0.0_r8
-         dummyf(1:nrfm)=0.0_r8
-         dummyg(1:pver)=ti(i,1:pver)
          dummyx(1:pver)=xnorm(i,1:pver)
+
+!     Temperature
+         dummyg(1:pver)=ti(i,1:pver)
          call a18linvne (xr,dummyf,dummyx,dummyg,pver,nrfm)
          tf(i,1:nrfm)=dummyf(1:nrfm)
 
 !     O3
-         vo3f(i,1:nrfm)=0.0_r8
-         dummyf(1:nrfm)=0.0_r8
          dummyg(1:pver)=vo3(i,1:pver)
-         dummyx(1:pver)=xnorm(i,1:pver)
          call a18linvne (xr,dummyf,dummyx,dummyg,pver,nrfm)
          vo3f(i,1:nrfm)=dummyf(1:nrfm)
 
 !     O2
-         vo2f(i,1:nrfm)=0.0_r8
-         dummyf(1:nrfm)=0.0_r8
          dummyg(1:pver)=vo2(i,1:pver)
-         dummyx(1:pver)=xnorm(i,1:pver)
          call a18linvne (xr,dummyf,dummyx,dummyg,pver,nrfm)
          vo2f(i,1:nrfm)=dummyf(1:nrfm)
 
 !     N2
-         vn2f(i,1:nrfm)=0.0_r8
-         dummyf(1:nrfm)=0.0_r8
          dummyg(1:pver)=vn2(i,1:pver)
-         dummyx(1:pver)=xnorm(i,1:pver)
          call a18linvne (xr,dummyf,dummyx,dummyg,pver,nrfm)
          vn2f(i,1:nrfm)=dummyf(1:nrfm)
 
 !     O
-         vof(i,1:nrfm)=0.0_r8
-         dummyf(1:nrfm)=0.0_r8
          dummyg(1:pver)=vo(i,1:pver)
-         dummyx(1:pver)=xnorm(i,1:pver)
          call a18linvne (xr,dummyf,dummyx,dummyg,pver,nrfm)
          vof(i,1:nrfm)=dummyf(1:nrfm)
          
 !     CO2
-         vco2f(i,1:nrfm)=0.0_r8
-         dummyf(1:nrfm)=0.0_r8
          dummyg(1:pver)=vco2(i,1:pver)
-         dummyx(1:pver)=xnorm(i,1:pver)
          call a18linvne (xr,dummyf,dummyx,dummyg,pver,nrfm)
          vco2f(i,1:nrfm)=dummyf(1:nrfm)
 
 !     COLCO2
-         uco2(i,1:nrfm)=0.0_r8
-         dummyf(1:nrfm)=0.0_r8
          dummyg(1:pver)=colco2(i,1:pver)
-         dummyx(1:pver)=xnorm(i,1:pver)
          call a18linvne (xr,dummyf,dummyx,dummyg,pver,nrfm)
          uco2(i,1:nrfm)=dummyf(1:nrfm)
 
 !     DEN
-         ndenf(i,1:nrfm)=0.0_r8
-         dummyf(1:nrfm)=0.0_r8
          dummyg(1:pver)=ndenair(i,1:pver)
-         dummyx(1:pver)=xnorm(i,1:pver)
          call a18linvne (xr,dummyf,dummyx,dummyg,pver,nrfm)
          ndenf(i,1:nrfm)=dummyf(1:nrfm)
          
 !     AM
-         mwairf(i,1:nrfm)=0.0_r8
-         dummyf(1:nrfm)=0.0_r8
          dummyg(1:pver)=mwair(i,1:pver)
-         dummyx(1:pver)=xnorm(i,1:pver)
          call a18linvne (xr,dummyf,dummyx,dummyg,pver,nrfm)
          mwairf(i,1:nrfm)=dummyf(1:nrfm)
          
@@ -1537,20 +1567,15 @@ implicit none
 
 !     Interpolate from Fomichev grid to CCM grid
       do i=1,ncol
+         dummyx(1:pver)=xnorm(i,1:pver)
 
 !     HCO2
-         co2cooln(i,1:pver)=0.0_r8
          dummyf(1:nrfm)=hco2(i,1:nrfm)
-         dummyg(1:pver)=0.0_r8
-         dummyx(1:pver)=xnorm(i,1:pver)
          call a18linvne (dummyx,dummyg,xr,dummyf,nrfm,pver)
          co2cooln(i,1:pver)=dummyg(1:pver)
 
 !     HO3
-         o3cooln(i,1:pver)=0.0_r8
          dummyf(1:nrfm)=ho3(i,1:nrfm)
-         dummyg(1:pver)=0.0_r8
-         dummyx(1:pver)=xnorm(i,1:pver)
          call a18linvne (dummyx,dummyg,xr,dummyf,nrfm,pver)
          o3cooln(i,1:pver)=dummyg(1:pver)
 
@@ -1628,19 +1653,19 @@ implicit none
 !     IF X(I) < XN(1) THEN Y(I)=YN(1)
 !     
 
-!     Input variables
-      integer imax
-      integer n
-      real(r8) y(imax)
-      real(r8) x(imax)
-      real(r8) xn(n)
-      real(r8) yn(n)
+!     Arguments
+      integer, intent(in) :: imax
+      integer, intent(in) :: n
+      real(r8), intent(out) :: y(imax)
+      real(r8), intent(in) :: x(imax)
+      real(r8), intent(in) :: xn(n)
+      real(r8), intent(in) :: yn(n)
 
-      integer i
 
 !     Local variables
       integer kk(imax)                 
       integer nn
+      integer i
 
 !     ****                                                               
 !     ****     Where:                                                    
@@ -1683,6 +1708,8 @@ implicit none
 !     ****     Perform interpolation prescribed above                    
 !     ****                                                               
 
+      y(:) = 0._r8
+      
       do i = 1,imax      
 
          if (kk(i).gt.0) then

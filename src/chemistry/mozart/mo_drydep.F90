@@ -2056,6 +2056,15 @@ contains
 
        call infld('fraction_landuse', piofile, 'ncol','class',1,pcols,1,n_land_type, begchunk,endchunk, &
             fraction_landuse, readvar, gridname='physgrid')
+       if (.not. readvar) then
+          write(iulog,*)'**************************************'
+          write(iulog,*)'get_landuse_and_soilw_from_file: INFO:'
+          write(iulog,*)' fraction_landuse not read from file: '
+          write(iulog,*)' ', trim(locfn)
+          write(iulog,*)' setting all values to zero'
+          write(iulog,*)'**************************************'
+          fraction_landuse = 0._r8
+       end if
 
        if(do_soilw) then
           call infld('soilw', piofile, 'ncol','month',1,pcols,1,12, begchunk,endchunk, &
@@ -2964,6 +2973,10 @@ contains
                       wrk(:) = wrk(:) + lnd_frc(:)/(dep_ra(:ncol,lt,lchnk) + dep_rb(:ncol,lt,lchnk) + resc(:))
                    endwhere
                 end if
+
+                !  JFL - increase in dry deposition of SO2 to improve bias over US/Europe
+                wrk(:) = wrk(:) * 2._r8
+
              case( 'SO4' )
                 where( fr_lnduse(:ncol,lt) )
                    wrk(:) = wrk(:) + lnd_frc(:)/(dep_ra(:ncol,lt,lchnk) + rds(:,lt))

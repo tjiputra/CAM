@@ -8,4 +8,5 @@
  inithist='ENDOFRUN'
  pbuf_global_allocate=.false.
  ncdata='$CSMDATA/atm/waccm/ic/aqua.cam6.waccmsc_1.9x2.5_L70.2000-01-01.c170123.nc'
+ use_gw_rdg_beta=.false.
  /

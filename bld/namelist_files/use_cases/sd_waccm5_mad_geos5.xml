@@ -3,7 +3,7 @@
 <namelist_defaults>
 
 <!-- Solar irradiance -->
-<solar_data_file>atm/cam/solar/solarforcing_ref_day_3.1_SSI_c160505.nc</solar_data_file>
+<solar_irrad_data_file>atm/cam/solar/solarforcing_ref_day_3.1_SSI_c160505.nc</solar_irrad_data_file>
 
 <start_ymd>19900101</start_ymd>
 <restart_option> yearly </restart_option>
@@ -75,7 +75,7 @@
 <srf_emis_type>'INTERP_MISSING_MONTHS'</srf_emis_type>
 
 <!-- Kp Ap indices -->
-<solar_parms_file>atm/waccm/solar/wasolar_c150720.nc</solar_parms_file>
+<solar_parms_data_file>atm/waccm/solar/wasolar_c150720.nc</solar_parms_data_file>
 
 <!-- Energitic Particles -->
 <epp_all_filepath>atm/cam/solar/solarforcing_ref_day_3.1_EPP_c160505.nc</epp_all_filepath>

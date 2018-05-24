@@ -258,8 +258,7 @@ column_loop : &
 !           data returned is three dimensional (on geographic coordinates)
 !----------------------------------------------------------------------
 
-      use time_manager, only : is_first_step, is_first_restart_step, &
-                               is_end_curr_day, get_curr_calday
+      use time_manager, only : get_curr_calday
       use ppgrid,       only : pcols, begchunk, endchunk
       use phys_grid,    only : get_ncols_p
       use spmd_utils,   only : masterproc
@@ -280,34 +279,32 @@ column_loop : &
       real(r8)                 :: doy                ! day of year
       real(r8), allocatable    :: zm(:,:)            ! zonal mean nitric oxide distribution (molecules/cm^3)
 
-      if( is_first_step() .or. is_first_restart_step() .or. is_end_curr_day() ) then
-         allocate( zm(nmlat,nlev),stat=astat )
-         if( astat /= 0 ) then
-            write(iulog,*) 'snoe_3d: failed to allocate zm; error = ',astat
-	    call endrun
-         end if
-         doy = aint( get_curr_calday() )
-#ifdef SNOE_DIAGS
-         if( masterproc ) then
-	    write(iulog,*) ' '
-	    write(iulog,*) 'set_snoe_no: doy,kp,f107 = ',doy,kp,f107
-	    write(iulog,*) ' '
-         end if
-#endif
-!----------------------------------------------------------------------
-!	... obtain SNOE zonal mean data in geomagnetic coordinates
-!----------------------------------------------------------------------
-         call snoe_zm( doy, kp, f107, zm )
-
-!----------------------------------------------------------------------
-!	... map mean to model longitudes
-!----------------------------------------------------------------------
-         do c = begchunk,endchunk
-            ncol = get_ncols_p( c )
-            call snoe_zmto3d( c, ncol, zm, nmlat, nlev )
-         end do
-         deallocate( zm )
+      allocate( zm(nmlat,nlev),stat=astat )
+      if( astat /= 0 ) then
+         write(iulog,*) 'snoe_3d: failed to allocate zm; error = ',astat
+         call endrun
       end if
+      doy = aint( get_curr_calday() )
+#ifdef SNOE_DIAGS
+      if( masterproc ) then
+         write(iulog,*) ' '
+         write(iulog,*) 'set_snoe_no: doy,kp,f107 = ',doy,kp,f107
+         write(iulog,*) ' '
+      end if
+#endif
+      !----------------------------------------------------------------------
+      ! ... obtain SNOE zonal mean data in geomagnetic coordinates
+      !----------------------------------------------------------------------
+      call snoe_zm( doy, kp, f107, zm )
+
+      !----------------------------------------------------------------------
+      ! ... map mean to model longitudes
+      !----------------------------------------------------------------------
+      do c = begchunk,endchunk
+         ncol = get_ncols_p( c )
+         call snoe_zmto3d( c, ncol, zm, nmlat, nlev )
+      end do
+      deallocate( zm )
 
       end subroutine snoe_timestep_init
 

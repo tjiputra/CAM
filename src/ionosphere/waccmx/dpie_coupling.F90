@@ -15,25 +15,27 @@ module dpie_coupling
   use perf_mod        ,only: t_startf, t_stopf
 
   implicit none
-!
-! Weimer 2005 data file name (this should be in a namelist file):
-! 
-  character(len=256) :: wei05sc_ncfile = 'wei05sc.nc'
 
   private
-  public :: d_pie_coupling
   public :: d_pie_init
+  public :: d_pie_epotent  ! sets electric potential
+  public :: d_pie_coupling ! handles coupling with edynamo and ion transport
 
   logical :: ionos_edyn_active, ionos_oplus_xport    ! if true, call oplus_xport for O+ transport
+  integer :: nspltop  ! nsplit for oplus_xport
+
   logical :: debug = .false.
+
 contains
 !----------------------------------------------------------------------
-  subroutine d_pie_init( edyn_active_in, oplus_xport_in )
+  subroutine d_pie_init( edyn_active_in, oplus_xport_in, oplus_nsplit_in )
 
     logical, intent(in) :: edyn_active_in, oplus_xport_in
+    integer, intent(in) :: oplus_nsplit_in
 
     ionos_edyn_active = edyn_active_in
     ionos_oplus_xport = oplus_xport_in
+    nspltop = oplus_nsplit_in
 
     ! Dynamo inputs (called from dpie_coupling. Fields are in waccm format, in CGS units):
     call addfld ('DPIE_OMEGA',(/ 'lev' /), 'I', 'Pa/s    ','OMEGA input to DPIE coupling', gridname='fv_centers')
@@ -73,6 +75,74 @@ contains
   end subroutine d_pie_init
 
 !-----------------------------------------------------------------------
+  subroutine d_pie_epotent
+    use edyn_solve,  only: pfrac    ! NH fraction of potential (nmlonp1,nmlat0)
+    use edyn_geogrid,only: nglblat=>nlat
+    use time_manager,only: get_nstep
+    use time_manager,only: get_curr_date
+    use mag_parms,   only: get_mag_parms
+    use mag_parms,   only: highlat_potential_model ! either 'heelis' or 'weimer'
+    use heelis,      only: heelis_model
+    use wei05sc,     only: weimer05  ! driver for weimer high-lat convection model
+    use edyn_esmf,   only: edyn_esmf_update
+    use solar_parms_data, only: solar_parms_advance
+    use solar_wind_data, only: solar_wind_advance
+    use solar_wind_data, only: bzimf=>solar_wind_bzimf, byimf=>solar_wind_byimf
+    use solar_wind_data, only: swvel=>solar_wind_swvel, swden=>solar_wind_swden
+
+    real(r8) :: secs           ! time of day in seconds
+    integer :: nstep,iyear,imo,iday,tod  ! tod is time-of-day in seconds
+    real(r8) :: ctpoten        ! Cross-tail potential from get_mag_parms method
+    real(r8) :: ctpoten_weimer ! Cross-tail potential from Weimer model
+    real(r8) :: sunlons(nglblat)
+
+    call edyn_esmf_update()
+
+    call get_curr_date(iyear,imo,iday,tod) ! tod is integer time-of-day in seconds
+    secs = tod                             ! should promote from int to real(r8)
+
+    ! update solar wind data (IMF, etc.)
+    call solar_wind_advance()
+
+    ! update kp -- phys timestep init happens later ...
+    call solar_parms_advance()
+
+    call get_mag_parms( ctpoten = ctpoten )
+
+    !
+    ! Get sun's longitude at latitudes (geographic):
+    !
+    call sunloc(iday,secs,sunlons) ! sunlons(nglblat) is returned
+    !
+    ! Get high-latitude convection from empirical model (heelis or weimer).
+    ! High-latitude potential phihm (edyn_solve) is defined for edynamo.
+    ! Heelis takes ctpoten as input, Weimer returns ctpoten_weimer as output.
+    !
+    if (trim(highlat_potential_model) == 'heelis') then
+       if (debug.and.masterproc) then
+         nstep = get_nstep()
+          write(iulog,"('dpie_coupling call heelis: nstep=', i16, ' sunloc=', f16.12  ,' ctpoten=',f16.12)") &
+               nstep,sunlons(1),ctpoten
+       endif
+       call heelis_model(ctpoten,sunlons) ! heelis.F90
+       call calc_pfrac(sunlons(1),pfrac) ! returns pfrac for dynamo (edyn_solve)
+    elseif (trim(highlat_potential_model) == 'weimer') then
+       !
+       ! ctpoten_weimer is returned by Weimer model (weisc05.F90).
+       ! If get_mag_parms is called for ctpoten, it will return ctpoten_weimer.
+       !
+       call weimer05(byimf,bzimf,swvel,swden,sunlons,ctpoten_weimer)
+       call calc_pfrac(sunlons(1),pfrac) ! returns pfrac for dynamo (edyn_solve)
+       if (debug.and.masterproc) then
+          write(iulog,"('dpie_coupling call weimer05: byimf,bzimf=',2f8.2,' swvel,swden=',2f8.2,' ctpoten_weimer=',f8.2)") &
+               byimf,bzimf,swvel,swden,ctpoten_weimer
+       endif
+    else
+       call endrun('dpie_coupling: Unknown highlat_potential_model') 
+    endif
+  end subroutine d_pie_epotent
+
+!-----------------------------------------------------------------------
   subroutine d_pie_coupling(omega,pe,zgi,zgpmid,u,v,tn,    &
     sigma_ped,sigma_hall,te,ti,o2mmr,o1mmr,h1mmr,o2pmmr,          &
     nopmmr,n2pmmr,opmmr,opmmrtm1,ui,vi,wi,                                     &
@@ -91,19 +161,11 @@ contains
       kboltz => shr_const_boltz      ! Boltzmann constant (J/K/molecule)
     use time_manager, only: get_nstep
     use time_manager, only: get_curr_date
-    use mag_parms,    only: get_mag_parms
-    use heelis,       only: heelis_model
     use edynamo,      only: dynamo
-    use edyn_geogrid,  only: nglblat=>nlat
-    use mag_parms,     only: highlat_potential_model ! either 'heelis' or 'weimer'
     use edyn_mpi,      only: switch_model_format ! routine to switch between "model formats"
     use edyn_mpi,      only: mp_geo_halos,mp_pole_halos
     use oplus,         only: oplus_xport
-    use mo_solar_parms,only: solar_parms_get
-    use wei05sc,       only: weimer05            ! driver for weimer high-lat convection model
-    use edyn_solve,    only: pfrac    ! NH fraction of potential (nmlonp1,nmlat0)
     use ref_pres,      only: pref_mid
-    use edyn_esmf,     only: edyn_esmf_update
 !
 ! Args:
 !
@@ -151,11 +213,9 @@ contains
     integer :: nstep
     integer :: nfields             ! Number of fields for multi-field calls
     integer :: iyear,imo,iday,tod  ! tod is time-of-day in seconds
-    integer :: nspltop             ! local nsplit for oplus_xport
     integer :: isplit              ! loop index
 
     real(r8) :: secs           ! time of day in seconds
-    real(r8) :: ctpoten        ! Cross-tail potential from get_mag_parms method
 
     real(r8), parameter :: n2min = 1.e-6_r8  ! lower limit of N2 mixing ratios
     real(r8), parameter :: small = 1.e-25_r8 ! for fields not currently available
@@ -212,21 +272,6 @@ contains
     real(r8),target :: halo_mbar(nlev,i0-2:i1+2,j0-2:j1+2) ! mean molecular weight
     real(r8), allocatable :: polesign(:)
 !
-! Solar parameter(read-only):
-    real(r8) :: f107d,f107a,ap,kp
-!
-! IMF and solar wind scalar parameters for Weimer model.
-! (These could go into a namelist input file at some point,
-!  made time-dependent, or OMNI nc data files could be 
-!  imported, as in TIEGCM, LFM, etc)
-!
-    real(r8) :: &
-      byimf,     &  ! BY component of IMF
-      bzimf,     &  ! BZ component of IMF in nT
-      swvel,     &  ! Solar wind velocity in km/s
-      swden         ! Solar wind density in #/cm3
-    real(r8) :: sunlons(nglblat)
-    real(r8) :: ctpoten_weimer ! Cross-tail potential from Weimer model
     real(r8) :: nmf2  (i0:i1,j0:j1) ! Electron number density at F2 peak (m-3 converted to cm-3)
     real(r8) :: hmf2  (i0:i1,j0:j1) ! Height of electron number density F2 peak (m converted to km)
     real(r8) :: &
@@ -241,26 +286,16 @@ contains
 
     call t_startf('d_pie_coupling')
 
-    nstep = get_nstep()
-    call get_curr_date(iyear,imo,iday,tod) ! tod is integer time-of-day in seconds
-    secs = tod ! integer to float
-!
-! If dtime=300 (5 minutes) and nspltop=5, then oplus_xport will be
-! called with 60-sec step (300/5)
-!
-    nspltop = 5
-    if (debug.and.masterproc) &
-        write(iulog,"('Enter d_pie_coupling: nstep=',i8,' iyear,imo,iday=',3i5,' ut (hrs)=',f6.2)") &
-             nstep,iyear,imo,iday,secs/3600._r8
-!
-! Get solar parameters (solar_parms_file can be specified in user_nl_cam)
-! (default location of solar parms files is /glade/p/cesmdata/cseg/inputdata/atm/waccm/phot/) 
-!
-    call solar_parms_get(f107d,f107a,ap,kp)
-    if (nstep==1.and.masterproc) then
-      write(iulog,"('d_pie_coupling: nspltop = ',i3)") nspltop
-      write(iulog,"('d_pie_coupling: f107d=',f8.2,' f107a=',f8.2,' ap=',f8.2,' kp=',f8.2)") &
-        f107d,f107a,ap,kp
+    if (debug.and.masterproc) then
+
+       nstep = get_nstep()
+       call get_curr_date(iyear,imo,iday,tod) ! tod is integer time-of-day in seconds
+       secs = tod ! integer to float
+
+       write(iulog,"('Enter d_pie_coupling: nstep=',i8,' iyear,imo,iday=',3i5,' ut (hrs)=',f6.2)") &
+            nstep,iyear,imo,iday,secs/3600._r8
+
+       write(iulog,"('d_pie_coupling: nspltop = ',i3)") nspltop
     endif
 !
 ! Get pressure at midpoints from pe (note pe is vertical dimension is nilev):
@@ -407,53 +442,12 @@ contains
 !   real(r8),intent(in) :: ion_OpO2(i0:i1,j0:j1,nlev) ! Op+O2 rate
 !   real(r8),intent(in) :: ion_OpN2(i0:i1,j0:j1,nlev) ! Op+N2 rate
 
-    call edyn_esmf_update()
 
 !
 ! Get high-latitude potential from Heelis empirical model:
 ! (sub heelis_model is in heelis.F90)
 !
-    call get_curr_date(iyear,imo,iday,tod) ! tod is integer time-of-day in seconds
-    secs = tod                             ! should promote from int to real(r8)
-    call get_mag_parms( ctpoten = ctpoten )
 
-!
-! Get sun's longitude at latitudes (geographic):
-!
-    call sunloc(iday,secs,sunlons) ! sunlons(nglblat) is returned
-!
-! Get high-latitude convection from empirical model (heelis or weimer).
-! High-latitude potential phihm (edyn_solve) is defined for edynamo.
-! Heelis takes ctpoten as input, Weimer returns ctpoten_weimer as output.
-!
-    if (trim(highlat_potential_model) == 'heelis') then
-      if (debug.and.masterproc) then
-         write(iulog,"('dpie_coupling call heelis: nstep=', i16, ' sunloc=', f16.12  ,' ctpoten=',f16.12)") &
-               nstep,sunlons(1),ctpoten
-      endif
-      call heelis_model(ctpoten,sunlons) ! heelis.F90
-      call calc_pfrac(sunlons(1),pfrac) ! returns pfrac for dynamo (edyn_solve)
-    elseif (trim(highlat_potential_model) == 'weimer') then
-!     byimf = 0._r8   ! nT
-!     bzimf = -2.0_r8 ! nT
-      swvel = 400._r8 ! km/s
-      swden = 10._r8  ! per cm3
-!
-! get_mag_parms will return by=0, and will calculate bz from kp.
-      call get_mag_parms(by=byimf, bz=bzimf)
-!
-! ctpoten_weimer is returned by Weimer model (weisc05.F90).
-! If get_mag_parms is called for ctpoten, it will return ctpoten_weimer.
-!
-      call weimer05(byimf,bzimf,swvel,swden,sunlons,wei05sc_ncfile,ctpoten_weimer)
-      call calc_pfrac(sunlons(1),pfrac) ! returns pfrac for dynamo (edyn_solve)
-      if (debug.and.masterproc) then
-         write(iulog,"('dpie_coupling call weimer05: byimf,bzimf=',2f8.2,' swvel,swden=',2f8.2,' ctpoten_weimer=',f8.2)") &
-              byimf,bzimf,swvel,swden,ctpoten_weimer
-      endif
-    else
-      call endrun('dpie_coupling: Unknown highlat_potential_model') 
-    endif
 !
 ! Prepare inputs to edynamo and oplus_xport:
 !

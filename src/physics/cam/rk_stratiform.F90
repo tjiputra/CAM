@@ -617,6 +617,14 @@ subroutine rk_stratiform_tend( &
 
    call pbuf_get_field(pbuf, wsedl_idx,  wsedl)
    
+   ! check that qcwat and tcwat were initialized; if not then do it now.
+   if (qcwat(1,1) == huge(1._r8)) then
+      qcwat(:ncol,:) = state%q(:ncol,:,1)
+   end if
+   if (tcwat(1,1) == huge(1._r8)) then
+      tcwat(:ncol,:) = state%t(:ncol,:)
+   end if
+
    if ( do_psrhmin ) then
       call tropopause_find(state, troplev, primary=TROP_ALG_TWMO, backup=TROP_ALG_CLIMATE)
       call get_rlat_all_p(lchnk,ncol,rlat)

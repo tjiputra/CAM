@@ -20,30 +20,30 @@ module subcol_tstcp
    private
    save
 
-   public :: subcol_gen_tstcp 
+   public :: subcol_gen_tstcp
    public :: subcol_register_tstcp
    public :: subcol_readnl_tstcp
    public :: subcol_field_avg_tstcp
    public :: subcol_ptend_avg_tstcp
 
    interface subcol_field_avg_tstcp
-      module procedure subcol_field_avg_tstcp_1dr 
-      module procedure subcol_field_avg_tstcp_1di 
-      module procedure subcol_field_avg_tstcp_2dr 
+      module procedure subcol_field_avg_tstcp_1dr
+      module procedure subcol_field_avg_tstcp_1di
+      module procedure subcol_field_avg_tstcp_2dr
    end interface
 
    logical :: subcol_tstcp_noAvg   ! if set, bypasses averaging and assigns back the first subcolumn to grid
 
-   logical :: subcol_tstcp_filter  ! if set, sets up a filter which yields BFB results 
+   logical :: subcol_tstcp_filter  ! if set, sets up a filter which yields BFB results
                                    ! (doesn't really excercise the filter arithmetic)
 
-   logical :: subcol_tstcp_weight  ! if set, sets up a weight which yields BFB results 
+   logical :: subcol_tstcp_weight  ! if set, sets up a weight which yields BFB results
                                    ! (doesn't really excercise the weight arithmetic)
 
    logical :: subcol_tstcp_perturb ! if set, turns on the perturbation test which changes the state temperatures
                                    ! to make sure subcolumns differ
 
-   logical :: subcol_tstcp_restart ! if set, sets up weights so that they are more adequately tested in restart, 
+   logical :: subcol_tstcp_restart ! if set, sets up weights so that they are more adequately tested in restart,
                                    ! but will not be BFB with non-subcolumnized run
 
    integer :: tstcpy_scol_idx      ! pbuf index for subcolumn-only test field
@@ -102,10 +102,11 @@ contains
 
    subroutine subcol_gen_tstcp(state, tend, state_sc, tend_sc, pbuf)
 
-      use subcol_utils,   only: subcol_set_subcols, subcol_get_nsubcol, subcol_set_weight, subcol_set_filter
-      use physics_buffer, only: physics_buffer_desc, pbuf_get_field, col_type_subcol
-      use phys_grid,      only: get_gcol_p
-      use time_manager,   only: is_first_step, is_first_restart_step
+      use subcol_utils,    only: subcol_set_subcols, subcol_set_weight, subcol_set_filter
+      use subcol_pack_mod, only: subcol_get_nsubcol
+      use physics_buffer,  only: physics_buffer_desc, pbuf_get_field, col_type_subcol
+      use phys_grid,       only: get_gcol_p
+      use time_manager,    only: is_first_step, is_first_restart_step
 
 
       !-----------------------------------
@@ -212,7 +213,7 @@ contains
           indx=indx+nsubcol(i)
         end do
       end if
-          
+
       ! Set weight to 1 for first column, 0 for all others -- will be BFB with noUniAv case
       if(subcol_tstcp_filter .and. subcol_tstcp_weight) then
         weight=1._r8
@@ -311,7 +312,7 @@ subroutine subcol_field_avg_tstcp_1dr (field_sc, ngrdcol, lchnk, field)
       ! Unless specialized averaging is needed, most subcolumn schemes will be handled here
       if (subcol_tstcp_noAvg) then
          call subcol_field_get_firstsubcol(field_sc, .true., ngrdcol, lchnk, field)
-      else 
+      else
          call subcol_field_avg_shr(field_sc, ngrdcol, lchnk, field, is_filter_set(), is_weight_set())
       end if
 
@@ -380,7 +381,7 @@ subroutine subcol_ptend_avg_tstcp (ptend_sc, ngrdcol, lchnk, ptend)
       type(physics_ptend), intent(in)             :: ptend_sc        ! intent in
       integer,  intent(in)                        :: ngrdcol       ! # grid cols
       integer,  intent(in)                        :: lchnk         ! chunk index
-      type(physics_ptend), intent(inout)          :: ptend     
+      type(physics_ptend), intent(inout)          :: ptend
 
       if (subcol_tstcp_noAvg) then
          call subcol_ptend_get_firstsubcol(ptend_sc, .true., ngrdcol, lchnk, ptend)

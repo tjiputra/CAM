@@ -55,14 +55,14 @@ module spmd_utils
 !  Forward these from mpif.h (or mpi.mod), the idea being that this should
 !  be the only module that uses mpi directly, the rest of cam should use spmd_utils
 !
-   public :: mpi_max_processor_name,                     &
-             mpi_integer, mpi_integer8, mpi_character,   &
-             mpi_logical, mpi_real8, mpi_real4,          &
-             mpi_complex16,                              &
-             mpi_packed, mpi_max, mpi_min,               &
-             mpi_comm_null, mpi_group_null,              &
-             mpi_undefined, mpi_status_size, mpi_success,&
-             mpi_status_ignore, mpi_double_precision, mpi_sum, mpir8
+   public :: mpi_max_processor_name, mpi_max_error_string, mpi_error,        &
+             mpi_integer, mpi_integer8, mpi_character, mpi_double_precision, &
+             mpi_logical, mpi_real8, mpi_real4, mpi_complex16,               &
+             mpi_packed, mpi_tag_ub, mpi_info_null,                          &
+             mpi_comm_null, mpi_group_null, mpi_undefined,                   &
+             mpi_status_size, mpi_success, mpi_status_ignore,                &
+             mpi_max, mpi_min, mpi_sum, mpi_band,                            &
+             mpir8
 
 
 

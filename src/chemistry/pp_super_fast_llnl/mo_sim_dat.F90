@@ -13,7 +13,7 @@
       use chem_mods,     only : phtcnt, rxt_tag_cnt, rxt_tag_lst, rxt_tag_map
       use chem_mods,     only : pht_alias_lst, pht_alias_mult
       use chem_mods,     only : extfrc_lst, inv_lst, slvd_lst
-      use chem_mods,     only : enthalpy_cnt, cph_enthalpy, cph_rid
+      use chem_mods,     only : enthalpy_cnt, cph_enthalpy, cph_rid, num_rnts, rxntot
       use cam_abortutils,only : endrun
       use mo_tracname,   only : solsym
       use chem_mods,     only : frc_from_dataset
@@ -82,14 +82,14 @@
          write(iulog,*) 'set_sim_dat: failed to allocate rxt_tag_map; error = ',ios
          call endrun
       end if
-      rxt_tag_lst(:rxt_tag_cnt) = (/ 'j2oh                            ', 'jh2o2                           ', &
-                                     'jno2                            ', 'jch2o_a                         ', &
-                                     'jch2o_b                         ', 'jch3ooh                         ', &
-                                     'out6                            ', 'usr_HO2_HO2                     ', &
-                                     'usr_oh_co                       ', 'het_no2_h2o                     ', &
-                                     'usr_oh_dms                      ', 'tag_so2_oh_m                    ', &
-                                     'aq_so2_h2o2                     ', 'aq_so2_o3                       ', &
-                                     'isop_oh                         ', 'isop_o3                         ' /)
+      rxt_tag_lst(     1:    16) = (/ 'j2oh                            ', 'jh2o2                           ', &
+                                      'jno2                            ', 'jch2o_a                         ', &
+                                      'jch2o_b                         ', 'jch3ooh                         ', &
+                                      'out6                            ', 'usr_HO2_HO2                     ', &
+                                      'usr_oh_co                       ', 'het_no2_h2o                     ', &
+                                      'usr_oh_dms                      ', 'tag_so2_oh_m                    ', &
+                                      'aq_so2_h2o2                     ', 'aq_so2_o3                       ', &
+                                      'isop_oh                         ', 'isop_o3                         ' /)
       rxt_tag_map(:rxt_tag_cnt) = (/    1,   2,   3,   4,   5,   6,   8,  10,  16,  23, &
                                        25,  26,  27,  28,  29,  30 /)
       if( allocated( pht_alias_lst ) ) then
@@ -116,6 +116,14 @@
                           1._r8 /)
       pht_alias_mult(:,2) = (/ 1._r8, 1._r8, 1._r8, 1._r8, 1._r8, &
                           1._r8 /)
+      allocate( num_rnts(rxntot-phtcnt),stat=ios )
+      if( ios /= 0 ) then
+         write(iulog,*) 'set_sim_dat: failed to allocate num_rnts; error = ',ios
+         call endrun
+      end if
+      num_rnts(:) = (/      2,     2,     2,     2,     2,     2,     2,     3,     2,     2, &
+                            2,     2,     2,     2,     2,     2,     2,     2,     2,     3, &
+                            2,     2,     2,     2 /)
 
       end subroutine set_sim_dat
 

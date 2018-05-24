@@ -30,7 +30,7 @@ module iop
                               use_3dfrc, betacam, fixmascam, alphacam, ioptimeidx,doiopupdate, &
                               use_userdata, cldiceobs,  cldliqobs, cldobs, clwpobs, divu, &
                               divu3d, divv, divv3d, iopfile, lhflxobs, numiceobs, numliqobs, &
-                              precobs, q1obs, scmlat, scmlon, shflxobs, tsair, have_omega, wfldh
+                              precobs, q1obs, scmlat, scmlon, shflxobs, tsair, have_omega, wfldh,qinitobs
   use shr_kind_mod,     only: r8 => shr_kind_r8, max_chars=>shr_kind_cl
   use shr_scam_mod,     only: shr_scam_GetCloseLatLon
   use spmd_utils,       only: masterproc
@@ -434,6 +434,10 @@ integer, optional, intent(in) :: timelevel
       status = nf90_get_var(ncid, varid, srf(1), strt4)
       have_srf = .true.
    endif
+
+   if (is_first_step()) then
+      qinitobs(:,:)=q3(1,:,:,1,ntimelevel)
+   end if
 
    qobs(:)= q3(1,:,1,1,ntimelevel)
 

@@ -1,17 +1,18 @@
 * Comments
-* User-given Tag Description: TSMLT1 for CESM2
-* Tag database identifier : MZ150_TSMLT1_20170406
+* User-given Tag Description: TSMLT1 for CESM2.0
+* Tag database identifier : MZ197_TSMLT1_20180423
 * Tag created by : lke
 * Tag created from branch : TSMLT1
-* Tag created on : 2017-04-06 12:37:39.334374-06
+* Tag created on : 2018-04-23 17:47:30.657331-06
 * Comments for this tag follow:
-*     lke : 2017-04-06 : with aerosol uptake of organic nitrates
+*     lke : 2018-04-23 : Latest change only removes O3S loss reactions.
 
       SPECIES
 
       Solution
  ALKNIT -> C5H11ONO2,
  ALKOOH -> C5H12O2,
+ AOA_NH -> CO,
  bc_a1 -> C,
  bc_a4 -> C,
  BCARY -> C15H24,
@@ -40,7 +41,7 @@
  C3H6,
  C3H7OOH,
  C3H8,
- C6H5OOH,
+ C6H5OOH -> C6H5OOH,
  CCL4 -> CCl4,
  CF2CLBR -> CF2ClBr,
  CF3BR -> CF3Br,
@@ -130,6 +131,8 @@
  ncl_a3 -> NaCl,
  NH3,
  NH4,
+ NH_5 -> CO,
+ NH_50 -> CO,
  NO,
  NO2,
  NO3,
@@ -142,7 +145,6 @@
  O,
  O2,
  O3,
- O3S -> O3,
  OCLO -> OClO,
  OCS -> OCS,
  ONITR -> C4H7NO4,
@@ -178,9 +180,10 @@
  SOAG2 -> C15H38O2,
  SOAG3 -> C15H38O2,
  SOAG4 -> C15H38O2,
+ ST80_25 -> CO,
  SVOC -> C22H46,
  TEPOMUC -> C7H8O3,
- TERP2OOH -> C10H16O4,
+ TERP2OOH -> C10H18O3,
  TERPNIT -> C10H17NO4,
  TERPOOH -> C10H18O3,
  TERPROD1 -> C10H16O2,
@@ -302,6 +305,7 @@
 
    Solution classes
       Explicit
+ AOA_NH
  BRY
  CCL4
  CF2CLBR
@@ -319,13 +323,16 @@
  CHBR3
  CLY
  CO2
+ E90
  H2402
  HCFC141B
  HCFC142B
  HCFC22
  N2O
- O3S
+ NH_5
+ NH_50
  SF6
+ ST80_25
  NHDEP
  NDEP
       End Explicit
@@ -383,7 +390,6 @@
  dst_a1
  dst_a2
  dst_a3
- E90
  EOOH
  F
  GLYALD
@@ -698,11 +704,6 @@
 [jso]                         SO + hv -> S + O 
 [jso2]                        SO2 + hv -> SO + O 
 [jso3]                        SO3 + hv -> SO2 + O 
-*********************************
-*** O3S tracer
-*********************************
-[jo3s_b->,jo3_b]              O3S + hv ->  
-[jo3s_a->,jo3_a]              O3S + hv ->  
 *********************************
 *** soa
 *********************************
@@ -1138,18 +1139,18 @@
 [usr_DMS_OH]           DMS + OH  -> 0.5*SO2 + 0.5*HO2                            
 [usr_GLYOXAL_aer]      GLYOXAL  -> SOAG0                                         
 [usr_HO2_aer]          HO2  -> 0.5*H2O2                                          
-[usr_NO2_aer]          NO2  -> 0.5*OH + 0.5*NO + 0.5*HNO3                        
-[usr_NO3_aer]          NO3  -> HNO3                                              
-[usr_N2O5_aer]         N2O5  -> 2*HNO3                                           
 [usr_HONITR_aer]       HONITR  -> HNO3                                           
 [usr_ISOPNITA_aer]     ISOPNITA  -> HNO3                                         
 [usr_ISOPNITB_aer]     ISOPNITB  -> HNO3                                         
+[usr_N2O5_aer]         N2O5  -> 2*HNO3                                           
 [usr_NC4CH2OH_aer]     NC4CH2OH  -> HNO3                                         
 [usr_NC4CHO_aer]       NC4CHO  -> HNO3                                           
+[usr_NH4_strat_tau]    NH4  -> 1*NHDEP                                          ; 6.34e-08 
+[usr_NO2_aer]          NO2  -> 0.5*OH + 0.5*NO + 0.5*HNO3                        
+[usr_NO3_aer]          NO3  -> HNO3                                              
 [usr_NTERPOOH_aer]     NTERPOOH  -> HNO3                                         
 [usr_ONITR_aer]        ONITR  -> HNO3                                            
 [usr_TERPNIT_aer]      TERPNIT  -> HNO3                                          
-[usr_NH4_strat_tau]    NH4  -> 1*NHDEP                                          ; 6.34e-08 
 *********************************
 *** SOA
 *********************************
@@ -1206,49 +1207,38 @@
 [ion_Op_N2,cph=105.04] Op + N2  -> NOp + N                                       
 [ion_Op_O2,cph=150.11] Op + O2  -> O2p + O                                       
 *********************************
-*** O3S tracer
+*** Tracers
 *********************************
-[BCARY_O3S]            BCARY + O3S  -> BCARY                                    ; 1.2e-14 
-[C2H4_O3S]             C2H4 + O3S  -> C2H4                                      ; 1.2e-14, -2630 
-[C3H6_O3S]             C3H6 + O3S  -> C3H6                                      ; 6.5e-15, -1900 
-[HO2_O3S]              HO2 + O3S  -> HO2                                        ; 1e-14, -490 
-[H_O3S]                H + O3S  -> H                                            ; 1.4e-10, -470 
-[ISOP_O3S]             ISOP + O3S  -> ISOP                                      ; 1.05e-14, -2000 
-[MACR_O3S]             MACR + O3S  -> MACR                                      ; 4.4e-15, -2500 
-[MTERP_O3S]            MTERP + O3S  -> MTERP                                    ; 6.3e-16, -580 
-[MVK_O3S]              MVK + O3S  -> MVK                                        ; 8.5e-16, -1520 
-[NO2_O3S]              NO2 + O3S  -> NO2                                        ; 1.2e-13, -2450 
-[NO_O3S]               NO + O3S  -> NO                                          ; 3e-12, -1500 
-[O1D_O3S]              O1D + O3S  -> O1D                                        ; 1.2e-10 
-[OH_O3S]               OH + O3S  -> OH                                          ; 1.7e-12, -940 
-[O_O3S]                O + O3S  -> O                                            ; 8e-12, -2060 
-[PHENO_O3S]            PHENO + O3S  -> PHENO                                    ; 2.8e-13 
 [E90_tau]              E90  -> sink                                             ; 1.29e-07 
+[NH_50_tau]            NH_50  ->                                                ; 2.31e-07 
+[NH_5_tau]             NH_5  ->                                                 ; 2.31e-06 
+[ST80_25_tau]          ST80_25  ->                                              ; 4.63e-07 
       End Reactions
 
       Ext Forcing
- NO <- dataset 
  NO2 <- dataset 
+ NO <- dataset 
  CO <- dataset 
  SO2 <- dataset 
- SVOC <- dataset
- bc_a1 <- dataset 
- bc_a4 <- dataset 
- pom_a1 <- dataset 
- pom_a4 <- dataset 
+ SVOC <- dataset 
  so4_a1 <- dataset 
  so4_a2 <- dataset 
+ pom_a1 <- dataset 
+ pom_a4 <- dataset 
  num_a1 <- dataset 
  num_a2 <- dataset 
  num_a4 <- dataset 
+ bc_a1 <- dataset 
+ bc_a4 <- dataset 
+ AOA_NH 
+ O2p 
+ Np 
+ N2p 
+ N2D 
+ e 
  N 
  OH 
  Op 
- O2p 
- N2p 
- Np 
- N2D 
- e 
       End Ext Forcing
 
       End Chemistry
@@ -1259,7 +1249,7 @@
         machine = nec
         model   = cam
         model_architecture = VECTOR
-	vector_length = 32
+        vector_length = 32
         architecture = hybrid
 *       vec_ftns = on
         namemod = on

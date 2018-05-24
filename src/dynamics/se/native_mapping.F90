@@ -1,25 +1,26 @@
 module native_mapping
 !
-!  Create mapping files using the SE basis functions.  This module looks for the namelist 'native_mapping' in 
+!  Create mapping files using the SE basis functions.  This module looks for the namelist 'native_mapping' in
 !  file NLFileName (usually atm_in) and reads from it a list of up to maxoutgrids grid description files
 !  It then creates a grid mapping file from the currently defined SE grid to the grid described in each file
 !  using the SE basis functions.   The output mapping file name is generated based on the SE model resolution
 !  and the input grid file name and ends in '_date_native.nc'
-! 
+!
   use cam_logfile,       only : iulog
   use shr_kind_mod,      only : r8 => shr_kind_r8, shr_kind_cl
+  use shr_const_mod,     only : pi=>shr_const_pi
   use cam_abortutils,    only : endrun
   use spmd_utils,        only : iam, masterproc, mpi_character, mpi_logical, mpi_integer, mpi_max, &
                                 mpicom, mstrid=>masterprocid
 
   implicit none
   private
-  public :: native_mapping_readnl, create_native_mapping_files
+  public :: native_mapping_readnl, create_native_mapping_files, do_native_mapping
 
   integer, parameter :: maxoutgrids=5
   character(len=shr_kind_cl) :: native_mapping_outgrids(maxoutgrids)
-  logical :: do_native_mapping
-  
+  logical, protected :: do_native_mapping
+
 !=============================================================================================
 contains
 !=============================================================================================
@@ -33,7 +34,7 @@ subroutine native_mapping_readnl(NLFileName)
 
    character(len=shr_kind_cl) :: mappingfile, fname
 
-   namelist /native_mapping/  native_mapping_outgrids
+   namelist /native_mapping_nl/  native_mapping_outgrids
    integer :: nf, unitn, ierr
    logical :: exist
    character(len=*), parameter ::  sub="native_mapping_readnl"
@@ -47,24 +48,24 @@ subroutine native_mapping_readnl(NLFileName)
 
    if(masterproc) then
       exist=.true.
-      write(iulog,*) sub//': Check for native_mapping namelist in ',trim(nlfilename)
+      write(iulog,*) sub//': Check for native_mapping_nl namelist in ',trim(nlfilename)
       unitn = getunit()
-      open( unitn, file=trim(nlfilename), status='old' )       
+      open( unitn, file=trim(nlfilename), status='old' )
 
-      call find_group_name(unitn, 'native_mapping', status=ierr)
+      call find_group_name(unitn, 'native_mapping_nl', status=ierr)
       if(ierr/=0) then
-         write(iulog,*) sub//': No native_mapping namelist found'
+         write(iulog,*) sub//': No native_mapping_nl namelist found'
          exist=.false.
       end if
       if(exist) then
-         read(unitn, native_mapping, iostat=ierr)
+         read(unitn, native_mapping_nl, iostat=ierr)
          if(ierr/=0) then
-            call endrun(sub//': namelist read returns an error condition for native_mapping')
+            call endrun(sub//': namelist read returns an error condition for native_mapping_nl')
          end if
-         close(unitn)
-         call freeunit(unitn)
          if(len_trim(native_mapping_outgrids(1))==0) exist=.false.
       end if
+      close(unitn)
+      call freeunit(unitn)
    end if
 
    call mpi_bcast(exist, 1, mpi_logical, mstrid, mpicom, ierr)
@@ -81,13 +82,13 @@ end subroutine native_mapping_readnl
 
 !=============================================================================================
 
+subroutine create_native_mapping_files(par, elem, maptype, ncol, clat, clon, areaa)
 
-  subroutine create_native_mapping_files(par, elem, maptype)
     use parallel_mod, only : parallel_t, global_shared_buf, global_shared_sum
     use global_norms_mod, only: wrap_repro_sum
     use cam_pio_utils, only : cam_pio_openfile, cam_pio_createfile
     use element_mod, only : element_t
-    use hybrid_mod, only : hybrid_t, hybrid_create
+    use hybrid_mod, only : hybrid_t, config_thread_region
     use pio, only : pio_noerr, pio_openfile, pio_createfile, pio_closefile, &
          pio_get_var, pio_put_var, pio_write_darray,pio_int, pio_double, &
          pio_def_var, pio_put_att, pio_global, file_desc_t, var_desc_t, &
@@ -102,9 +103,7 @@ end subroutine native_mapping_readnl
     use reduction_mod, only : ParallelMin,ParallelMax
     use cube_mod, only : convert_gbl_index
     use infnan, only : isnan
-    use dyn_grid, only : get_dyn_grid_parm, get_horiz_grid_d
     use dof_mod, only : CreateMetaData
-    use shr_const_mod, only : pi=>shr_const_pi
     use thread_mod,     only: omp_get_thread_num
     use datetime_mod, only: datetime
 
@@ -112,10 +111,15 @@ end subroutine native_mapping_readnl
     use cam_history_support, only : fillvalue
 
 
-    character(len=*), intent(in) :: maptype
-    type(element_t), intent(in) :: elem(:)
     type(parallel_t), intent(in) :: par
-    character(len=shr_kind_cl) :: mappingfile, fname	
+    type(element_t),  intent(in) :: elem(:)
+    character(len=*), intent(in) :: maptype
+    integer,          intent(in) :: ncol
+    real(r8),         intent(in) :: clat(ncol)
+    real(r8),         intent(in) :: clon(ncol)
+    real(r8),         intent(in) :: areaa(ncol)
+
+    character(len=shr_kind_cl) :: mappingfile, fname
 
 
     type(hybrid_t) :: hybrid
@@ -124,8 +128,8 @@ end subroutine native_mapping_readnl
     type (spherical_polar_t) :: sphere
     type(file_desc_t) :: ogfile, agfile
     type (interpdata_t)  :: interpdata(nelemd)
-    integer :: ierr, dimid, npts, vid, ncol
-    real(r8), allocatable :: lat(:), lon(:), clat(:), clon(:)
+    integer :: ierr, dimid, npts, vid
+    real(r8), allocatable :: lat(:), lon(:)
     integer :: i, ii, ie2, je2, ie, je, face_no, face_no2, k, j, n, ngrid, tpts, nf, number
     real(r8) :: countx, count_max, count_total
     integer :: fdofp(np,np,nelemd)
@@ -138,7 +142,7 @@ end subroutine native_mapping_readnl
     type(var_desc_t) :: areaA_id, areaB_id, dg_id, sg_id
     type(io_desc_t) :: iodesci, iodescd
     character(len=12) :: unit_str
-    real(r8), allocatable :: areaA(:), areaB(:)
+    real(r8), allocatable :: areaB(:)
     integer :: cntperelem_in(nelem),  cntperelem_out(nelem)
     integer :: ithr, dg_rank, substr1, substr2
 
@@ -159,14 +163,14 @@ end subroutine native_mapping_readnl
     endif
 
 
-    
+
 
     if(iam > par%nprocs) then
        ! The special case of npes_se < npes_cam is not worth dealing with here
        call endrun('Native mapping code requires npes_se==npes_cam')
     end if
 
-    
+
     call interp_init()
 
 
@@ -175,16 +179,16 @@ end subroutine native_mapping_readnl
     olditype = get_interp_parameter('itype')
 
     call datetime(cdate, ctime)
-    
+
     do nf=1,maxoutgrids
-       fname = native_mapping_outgrids(nf) 
+       fname = native_mapping_outgrids(nf)
        if(masterproc) then
           write(iulog,*) 'looking for target grid = ',trim(fname)
        endif
        if(len_trim(fname)==0) cycle
        inquire(file=fname,exist=exist)
        if(.not. exist) then
-          write(iulog,*) 'WARNING: Could not find or open grid file ',fname          
+          write(iulog,*) 'WARNING: Could not find or open grid file ',fname
           cycle
        end if
        if(masterproc) then
@@ -209,7 +213,7 @@ end subroutine native_mapping_readnl
 
        ierr = pio_inq_varid( ogfile, 'grid_center_lon', vid)
        ierr = pio_get_var(ogfile, vid, lon)
-       
+
        call pio_seterrorhandling(ogfile, PIO_BCAST_ERROR)
        ierr = pio_inq_varid( ogfile, 'grid_area', vid)
        call pio_seterrorhandling(ogfile, PIO_INTERNAL_ERROR)
@@ -241,20 +245,20 @@ end subroutine native_mapping_readnl
           call set_interp_parameter('nlat',dg_dims(1))
        end if
 
-       
+
 
 
 
 !       call setup_latlon_interp(elem, cam_interpolate, hybrid, 1, nelemd)
        ! go through once, counting the number of points on each element
 
-       sphere%r=1    
+       sphere%r=1
        do i=1,npts
           if(grid_imask(i)==1) then
              sphere%lat=lat(i)
              sphere%lon=lon(i)
              call cube_facepoint_ne(sphere, ne, cart, number)  ! new interface
-             if (number /= -1) then 
+             if (number /= -1) then
                 do ii=1,nelemd
                    if (number == elem(ii)%vertex%number) then
                       interpdata(ii)%n_interp = interpdata(ii)%n_interp + 1
@@ -272,9 +276,9 @@ end subroutine native_mapping_readnl
           end if
        enddo
 
-       ithr=omp_get_thread_num()
-       hybrid = hybrid_create(par,ithr,1)
-
+       hybrid = config_thread_region(par,'serial')
+!       ithr=omp_get_thread_num()
+!       hybrid = hybrid_create(par,ithr,1)
 
 
 
@@ -286,7 +290,7 @@ end subroutine native_mapping_readnl
        tpts = sum(grid_imask)
        if (count_total /= tpts ) then
           write(iulog,*)__FILE__,__LINE__,iam, count_total, tpts, npts
-          call endrun('Error setting up interpolation grid count_total<>npts') 
+          call endrun('Error setting up interpolation grid count_total<>npts')
        endif
 
        countx=maxval(interpdata(1:nelemd)%n_interp)
@@ -309,13 +313,13 @@ end subroutine native_mapping_readnl
 
        ! now go through the list again, adding the coordinates
        ! if this turns out to be slow, then it can be done in the loop above
-       ! but we have to allocate and possibly resize the interp_xy() array.  
+       ! but we have to allocate and possibly resize the interp_xy() array.
        do i=1,npts
           if(grid_imask(i)==1) then
              sphere%lat=lat(i)
              sphere%lon=lon(i)
              call cube_facepoint_ne(sphere, ne, cart, number)  ! new interface
-             if (number /= -1) then 
+             if (number /= -1) then
                 do ii=1,nelemd
                    if (number == elem(ii)%vertex%number) then
                       ngrid = interpdata(ii)%n_interp + 1
@@ -350,7 +354,7 @@ end subroutine native_mapping_readnl
                 f = 0.0_R8
                 f(i,j) = 1.0_R8
                 h = 0
-                call interpolate_scalar(interpdata(ie), f, np, h(:))
+                call interpolate_scalar(interpdata(ie), f, np, 0, h(:))
 
                 do n=1,interpdata(ie)%n_interp
                    if(any(isnan(h ))) then
@@ -360,7 +364,7 @@ end subroutine native_mapping_readnl
                    if(h(n)/=0) then
                       ngrid=ngrid+1
                       h1d(ngrid) = h(n)
-                      row(ngrid) = interpdata(ie)%ilon(n) 
+                      row(ngrid) = interpdata(ie)%ilon(n)
                       col(ngrid) =  fdofp(i,j,ie)
                       cntperelem_in(elem(ie)%Globalid)=cntperelem_in(elem(ie)%Globalid)+1
                    end if
@@ -397,18 +401,13 @@ end subroutine native_mapping_readnl
        deallocate(h)
 
        ngrid = int(count_total)
-       ncol =  get_dyn_grid_parm('plon')
-
-       allocate(areaA(ncol))
-       allocate(clat(ncol),clon(ncol))
-       call get_horiz_grid_d(ncol, clat_d_out=clat, clon_d_out=clon, area_d_out=areaA)
 
        substr1 = index(fname,'/',BACK=.true.)
        substr2 = index(fname,'.nc',BACK=.true.)
 
        if(ne<100) then
           write(mappingfile,113) ne,np,fname(substr1+1:substr2-1),trim(maptype),cdate(7:8),cdate(1:2),cdate(4:5)
-       else if(ne<1000) then 
+       else if(ne<1000) then
           write(mappingfile,114) ne,np,fname(substr1+1:substr2-1),trim(maptype),cdate(7:8),cdate(1:2),cdate(4:5)
        else
           write(mappingfile,115) ne,np,fname(substr1+1:substr2-1),trim(maptype),cdate(7:8),cdate(1:2),cdate(4:5)
@@ -421,8 +420,8 @@ end subroutine native_mapping_readnl
        call cam_pio_createfile( ogfile,mappingfile , 0)
 
        ierr = pio_def_dim( ogfile, 'n_a', ncol, na_dim)
-       ierr = pio_def_dim( ogfile, 'n_b', npts, nb_dim) 
-       ierr = pio_def_dim( ogfile, 'n_s', ngrid, ns_dim) 
+       ierr = pio_def_dim( ogfile, 'n_b', npts, nb_dim)
+       ierr = pio_def_dim( ogfile, 'n_s', ngrid, ns_dim)
 
        ierr = pio_def_dim( ogfile, 'src_grid_rank', 1, sg_dim)
        ierr = pio_def_var( ogfile, 'src_grid_dims',pio_int, (/sg_dim/),sg_id)
@@ -486,7 +485,7 @@ end subroutine native_mapping_readnl
 
 
        ierr = pio_put_var(ogfile, xcb_id, lon)
-       ierr = pio_put_var(ogfile, ycb_id, lat)   
+       ierr = pio_put_var(ogfile, ycb_id, lat)
 
        ierr = pio_put_var(ogfile, xca_id, clon)
        ierr = pio_put_var(ogfile, yca_id, clat)
@@ -496,7 +495,7 @@ end subroutine native_mapping_readnl
 
        ierr = pio_put_var(ogfile, areaA_id, areaA)
        ierr = pio_put_var(ogfile, areaB_id, areaB)
-       deallocate(areaA,areaB)
+       deallocate(areaB)
 
        allocate(grid_imask(ncol))
        grid_imask=1
@@ -505,7 +504,7 @@ end subroutine native_mapping_readnl
 
        call pio_closefile(ogfile)
 
-       deallocate(grid_imask, lat,lon, clat, clon, h1d, col, row, dg_dims, ldof)
+       deallocate(grid_imask, lat,lon, h1d, col, row, dg_dims, ldof)
        do ii=1,nelemd
           if(associated(interpdata(ii)%interp_xy))then
              deallocate(interpdata(ii)%interp_xy)
@@ -533,5 +532,3 @@ end subroutine native_mapping_readnl
 
 
 end module native_mapping
-
-

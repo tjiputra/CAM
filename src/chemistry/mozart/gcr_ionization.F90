@@ -22,7 +22,7 @@ module gcr_ionization
   type(trfile), save :: file
 
   character(len=32)  :: specifier(1) = 'prod'
-  character(len=256) :: filename = ''
+  character(len=256) :: filename = 'NONE'
   character(len=256) :: filelist = ''
   character(len=256) :: datapath = ''
   character(len=32)  :: datatype = 'SERIAL'
@@ -114,7 +114,7 @@ contains
     fixed_tod = gcr_ionization_fixed_tod
 
     ! Turn on galactic cosmic rays if user has specified an input dataset.
-    if (len_trim(filename) > 0 ) has_gcr_ionization = .true.
+    if (len_trim(filename) > 0 .and. filename.ne.'NONE') has_gcr_ionization = .true.
 
   end subroutine gcr_ionization_readnl
 

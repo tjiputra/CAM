@@ -2,7 +2,7 @@
 -chem trop_mozart
 -nlev 56
 -dyn fv
--res 1.9x2.5
+-hgrid 1.9x2.5
 -debug
 -offline_dyn
 -phys cam4

@@ -51,7 +51,7 @@ module nlte_lw
 contains
 !================================================================================================
 
-  subroutine nlte_init (pref_mid, nlte_use_mo_in)
+  subroutine nlte_init (pref_mid, nlte_use_mo_in, nlte_limit_co2)
 !
 ! Initialize the nlte parameterizations and tgcm forcing data, if required
 !------------------------------------------------------------------------
@@ -63,7 +63,7 @@ contains
 
     real(r8),         intent(in) :: pref_mid(plev)
     logical,          intent(in) :: nlte_use_mo_in
-
+    logical,          intent(in) :: nlte_limit_co2
 
     real(r8) :: o1_mw                      ! O molecular weight
     real(r8) :: o2_mw                      ! O2 molecular weight
@@ -151,7 +151,7 @@ contains
     use_waccm_forcing = use_data_o3 .or. (.not.nlte_use_mo) .or. (.not. has_hrates)
 
 ! Initialize Fomichev parameterization
-    call nlte_fomichev_init (co2_mw, n2_mw, o1_mw, o2_mw, o3_mw, no_mw)
+    call nlte_fomichev_init (co2_mw, n2_mw, o1_mw, o2_mw, o3_mw, no_mw, nlte_limit_co2)
 
 ! Initialize waccm forcing data
     if (use_waccm_forcing) then
@@ -290,8 +290,8 @@ contains
     xn2mmr  => n2mmr(:,:)
 
 ! do non-LTE parameterization 
-    call nlte_fomichev_calc (ncol,state%pmid,state%pint,state%t,xo2mmr,xommr,xo3mmr,xn2mmr,xco2mmr,qrlf,&
-        co2cool,o3cool,c2scool)
+    call nlte_fomichev_calc (lchnk,ncol,state%pmid,state%pint,state%t, &
+         xo2mmr,xommr,xo3mmr,xn2mmr,xco2mmr,qrlf,co2cool,o3cool,c2scool)
 
 ! do NO cooling 
     call nocooling (ncol, state%t, state%pmid, xnommr,xommr,xo2mmr,xo3mmr,xn2mmr,nocool)

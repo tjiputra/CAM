@@ -19,9 +19,6 @@ use cam_control_mod,     only: lambm0, obliqr, mvelpp, eccen
 
 use radae,               only: abstot_3d, absnxt_3d, emstot_3d, initialize_radbuffer, ntoplw
 
-use cospsimulator_intr,  only: docosp, cospsimulator_intr_init, &
-                               cospsimulator_intr_run, cosp_nradsteps
-
 use scamMod,             only: scm_crm_mode, single_column,have_cld,cldobs,&
                                have_clwp,clwpobs,have_tg,tground
 
@@ -61,10 +58,6 @@ public :: &
    radiation_read_restart,   &!
    radiation_tend,           &! compute heating rates and fluxes
    rad_out_t                  ! type for diagnostic outputs
-
-integer, public, allocatable :: cosp_cnt(:)       ! counter for cosp
-integer, public              :: cosp_cnt_init = 0 !initial value for cosp counter
-
 
 type rad_out_t
    real(r8) :: solin(pcols)         ! Solar incident flux
@@ -149,8 +142,6 @@ real(r8), parameter :: cgs2mks = 1.e-3_r8
 
 type(var_desc_t), allocatable :: abstot_desc(:)
 type(var_desc_t) :: emstot_desc, absnxt_desc(4)
-
-type(var_desc_t) :: cospcnt_desc
 
 !===============================================================================
 contains
@@ -404,14 +395,6 @@ subroutine radiation_init(pbuf2d)
       nstep       = get_nstep()
       irad_always = irad_always + nstep
    end if
-   if (docosp) call cospsimulator_intr_init
-
-   allocate(cosp_cnt(begchunk:endchunk))
-   if (is_first_restart_step()) then
-      cosp_cnt(begchunk:endchunk)=cosp_cnt_init
-   else
-      cosp_cnt(begchunk:endchunk)=0 	
-   end if
 
    ! Shortwave radiation
    call addfld ('SOLIN',           horiz_only,   'A','W/m2','Solar insolation',                            sampling_seq='rad_lwsw')
@@ -612,10 +595,6 @@ subroutine radiation_define_restart(file)
 
    end if
 
-   if (docosp) then
-      ierr = pio_def_var(File, 'cosp_cnt_init', pio_int, cospcnt_desc)
-   end if
-
 end subroutine radiation_define_restart
   
 !===============================================================================
@@ -678,10 +657,6 @@ subroutine radiation_write_restart(file)
 
       ! module data was allocated in radiation_define_restart
       deallocate(abstot_desc)
-   end if
-
-   if (docosp) then
-      ierr = pio_put_var(File, cospcnt_desc, (/cosp_cnt(begchunk)/))
    end if
 
 end subroutine radiation_write_restart
@@ -752,17 +727,6 @@ subroutine radiation_read_restart(file)
          call cam_grid_read_dist_array(File, physgrid, dims(1:3), &
               gdims(1:nhdims+1), absnxt_3d(:,:,i,:), vardesc)
       end do
-   end if
-
-   if (docosp) then
-      call pio_seterrorhandling(File, PIO_BCAST_ERROR, err_handling)
-      ierr = pio_inq_varid(File, 'cosp_cnt_init', vardesc)
-      call pio_seterrorhandling(File, err_handling)
-      if (ierr /= PIO_NOERR) then
-         cosp_cnt_init=0
-      else
-         ierr = pio_get_var(File, vardesc, cosp_cnt_init)
-      end if
    end if
 
 end subroutine radiation_read_restart
@@ -892,6 +856,8 @@ subroutine radiation_tend( &
 
    character(*), parameter :: name = 'radiation_tend'
 
+   logical, parameter :: cosz_rad_call=.true. !+tht
+
    ! tropopause diagnostic
    integer :: troplev(pcols)
    real(r8):: p_trop(pcols)
@@ -938,7 +904,7 @@ subroutine radiation_tend( &
    ! Cosine solar zenith angle for current time step
    call get_rlat_all_p(lchnk, ncol, clat)
    call get_rlon_all_p(lchnk, ncol, clon)
-   call zenith (calday, clat, clon, coszrs, ncol, dt_avg)
+   call zenith (calday, clat, clon, coszrs, ncol, dt_avg, cosz_rad_call)
 
    ! Gather night/day column indices.
    Nday = 0
@@ -1156,20 +1122,6 @@ subroutine radiation_tend( &
       ! Cloud cover diagnostics
       ! radsw can change pmxrgn and nmxrgn so cldsav needs to follow radsw
       if (write_output) call cloud_cover_diags_out(lchnk, ncol, cld, state%pmid, nmxrgn, pmxrgn )
-
-      if (docosp) then
-         ! cosp_cnt referenced for each chunk... cosp_cnt(lchnk) (this is for thread safety)
-         ! advance counter for this timestep
-         cosp_cnt(lchnk) = cosp_cnt(lchnk) + 1
-
-         ! if counter is the same as cosp_nradsteps, run cosp and reset counter
-         if (cosp_nradsteps .eq. cosp_cnt(lchnk)) then
-            ! call should be compatible with rrtm radiation.F90 interface too, should be with (in),optional
-            call cospsimulator_intr_run(state,  pbuf, &
-               cam_in, emis, coszrs, cliqwp_in=cliqwp, cicewp_in=cicewp)
-            cosp_cnt(lchnk) = 0  ! reset counter
-         end if
-      end if
 
    else   !  if (dosw .or. dolw) then
 

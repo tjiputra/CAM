@@ -131,7 +131,7 @@ subroutine radcswmx(lchnk   ,ncol    ,                         &
    use cmparray_mod,     only: CmpDayNite, ExpDayNite
    use quicksort,        only: quick_sort
    use phys_control,     only: phys_getopts
-   use solar_data,       only: sol_tsi, do_spctrl_scaling, ref_tsi
+   use solar_irrad_data, only: sol_tsi, do_spctrl_scaling, ref_tsi
    use radconstants,     only: frcsol, ph2o, pco2, po2
 
 !-----------------------Constants for new band (640-700 nm)-------------

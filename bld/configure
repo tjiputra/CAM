@@ -121,11 +121,11 @@ OPTIONS
                           test_tracers, test_tracers2].
                         Default: none.
      -chem <name>       Build CAM with specified prognostic chemistry package
-                        [ trop_mam3 | trop_mam4 | trop_mam7 | trop_mozart | trop_strat_mam4_vbs | 
-                          trop_bam | trop_ghg | waccm_ma | waccm_mad_mam4 | waccm_ma_mam4 | 
-                          waccm_ma_sulfur | waccm_sc | waccm_sc_mam4 | waccm_tsmlt | waccm_tsmlt_mam4 | 
+                        [ trop_mam3 | trop_mam4 | trop_mam7 | trop_mozart | trop_strat_mam4_vbs |
+                          trop_bam | trop_ghg | waccm_ma | waccm_mad_mam4 | waccm_ma_mam4 |
+                          waccm_ma_sulfur | waccm_sc | waccm_sc_mam4 | waccm_tsmlt | waccm_tsmlt_mam4 |
                           waccm_tsmlt_sulfur | super_fast_llnl | super_fast_llnl_mam3 | terminator | none ].
-                        Default: trop_mam3.
+                        Default: trop_mam4 for cam6 and trop_mam3 for cam5.
      -[no]clubb_sgs     Switch on [off] CLUBB_SGS.  Default: on for cam6, otherwise off.
      -clubb_opts <list> Comma separated list of CLUBB options to turn on/off.  By default they are all off.
                         Current option is: clubb_do_adv (Advect CLUBB moments)
@@ -152,13 +152,12 @@ OPTIONS
      -pbl <name>        Specify the PBL option [uw | hb | hbr].
      -pcols <n>         Set maximum number of columns in a chunk to <n>.
      -pergro            Switch enables building CAM for perturbation growth tests.
-     -phys <name>       Physics option [cam3 | cam4 | cam5 | cam6 | held_suarez | adiabatic | kessler | 
+     -phys <name>       Physics option [cam3 | cam4 | cam5 | cam6 | held_suarez | adiabatic | kessler |
                                         spcam_sam1mom | spcam_m2005].  Default: cam6
      -prog_species <list>Comma-separate list of prognostic mozart species packages.
                         Currently available: DST,SSLT,SO4,GHG,OC,BC,CARBON16
      -psubcols <n>      Maximum number of sub-columns in a run - set to 1 if not using sub-columns (default)
      -rad <name>        Specify the radiation package [rrtmg | camrt]
-     -res <name>        Specify horizontal grid.  ***DEPRECATED***  Use the -hgrid option.
      -spcam_clubb_sgs   Turn on the SPCAM version of CLUBB
      -spcam_nx <n>      SPCAM x-grid. - defaults to 4 (note the CRM requires spcam_nx to be greater than or equal to 4)
      -spcam_ny <n>      SPCAM y-grid. - defaults to 1
@@ -351,7 +350,6 @@ GetOptions(
     "psubcols=s"                => \$opts{'psubcols'},
     "rad=s"                     => \$opts{'rad'},
     "offline_drv=s"             => \$opts{'offline_drv'},
-    "res=s"                     => \$opts{'res'},
     "scam"                      => \$opts{'scam'},
     "s|silent"                  => \$opts{'silent'},
     "smp!"                      => \$opts{'smp'},
@@ -657,7 +655,7 @@ if (defined $opts{'chem'}) {
         # the only valid chemistry options are 'none' and 'terminator'
         if (($chem_pkg ne 'none') and ($chem_pkg ne 'terminator')) {
             die "configure ERROR: -phys=$phys_pkg  -chem=$chem_pkg\n".
-                "                 -chem can only be set to 'none or terminator'.\n";
+                "                 -chem can only be set to 'none' or 'terminator'.\n";
         }
     }
     elsif ($phys_pkg =~ m/^cam3$|^cam4$|^spcam_sam1mom$/) {
@@ -1121,15 +1119,15 @@ if (defined $opts{'cosp'}) {
 }
 my $cosp = $cfg_ref->get('cosp');
 
+# cosp is only implemented with the cam5 and cam6 physics packages
+if ($cosp and ($phys_pkg ne 'cam5' and $phys_pkg ne 'cam6')) {
+        die "configure ERROR: cosp not implemented for the $phys_pkg physics package \n";
+}
+
 if ($cosp and $print>=2) { print "COSP simulator enabled$eol"; }
 
 #-----------------------------------------------------------------------------------------------
 # Checks for SPCAM compatability
-
-# unable to run cosp and SPCAM
-if ($cosp and ($phys_pkg eq 'spcam_m2005' or $phys_pkg eq 'spcam_sam1mom')) {
-        die "configure ERROR: currently cosp and SPCAM can not be run together \n";
-}
 
 if ($phys_pkg eq 'spcam_sam1mom') {
    if ($rad_pkg ne 'camrt') {
@@ -1223,16 +1221,6 @@ if ($scam eq 'ON' and $dyn_pkg ne 'eul') {
 EOF
 }
 
-# Check that model is configured for serial execution.  Note that configuring with spmd
-# and running with 1 task doesn't work because the EUL dycore expects at least 2 tasks.
-# The model should run if built for threading.
-if ($scam eq 'ON' and $spmd ne 'OFF') {
-    die <<"EOF";
-**  ERROR: SCAM mode assumes a serial build.
-**         Requested parallel modes are: spmd=$spmd  smp=$smp
-EOF
-}
-
 if ($print>=2) { print "CAM single column mode (SCAM): $scam$eol"; }
 
 #-----------------------------------------------------------------------------------------------
@@ -1256,13 +1244,13 @@ if ($print>=2) { print "Produce IOP file for SCAM: $camiop$eol"; }
 # Horizontal grid parameters
 # Dycore dependent defaults:
 my $hgrid;
-if ($dyn_pkg == 'fv') {
+if ($dyn_pkg eq 'fv') {
     $hgrid = '1.9x2.5';
 }
-elsif ($dyn_pkg == 'eul') {
+elsif ($dyn_pkg eq 'eul') {
     $hgrid = '64x128';
 }
-elsif ($dyn_pkg == 'se') {
+elsif ($dyn_pkg eq 'se') {
     $hgrid = 'ne16np4';
 }
 $cfg_ref->set('hgrid', $hgrid);
@@ -1270,9 +1258,6 @@ $cfg_ref->set('hgrid', $hgrid);
 # User override.
 if (defined $opts{'hgrid'}) {
     $cfg_ref->set('hgrid', $opts{'hgrid'});
-}
-elsif (defined $opts{'res'}) {
-    $cfg_ref->set('hgrid', $opts{'res'});
 }
 my $hgrid = $cfg_ref->get('hgrid');
 
@@ -1353,7 +1338,7 @@ elsif ($phys_pkg eq 'cam3') {
     $nlev = 26;
 }
 else {
-    # This will be used for held_suarez and other 'simple' physics
+    # This will be used for Held-Suarez and other 'simple' physics
     # We may change this to 32 once IC files are available.
     $nlev = 30;
 }
@@ -1391,41 +1376,36 @@ if (!$prog_species) {
   $cfg_ref->set('chem_src_dir', $chem_src_dir);
 }
 
-if (($chem_pkg ne 'none') || ($prog_species)) {
+# customize chemistry
+my $edit_chem_mech = $cfg_ref->get('edit_chem_mech');
+my $usr_mech_infile = $cfg_ref->get('usr_mech_infile');
+my $customize = $prog_species || $edit_chem_mech || $usr_mech_infile;
 
-    # customize chemistry
-    my $edit_chem_mech = $cfg_ref->get('edit_chem_mech');
-    my $usr_mech_infile = $cfg_ref->get('usr_mech_infile');
-    my $prog_species = $cfg_ref->get('prog_species');
-
-    my $customize = $prog_species || $edit_chem_mech || $usr_mech_infile;
-
-    if ($customize) {
-        # build_chem_proc option used to force a build even if an executable exists
-        if (defined $opts{'build_chem_proc'}) {
-            $cfg_ref->set('build_chem_proc', $opts{'build_chem_proc'});
-        } else {
-            $cfg_ref->set('build_chem_proc', 0);
-        }
-        my $chem_proc_src ;
-        $chem_proc_src = "$cam_bld/chem_proc/source";
-        $cfg_ref->set('chem_proc_src', $chem_proc_src) ;
-        my $chemproc_fc;
-        # determine which fortran compiler to use for building the preprocessor
-        if (defined $opts{'fc_type'}) {
-            $chemproc_fc = $opts{'fc_type'};
-            if ($print>=2) { print "Chem preprocessor compiler set from fc config opt$eol"; }
-        }
-        if ($print>=2) { print "Chem preprocessor compiler: $chemproc_fc $eol"; }
-        ($chem_nadv) = chem_preprocess($cfg_ref,$print,$chemproc_fc);
+if ($customize) {
+    # build_chem_proc option used to force a build even if an executable exists
+    if (defined $opts{'build_chem_proc'}) {
+        $cfg_ref->set('build_chem_proc', $opts{'build_chem_proc'});
     } else {
-       # copy over chem docs
-        copy("$chem_src_dir/chem_mech.doc",$cam_bld) or die "copy failed $! \n";
-        copy("$chem_src_dir/chem_mech.in" ,$cam_bld) or die "copy failed $! \n";
-        ($chem_nadv) = chem_number_adv($chem_src_dir);
+        $cfg_ref->set('build_chem_proc', 0);
     }
-
+    my $chem_proc_src ;
+    $chem_proc_src = "$cam_bld/chem_proc/source";
+    $cfg_ref->set('chem_proc_src', $chem_proc_src) ;
+    my $chemproc_fc;
+    # determine which fortran compiler to use for building the preprocessor
+    if (defined $opts{'fc_type'}) {
+        $chemproc_fc = $opts{'fc_type'};
+        if ($print>=2) { print "Chem preprocessor compiler set from fc config opt$eol"; }
+    }
+    if ($print>=2) { print "Chem preprocessor compiler: $chemproc_fc $eol"; }
+    ($chem_nadv) = chem_preprocess($cfg_ref,$print,$chemproc_fc);
+} elsif ($chem_pkg ne 'none') {
+   # copy over chem docs
+    copy("$chem_src_dir/chem_mech.doc",$cam_bld) or die "copy failed $! \n";
+    copy("$chem_src_dir/chem_mech.in" ,$cam_bld) or die "copy failed $! \n";
+    ($chem_nadv) = chem_number_adv($chem_src_dir);
 }
+
 if ($chem_pkg =~ '_mam3') {
     $chem_cppdefs = ' -DMODAL_AERO -DMODAL_AERO_3MODE ';
 } elsif ($chem_pkg =~ '_mam4') {
@@ -1514,14 +1494,14 @@ else {
     # commandline arg, then determine the default number.
 
     # There is always at least one advected constituent, the specific humidity, even
-    # if it's set to zero which is the case for adiabatic or held_suarez physics.
+    # if it's set to zero which is the case for adiabatic or Held-Suarez physics.
     $nadv = 1;
 
     # Chemistry package:
     $nadv += $chem_nadv;
     if ($print>=2) { print "Advected constituents added by chemistry $chem_pkg: $chem_nadv$eol"; }
 
-    # If no 'simple' (e.g., held_suarez) physics package is used,
+    # If no 'simple' (e.g., Held-Suarez) physics package is used,
     # then accumulate advected constituents from the moist physics and
     # chemistry processes.
 
@@ -1576,7 +1556,7 @@ else {
       $nadv += 2
     }
 
-    # Add in specified test tracers.  These may be present with 'simple' (e.g., held_suarez) physics.
+    # Add in specified test tracers.  These may be present with 'simple' (e.g., Held-Suarez) physics.
     $nadv += $ttrac_nadv;
     if ($print>=2 and $ttrac_nadv) { print "Advected constituents added by test tracer package: $ttrac_nadv$eol"; }
 
@@ -1639,7 +1619,7 @@ if ($target_os eq 'aix') {
     $cc = 'mpcc_r';
 }
 elsif ($target_os eq 'linux') {
-    $fc='pgf95';
+    $fc='gfortran';
 }
 elsif ($target_os eq 'darwin') {
 
@@ -1710,11 +1690,6 @@ else {
     if ($target_os eq 'linux') {
         die "Fortran compiler type must be set on Linux platform.  Specify using the '-fc_type' argument.$eol";
     }
-}
-
-# NAG does not work with threading - error out
-if ($fc_type eq 'nag' and $smp eq 'ON') {
-  die "NAG does not compile properly with threading turned on"
 }
 
 # If a default hasn't been set yet for CC then set one now.
@@ -1876,22 +1851,32 @@ my $nlon = $cfg_ref->get('nlon');
 my $nlat = $cfg_ref->get('nlat');
 $cfg_cppdefs .= " -DPLON=$nlon -DPLAT=$nlat";
 
-
 # Parameters for multiple instances
 if (!$ccsm_seq){
     $cfg_cppdefs .= " -DNUM_COMP_INST_ATM=1 -DNUM_COMP_INST_LND=1 -DNUM_COMP_INST_OCN=1 -DNUM_COMP_INST_ICE=1";
     $cfg_cppdefs .= " -DNUM_COMP_INST_GLC=1 -DNUM_COMP_INST_ROF=1 -DNUM_COMP_INST_WAV=1 -DNUM_COMP_INST_ESP=1";
 }
 
-# Resolution parameters for spectral element cubed sphere grids.
-# F2003 definition turns on standard-conforming method of causing edge
-# buffers to overlap. This method works in all CAM compilers, but fails
-# on some older compilers used by HOMME standalone.
+# Parameters for spectral element dycore.
+# HAVE_F2003_PTR_BND_REMAP definition turns on standard-conforming method of causing edge
+# buffers to overlap. This method works in all CAM compilers.
 if ($dyn_pkg eq 'se') {
+
     my $csnp = $cfg_ref->get('csnp');
-    $cfg_cppdefs .= " -DNP=$csnp -DNC=4 -DHAVE_F2003_PTR_BND_REMAP";
+    $cfg_cppdefs .= " -DCAM  -D_WK_GRAD -DNP=$csnp -DHAVE_F2003_PTR_BND_REMAP";
+
+    # Check to see if physics grid is being used
+    my $npg = $cfg_ref->get('npg');
+    if ($npg > 0) {
+        die "CSLAM and FVM physics grid are not currently supported.$eol";
+    }
+
     if ($smp eq 'ON') {
-      $cfg_cppdefs .= " -DHORIZ_OPENMP"
+        $cfg_cppdefs .= " -D_OPENMP";
+    }
+
+    if ($spmd eq 'ON') {
+        $cfg_cppdefs .= " -D_MPI";
     }
 }
 
@@ -1914,12 +1899,6 @@ $cfg_cppdefs .= " -DPTRM=$trm -DPTRN=$trn -DPTRK=$trk";
 # offline driver for FV dycore
 if ($offline_dyn) { $cfg_cppdefs .= ' -DOFFLINE_DYN'; }
 
-# Spectral Element dycore
-if($dyn_pkg eq 'se'){
-    if ($spmd eq 'ON'){ $cfg_cppdefs .=" -D_MPI"; }
-    $cfg_cppdefs .= " -DCAM  -D_WK_GRAD -D_PRIM ";
-}
-
 # -DSPMD only added for CESM build.  The CAM Makefile has a separate SPMD macro.
 if ( ($ccsm_seq) and ($spmd eq 'ON') ) { $cfg_cppdefs .= " -DSPMD"; }
 
@@ -1936,7 +1915,7 @@ if ($cfg_ref->get('analytic_ic')) {
 
 #WACCM-X extended thermosphere/ionosphere model
 if ($waccmx) {
-    $cfg_cppdefs .= ' -DWACCMX_PHYS'; 
+    $cfg_cppdefs .= ' -DWACCMX_PHYS';
     if (($dyn_pkg ne 'fv') and ($ionos ne 'none'))  {
         die "ERROR:  Ionosphere is only available for FV dycore \n";
     }
@@ -2327,7 +2306,7 @@ if ($cosp) {
     }
 
     # Create the COSP Makefile from a template and copy it into the cosp bld directory
-    write_cosp_makefile("$cfgdir/../src/physics/cosp/Makefile.cospinline.in", "$cosp_libdir/Makefile");
+    write_cosp_makefile("$cfgdir/../src/physics/cosp2/Makefile.in", "$cosp_libdir/Makefile");
     if ($print) { print "creating $cosp_libdir/Makefile\n"; }
 }
 
@@ -2858,7 +2837,7 @@ sub write_filepath
     # Dynamics package and test utilities
     print $fh "$camsrcdir/cam/src/dynamics/$dyn\n";
     if($dyn eq 'se') {
-       print $fh "$camsrcdir/cam/src/dynamics/se/share\n";
+       print $fh "$camsrcdir/cam/src/dynamics/se/dycore\n";
     }
     print $fh "$camsrcdir/cam/src/dynamics/tests\n";
     if($inic_val) {
@@ -2895,13 +2874,13 @@ sub write_filepath
         print $fh "$cam_root/cime/src/drivers/mct/main\n";
         print $fh "$cam_root/cime/src/drivers/mct/shr\n";
 
-
 	# Ocean package.
 	if ($ocn eq 'dom') {
 	    print $fh "$camsrcdir/cam/src/utils/cam_dom\n";
 	}
 	elsif ($ocn eq 'docn' or $ocn eq 'som') {
 	    print $fh "$cam_root/cime/src/components/data_comps/docn\n";
+	    print $fh "$cam_root/cime/src/components/data_comps/docn/mct\n";
 	}
 	elsif ($ocn eq 'aquaplanet') {
 	    print $fh "$camsrcdir/cam/src/utils/cam_aqua\n";
@@ -2931,13 +2910,13 @@ sub write_filepath
 
         # Share utilities
         print $fh "$cam_root/cime/src/share/util\n";
+        print $fh "$cam_root/cime/src/share/streams\n";
         print $fh "$cam_root/cime/src/share/include\n";
         print $fh "$cam_root/cime/src/share/RandNum/include\n";
         print $fh "$cam_root/cime/src/share/RandNum/src\n";
         print $fh "$cam_root/cime/src/share/RandNum/src/dsfmt_f03\n";
         print $fh "$cam_root/cime/src/share/RandNum/src/kissvec\n";
         print $fh "$cam_root/cime/src/share/RandNum/src/mt19937\n";
-        print $fh "$cam_root/cime/src/components/data_comps/dshare\n";
 
         # GPTL and timing code
 #        print $fh "$cam_root/cime/src/externals/pio2/src/gptl\n";
@@ -3080,15 +3059,15 @@ sub write_cosp_makefile
 
     print $fh_out  <<"EOF";
 
-
-CAM_BLD    := $cam_bld
-COSP_PATH  := $cam_root/components/cam/src/physics/cosp
-ISCCP_PATH := $cam_root/components/cam/src/physics/icarus-scops
-RS_PATH    := $cam_root/components/cam/src/physics/cosp/quickbeam
-CS_PATH    := $cam_root/components/cam/src/physics/cosp/actsim
-LLNL_PATH  := $cam_root/components/cam/src/physics/cosp/llnl
-MISR_PATH  := $cam_root/components/cam/src/physics/cosp/MISR_simulator
-MODIS_PATH := $cam_root/components/cam/src/physics/cosp/MODIS_simulator
+CAM_BLD      := $cam_bld
+COSP_PATH    := $cam_root/components/cam/src/physics/cosp2
+ISCCP_PATH   := $cam_root/components/cam/src/physics/cosp2/src/simulator/icarus
+RS_PATH      := $cam_root/components/cam/src/physics/cosp2/src/simulator/quickbeam
+RT_PATH      := $cam_root/components/cam/src/physics/cosp2/src/simulator/rttov
+CS_PATH      := $cam_root/components/cam/src/physics/cosp2/src/simulator/actsim
+MISR_PATH    := $cam_root/components/cam/src/physics/cosp2/src/simulator/MISR_simulator
+MODIS_PATH   := $cam_root/components/cam/src/physics/cosp2/src/simulator/MODIS_simulator
+PARASOL_PATH := $cam_root/components/cam/src/physics/cosp2/src/simulator/parasol
 
 EOF
 
@@ -3180,9 +3159,19 @@ sub set_horiz_grid
     elsif ( $dyn_pkg eq 'fvcubed' ) {
         $cfg_ref->set('csnp', $a{'csnp'});
     }
-    elsif ( $dyn_pkg eq 'se' ) {
+    elsif ( $dyn_pkg eq 'se') {
         $cfg_ref->set('csne', $a{'csne'});
         $cfg_ref->set('csnp', $a{'csnp'});
+        $cfg_ref->set('npg',  $a{'npg'});
+
+        # To allow more flexibility when matching grid attributes in the namelist
+        # defaults file split the GLL and physics grid specifiers in the hgrid
+        # argument to configure, and just store the GLL part in the hgrid parameter of
+        # the config_cache file.  The physics grid specifier is stored separately
+        # in the npg parameter.
+
+        $hgrid =~ s/\.pg\d//;   # strip the '.pgN' extension
+        $cfg_ref->set('hgrid', $hgrid);
     }
 
     # Override resolution settings to configure for SCAM mode.  The override is needed
@@ -3662,4 +3651,3 @@ sub print_hash {
     my ($k, $v);
     while ( ($k,$v) = each %h ) { print "$k => $v\n"; }
 }
-

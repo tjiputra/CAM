@@ -91,6 +91,14 @@ subroutine convect_deep_register
   select case ( deep_scheme )
   case('ZM') !    Zhang-McFarlane (default)
      call zm_conv_register
+
+  case('off', 'UNICON') ! Off needs to setup the following fields
+   call pbuf_add_field('ICWMRDP',    'physpkg',dtype_r8,(/pcols,pver/),icwmrdp_idx)
+   call pbuf_add_field('RPRDDP',     'physpkg',dtype_r8,(/pcols,pver/),rprddp_idx)
+   call pbuf_add_field('NEVAPR_DPCU','physpkg',dtype_r8,(/pcols,pver/),nevapr_dpcu_idx)
+   call pbuf_add_field('PREC_DP',    'physpkg',dtype_r8,(/pcols/),     prec_dp_idx)
+   call pbuf_add_field('SNOW_DP',    'physpkg',dtype_r8,(/pcols/),     snow_dp_idx)
+
   end select
 
   ! If gravity waves from deep convection are on, output this field.

@@ -5,7 +5,7 @@
 <start_ymd>18500101</start_ymd>
 
 <!-- TSI dataset from Lean (via Caspar Ammann) -->
-<solar_data_file>atm/cam/solar/SOLAR_SPECTRAL_Lean_1610-2008_annual_c090324.nc</solar_data_file>
+<solar_irrad_data_file>atm/cam/solar/SOLAR_SPECTRAL_Lean_1610-2008_annual_c090324.nc</solar_irrad_data_file>
 <solar_data_type>SERIAL</solar_data_type>
 
 <!-- GHG values from Doug Kinnison -->

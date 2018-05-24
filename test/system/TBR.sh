@@ -1,6 +1,9 @@
 #!/bin/sh 
 #
 
+# utility functions
+. $CAM_SCRIPTDIR/CAM_utils.sh
+
 if [ $# -ne 4 ]; then
     echo "TBR.sh: incorrect number of input arguments" 
     exit 1
@@ -103,15 +106,10 @@ else
 fi
 
 ## branch from an older restart file if more than one available 
-## note i need to account for clm generating additional netcdf restart files 
-## note that there may be no clm file in certain modes (adiabatic for example) 
-## and cam will ignore the namelist vars for clm
 ## the following commands now do their ls in the directory the files were 
 ## copied from because the above cp's sometimes wouldn't finish in time on bluesky
 master_cam_restart=`ls -1rt ${CAM_TESTDIR}/TSM.$1.$2.${initial_length}${stop_flag}/*.cam*.r.*[0-9].nc \
     | tail -2 | head -1`
-master_clm_restart=`ls -1rt ${CAM_TESTDIR}/TSM.$1.$2.${initial_length}${stop_flag}/*.clm*.r.* \
-    | tail -3 | head -1`
 master_cpl_restart=`ls -1rt ${CAM_TESTDIR}/TSM.$1.$2.${initial_length}${stop_flag}/*.cpl*.r.* \
     | tail -2 | head -1`
 if [ -f ${CAM_TESTDIR}/TSM.$1.$2.${initial_length}${stop_flag}/docn_in ]; then
@@ -119,35 +117,22 @@ if [ -f ${CAM_TESTDIR}/TSM.$1.$2.${initial_length}${stop_flag}/docn_in ]; then
    ocn_branch_nlparm=restfilm
    master_ocn_restart=`ls -1rt ${CAM_TESTDIR}/TSM.$1.$2.${initial_length}${stop_flag}/*.docn*.rs1.* \
        | tail -2 | head -1`
-else
-   ocn_inparm=dom_inparm
-   ocn_branch_nlparm=dom_branch_file
-   master_ocn_restart=`ls -1rt ${CAM_TESTDIR}/TSM.$1.$2.${initial_length}${stop_flag}/*.camdom*.r.* \
-       | tail -2 | head -1`
 fi
 
-## modify the # of tasks/threads for restart if not testing fv decomposition
-if grep -ic npr_yz ${CAM_SCRIPTDIR}/nl_files/$nl_file > /dev/null; then
-    echo "TBR.sh: configured for fv2d, will not modify tasks/threads for branch"
-else
-    echo "TBR.sh: will modify tasks/threads for branch to tasks=${CAM_RESTART_TASKS} and threads=${CAM_RESTART_THREADS}"
-    export CAM_TASKS=${CAM_RESTART_TASKS}
-    export CAM_THREADS=${CAM_RESTART_THREADS}
+## set # of tasks/threads for branch
+ntasks=$CAM_RESTART_TASKS
+nthreads=$CAM_RESTART_THREADS
+
+run_mode=`get_run_mode $1`
+if [ $run_mode = mpi ]; then
+    ntasks=$(( ntasks * nthreads / 2 ))
 fi
-
-echo "TBR.sh calling CAM_decomp.sh to build decomposition string:"
-echo "${CAM_SCRIPTDIR}/CAM_decomp.sh $1 $nl_file 2"
-
-${CAM_SCRIPTDIR}/CAM_decomp.sh $1 $nl_file 2
-rc=$?
-if [ $rc -eq 0 ] && [ -f cam_decomp_string.txt ]; then
-    read decomp_str < cam_decomp_string.txt
-    echo "TBR.sh: cam decomp string: $decomp_str"
-    rm cam_decomp_string.txt
-else
-    echo "TBR.sh: error building decomp string; error from CAM_decomp.sh= $rc"
-    echo "FAIL.job${JOBID}" > TestStatus
-    exit 8
+echo "TBR.sh: run mode is ${run_mode}." 
+if [ $run_mode = mpi ] || [ $run_mode = hybrid ]; then
+    echo "TBR.sh: branch run will use $ntasks tasks." 
+fi
+if [ $run_mode = omp ] || [ $run_mode = hybrid ]; then
+    echo "TBR.sh: branch run will use $nthreads threads." 
 fi
 
 cp ${CAM_SCRIPTDIR}/nl_files/$nl_file ${CAM_TESTDIR}/${test_name}/.
@@ -163,54 +148,38 @@ fi
 
 echo "TBR.sh: branching cam; output in ${CAM_TESTDIR}/${test_name}/test.log"
 echo "TBR.sh: call to build-namelist:"
-echo "        env OMP_NUM_THREADS=${CAM_THREADS} ${cfgdir}/build-namelist -test -runtype branch  \
+echo "        env OMP_NUM_THREADS=$nthreads ${cfgdir}/build-namelist -test -runtype branch  \
     -config ${CAM_TESTDIR}/TCB.$1/config_cache.xml \
     -infile ${CAM_TESTDIR}/${test_name}/$nl_file \
     -ignore_ic_date $use_case_string \
-    -namelist \"&seq_timemgr_inparm stop_n=${branch_length} stop_option=\'$stop_option\' $decomp_str $history_output / \
+    -ntasks $ntasks \
+    -namelist \"&seq_timemgr_inparm stop_n=${branch_length} stop_option=\'$stop_option\' $history_output / \
     &seq_infodata_inparm brnch_retain_casename=.true. restart_file=\'${master_cpl_restart}\' / \
     &cam_inparm cam_branch_file=\'${master_cam_restart}\' / \
-    &${ocn_inparm} ${ocn_branch_nlparm}='${master_ocn_restart} ' / \
-    &clm_inparm nrevsn=\'${master_clm_restart}\' /\""
+    &${ocn_inparm} ${ocn_branch_nlparm}='${master_ocn_restart} ' /\""
 
-env OMP_NUM_THREADS=${CAM_THREADS} ${cfgdir}/build-namelist -test -runtype branch \
+env OMP_NUM_THREADS=$nthreads ${cfgdir}/build-namelist -test -runtype branch \
     -config ${CAM_TESTDIR}/TCB.$1/config_cache.xml \
     -ignore_ic_date $use_case_string \
     -infile ${CAM_TESTDIR}/${test_name}/$nl_file \
-    -namelist "&seq_timemgr_inparm stop_n=${branch_length} stop_option='$stop_option' $decomp_str $history_output / \
+    -ntasks $ntasks \
+    -namelist "&seq_timemgr_inparm stop_n=${branch_length} stop_option='$stop_option' $history_output / \
     &seq_infodata_inparm brnch_retain_casename=.true. \
     restart_file='${master_cpl_restart}' / \
     &cam_inparm cam_branch_file='${master_cam_restart}' / \
-    &${ocn_inparm} ${ocn_branch_nlparm}='${master_ocn_restart} ' / \
-    &clm_inparm nrevsn='${master_clm_restart}' /" \
+    &${ocn_inparm} ${ocn_branch_nlparm}='${master_ocn_restart} ' /" \
      > test.log 2>&1
 rc=$?
-cat >ocn_modelio.nml <<EOF
-&modelio
- diro = '$PWD'
- logfile = 'ocn.log'
-/
-&pio_inparm
- pio_numiotasks = -99
- pio_root = -99
- pio_stride = -99
- pio_typename = 'nothing'
-/
-EOF
 
 if [ $rc -eq 0 ]; then
     echo "TBR.sh: cam build-namelist was successful"
     cat drv_in
     cat atm_in
-    cat lnd_in
     cat docn_in
-    cat ocn_in
-    cat ice_in
     cat docn_in
     cat docn_ocn_in
     cat drv_flds_in
     cat docn.stream.txt
-    cat ocn_modelio.nml
 else
     echo "TBR.sh: error building namelist, error from build-namelist= $rc"
     echo "TBR.sh: see ${CAM_TESTDIR}/${test_name}/test.log for details"
@@ -219,7 +188,7 @@ else
 fi
 
 echo "TBR.sh calling CAM_runcmnd.sh to build run command"
-${CAM_SCRIPTDIR}/CAM_runcmnd.sh $1 2
+${CAM_SCRIPTDIR}/CAM_runcmnd.sh $1 $ntasks $nthreads
 rc=$?
 if [ $rc -eq 0 ] && [ -f cam_run_command.txt ]; then
     read cmnd < cam_run_command.txt

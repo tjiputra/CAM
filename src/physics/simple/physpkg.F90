@@ -177,6 +177,7 @@ contains
     use tracers,            only: tracers_init
     use wv_saturation,      only: wv_sat_init
     use phys_debug_util,    only: phys_debug_init
+    use qneg_module,        only: qneg_init
 
     ! Input/output arguments
     type(physics_state), pointer       :: phys_state(:)
@@ -236,6 +237,9 @@ contains
       ! Prognostic chemistry.
       call chem_init(phys_state,pbuf2d)
     end if
+
+    ! Initialize qneg3 and qneg4
+    call qneg_init()
 
   end subroutine phys_init
 
@@ -492,11 +496,12 @@ contains
       allocate(cldiceini(pcols, pver))
       cldiceini = 0.0_r8
     end if
-
-    ! FV & SE: convert dry-type mixing ratios to moist here because
-    !   physics_dme_adjust assumes moist. This is done in p_d_coupling for
-    ! other dynamics. Bundy, Feb 2004.
-    if (moist_physics .and. (dycore_is('LR') .or. dycore_is('SE'))) then
+    !
+    ! FV: convert dry-type mixing ratios to moist here because
+    !     physics_dme_adjust assumes moist. This is done in p_d_coupling for
+    !     other dynamics. Bundy, Feb 2004.
+    !
+    if (moist_physics .and.dycore_is('LR')) then
       call set_dry_to_wet(state)    ! Physics had dry, dynamics wants moist
     end if
 
@@ -515,7 +520,7 @@ contains
       else
         tmp_cldice(:ncol,:pver) = 0.0_r8
       end if
-      call physics_dme_adjust(state, tend, qini, ztodt)
+      if (dycore_is('LR')) call physics_dme_adjust(state, tend, qini, ztodt)
     else
       tmp_q     (:ncol,:pver) = 0.0_r8
       tmp_cldliq(:ncol,:pver) = 0.0_r8
@@ -730,7 +735,7 @@ contains
     ! check_energy_chng to account for how the ideal physics forcings are
     ! changing the total exnergy.
     call check_energy_chng(state, tend, "tphysidl", nstep, ztodt, zero, zero, zero, zero)
-       
+
     if (chem_is_active()) then
       call t_startf('simple_chem')
 

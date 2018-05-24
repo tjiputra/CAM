@@ -1,56 +1,26 @@
 module dycore
-!
-! Data and utility routines related to the dycore
-!
-   implicit none
 
-PRIVATE
+implicit none
+private
 
-   public :: dycore_is, get_resolution
+public :: dycore_is
 
+!=========================================================================================
 CONTAINS
+!=========================================================================================
 
-   logical function dycore_is (name)
-!
-! Input arguments
-!
-      character(len=*) :: name
-      
-      dycore_is = .false.
-      if (name == 'unstructured' .or. name == 'UNSTRUCTURED' .or. &
-           name == 'se' .or. name == 'SE') then
-         dycore_is = .true.
-      end if
-      
-      return
-   end function dycore_is
+logical function dycore_is (name)
 
-   character(len=7) function get_resolution()
+   character(len=*) :: name
 
-!     use pmgrid, only: plat
+   dycore_is = .false.
+   if (name == 'unstructured' .or. name == 'UNSTRUCTURED' .or. &
+      name == 'se' .or. name == 'SE') then
+      dycore_is = .true.
+   end if
 
-!     select case ( plat )
-!     case ( 8 )
-!        get_resolution = 'T5'
-!     case ( 32 )
-!        get_resolution = 'T21'
-!     case ( 48 )
-!        get_resolution = 'T31'
-!     case ( 64 )
-!        get_resolution = 'T42'
-!     case ( 128 )
-!        get_resolution = 'T85'
-!     case ( 256 )
-!        get_resolution = 'T170'
-!     case default
-!        get_resolution = 'UNKNOWN'
-! This forces the physics settings to be the same as those used for T85 eul
-        get_resolution = 'T85'
-!     end select
+end function dycore_is
 
-     return
-   end function get_resolution
+!=========================================================================================
 
 end module dycore
-
-
