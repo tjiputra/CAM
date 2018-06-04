@@ -1,7 +1,10 @@
 #!/bin/sh 
 #
 
-echo $1 $2 $3 $4
+# utility functions
+. $CAM_SCRIPTDIR/CAM_utils.sh
+
+echo "TSM.sh: called with args: $1 $2 $3 $4"
 
 if [ $# -ne 4 ]; then
     echo "TSM.sh: incorrect number of input arguments" 
@@ -59,7 +62,6 @@ fi
 
 nl_file=${2%+*}
 use_case=${2#*+}
-cfg_file=${1%+*}
 
 if [ ! -f ${CAM_SCRIPTDIR}/nl_files/$nl_file ]; then
     echo "TSM.sh: namelist options file ${CAM_SCRIPTDIR}/nl_files/$nl_file not found" 
@@ -89,19 +91,17 @@ case $stop_flag in
     m )  stop_option="nmonths";;
 esac
 
-echo "TSM.sh calling CAM_decomp.sh to build decomposition string:" 
-echo "${CAM_SCRIPTDIR}/CAM_decomp.sh $cfg_file $nl_file 1"
+# set # of tasks/threads for smoke test
+ntasks=$CAM_TASKS
+nthreads=$CAM_THREADS
 
-${CAM_SCRIPTDIR}/CAM_decomp.sh $cfg_file $nl_file 1
-rc=$?
-if [ $rc -eq 0 ] && [ -f cam_decomp_string.txt ]; then
-    read decomp_str < cam_decomp_string.txt
-    echo "TSM.sh: cam decomp string: $decomp_str"  
-    rm cam_decomp_string.txt
-else
-    echo "TSM.sh: error building decomp string; error from CAM_decomp.sh= $rc" 
-    echo "FAIL.job${JOBID}" > TestStatus
-    exit 8
+run_mode=`get_run_mode $1`
+if [ $run_mode = mpi ]; then
+    ntasks=$(( CAM_TASKS * CAM_THREADS ))
+fi
+echo "TSM.sh: run mode is ${run_mode}." 
+if [ $run_mode = mpi ] || [ $run_mode = hybrid ]; then
+    echo "TSM.sh: run will use $ntasks tasks." 
 fi
 
 cp ${CAM_SCRIPTDIR}/nl_files/$nl_file ${CAM_TESTDIR}/${test_name}/.
@@ -117,43 +117,29 @@ fi
 
 echo "TSM.sh: running cam; output in ${CAM_TESTDIR}/${test_name}/test.log" 
 echo "TSM.sh: call to build-namelist:" 
-echo "        env OMP_NUM_THREADS=${CAM_THREADS} ${cfgdir}/build-namelist -test -runtype startup \
+echo "        env OMP_NUM_THREADS=$nthreads ${cfgdir}/build-namelist -test -runtype startup \
     -ignore_ic_date $use_case_string \
     -config ${CAM_TESTDIR}/TCB.$1/config_cache.xml \
     -infile ${CAM_TESTDIR}/${test_name}/$nl_file \
-    -namelist \"&seq_timemgr_inparm stop_n=$run_length stop_option=\'$stop_option\' $decomp_str /\""  
+    -ntasks $ntasks \
+    -namelist \"&seq_timemgr_inparm stop_n=$run_length stop_option=\'$stop_option\' /\""  
 
-env OMP_NUM_THREADS=${CAM_THREADS} perl ${cfgdir}/build-namelist -test -runtype startup \
+env OMP_NUM_THREADS=$nthreads perl ${cfgdir}/build-namelist -test -runtype startup \
     -ignore_ic_date $use_case_string \
     -config ${CAM_TESTDIR}/TCB.$1/config_cache.xml \
     -infile ${CAM_TESTDIR}/${test_name}/$nl_file \
-    -namelist "&seq_timemgr_inparm stop_n=$run_length stop_option='$stop_option' $decomp_str $history_output/"  > test.log 2>&1
+    -ntasks $ntasks \
+    -namelist "&seq_timemgr_inparm stop_n=$run_length stop_option='$stop_option' $history_output/"  > test.log 2>&1
 rc=$?
-cat >ocn_modelio.nml <<EOF
-&modelio
- diro = '$PWD'
- logfile = 'ocn.log'
-/
-&pio_inparm
- pio_numiotasks = -99
- pio_root = -99
- pio_stride = -99
- pio_typename = 'nothing'
-/
-EOF
 
 if [ $rc -eq 0 ]; then
     echo "TSM.sh: cam build-namelist was successful" 
     cat drv_in
     cat atm_in
-    cat lnd_in
-    cat ocn_in
-    cat ice_in
     cat docn_in
     cat docn_ocn_in
     cat drv_flds_in
     cat docn.stream.txt
-    cat ocn_modelio.nml
 else
     echo "TSM.sh: error building namelist, error from build-namelist= $rc" 
     echo "TSM.sh: see ${CAM_TESTDIR}/${test_name}/test.log for details"
@@ -162,7 +148,7 @@ else
 fi
 
 echo "TSM.sh calling CAM_runcmnd.sh to build run command" 
-${CAM_SCRIPTDIR}/CAM_runcmnd.sh $cfg_file 1
+${CAM_SCRIPTDIR}/CAM_runcmnd.sh $1 $ntasks $nthreads
 rc=$?
 if [ $rc -eq 0 ] && [ -f cam_run_command.txt ]; then
     read cmnd < cam_run_command.txt

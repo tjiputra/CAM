@@ -24,7 +24,7 @@ private :: &
 contains
 
 
-  subroutine set_diurnal_invariants(invariants,dtc,ncol,lchnk,inv_oh,inv_ho2,id_oh,id_ho2)
+  subroutine set_diurnal_invariants(invariants,dtc,ncol,lchnk,inv_oh,inv_ho2,id_oh,id_ho2, inv_no3, id_no3) !++IH: added ,inv_no3, id_no3
 
    use chem_mods, only :  nfs
    use time_manager,      only : get_curr_date
@@ -33,9 +33,9 @@ contains
    real(r8), intent(in)      :: dtc ! Time step
    integer, intent(in)       :: ncol
    integer,  intent(in)      :: lchnk      ! chunk id
-   logical, intent(in)       :: inv_oh, inv_ho2
-   integer, intent(in)       :: id_oh, id_ho2
-   real(r8), intent(inout)   ::  invariants(ncol,pver,nfs)
+   logical, intent(in)       :: inv_oh, inv_ho2, inv_no3  !++IH: added inv_no3
+   integer, intent(in)       :: id_oh, id_ho2, id_no3     !++IH: added id_no3
+   real(r8), intent(inout)   :: invariants(ncol,pver,nfs)
 
 
 
@@ -55,7 +55,8 @@ contains
    real(r8) :: trisej, tsetj               ! working vars
    real(r8) :: t1, t2, ta, tb              ! working vars
    real(r8) :: rlats(pcols), rlons(pcols)  ! latitude & longitude (radians)
-   real(r8) ::  fdiurn_oxid     
+   real(r8) :: fdiurn_oxid     
+   real(r8) :: fdiurn_no3oxid              !++IH
 
 
 
@@ -75,6 +76,7 @@ contains
    do i=1,ncol
 
    fdiurn_oxid=1._r8
+   fdiurn_no3oxid=1._r8  !++IH
 
       deglat = rlats(i)*180._r8/pi
       deglat = max( -89.9999_r8, min( +89.9999_r8, deglat ) )
@@ -109,6 +111,7 @@ contains
 ! Also in periods with all night, we put the mean value for all night steps
       if ((tlight .ge. 0.99_r8) .or. (tlight .le. 0.01_r8)) then
          fdiurn_oxid = 1._r8
+         fdiurn_no3oxid = 1._r8  !++IH
 ! otherwise determine overlap between current timestep and daylight times
 ! to account for all overlap possibilities, need to try this 
 ! with rise/set times shifted by +/- 1 day 
@@ -130,8 +133,19 @@ contains
          !"tlight is fraction of day which has light
          !So if fraction of dt is higher than avg fraction during day ==> increase oxidants
          !   if fraction of dt is lower than  avg fraction during day ==> decrease oxidants
-         fdiurn_oxid = max(1.0e-3_r8, sum/(t2-t1)/tlight)
 
+         !++IH
+         if (inv_oh .or. inv_ho2) then
+         !--IH
+            fdiurn_oxid = max(1.0e-3_r8, sum/(t2-t1)/tlight)
+         !++IH
+         end if
+         if (inv_no3) then
+            fdiurn_no3oxid = max(1.0e-3_r8, (1._r8 - (sum/(t2-t1))) / (1._r8 - tlight))
+         ! (1._r8 - (sum/(t2-t1))) is the fraction of timestep WITHOUT light
+         ! (1._r8 - tlight) is the fraction of day WITHOUT light
+         end if 
+         !--IH
       end if
 
   if (inv_oh) then
@@ -145,6 +159,14 @@ contains
         invariants(i,k,id_ho2)=invariants(i,k,id_ho2)*fdiurn_oxid
       end do
     end if
+    
+    !++IH
+    if (inv_no3) then
+      do k=1,pver
+        invariants(i,k,id_no3)=invariants(i,k,id_no3)*fdiurn_no3oxid
+      end do
+    end if
+    !--IH
 
    end do  ! i= 1,ncol   
    end   subroutine set_diurnal_invariants

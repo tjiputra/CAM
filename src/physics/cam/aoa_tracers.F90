@@ -44,26 +44,26 @@ module aoa_tracers
   ! Data from namelist variables
   logical :: aoa_tracers_flag  = .false.    ! true => turn on test tracer code, namelist variable
   logical :: aoa_read_from_ic_file = .true. ! true => tracers initialized from IC file
-  
+
   real(r8),  parameter ::  treldays = 15._r8
   real(r8),  parameter ::  vert_offset = 10._r8
 
-  ! 15-days used for diagnostic of transport circulation and K-tensors  
-  ! relaxation (in the original papers PM-1987 and YSGD-2000) => Zonal Mean 
+  ! 15-days used for diagnostic of transport circulation and K-tensors
+  ! relaxation (in the original papers PM-1987 and YSGD-2000) => Zonal Mean
   ! to evaluate eddy-fluxes for 2D-diagnostics, here relaxation to the GLOBAL MEAN  IC
   ! it may help to keep gradients but will rule-out 2D-transport diagnostics
   ! in km  to avoid negative values of  vertical tracers
   ! VERT(k) = -7._r8*alog(hyam(k)+hybm(k)) + vert_offset
-  
+
   ! PM-1987:
   ! Plumb, R. A., and J. D. Mahlman (1987), The zonally averaged transport
   ! characteristics of the GFDL general circulation/transport model,
-  ! J. Atmos.Sci.,44, 298–327
+  ! J. Atmos.Sci.,44, 298-327
 
   ! YSGD-2000:
-  ! Yudin, Valery A., Sergey P. Smyshlyaev, Marvin A. Geller, Victor L. Dvortsov, 2000: 
-  ! Transport Diagnostics of GCMs and Implications for 2D Chemistry-Transport Model of 
-  ! Troposphere and Stratosphere. J. Atmos. Sci., 57, 673–699.
+  ! Yudin, Valery A., Sergey P. Smyshlyaev, Marvin A. Geller, Victor L. Dvortsov, 2000:
+  ! Transport Diagnostics of GCMs and Implications for 2D Chemistry-Transport Model of
+  ! Troposphere and Stratosphere. J. Atmos. Sci., 57, 673-699.
   ! doi: http://dx.doi.org/10.1175/1520-0469(2000)057<0673:TDOGAI>2.0.CO;2
 
   real(r8) :: qrel_vert(pver)  ! = -7._r8*log(pref_mid_norm(k)) + vert_offset
@@ -117,10 +117,10 @@ contains
 !================================================================================
 
   subroutine aoa_tracers_register
-    !----------------------------------------------------------------------- 
-    ! 
+    !-----------------------------------------------------------------------
+    !
     ! Purpose: register advected constituents
-    ! 
+    !
     !-----------------------------------------------------------------------
     use physconst,  only: cpair, mwdry
     !-----------------------------------------------------------------------
@@ -142,10 +142,10 @@ contains
 !===============================================================================
 
   function aoa_tracers_implements_cnst(name)
-    !----------------------------------------------------------------------- 
-    ! 
+    !-----------------------------------------------------------------------
+    !
     ! Purpose: return true if specified constituent is implemented by this package
-    ! 
+    !
     !-----------------------------------------------------------------------
 
     character(len=*), intent(in) :: name   ! constituent name
@@ -172,9 +172,9 @@ contains
 
   subroutine aoa_tracers_init_cnst(name, latvals, lonvals, mask, q)
 
-    !----------------------------------------------------------------------- 
+    !-----------------------------------------------------------------------
     !
-    ! Purpose: initialize test tracers mixing ratio fields 
+    ! Purpose: initialize test tracers mixing ratio fields
     !  This subroutine is called at the beginning of an initial run ONLY
     !
     !-----------------------------------------------------------------------
@@ -203,8 +203,8 @@ contains
 
   subroutine aoa_tracers_init
 
-    !----------------------------------------------------------------------- 
-    ! 
+    !-----------------------------------------------------------------------
+    !
     ! Purpose: initialize age of air constituents
     !          (declare history variables)
     !-----------------------------------------------------------------------
@@ -244,7 +244,7 @@ contains
     use ppgrid,         only: begchunk, endchunk
     use physics_types,  only: physics_state
 
-    type(physics_state), intent(inout), dimension(begchunk:endchunk), optional :: phys_state    
+    type(physics_state), intent(inout), dimension(begchunk:endchunk), optional :: phys_state
 
 
     integer c, i, k, ncol
@@ -301,7 +301,7 @@ contains
     logical  :: lq(pcnst)
     real(r8) :: teul                          ! relaxation in  1/sec*dt/2 = k*dt/2
     real(r8) :: wimp                          !     1./(1.+ k*dt/2)
-    real(r8) :: wsrc                          !  teul*wimp    
+    real(r8) :: wsrc                          !  teul*wimp
     !------------------------------------------------------------------
 
     teul = .5_r8*dt/(86400._r8 * treldays)   ! 1/2 for the semi-implicit scheme if dt=time step
@@ -378,8 +378,6 @@ contains
 !===========================================================================
 
   subroutine init_cnst_3d(m, latvals, lonvals, mask, q)
-
-    use dyn_grid, only : get_horiz_grid_d, get_horiz_grid_dim_d
 
     integer,  intent(in)  :: m          ! global constituent index
     real(r8), intent(in)  :: latvals(:) ! lat in degrees (ncol)

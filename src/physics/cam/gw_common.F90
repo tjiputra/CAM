@@ -269,7 +269,7 @@ subroutine gw_drag_prof(ncol, band, p, src_level, tend_level, dt, &
      piln, rhoi,    nm,   ni,  ubm,  ubi,  xv,    yv,   &
      effgw,      c, kvtt, q,   dse,  tau,  utgw,  vtgw, &
      ttgw, qtgw, egwdffi,   gwut, dttdf, dttke, ro_adjust, &
-     kwvrdg, satfac_in, lapply_effgw_in )
+     kwvrdg, satfac_in, lapply_effgw_in, lapply_vdiff )
 
   !-----------------------------------------------------------------------
   ! Solve for the drag profile from the multiple gravity wave drag
@@ -360,7 +360,7 @@ subroutine gw_drag_prof(ncol, band, p, src_level, tend_level, dt, &
   real(r8), intent(in), optional :: &
        satfac_in
 
-  logical, intent(in), optional :: lapply_effgw_in
+  logical, intent(in), optional :: lapply_effgw_in, lapply_vdiff
 
   !---------------------------Local storage-------------------------------
 
@@ -390,7 +390,7 @@ subroutine gw_drag_prof(ncol, band, p, src_level, tend_level, dt, &
   ! unless overidden by satfac_in
   real(r8) :: satfac
 
-  logical :: lapply_effgw
+  logical :: lapply_effgw,do_vertical_diffusion
 
   ! LU decomposition.
   type(TriDiagDecomp) :: decomp
@@ -401,6 +401,13 @@ subroutine gw_drag_prof(ncol, band, p, src_level, tend_level, dt, &
      satfac = satfac_in
   else
      satfac = 2._r8
+  endif
+
+  ! Default behavior is to apply vertical diffusion.
+  ! The user has the option to turn off vert diffusion
+  do_vertical_diffusion = .true.
+  if (present(lapply_vdiff)) then
+     do_vertical_diffusion = lapply_vdiff
   endif
 
   ! Default behavior is to apply effgw and
@@ -428,6 +435,9 @@ subroutine gw_drag_prof(ncol, band, p, src_level, tend_level, dt, &
 
   dttke = 0._r8
   ttgw = 0._r8
+
+  dttdf = 0._r8
+  qtgw = 0._r8
 
   ! Workaround floating point exception issues on Intel by initializing
   ! everything that's first set in a where block.
@@ -645,22 +655,26 @@ subroutine gw_drag_prof(ncol, band, p, src_level, tend_level, dt, &
   end if
   !===========================================
 
-  ! Calculate effective diffusivity and LU decomposition for the
-  ! vertical diffusion solver.
-  call gw_ediff (ncol, pver, band%ngwv, kbot_tend, ktop, tend_level, &
-       gwut, ubm, nm, rhoi, dt, prndl, gravit, p, c, &
-       egwdffi, decomp, ro_adjust=ro_adjust)
+  if (do_vertical_diffusion) then
 
-  ! Calculate tendency on each constituent.
-  do m = 1, size(q,3)
+     ! Calculate effective diffusivity and LU decomposition for the
+     ! vertical diffusion solver.
+     call gw_ediff (ncol, pver, band%ngwv, kbot_tend, ktop, tend_level, &
+          gwut, ubm, nm, rhoi, dt, prndl, gravit, p, c, &
+          egwdffi, decomp, ro_adjust=ro_adjust)
 
-     call gw_diff_tend(ncol, pver, kbot_tend, ktop, q(:,:,m), &
-          dt, decomp, qtgw(:,:,m))
+     ! Calculate tendency on each constituent.
+     do m = 1, size(q,3)
 
-  enddo
+        call gw_diff_tend(ncol, pver, kbot_tend, ktop, q(:,:,m), &
+             dt, decomp, qtgw(:,:,m))
 
-  ! Calculate tendency from diffusing dry static energy (dttdf).
-  call gw_diff_tend(ncol, pver, kbot_tend, ktop, dse, dt, decomp, dttdf)
+     enddo
+
+     ! Calculate tendency from diffusing dry static energy (dttdf).
+     call gw_diff_tend(ncol, pver, kbot_tend, ktop, dse, dt, decomp, dttdf)
+
+  endif
 
   ! Evaluate second temperature tendency term: Conversion of kinetic
   ! energy into thermal.

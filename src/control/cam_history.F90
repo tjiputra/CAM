@@ -1,6 +1,6 @@
 module cam_history
   !-------------------------------------------------------------------------------------------
-  ! 
+  !
   ! The cam_history module provides the user interface for CAM's history output capabilities.
   ! It maintains the lists of fields that are written to each history file, and the associated
   ! metadata for those fields such as descriptive names, physical units, time axis properties,
@@ -14,6 +14,7 @@ module cam_history
   ! Public functions/subroutines:
   !   addfld, add_default
   !   intht
+  !   history_initialized
   !   write_restart_history
   !   read_restart_history
   !   outfld
@@ -21,6 +22,7 @@ module cam_history
   !-----------------------------------------------------------------------
 
    use shr_kind_mod,    only: r8 => shr_kind_r8, r4 => shr_kind_r4
+   use shr_kind_mod,    only: cl=>SHR_KIND_CL
    use shr_sys_mod,     only: shr_sys_flush
    use spmd_utils,      only: masterproc
    use ppgrid,          only: pcols, psubcols
@@ -37,10 +39,10 @@ module cam_history
                            pio_offset_kind, pio_unlimited, pio_global,        &
                            pio_inq_dimlen, pio_def_var, pio_enddef,           &
                            pio_put_att, pio_put_var, pio_get_att
-                           
+
 
    use perf_mod,            only: t_startf, t_stopf
-   use cam_logfile,         only: iulog	
+   use cam_logfile,         only: iulog
    use cam_history_support, only: max_fieldname_len, fieldname_suffix_len,    &
                                   max_chars, ptapes, fieldname_len,           &
                                   max_string_len, date2yyyymmdd, pflds,       &
@@ -50,7 +52,8 @@ module cam_history
                                   write_hist_coord_vars, interp_info_t,       &
                                   lookup_hist_coord_indices, get_hist_coord_index
    use sat_hist,            only: is_satfile
-   use mo_solar_parms,      only: solar_parms_get, solar_parms_on
+   use solar_parms_data,    only: solar_parms_on, kp=>solar_parms_kp, ap=>solar_parms_ap
+   use solar_parms_data,    only: f107=>solar_parms_f107, f107a=>solar_parms_f107a, f107p=>solar_parms_f107p
 
   implicit none
   private
@@ -97,11 +100,11 @@ module cam_history
   type rdim_id
     integer :: len
     integer :: dimid
-    character(len=fieldname_lenp2) :: name      
+    character(len=fieldname_lenp2) :: name
   end type rdim_id
   !
   !   The size of these parameters should match the assignments in restart_vars_setnames and restart_dims_setnames below
-  !   
+  !
   integer, parameter :: restartvarcnt              = 38
   integer, parameter :: restartdimcnt              = 10
   type(rvar_id)      :: restartvars(restartvarcnt)
@@ -135,6 +138,7 @@ module cam_history
   logical :: empty_htapes  = .false.  ! Namelist flag indicates no default history fields
   logical :: htapes_defined = .false. ! flag indicates history contents have been defined
 
+  character(len=cl) :: model_doi_url = '' ! Model DOI
   ! NB: This name must match the group name in namelist_definition.xml
   character(len=*), parameter   :: history_namelist = 'cam_history_nl'
   character(len=max_string_len) :: hrestpath(ptapes) = (/(' ',idx=1,ptapes)/) ! Full history restart pathnames
@@ -145,8 +149,8 @@ module cam_history
   character(len=16)  :: logname             ! user name
   character(len=16)  :: host                ! host name
   character(len=8)   :: inithist = 'YEARLY' ! If set to '6-HOURLY, 'DAILY', 'MONTHLY' or
-  ! 'YEARLY' then write IC file 
-  logical            :: inithist_all = .false. ! Flag to indicate set of fields to be 
+  ! 'YEARLY' then write IC file
+  logical            :: inithist_all = .false. ! Flag to indicate set of fields to be
                                           ! included on IC file
                                           !  .false.  include only required fields
                                           !  .true.   include required *and* optional fields
@@ -209,7 +213,7 @@ module cam_history
   !  Do *not* modify the parameters below.
   !
   integer, parameter :: tbl_hash_pri_sz = 2**tbl_hash_pri_sz_lg2
-  integer, parameter :: tbl_hash_oflow_sz = tbl_hash_pri_sz * (tbl_hash_oflow_percent/100.0_r8) 
+  integer, parameter :: tbl_hash_oflow_sz = tbl_hash_pri_sz * (tbl_hash_oflow_percent/100.0_r8)
   !
   !  The primary and overflow tables are organized to mimimize space (read:
   !  try to maximimze cache line usage).
@@ -297,6 +301,7 @@ module cam_history
   public :: wshist                    ! Write files out
   public :: outfld                    ! Output a field
   public :: intht                     ! Initialization
+  public :: history_initialized       ! .true. iff cam history initialized
   public :: wrapup                    ! process history files at end of run
   public :: write_inithist            ! logical flag to allow dump of IC history buffer to IC file
   public :: addfld                    ! Add a field to history file
@@ -311,30 +316,34 @@ module cam_history
 
 CONTAINS
 
-  subroutine intht ()
+  subroutine intht (model_doi_url_in)
     !
-    !----------------------------------------------------------------------- 
-    ! 
+    !-----------------------------------------------------------------------
+    !
     ! Purpose: Initialize history file handler for initial or continuation run.
     !          For example, on an initial run, this routine initializes "ptapes"
-    !          history files.  On a restart or regeneration  run, this routine 
-    !          only initializes history files declared beyond what existed on the 
-    !          previous run.  Files which already existed on the previous run have 
+    !          history files.  On a restart or regeneration  run, this routine
+    !          only initializes history files declared beyond what existed on the
+    !          previous run.  Files which already existed on the previous run have
     !          already been initialized (i.e. named and opened) in routine RESTRT.
-    ! 
+    !
     ! Method: Loop over tapes and fields per tape setting appropriate variables and
     !         calling appropriate routines
-    ! 
+    !
     ! Author: CCM Core Group
-    ! 
+    !
     !-----------------------------------------------------------------------
     use shr_sys_mod,      only: shr_sys_getenv
     use time_manager,     only: get_prev_time, get_curr_time
     use cam_control_mod,  only: restart_run, branch_run
     use sat_hist,         only: sat_hist_init
-    use spmd_utils,       only: mpicom, masterprocid, mpicom, mpi_character
+    use spmd_utils,       only: mpicom, masterprocid, mpi_character
     !
     !-----------------------------------------------------------------------
+    !
+    ! Dummy argument
+    !
+    character(len=cl), intent(in) :: model_doi_url_in
     !
     ! Local workspace
     !
@@ -350,6 +359,11 @@ CONTAINS
     type(master_entry), pointer :: listentry
     character(len=32) :: fldname ! temp variable used to produce a left justified field name
     ! in the formatted logfile output
+
+    !
+    ! Save the DOI
+    !
+    model_doi_url = trim(model_doi_url_in)
 
     !
     ! Print master field list
@@ -405,11 +419,11 @@ CONTAINS
       end if
     end do
     !
-    ! Define field list information for all history files.  
+    ! Define field list information for all history files.
     !
     call fldlst ()
     !
-    ! Loop over max. no. of history files permitted  
+    ! Loop over max. no. of history files permitted
     !
     if (branch_run) then
       call get_prev_time(day, sec)  ! elapased time since reference date
@@ -458,6 +472,10 @@ CONTAINS
 
     return
   end subroutine intht
+
+  logical function history_initialized()
+    history_initialized = associated(masterlist)
+  end function history_initialized
 
   subroutine history_readnl(nlfile)
 
@@ -567,16 +585,16 @@ CONTAINS
 
     ! Initialize namelist 'temporary variables'
     do f = 1, pflds
-      fincl1(f)        = ' '         
-      fincl2(f)        = ' '         
-      fincl3(f)        = ' '         
-      fincl4(f)        = ' '         
-      fincl5(f)        = ' '         
-      fincl6(f)        = ' '         
-      fincl7(f)        = ' '         
-      fincl8(f)        = ' '         
-      fincl9(f)        = ' '         
-      fincl10(f)       = ' '         
+      fincl1(f)        = ' '
+      fincl2(f)        = ' '
+      fincl3(f)        = ' '
+      fincl4(f)        = ' '
+      fincl5(f)        = ' '
+      fincl6(f)        = ' '
+      fincl7(f)        = ' '
+      fincl8(f)        = ' '
+      fincl9(f)        = ' '
+      fincl10(f)       = ' '
       fincl1lonlat(f)  = ' '
       fincl2lonlat(f)  = ' '
       fincl3lonlat(f)  = ' '
@@ -675,17 +693,17 @@ CONTAINS
       !
       ! If generate an initial conditions history file as an auxillary tape:
       !
-      ctemp = shr_string_toUpper(inithist) 
+      ctemp = shr_string_toUpper(inithist)
       inithist = trim(ctemp)
       if ( (inithist /= '6-HOURLY') .and. (inithist /= 'DAILY')  .and.        &
            (inithist /= 'MONTHLY')  .and. (inithist /= 'YEARLY') .and.        &
            (inithist /= 'CAMIOP')   .and. (inithist /= 'ENDOFRUN')) then
         inithist = 'NONE'
       end if
-      ! 
+      !
       ! History file write times
       ! Convert write freq. of hist files from hours to timesteps if necessary.
-      ! 
+      !
       dtime = get_step_size()
       do t = 1, ptapes
         if (nhtfrq(t) < 0) then
@@ -916,7 +934,7 @@ CONTAINS
     rvindex = 1
     restartvars(rvindex)%name = 'rgnht'
     restartvars(rvindex)%type = pio_int
-    restartvars(rvindex)%ndims = 1     
+    restartvars(rvindex)%ndims = 1
     restartvars(rvindex)%dims(1) = ptapes_dim_ind
 
     rvindex = rvindex + 1
@@ -1222,7 +1240,7 @@ CONTAINS
     !
     type(file_desc_t), intent(inout) :: File                 ! Pio file Handle
     !
-    ! Local 
+    ! Local
     !
     integer :: dimids(4), ndims
     integer :: ierr, i, k
@@ -1279,7 +1297,7 @@ CONTAINS
 
   !#######################################################################
 
-  subroutine write_restart_history ( File, & 
+  subroutine write_restart_history ( File, &
        yr_spec, mon_spec, day_spec, sec_spec )
     use cam_history_support, only: hist_coord_name, registeredmdims
 
@@ -1631,7 +1649,7 @@ CONTAINS
     ierr = pio_inq_dimlen(File, dimid, maxvarmdims)
 
     ierr = pio_inq_varid(File, 'rgnht', vdesc)
-    ierr = pio_get_var(File, vdesc, rgnht_int(1:mtapes))      
+    ierr = pio_get_var(File, vdesc, rgnht_int(1:mtapes))
 
     ierr = pio_inq_varid(File, 'nhtfrq', vdesc)
     ierr = pio_get_var(File, vdesc, nhtfrq(1:mtapes))
@@ -1886,13 +1904,13 @@ CONTAINS
     ! Loop over the total number of history files declared and
     ! read the pathname for any history restart files
     ! that are present (if any). Test to see if the run is a restart run
-    ! AND if any history buffer regen files exist (rgnht=.T.). Note, rgnht 
+    ! AND if any history buffer regen files exist (rgnht=.T.). Note, rgnht
     ! is preset to false, reset to true in routine WSDS if hbuf restart files
     ! are written and saved in the master restart file. Each history buffer
     ! restart file is then obtained.
-    ! Note: some f90 compilers (e.g. SGI) complain about I/O of 
+    ! Note: some f90 compilers (e.g. SGI) complain about I/O of
     ! derived types which have pointer components, so explicitly read each one.
-    ! 
+    !
     do t=1,mtapes
       if (rgnht(t)) then
         !
@@ -1903,7 +1921,7 @@ CONTAINS
         !
         ! Read history restart file
         !
-        do f = 1, nflds(t)  
+        do f = 1, nflds(t)
 
           fname_tmp = strip_suffix(tape(t)%hlist(f)%field%name)
           if(masterproc) write(iulog, *) 'Reading history variable ',fname_tmp
@@ -1983,7 +2001,7 @@ CONTAINS
           end if
 
         end do
-        !          
+        !
         ! Done reading this history restart file
         !
         call cam_pio_closefile(tape(t)%File)
@@ -2064,13 +2082,13 @@ CONTAINS
 
   character(len=max_string_len) function get_hfilepath( tape )
     !
-    !----------------------------------------------------------------------- 
-    ! 
+    !-----------------------------------------------------------------------
+    !
     ! Purpose: Return full filepath of history file for given tape number
     ! This allows public read access to the filenames without making
     ! the filenames public data.
     !
-    !----------------------------------------------------------------------- 
+    !-----------------------------------------------------------------------
     !
     integer, intent(in) :: tape  ! Tape number
 
@@ -2081,13 +2099,13 @@ CONTAINS
 
   character(len=max_string_len) function get_hist_restart_filepath( tape )
     !
-    !----------------------------------------------------------------------- 
-    ! 
+    !-----------------------------------------------------------------------
+    !
     ! Purpose: Return full filepath of restart file for given tape number
     ! This allows public read access to the filenames without making
     ! the filenames public data.
     !
-    !----------------------------------------------------------------------- 
+    !-----------------------------------------------------------------------
     !
     integer, intent(in) :: tape  ! Tape number
 
@@ -2098,13 +2116,13 @@ CONTAINS
 
   integer function get_ptapes( )
     !
-    !----------------------------------------------------------------------- 
-    ! 
+    !-----------------------------------------------------------------------
+    !
     ! Purpose: Return the number of tapes being used.
     ! This allows public read access to the number of tapes without making
     ! ptapes public data.
     !
-    !----------------------------------------------------------------------- 
+    !-----------------------------------------------------------------------
     !
     get_ptapes = ptapes
   end function get_ptapes
@@ -2162,12 +2180,13 @@ CONTAINS
   subroutine fldlst ()
 
     use cam_grid_support, only: cam_grid_num_grids
+    use spmd_utils,       only: mpicom
     !
-    !----------------------------------------------------------------------- 
-    ! 
+    !-----------------------------------------------------------------------
+    !
     ! Purpose: Define the contents of each history file based on namelist input for initial or branch
     ! run, and restart data if a restart run.
-    !          
+    !
     ! Method: Use arrays fincl and fexcl to modify default history tape contents.
     !         Then sort the result alphanumerically for later use by OUTFLD to
     !         allow an n log n search time.
@@ -2186,6 +2205,7 @@ CONTAINS
 
     type(master_entry), pointer :: listentry
     logical                     :: fieldontape      ! .true. iff field on tape
+    integer                     :: errors_found
 
     ! List of active grids (first dim) for each tape (second dim)
     ! An active grid is one for which there is a least one field being output
@@ -2195,6 +2215,7 @@ CONTAINS
     !
     ! First ensure contents of fincl, fexcl, and fwrtpr are all valid names
     !
+    errors_found = 0
     do t=1,ptapes
       f = 1
       do while (f < pflds .and. fincl(f,t) /= ' ')
@@ -2203,10 +2224,17 @@ CONTAINS
         listentry => get_entry_by_name(masterlinkedlist, name)
         if(associated(listentry)) mastername = listentry%field%name
         if (name /= mastername) then
-          write(iulog,*)'FLDLST: ', trim(name), ' in fincl(', f, ') not found'
-          call endrun
+          write(errormsg,'(3a,2(i0,a))')'FLDLST: ', trim(name), ' in fincl(', f,', ',t, ') not found'
+          if (masterproc) then
+             write(iulog,*) trim(errormsg)
+             call shr_sys_flush(iulog)
+          endif
+          fincl(f:pflds-1,t)=fincl(f+1:pflds,t)
+          fincl(pflds,t)=' '
+          errors_found = errors_found + 1
+        else
+          f = f + 1
         end if
-        f = f + 1
       end do
 
       f = 1
@@ -2216,10 +2244,17 @@ CONTAINS
         if(associated(listentry)) mastername = listentry%field%name
 
         if (fexcl(f,t) /= mastername) then
-          write(iulog,*)'FLDLST: ', fexcl(f,t), ' in fexcl(', f, ') not found'
-          call endrun
+          write(errormsg,'(3a,2(i0,a))')'FLDLST: ', trim(fexcl(f,t)), ' in fexcl(', f,', ',t, ') not found'
+          if (masterproc) then
+             write(iulog,*) trim(errormsg)
+             call shr_sys_flush(iulog)
+          end if
+          fexcl(f:pflds-1,t)=fexcl(f+1:pflds,t)
+          fexcl(pflds,t)=' '
+          errors_found = errors_found + 1
+        else
+          f = f + 1
         end if
-        f = f + 1
       end do
 
       f = 1
@@ -2229,18 +2264,33 @@ CONTAINS
         listentry => get_entry_by_name(masterlinkedlist, name)
         if(associated(listentry)) mastername = listentry%field%name
         if (name /= mastername) then
-          write(iulog,*)'FLDLST: ', trim(name), ' in fwrtpr(', f, ') not found'
-          call endrun
+          write(errormsg,'(3a,i0,a)')'FLDLST: ', trim(name), ' in fwrtpr(', f, ') not found'
+          if (masterproc) then
+             write(iulog,*) trim(errormsg)
+             call shr_sys_flush(iulog)
+          end if
+          errors_found = errors_found + 1
         end if
         do ff=1,f-1                 ! If duplicate entry is found, stop
           if (trim(name) == trim(getname(fwrtpr(ff,t)))) then
-            write(iulog,*)'FLDLST: Duplicate field ', name, ' in fwrtpr'
-            call endrun
+            write(errormsg,'(3a)')'FLDLST: Duplicate field ', trim(name), ' in fwrtpr'
+            if (masterproc) then
+               write(iulog,*) trim(errormsg)
+               call shr_sys_flush(iulog)
+            end if
+            errors_found = errors_found + 1
           end if
         end do
         f = f + 1
       end do
     end do
+
+    if (errors_found > 0) then
+       ! Give masterproc a chance to write all the log messages
+       call mpi_barrier(mpicom, t)
+       write(errormsg, '(a,i0,a)') 'FLDLST: ',errors_found,' errors found, see log'
+      !call endrun(trim(errormsg))
+    end if
 
     nflds(:) = 0
     ! IC history file is to be created, set properties
@@ -2379,7 +2429,7 @@ CONTAINS
         call patch_init(t)
       end if
       !
-      ! Specification of tape contents now complete.  Sort each list of active 
+      ! Specification of tape contents now complete.  Sort each list of active
       ! entries for efficiency in OUTFLD.  Simple bubble sort.
       !
 !!XXgoldyXX: v In the future, we will sort according to decomp to speed I/O
@@ -2521,15 +2571,15 @@ end subroutine print_active_fldlst
   subroutine inifld (t, listentry, avgflag, prec_wrt)
     use cam_grid_support, only: cam_grid_is_zonal
     !
-    !----------------------------------------------------------------------- 
-    ! 
+    !-----------------------------------------------------------------------
+    !
     ! Purpose: Add a field to the active list for a history tape
-    ! 
+    !
     ! Method: Copy the data from the master field list to the active list for the tape
     !         Also: define mapping arrays from (col,chunk) -> (lon,lat)
-    ! 
+    !
     ! Author: CCM Core Group
-    ! 
+    !
     !-----------------------------------------------------------------------
 
 
@@ -2610,12 +2660,16 @@ end subroutine print_active_fldlst
     end if
 
 #ifdef HDEBUG
-    write(iulog,*)'HDEBUG: ',__LINE__,' field ', tape(t)%hlist(n)%field%name, ' added as ', 'field number ', n,' on tape ', t
-    write(iulog,*)'units=',tape(t)%hlist(n)%field%units
-    write(iulog,*)'numlev=',tape(t)%hlist(n)%field%numlev
-    write(iulog,*)'avgflag=',tape(t)%hlist(n)%avgflag
-    write(iulog,*)'time_op=',tape(t)%hlist(n)%time_op
-    write(iulog,*)'hwrt_prec=',tape(t)%hlist(n)%hwrt_prec
+    if (masterproc) then
+      write(iulog,'(a,i0,3a,i0,a,i2)')'HDEBUG: ',__LINE__,' field ',          &
+           trim(tape(t)%hlist(n)%field%name), ' added as field number ', n,   &
+           ' on tape ', t
+      write(iulog,'(2a)')'  units     = ',trim(tape(t)%hlist(n)%field%units)
+      write(iulog,'(a,i0)')'  numlev    = ',tape(t)%hlist(n)%field%numlev
+      write(iulog,'(2a)')'  avgflag   = ',tape(t)%hlist(n)%avgflag
+      write(iulog,'(3a)')'  time_op   = "',trim(tape(t)%hlist(n)%time_op),'"'
+      write(iulog,'(a,i0)')'  hwrt_prec = ',tape(t)%hlist(n)%hwrt_prec
+    end if
 #endif
 
     return
@@ -2634,7 +2688,7 @@ end subroutine print_active_fldlst
     integer                           :: i     ! General loop index
     integer                           :: npatches
     type(history_patch_t), pointer    :: patchptr
-    
+
     character(len=max_chars)          :: errormsg
     character(len=max_chars)          :: lonlatname(pflds)
     real(r8)                          :: beglon, beglat, endlon, endlat
@@ -2714,7 +2768,7 @@ end subroutine print_active_fldlst
         nullify(patchptr)
       end do
     end if
-    ! We are done processing this tape's fincl#lonlat entries. Now, 
+    ! We are done processing this tape's fincl#lonlat entries. Now,
     ! compact each patch so that the output variables have no holes
     ! We wait until now for when collect_column_output(t) is .true. since
     !    all the fincl#lonlat entries are concatenated
@@ -2738,10 +2792,10 @@ end subroutine print_active_fldlst
 
   character(len=max_fieldname_len) function strip_suffix (name)
     !
-    !---------------------------------------------------------- 
-    ! 
+    !----------------------------------------------------------
+    !
     ! Purpose:  Strip "&IC" suffix from fieldnames if it exists
-    !          
+    !
     !----------------------------------------------------------
     !
     ! Arguments
@@ -2772,13 +2826,13 @@ end subroutine print_active_fldlst
 
   character(len=fieldname_len) function getname (inname)
     !
-    !----------------------------------------------------------------------- 
-    ! 
+    !-----------------------------------------------------------------------
+    !
     ! Purpose: retrieve name portion of inname
-    !          
-    ! Method:  If an averaging flag separater character is present (":") in inname, 
+    !
+    ! Method:  If an averaging flag separater character is present (":") in inname,
     !          lop it off
-    ! 
+    !
     !-------------------------------------------------------------------------------
     !
     ! Arguments
@@ -2899,7 +2953,7 @@ end subroutine print_active_fldlst
 
     !
     ! make sure _ separator is present
-    !      
+    !
     underpos = scan(lonlatname, '_')
     if (underpos == 0) then
       write(errormsg,*) 'Improperly formatted fincllonlat string. ',          &
@@ -2968,13 +3022,13 @@ end subroutine print_active_fldlst
 
   character(len=1) function getflag (inname)
     !
-    !----------------------------------------------------------------------- 
-    ! 
+    !-----------------------------------------------------------------------
+    !
     ! Purpose: retrieve flag portion of inname
-    !          
-    ! Method:  If an averaging flag separater character is present (":") in inname, 
+    !
+    ! Method:  If an averaging flag separater character is present (":") in inname,
     !          return the character after it as the flag
-    ! 
+    !
     !-------------------------------------------------------------------------------
     !
     ! Arguments
@@ -3045,7 +3099,7 @@ end subroutine print_active_fldlst
          hbuf_accum_add00z, hbuf_accum_max, hbuf_accum_min,          &
          hbuf_accum_addlcltime
     use cam_history_support, only: dim_index_2d
-    use subcol_utils,        only: subcol_unpack
+    use subcol_pack_mod,     only: subcol_unpack
     use cam_grid_support,    only: cam_grid_id
 
     interface
@@ -3059,11 +3113,11 @@ end subroutine print_active_fldlst
     end interface
 
     !
-    !----------------------------------------------------------------------- 
-    ! 
+    !-----------------------------------------------------------------------
+    !
     ! Purpose: Accumulate (or take min, max, etc. as appropriate) input field
     !          into its history buffer for appropriate tapes
-    ! 
+    !
     ! Method: Check 'masterlist' whether the requested field 'fname' is active
     !         on one or more history tapes, and if so do the accumulation.
     !         If not found, return silently.
@@ -3077,9 +3131,9 @@ end subroutine print_active_fldlst
     !       NB: If output is on a subcolumn grid (requested in addfle), it is
     !           an error to use avg_subcol_field. A subcolumn field is assumed and
     !           subcol_unpack is called before accumulation.
-    ! 
+    !
     ! Author: CCM Core Group
-    ! 
+    !
     !-----------------------------------------------------------------------
     !
     ! Arguments
@@ -3205,7 +3259,7 @@ end subroutine print_active_fldlst
         case ('I') ! Instantaneous
           call hbuf_accum_inst(hbuf, ufield, nacs, dimind, pcols,        &
                flag_xyfill, fillvalue)
-          
+
         case ('A') ! Time average
           call hbuf_accum_add(hbuf, ufield, nacs, dimind, pcols,         &
                flag_xyfill, fillvalue)
@@ -3223,7 +3277,7 @@ end subroutine print_active_fldlst
                flag_xyfill, fillvalue)
 
         case ('L')
-          call hbuf_accum_addlcltime(hbuf, ufield, nacs, dimind, pcols,  & 
+          call hbuf_accum_addlcltime(hbuf, ufield, nacs, dimind, pcols,  &
                flag_xyfill, fillvalue, c,                                &
                otape(t)%hlist(f)%field%decomp_type,                      &
                lcltod_start(t), lcltod_stop(t))
@@ -3287,16 +3341,16 @@ end subroutine print_active_fldlst
 
     implicit none
     !
-    !----------------------------------------------------------------------- 
-    ! 
+    !-----------------------------------------------------------------------
+    !
     ! Purpose: If fname is active, lookup and return field information
-    ! 
+    !
     ! Method: Check 'masterlist' whether the requested field 'fname' is active
     !         on one or more history tapes, and if so, return the requested
     !         field information
-    ! 
+    !
     ! Author: goldy
-    ! 
+    !
     !-----------------------------------------------------------------------
     !
     ! Arguments
@@ -3366,15 +3420,15 @@ end subroutine print_active_fldlst
 
   logical function is_initfile (file_index)
     !
-    !------------------------------------------------------------------------ 
-    ! 
+    !------------------------------------------------------------------------
+    !
     ! Purpose: to determine:
     !
     !   a) if an IC file is active in this model run at all
     !       OR,
     !   b) if it is active, is the current file index referencing the IC file
     !      (IC file is always at ptapes)
-    ! 
+    !
     !------------------------------------------------------------------------
     !
     ! Arguments
@@ -3397,12 +3451,12 @@ end subroutine print_active_fldlst
 
   integer function strcmpf (name1, name2)
     !
-    !----------------------------------------------------------------------- 
-    ! 
+    !-----------------------------------------------------------------------
+    !
     ! Purpose: Return the lexical difference between two strings
-    ! 
+    !
     ! Method: Use ichar() intrinsic as we loop through the names
-    ! 
+    !
     !-----------------------------------------------------------------------
     !
     ! Arguments
@@ -3424,12 +3478,12 @@ end subroutine print_active_fldlst
     use pio,           only: pio_inq_varid, pio_inq_attlen
     use cam_pio_utils, only: cam_pio_handle_error
    !
-    !----------------------------------------------------------------------- 
-    ! 
+    !-----------------------------------------------------------------------
+    !
     ! Purpose: Ensure that the proper variables are on a history file
-    ! 
+    !
     ! Method: Issue the appropriate netcdf wrapper calls
-    ! 
+    !
     !-----------------------------------------------------------------------
     !
     ! Arguments
@@ -3454,7 +3508,7 @@ end subroutine print_active_fldlst
 
 
     !
-    ! Create variables for model timing and header information 
+    ! Create variables for model timing and header information
     !
     if(.not. is_satfile(t)) then
       ierr=pio_inq_varid (tape(t)%File,'ndcur   ',    tape(t)%ndcurid)
@@ -3480,6 +3534,7 @@ end subroutine print_active_fldlst
         if (solar_parms_on) then
           ierr=pio_inq_varid (tape(t)%File,'f107    ',    tape(t)%f107id)
           ierr=pio_inq_varid (tape(t)%File,'f107a   ',    tape(t)%f107aid)
+          ierr=pio_inq_varid (tape(t)%File,'f107p   ',    tape(t)%f107pid)
           ierr=pio_inq_varid (tape(t)%File,'kp      ',    tape(t)%kpid)
           ierr=pio_inq_varid (tape(t)%File,'ap      ',    tape(t)%apid)
         endif
@@ -3546,12 +3601,12 @@ end subroutine print_active_fldlst
 
   subroutine add_default (name, tindex, flag)
     !
-    !----------------------------------------------------------------------- 
-    ! 
+    !-----------------------------------------------------------------------
+    !
     ! Purpose: Add a field to the default "on" list for a given history file
-    ! 
-    ! Method: 
-    ! 
+    !
+    ! Method:
+    !
     !-----------------------------------------------------------------------
     !
     ! Arguments
@@ -3610,12 +3665,12 @@ end subroutine print_active_fldlst
 
   subroutine h_override (t)
     !
-    !----------------------------------------------------------------------- 
-    ! 
+    !-----------------------------------------------------------------------
+    !
     ! Purpose: Override default history tape contents for a specific tape
     !
     ! Method: Copy the flag into the master field list
-    ! 
+    !
     !-----------------------------------------------------------------------
     !
     ! Arguments
@@ -3645,12 +3700,12 @@ end subroutine print_active_fldlst
 
   subroutine h_define (t, restart)
     !
-    !----------------------------------------------------------------------- 
-    ! 
+    !-----------------------------------------------------------------------
+    !
     ! Purpose: Define contents of history file t
-    ! 
+    !
     ! Method: Issue the required netcdf wrapper calls to define the history file contents
-    ! 
+    !
     !-----------------------------------------------------------------------
     use cam_grid_support, only: cam_grid_header_info_t
     use cam_grid_support, only: cam_grid_write_attr, cam_grid_write_var
@@ -3682,7 +3737,7 @@ end subroutine print_active_fldlst
     integer :: nbsec           ! time of day component of base date [seconds]
     integer :: yr, mon, day    ! year, month, day components of a date
 
-    character(len=max_chars) :: str       ! character temporary 
+    character(len=max_chars) :: str       ! character temporary
     character(len=max_chars) :: fname_tmp ! local copy of field name
     character(len=max_chars) :: calendar  ! Calendar type
     character(len=max_chars) :: cell_methods ! For cell_methods attribute
@@ -3759,7 +3814,7 @@ end subroutine print_active_fldlst
     else
       !
       ! Setup netcdf file - create the dimensions of lat,lon,time,level
-      !     
+      !
       ! interpolate is only supported for unstructured dycores
       interpolate = (interpolate_output(t) .and. (.not. restart))
       patch_output = (associated(tape(t)%patches) .and. (.not. restart))
@@ -3815,8 +3870,8 @@ end subroutine print_active_fldlst
     str = 'current seconds of current date'
     ierr=pio_put_att (tape(t)%File, tape(t)%datesecid, 'long_name', trim(str))
 
-    !     
-    ! Character header information 
+    !
+    ! Character header information
     !
     str = 'CF-1.0'
     ierr=pio_put_att (tape(t)%File, PIO_GLOBAL, 'Conventions', trim(str))
@@ -3834,6 +3889,9 @@ end subroutine print_active_fldlst
          '$Id$')
     ierr=pio_put_att (tape(t)%File, PIO_GLOBAL, 'initial_file', ncdata)
     ierr=pio_put_att (tape(t)%File, PIO_GLOBAL, 'topography_file', bnd_topo)
+    if (len_trim(model_doi_url) > 0) then
+       ierr=pio_put_att (tape(t)%File, PIO_GLOBAL, 'model_doi_url', model_doi_url)
+    end if
 
     ! Determine what time period frequency is being output for each file
     ! Note that nhtfrq is now in timesteps
@@ -3841,12 +3899,12 @@ end subroutine print_active_fldlst
     sec_nhtfrq = nhtfrq(t)
 
     ! If nhtfrq is in hours, convert to seconds
-    if (nhtfrq(t) < 0) then    
+    if (nhtfrq(t) < 0) then
       sec_nhtfrq = abs(nhtfrq(t))*3600
     end if
 
     dtime = get_step_size()
-    if (sec_nhtfrq == 0) then                                !month 
+    if (sec_nhtfrq == 0) then                                !month
       time_per_freq = 'month_1'
     else if (mod(sec_nhtfrq*dtime,86400) == 0) then          ! day
       write(time_per_freq,999) 'day_',sec_nhtfrq*dtime/86400
@@ -3904,7 +3962,7 @@ end subroutine print_active_fldlst
       ierr=pio_put_att (tape(t)%File, tape(t)%mdtid, 'units', 's')
 
       !
-      ! Create variables for model timing and header information 
+      ! Create variables for model timing and header information
       !
 
       ierr=pio_def_var (tape(t)%File,'ndcur   ',pio_int,(/timdim/),tape(t)%ndcurid)
@@ -3956,6 +4014,10 @@ end subroutine print_active_fldlst
           str = '81-day centered mean of 10.7 cm solar radio flux (F10.7)'
           ierr=pio_put_att (tape(t)%File, tape(t)%f107aid, 'long_name', trim(str))
 
+          ierr=pio_def_var (tape(t)%File,'f107p',pio_double,(/timdim/),tape(t)%f107pid)
+          str = 'Pervious day 10.7 cm solar radio flux (F10.7)'
+          ierr=pio_put_att (tape(t)%File, tape(t)%f107pid, 'long_name', trim(str))
+
           ierr=pio_def_var (tape(t)%File,'kp',pio_double,(/timdim/),tape(t)%kpid)
           str = 'Daily planetary K geomagnetic index'
           ierr=pio_put_att (tape(t)%File, tape(t)%kpid, 'long_name', trim(str))
@@ -3991,7 +4053,7 @@ end subroutine print_active_fldlst
       if ((tape(t)%hlist(f)%hwrt_prec == 8) .or. restart) then
         ncreal = pio_double
       else
-        ncreal = pio_real 
+        ncreal = pio_real
       end if
 
       if(associated(tape(t)%hlist(f)%field%mdims)) then
@@ -4000,7 +4062,7 @@ end subroutine print_active_fldlst
       else if(tape(t)%hlist(f)%field%numlev > 1) then
         call endrun('mdims not defined for variable '//trim(tape(t)%hlist(f)%field%name))
       else
-        mdimsize=0   
+        mdimsize=0
       end if
 
       ! num_patches will loop through the number of patches (or just one
@@ -4061,7 +4123,7 @@ end subroutine print_active_fldlst
 
       !
       !  Create variables and atributes for fields written out as columns
-      !         
+      !
 
       do i = 1, num_patches
         fname_tmp = strip_suffix(tape(t)%hlist(f)%field%name)
@@ -4269,13 +4331,13 @@ end subroutine print_active_fldlst
     use cam_history_support, only: dim_index_2d
 
     !
-    !----------------------------------------------------------------------- 
-    ! 
+    !-----------------------------------------------------------------------
+    !
     ! Purpose: Normalize fields on a history file by the number of accumulations
-    ! 
+    !
     ! Method: Loop over fields on the tape.  Need averaging flag and number of
     !         accumulations to perform normalization.
-    ! 
+    !
     !-----------------------------------------------------------------------
     !
     ! Input arguments
@@ -4368,12 +4430,12 @@ end subroutine print_active_fldlst
   subroutine h_zero (f, t)
     use cam_history_support, only: dim_index_2d
     !
-    !----------------------------------------------------------------------- 
-    ! 
+    !-----------------------------------------------------------------------
+    !
     ! Purpose: Zero out accumulation buffers for a tape
-    ! 
+    !
     ! Method: Loop through fields on the tape
-    ! 
+    !
     !-----------------------------------------------------------------------
     !
     integer, intent(in) :: f     ! field index
@@ -4384,7 +4446,7 @@ end subroutine print_active_fldlst
     type (dim_index_2d) :: dimind   ! 2-D dimension index
     integer :: c                    ! chunk index
     integer :: begdim3              ! on-node chunk or lat start index
-    integer :: enddim3              ! on-node chunk or lat end index  
+    integer :: enddim3              ! on-node chunk or lat end index
 
     call t_startf ('h_zero')
 
@@ -4416,8 +4478,8 @@ end subroutine print_active_fldlst
     integer,     intent(in)    :: t
     logical,     intent(in)    :: restart
     !
-    !----------------------------------------------------------------------- 
-    ! 
+    !-----------------------------------------------------------------------
+    !
     ! Purpose: Write a variable to a history tape using PIO
     !          For restart tapes, also write the accumulation buffer (nacs)
     !
@@ -4557,10 +4619,10 @@ end subroutine print_active_fldlst
   logical function write_inithist ()
     !
     !-----------------------------------------------------------------------
-    ! 
+    !
     ! Purpose: Set flags that will initiate dump to IC file when OUTFLD and
     ! WSHIST are called
-    ! 
+    !
     !-----------------------------------------------------------------------
     !
     use time_manager, only: get_nstep, get_curr_date, get_step_size, is_last_step
@@ -4592,7 +4654,7 @@ end subroutine print_active_fldlst
       elseif(inithist == 'YEARLY'  ) then
         write_inithist = nstep /= 0 .and. ncsec == 0 .and. day == 1 .and. mon == 1
       elseif(inithist == 'CAMIOP'  ) then
-        write_inithist = nstep == 0 
+        write_inithist = nstep == 0
       elseif(inithist == 'ENDOFRUN'  ) then
         write_inithist = nstep /= 0 .and. is_last_step()
       end if
@@ -4605,15 +4667,15 @@ end subroutine print_active_fldlst
 
   subroutine wshist (rgnht_in)
     !
-    !----------------------------------------------------------------------- 
-    ! 
+    !-----------------------------------------------------------------------
+    !
     ! Purpose: Driver routine to write fields on history tape t
-    ! 
-    ! 
+    !
+    !
     !-----------------------------------------------------------------------
     use time_manager,  only: get_nstep, get_curr_date, get_curr_time, get_step_size
     use chem_surfvals, only: chem_surfvals_get, chem_surfvals_co2_rad
-    use solar_data,    only: sol_tsi
+    use solar_irrad_data, only: sol_tsi
     use sat_hist,      only: sat_hist_write
     use interp_mod,    only: set_interp_hfile
     use datetime_mod,  only: datetime
@@ -4652,11 +4714,6 @@ end subroutine print_active_fldlst
     integer :: tsec             ! day component of current time
     integer :: dtime            ! seconds component of current time
 #endif
-    real(r8) :: kp, ap, f107, f107a
-
-    !-----------------------------------------------------------------------
-    ! get solar/geomagnetic activity data...
-    call solar_parms_get( f107_s=f107, f107a_s=f107a, ap_s=ap, kp_s=kp )
 
     if(present(rgnht_in)) then
       rgnht=rgnht_in
@@ -4686,7 +4743,7 @@ end subroutine print_active_fldlst
         if( is_initfile(file_index=t) ) then
           hstwr(t) =  write_inithist()
           prev     = .false.
-        else 
+        else
           if (nhtfrq(t) == 0) then
             hstwr(t) = nstep /= 0 .and. day == 1 .and. ncsec == 0
             prev     = .true.
@@ -4722,7 +4779,7 @@ end subroutine print_active_fldlst
         !
         if (nfils(t)==0 .or. (restart.and.rgnht(t))) then
           if(restart) then
-            rhfilename_spec = '%c.cam' // trim(inst_suffix) // '.rh%t.%y-%m-%d-%s.nc' 
+            rhfilename_spec = '%c.cam' // trim(inst_suffix) // '.rh%t.%y-%m-%d-%s.nc'
             fname = interpret_filename_spec( rhfilename_spec, number=(t-1))
             hrestpath(t)=fname
           else if(is_initfile(file_index=t)) then
@@ -4785,6 +4842,7 @@ end subroutine print_active_fldlst
             if (solar_parms_on) then
               ierr=pio_put_var (tape(t)%File, tape(t)%f107id, (/start/), (/count1/),(/ f107 /) )
               ierr=pio_put_var (tape(t)%File, tape(t)%f107aid,(/start/), (/count1/),(/ f107a /) )
+              ierr=pio_put_var (tape(t)%File, tape(t)%f107pid,(/start/), (/count1/),(/ f107p /) )
               ierr=pio_put_var (tape(t)%File, tape(t)%kpid,   (/start/), (/count1/),(/ kp /) )
               ierr=pio_put_var (tape(t)%File, tape(t)%apid,   (/start/), (/count1/),(/ ap /) )
             endif
@@ -4872,14 +4930,14 @@ end subroutine print_active_fldlst
        gridname, flag_xyfill, sampling_seq, standard_name, fill_value)
 
     !
-    !----------------------------------------------------------------------- 
-    ! 
+    !-----------------------------------------------------------------------
+    !
     ! Purpose: Add a field to the master field list
-    ! 
+    !
     ! Method: Put input arguments of field name, units, number of levels,
     !         averaging flag, and long name into a type entry in the global
     !         master field list (masterlist).
-    ! 
+    !
     !-----------------------------------------------------------------------
 
     !
@@ -4893,8 +4951,8 @@ end subroutine print_active_fldlst
 
     character(len=*), intent(in), optional :: gridname    ! decomposition type
     logical, intent(in), optional :: flag_xyfill ! non-applicable xy points flagged with fillvalue
-    character(len=*), intent(in), optional :: sampling_seq ! sampling sequence - if not every timestep, 
-    ! how often field is sampled:  
+    character(len=*), intent(in), optional :: sampling_seq ! sampling sequence - if not every timestep,
+    ! how often field is sampled:
     ! every other; only during LW/SW radiation calcs, etc.
     character(len=*), intent(in), optional :: standard_name  ! CF standard name (max_chars)
     real(r8),         intent(in), optional :: fill_value
@@ -4924,14 +4982,14 @@ end subroutine print_active_fldlst
        gridname, flag_xyfill, sampling_seq, standard_name, fill_value)
 
     !
-    !----------------------------------------------------------------------- 
-    ! 
+    !-----------------------------------------------------------------------
+    !
     ! Purpose: Add a field to the master field list
-    ! 
+    !
     ! Method: Put input arguments of field name, units, number of levels,
     !         averaging flag, and long name into a type entry in the global
     !         master field list (masterlist).
-    ! 
+    !
     !-----------------------------------------------------------------------
     use cam_history_support, only: fillvalue, hist_coord_find_levels
     use cam_grid_support,    only: cam_grid_id, cam_grid_is_zonal
@@ -4948,8 +5006,8 @@ end subroutine print_active_fldlst
 
     character(len=*), intent(in), optional :: gridname    ! decomposition type
     logical, intent(in), optional :: flag_xyfill ! non-applicable xy points flagged with fillvalue
-    character(len=*), intent(in), optional :: sampling_seq ! sampling sequence - if not every timestep, 
-    ! how often field is sampled:  
+    character(len=*), intent(in), optional :: sampling_seq ! sampling sequence - if not every timestep,
+    ! how often field is sampled:
     ! every other; only during LW/SW radiation calcs, etc.
     character(len=*), intent(in), optional :: standard_name  ! CF standard name (max_chars)
     real(r8),         intent(in), optional :: fill_value
@@ -5171,7 +5229,7 @@ end subroutine print_active_fldlst
     type(master_entry), pointer      :: zlistentry
     character(len=*),   parameter    :: subname = 'REGISTER_VECTOR_FIELD'
     character(len=max_chars)         :: errormsg
-    
+
     if (htapes_defined) then
       write(errormsg, '(5a)') ': Attempt to register vector field (',         &
            trim(zonal_field_name), ', ', trim(meridional_field_name),         &
@@ -5262,16 +5320,16 @@ end subroutine print_active_fldlst
     !
     !-----------------------------------------------------------------------
     !
-    ! Purpose: 
+    ! Purpose:
     ! Close history files.
-    ! 
-    ! Method: 
+    !
+    ! Method:
     ! This routine will close any full hist. files
-    ! or any hist. file that has data on it when restart files are being 
+    ! or any hist. file that has data on it when restart files are being
     ! written.
-    ! If a partially full history file was disposed (for restart 
-    ! purposes), then wrapup will open that unit back up and position 
-    ! it for appending new data. 
+    ! If a partially full history file was disposed (for restart
+    ! purposes), then wrapup will open that unit back up and position
+    ! it for appending new data.
     !
     ! Original version: CCM2
     !
@@ -5332,8 +5390,8 @@ end subroutine print_active_fldlst
         lfill(t) = .true.
       endif
       !
-      ! Dispose history file if 
-      !    1) file is filled or 
+      ! Dispose history file if
+      !    1) file is filled or
       !    2) this is the end of run and file has data on it or
       !    3) restarts are being put out and history file has data on it
       !
@@ -5343,7 +5401,7 @@ end subroutine print_active_fldlst
         !
         !
         ! Is this the 0 timestep data of a monthly run?
-        ! If so, just close primary unit do not dispose. 
+        ! If so, just close primary unit do not dispose.
         !
         if (masterproc) write(iulog,*)'WRAPUP: nf_close(',t,')=',trim(nhfil(t))
         if(pio_file_is_open(tape(t)%File)) then
@@ -5359,10 +5417,10 @@ end subroutine print_active_fldlst
         end if
         if (nhtfrq(t) /= 0 .or. nstep > 0) then
 
-          ! 
+          !
           ! Print information concerning model output.
           ! Model day number = iteration number of history file data * delta-t / (seconds per day)
-          ! 
+          !
           tday = ndcur + nscur/86400._r8
           if(masterproc) then
             if (t==1) then
@@ -5373,17 +5431,17 @@ end subroutine print_active_fldlst
             write(iulog,9003)nstep,nfils(t),tday
             write(iulog,9004)
           end if
-          !                      
-          ! Auxilary files may have been closed and saved off without being full. 
+          !
+          ! Auxilary files may have been closed and saved off without being full.
           ! We must reopen the files and position them for more data.
           ! Must position auxiliary files if not full
-          !              
+          !
           if (.not.nlend .and. .not.lfill(t)) then
             call cam_PIO_openfile (tape(t)%File, nhfil(t), PIO_WRITE)
             call h_inquire(t)
           end if
         endif                 ! if 0 timestep of montly run****
-      end if                      ! if time dispose history fiels***   
+      end if                      ! if time dispose history fiels***
     end do                         ! do ptapes
     !
     ! Reset number of files on each history tape
@@ -5615,7 +5673,7 @@ end subroutine print_active_fldlst
     !
     !      itemp = 0
     !      ii = 1
-    !      do 
+    !      do
     !         if ( tbl_hash_oflow(ii) == 0 ) exit
     !         itemp = itemp + 1
     !         write(iulog,*) 'Overflow chain ', itemp, ' has ', tbl_hash_oflow(ii), ' entries:'
@@ -5661,7 +5719,7 @@ end subroutine print_active_fldlst
     !
     type(master_entry), pointer :: listentry
 
-    ! reset all the active flags to false 
+    ! reset all the active flags to false
     ! this is needed so that restarts work properly -- fvitt
     listentry=>masterlinkedlist
     do while(associated(listentry))
@@ -5688,7 +5746,7 @@ end subroutine print_active_fldlst
     !
     ! set flag indicating h-tape contents are now defined (needed by addfld)
     !
-    htapes_defined = .true.      
+    htapes_defined = .true.
 
     return
   end subroutine bld_htapefld_indices
@@ -5717,7 +5775,7 @@ end subroutine print_active_fldlst
     ff = get_masterlist_indx(fname_loc)
     if ( ff < 0 ) then
       hist_fld_active = .false.
-    else 
+    else
       hist_fld_active = masterlist(ff)%thisentry%act_sometape
     end if
 
@@ -5794,7 +5852,7 @@ end subroutine print_active_fldlst
       else
 
         ! No column output has been requested.  In that case the field has
-        ! global output which implies all columns are active.  No need to 
+        ! global output which implies all columns are active.  No need to
         ! check any other history files.
         hist_fld_col_active = .true.
         exit

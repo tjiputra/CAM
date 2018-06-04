@@ -8,15 +8,19 @@
 <use_topo_file>.false.</use_topo_file>
 
 <!-- history output customization -->
-<nhtfrq>0,-6</nhtfrq>
+<empty_htapes>.true.</empty_htapes>
+<nhtfrq>-24,-24</nhtfrq>
+<avgflag_pertape>'I'</avgflag_pertape>
+<fincl1>
+ 'PS'
+</fincl1>
 <fincl2>
- 'U:I','V:I','T:I','CL:I','CL2:I','RHO:I','k1:I','k2:I'
+ 'Q','T','U','V','CL','CL2','k1:I','k2:I'
 </fincl2>
 <analytic_ic_type>'baroclinic_wave'</analytic_ic_type>
-</namelist_defaults>
-<!--
-<test_tracer_num>6</test_tracer_num>
+
 <test_tracer_names>
- 'tt_slotted_cylinder','tt_gaus_ball','tt_tanh','tt_const','tt_Y2_2','tt_Y32_16'
+ 'TT_SLOT','TT_GBALL','TT_TANH','TT_EM8','TT_Y2_2','TT_Y32_16'
 </test_tracer_names>
--->
+
+</namelist_defaults>

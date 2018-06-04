@@ -6,7 +6,7 @@ module dp_coupling
    use shr_kind_mod,      only: r8 => shr_kind_r8
    use ppgrid,            only: pcols, pver
    use phys_grid
-   
+
    use physics_types,     only: physics_state, physics_tend
    use constituents,      only: pcnst
    use physconst,         only: gravit, zvir, cpairv, rairv
@@ -14,7 +14,7 @@ module dp_coupling
    use check_energy,      only: check_energy_timestep_init
    use dynamics_vars,     only: T_FVDYCORE_GRID, t_fvdycore_state
    use dyn_internal_state,only: get_dyn_state
-   use dyn_comp,          only: dyn_import_t, dyn_export_t
+   use dyn_comp,          only: dyn_import_t, dyn_export_t, fv_print_dpcoup_warn
    use cam_abortutils,    only: endrun
 #if defined ( SPMD )
    use spmd_dyn,          only: local_dp_map, block_buf_nrecs, chunk_buf_nrecs
@@ -33,11 +33,11 @@ module dp_coupling
 !
 ! !DESCRIPTION:
 !
-!      This module provides 
+!      This module provides
 !
 !      \begin{tabular}{|l|l|} \hline \hline
 !        d\_p\_coupling    &  dynamics output to physics input \\ \hline
-!        p\_d\_coupling    &  physics output to dynamics input \\ \hline 
+!        p\_d\_coupling    &  physics output to dynamics input \\ \hline
 !                                \hline
 !      \end{tabular}
 !
@@ -50,7 +50,7 @@ module dp_coupling
 !   02.03.01   Worley     Support for nontrivial physics remapping
 !   03.03.28   Boville    set all physics_state elements, add check_energy_timestep_init
 !   03.08.13   Sawyer     Removed ghost N1 region in u3sxy
-!   05.06.28   Sawyer     Simplified interfaces -- only XY decomposition 
+!   05.06.28   Sawyer     Simplified interfaces -- only XY decomposition
 !   05.10.25   Sawyer     Extensive refactoring, dyn_interface
 !   05.11.10   Sawyer     Now using dyn_import/export_t containers
 !   06.07.01   Sawyer     Transitioned constituents to T_TRACERS
@@ -58,7 +58,7 @@ module dp_coupling
 !EOP
 !-----------------------------------------------------------------------
 
-   private 
+   private
    real(r8), parameter ::  D0_5                    =  0.5_r8
    real(r8), parameter ::  D1_0                    =  1.0_r8
 
@@ -68,7 +68,7 @@ CONTAINS
 !BOP
 ! !IROUTINE: d_p_coupling --- convert dynamics output to physics input
 !
-! !INTERFACE: 
+! !INTERFACE:
   subroutine d_p_coupling(grid, phys_state, phys_tend,  pbuf2d, dyn_out)
 
 ! !USES:
@@ -88,6 +88,7 @@ CONTAINS
     use phys_control,   only: use_gw_front, use_gw_front_igw, waccmx_is
     use zonal_mean,     only: zonal_mean_3D
     use d2a3dikj_mod,   only: d2a3dikj
+    use qneg_module,   only: qneg3
 
 !-----------------------------------------------------------------------
     implicit none
@@ -96,17 +97,17 @@ CONTAINS
 !
     type(t_fvdycore_grid), intent(in) :: grid
     type(physics_buffer_desc), pointer :: pbuf2d(:,:)
-    type(dyn_export_t), intent(in)    :: dyn_out  ! dynamics export 
+    type(dyn_export_t), intent(in)    :: dyn_out  ! dynamics export
 
 ! !OUTPUT PARAMETERS:
 
     type(physics_state), intent(inout), dimension(begchunk:endchunk) :: phys_state
     type(physics_tend ), intent(inout), dimension(begchunk:endchunk) :: phys_tend
-    
+
 
 ! !DESCRIPTION:
 !
-!   Coupler for converting dynamics output variables into physics 
+!   Coupler for converting dynamics output variables into physics
 !   input variables
 !
 ! !REVISION HISTORY:
@@ -182,7 +183,6 @@ CONTAINS
     integer  :: ic, jc
     integer  :: astat
     integer  :: boff
-    logical, save :: debug_adjust_print = .true. ! true => print out tracer adjustment msgs
 
 !--------------------------------------------
 !  Variables needed for WACCM
@@ -211,7 +211,7 @@ CONTAINS
 #if (! defined SPMD)
     integer  :: block_buf_nrecs = 0
     integer  :: chunk_buf_nrecs = 0
-    logical  :: local_dp_map=.true. 
+    logical  :: local_dp_map=.true.
 #endif
     type(physics_buffer_desc), pointer :: pbuf_chnk(:)
 
@@ -404,7 +404,7 @@ chnk_loop1 : &
                 end do
              end do
           end do
- 
+
        end do chnk_loop1
 
     else has_local_map
@@ -456,7 +456,7 @@ chnk_loop1 : &
                 bbuffer(bpter(ib,k)+3) = v3    (i,k,j)
                 bbuffer(bpter(ib,k)+4) = omgaxy(i,k,j)
                 bbuffer(bpter(ib,k)+5) = ptxy(i,j,k) / (D1_0 + zvir*tracer(i,j,k,1))
-                bbuffer(bpter(ib,k)+6) = pkxy(i,j,pver+1) / pkzxy(i,j,k) 
+                bbuffer(bpter(ib,k)+6) = pkxy(i,j,pver+1) / pkzxy(i,j,k)
 
                 if (use_gw_front .or. use_gw_front_igw) then
                    bbuffer(bpter(ib,k)+7) = frontgf(i,k,j)
@@ -550,7 +550,7 @@ chnk_loop2 : &
 !------------------------------------------------------
 !  Get indices to access O, O2, H, H2, and N species
 !------------------------------------------------------
-    if ( waccmx_is('ionosphere') .or. waccmx_is('neutral') ) then 
+    if ( waccmx_is('ionosphere') .or. waccmx_is('neutral') ) then
       call cnst_get_ind('O', ixo)
       call cnst_get_ind('O2', ixo2)
       call cnst_get_ind('H', ixh)
@@ -575,7 +575,7 @@ chnk_loop2 : &
 
 ! Attempt to remove negative constituents in bottom layer only by moving from next level
 ! This is a BAB kludge to avoid masses of warning messages for cloud water and ice, since
-! the vertical remapping operator currently being used for cam is not strictly monotonic 
+! the vertical remapping operator currently being used for cam is not strictly monotonic
 ! at the endpoints.
        do m=1,pcnst
           do i=1,ncol
@@ -592,16 +592,15 @@ chnk_loop2 : &
                    phys_state(lchnk)%q(i,pver-1,m) = phys_state(lchnk)%q(i,pver-1,m) - dqreq
                    ! Comment out these log messages since they can make the log files so
                    ! large that they're unusable.
-                   !if (dqreq>1.e-14_r8 .and. debug_adjust_print) write(iulog,*) 'dpcoup dqreq', m, lchnk, i, qbot, qbotm1, dqreq
-                    if (dqreq>qmin(m) .and. dqreq>fraction*qbotm1 .and. debug_adjust_print) &
+                    if (dqreq>qmin(m) .and. dqreq>fraction*qbotm1 .and. (trim(fv_print_dpcoup_warn) == "full")) &
                                                                 write(iulog,*) 'dpcoup dqreq', m, lchnk, i, qbot, qbotm1, dqreq
-                else 
+                else
                    ! Comment out these log messages since they can make the log files so
                    ! large that they're unusable.
-                   !if (debug_adjust_print) write(iulog,*) 'dpcoup cant adjust', m, lchnk, i, qbot, qbotm1, dqreq
-                    if (dqreq>qmin(m) .and. debug_adjust_print) write(iulog,*) 'dpcoup cant adjust', m, lchnk, i, &
-                         qbot, qbotm1, dqreq
-                end if
+                    if (dqreq>qmin(m) .and. (trim(fv_print_dpcoup_warn) == "full")) then
+                       write(iulog,*) 'dpcoup cant adjust', m, lchnk, i, qbot, qbotm1, dqreq
+                    end if
+                 end if
              end if
           end do
        end do
@@ -619,7 +618,7 @@ chnk_loop2 : &
                 mmrSum_O_O2_H = phys_state(lchnk)%q(i,k,ixo)+phys_state(lchnk)%q(i,k,ixo2)+phys_state(lchnk)%q(i,k,ixh)
 
                 if ((1._r8-mmrMin-mmrSum_O_O2_H) < 0._r8) then
-           
+
                    phys_state(lchnk)%q(i,k,ixo) = phys_state(lchnk)%q(i,k,ixo) * (1._r8 - N2mmrMin) / mmrSum_O_O2_H
 
                    phys_state(lchnk)%q(i,k,ixo2) = phys_state(lchnk)%q(i,k,ixo2) * (1._r8 - N2mmrMin) / mmrSum_O_O2_H
@@ -631,14 +630,14 @@ chnk_loop2 : &
                 if(phys_state(lchnk)%q(i,k,ixh2) .gt. 6.e-5_r8) then
                    phys_state(lchnk)%q(i,k,ixh2) = 6.e-5_r8
                 endif
-	     
+
              end do
           end do
        endif
 
 !-----------------------------------------------------------------------------
 ! Call physconst_update to compute cpairv, rairv, mbarv, and cappav as constituent dependent variables
-! and compute molecular viscosity(kmvis) and conductivity(kmcnd) 
+! and compute molecular viscosity(kmvis) and conductivity(kmcnd)
 !-----------------------------------------------------------------------------
        if ( waccmx_is('ionosphere') .or. waccmx_is('neutral') ) then
          call physconst_update(phys_state(lchnk)%q, phys_state(lchnk)%t, lchnk, ncol)
@@ -647,10 +646,10 @@ chnk_loop2 : &
 !------------------------------------------------------------------------
 ! Fill local zvirv variable; calculated for WACCM-X
 !------------------------------------------------------------------------
-       if ( waccmx_is('ionosphere') .or. waccmx_is('neutral') ) then 
+       if ( waccmx_is('ionosphere') .or. waccmx_is('neutral') ) then
          zvirv(:,:) = shr_const_rwv / rairv(:,:,lchnk) -1._r8
        else
-         zvirv(:,:) = zvir    
+         zvirv(:,:) = zvir
        endif
 !
 ! Compute initial geopotential heights
@@ -714,7 +713,7 @@ chnk_loop2 : &
 !BOP
 ! !IROUTINE: p_d_coupling --- convert physics output to dynamics input
 !
-! !INTERFACE: 
+! !INTERFACE:
   subroutine p_d_coupling(grid, phys_state, phys_tend, &
                           dyn_in, dtime, zvir, cappa, ptop)
 
@@ -802,10 +801,10 @@ chnk_loop2 : &
 #if (! defined SPMD)
     integer  :: block_buf_nrecs = 0
     integer  :: chunk_buf_nrecs = 0
-    logical  :: local_dp_map=.true. 
+    logical  :: local_dp_map=.true.
 #endif
     integer  :: km, iam
-    integer  :: ifirstxy, ilastxy, jfirstxy, jlastxy 
+    integer  :: ifirstxy, ilastxy, jfirstxy, jlastxy
 
     real(r8) :: cappa3v( grid%ifirstxy:grid%ilastxy,&
                          grid%jfirstxy:grid%jlastxy, grid%km )
@@ -824,7 +823,7 @@ chnk_loop2 : &
     pexy    => dyn_in%pe
     delpxy  => dyn_in%delp
     pkxy    => dyn_in%pk
-    pkzxy   => dyn_in%pkz    
+    pkzxy   => dyn_in%pkz
 
     km   = grid%km
 
@@ -912,7 +911,7 @@ chnk_loop2 : &
                    end do
 
                 end do
-  
+
              end do
 
           end do

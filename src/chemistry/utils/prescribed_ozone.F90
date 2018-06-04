@@ -176,7 +176,7 @@ subroutine prescribed_ozone_readnl(nlfile)
    fixed_tod  = prescribed_ozone_fixed_tod
 
    ! Turn on prescribed volcanics if user has specified an input dataset.
-   if (len_trim(filename) > 0 ) has_prescribed_ozone = .true.
+   if (len_trim(filename) > 0 .and. filename.ne.'NONE') has_prescribed_ozone = .true.
 
 end subroutine prescribed_ozone_readnl
 

@@ -22,7 +22,7 @@ module dyn_comp
 !     Q:    Tracers
 !     PKZ:  Consistent mean for p^kappa
 !
-!  as well as a GRID and same additional run-specific variables 
+!  as well as a GRID and same additional run-specific variables
 !  (dt, iord, jord, nsplit, nspltrac, nspltvrm)
 !
 ! Note: PT is not updated if the flag CONVT is true.
@@ -55,20 +55,20 @@ use dyn_internal_state, only: get_dyn_state, get_dyn_state_grid
 use dyn_grid,           only: get_horiz_grid_dim_d
 use spmd_dyn,           only: spmd_readnl
 
-use cam_control_mod,    only: initial_run, ideal_phys, aqua_planet, moist_physics
+use cam_control_mod,    only: initial_run, moist_physics
 use phys_control,       only: phys_setopts
 
 use cam_initfiles,      only: initial_file_get_id, topo_file_get_id, pertlim
 use cam_pio_utils,      only: clean_iodesc_list
 use ncdio_atm,          only: infld
-use pio,                only: file_desc_t, pio_inq_varid, pio_get_att
+use pio,                only: pio_inq_varid, pio_get_att
 
 
 use perf_mod,           only: t_startf, t_stopf, t_barrierf
 use cam_logfile,        only: iulog
 use cam_abortutils,     only: endrun
 
-use pio,                only: file_desc_t
+use pio,                only: file_desc_t, pio_inq_dimid, pio_inq_dimlen
 use par_vecsum_mod,     only: par_vecsum
 use te_map_mod,         only: te_map
 
@@ -140,6 +140,9 @@ integer, protected :: uzm_idx = -1
 
 logical :: readvar            ! inquiry flag:  true => variable exists on netCDF file
 
+character(len=8)  :: fv_print_dpcoup_warn = "off"
+public            :: fv_print_dpcoup_warn
+
 !=============================================================================================
 CONTAINS
 !=============================================================================================
@@ -150,8 +153,9 @@ subroutine dyn_readnl(nlfilename)
    use units,           only: getunit, freeunit
    use namelist_utils,  only: find_group_name
    use spmd_utils,      only: mpicom, mstrid=>masterprocid, mpi_integer, mpi_real8, &
-                              mpi_logical
+                              mpi_logical, mpi_character
    use ctem,            only: ctem_readnl
+   use fill_module,     only: fill_readnl
 
    ! args
    character(len=*), intent(in) :: nlfilename
@@ -169,7 +173,7 @@ subroutine dyn_readnl(nlfilename)
    integer :: fv_kord        = 4       ! scheme to be used for vertical mapping
                                        ! _ord = 1: first order upwind
                                        ! _ord = 2: 2nd order van Leer (Lin et al 1994)
-                                       ! _ord = 3: standard PPM 
+                                       ! _ord = 3: standard PPM
                                        ! _ord = 4: enhanced PPM (default)
    logical :: fv_conserve    = .false. ! Flag indicating whether the dynamics is conservative
    integer :: fv_filtcw      = 0       ! flag for filtering c-grid winds
@@ -188,7 +192,8 @@ subroutine dyn_readnl(nlfilename)
    namelist /dyn_fv_inparm/ fv_nsplit, fv_nspltrac, fv_nspltvrm, fv_iord, fv_jord, &
                             fv_kord, fv_conserve, fv_filtcw, fv_fft_flt,           &
                             fv_div24del2flag, fv_del2coef, fv_am_correction,    &
-                            fv_am_fixer, fv_am_fix_lbl, fv_am_diag, fv_high_altitude
+                            fv_am_fixer, fv_am_fix_lbl, fv_am_diag, fv_high_altitude, &
+                            fv_print_dpcoup_warn
 
    type(t_fvdycore_state), pointer :: dyn_state
 
@@ -267,6 +272,9 @@ subroutine dyn_readnl(nlfilename)
 
    call mpi_bcast(fv_high_altitude, 1, mpi_logical, mstrid, mpicom, ierr)
    if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: fv_high_altitude")
+
+   call mpi_bcast(fv_print_dpcoup_warn, len(fv_print_dpcoup_warn), mpi_character, mstrid, mpicom, ierr)
+   if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: fv_print_dpcoup_warn")
 
    ! Store namelist settings in fv state object
    dyn_state => get_dyn_state()
@@ -352,6 +360,7 @@ subroutine dyn_readnl(nlfilename)
    call spmd_readnl(nlfilename)
 
    call ctem_readnl(nlfilename)
+   call fill_readnl(nlfilename)
 
    !---------------------------------------------------------------------------
    contains
@@ -362,8 +371,8 @@ subroutine dyn_readnl(nlfilename)
       !-----------------------------------------------------------------------
       ! find proper value for nsplit if not specified
       !
-      ! If nsplit=0 (module variable) then determine a good value 
-      ! for ns (used in dynpkg) based on resolution and the large-time-step 
+      ! If nsplit=0 (module variable) then determine a good value
+      ! for ns (used in dynpkg) based on resolution and the large-time-step
       ! (pdt). The user may have to set this manually if instability occurs.
       !
       ! REVISION HISTORY:
@@ -528,7 +537,7 @@ subroutine dyn_init(dyn_in, dyn_out)
    dyn_in%pk     = inf
    dyn_in%pkz    = inf
    dyn_in%delp   = inf
-   dyn_in%tracer = inf     
+   dyn_in%tracer = inf
 
    ! Export object has all of these except phis
    dyn_out%phis   => dyn_in%phis
@@ -623,7 +632,7 @@ subroutine dyn_init(dyn_in, dyn_out)
    end do
 
    call add_default('US&IC   ', 0, 'I')
-   call add_default('VS&IC   ', 0, 'I')   
+   call add_default('VS&IC   ', 0, 'I')
    call add_default('PS&IC      ',0, 'I')
    call add_default('T&IC       ',0, 'I')
    do m = 1, pcnst
@@ -700,7 +709,7 @@ subroutine dyn_run(ptop, ndt, te0, dyn_state, dyn_in, dyn_out, rc)
    ! ipt is updated if convt is false.
    ! The user may set the value of nx to optimize the SMP performance
    ! The optimal valuse of nx depends on the total number of available
-   ! shared memory CPUs per node (NS). Assuming the maximm MPI 
+   ! shared memory CPUs per node (NS). Assuming the maximm MPI
    ! decomposition is used in the y-direction, set nx=1 if the
    ! NS <=4; nx=4 if NS=16.
    !
@@ -749,7 +758,7 @@ subroutine dyn_run(ptop, ndt, te0, dyn_state, dyn_in, dyn_out, rc)
    !
    ! REVISION HISTORY:
    !   SJL 99.04.13:  Initial SMP version delivered to Will Sawyer
-   !   WS  99.10.03:  1D MPI completed and tested; 
+   !   WS  99.10.03:  1D MPI completed and tested;
    !   WS  99.10.11:  Additional documentation
    !   WS  99.10.28:  benergy and te_map added; arrays pruned
    !   SJL 00.01.01:  SMP and MPI enhancements; documentation
@@ -770,7 +779,7 @@ subroutine dyn_run(ptop, ndt, te0, dyn_state, dyn_in, dyn_out, rc)
    !   WS  05.06.11:  Inserted into FVCAM_GridCompMod
    !   WS  06.03.03:  Added dyn_state as argument (for reentrancy)
    !   WS  06.06.28:  Using new version of benergy
-   !   TT  16.12.11:  AM conservation options 
+   !   TT  16.12.11:  AM conservation options
    !   TT  17.30.01:  dynamic wind increments diagnostic
    !-----------------------------------------------------------------------
 
@@ -817,7 +826,7 @@ subroutine dyn_run(ptop, ndt, te0, dyn_state, dyn_in, dyn_out, rc)
    ! Variables from the dynamics interface (import or export)
 
    real(r8), pointer :: phisxy(:,:)   ! surface geopotential (grav*zs)
-   real(r8), pointer :: psxy(:,:)     ! Surface pressure (pa) 
+   real(r8), pointer :: psxy(:,:)     ! Surface pressure (pa)
    real(r8), pointer :: t3xy(:,:,:)   ! temperature (K)
    real(r8), pointer :: ptxy(:,:,:)   ! scaled (virtual) potential temperature
    real(r8), pointer :: delpxy(:,:,:) ! Pressure thickness
@@ -826,13 +835,13 @@ subroutine dyn_run(ptop, ndt, te0, dyn_state, dyn_in, dyn_out, rc)
    real(r8), pointer :: vxy(:,:,:)    ! v wind velocities, staggered grid
 
    !--------------------------------------------------------------------------------------
-   ! The arrays pexy, pkxy, pkzxy must be pre-computed as input to benergy(). 
-   ! They are NOT needed if dyn_state%consv=.F.; updated on output (to be used 
+   ! The arrays pexy, pkxy, pkzxy must be pre-computed as input to benergy().
+   ! They are NOT needed if dyn_state%consv=.F.; updated on output (to be used
    ! by physdrv) Please refer to routine pkez on the algorithm for computing pkz
    ! from pe and pk
    !--------------------------------------------------------------------------------------
 
-   real(r8), pointer :: pexy(:,:,:)   ! Pres at layer edges 
+   real(r8), pointer :: pexy(:,:,:)   ! Pres at layer edges
    real(r8), pointer :: pkxy(:,:,:)   ! pe**cappa
    real(r8), pointer :: pkzxy(:,:,:)  ! finite-volume mean of pk
 
@@ -872,10 +881,10 @@ subroutine dyn_run(ptop, ndt, te0, dyn_state, dyn_in, dyn_out, rc)
                  dyn_state%grid%kfirst:dyn_state%grid%klast)
    real(r8) :: pt(dyn_state%grid%im,  &
                   dyn_state%grid%jfirst-dyn_state%grid%ng_d:dyn_state%grid%jlast+dyn_state%grid%ng_d,&
-                  dyn_state%grid%kfirst:dyn_state%grid%klast) 
+                  dyn_state%grid%kfirst:dyn_state%grid%klast)
 
    real(r8) :: pi
-   real(r8) :: om       ! angular velocity of earth's rotation  
+   real(r8) :: om       ! angular velocity of earth's rotation
    real(r8) :: cp       ! heat capacity of air at constant pressure
    real(r8) :: ae       ! radius of the earth (m)
 
@@ -895,7 +904,7 @@ subroutine dyn_run(ptop, ndt, te0, dyn_state, dyn_in, dyn_out, rc)
    integer :: ntotq     ! total # of tracers to be advected
    integer :: iord      ! parameter controlling monotonicity in E-W
                                    ! recommendation: iord=4
-   integer :: jord      ! parameter controlling monotonicity in N-S 
+   integer :: jord      ! parameter controlling monotonicity in N-S
                                    ! recommendation: jord=4
    integer :: kord      ! parameter controlling monotonicity in mapping
                                    ! recommendation: kord=4
@@ -1050,8 +1059,8 @@ subroutine dyn_run(ptop, ndt, te0, dyn_state, dyn_in, dyn_out, rc)
    integer  :: kmtp                     ! range of levels (1:kmtp) where order is reduced
    real(r8) :: ame(dyn_state%grid%jm)
    real(r8) :: zpe(dyn_state%grid%jfirstxy:dyn_state%grid%jlastxy)
-   real(r8) :: tmp 
-   real(r8) :: du_fix_g 
+   real(r8) :: tmp
+   real(r8) :: du_fix_g
    real(r8) :: du_fix(dyn_state%grid%km)
    real(r8) :: du_fix_s(dyn_state%grid%km)
    real(r8), allocatable :: du_fix_i(:,:,:)
@@ -1208,7 +1217,7 @@ subroutine dyn_run(ptop, ndt, te0, dyn_state, dyn_in, dyn_out, rc)
             ! Tests indicate that t3 does not have consistent
             ! pole values, e.g. t3(:,1,k) are not all the same.
             ! Not clear why this is not the case: it may be that the pole
-            ! values are not consistent on the restart file.  For the time being, 
+            ! values are not consistent on the restart file.  For the time being,
             ! perform a parallel sum over t3 and correct the pole values
 
             if ( jfirstxy == 1 ) then
@@ -1228,7 +1237,7 @@ subroutine dyn_run(ptop, ndt, te0, dyn_state, dyn_in, dyn_out, rc)
                   end do
                end do
             end if
-            
+
             if (consv) then
                ! Compute globally integrated Total Energy (te0)
                call t_startf ('benergy')
@@ -1291,10 +1300,10 @@ subroutine dyn_run(ptop, ndt, te0, dyn_state, dyn_in, dyn_out, rc)
    allocate(    vc(im,jfirst-2:   jlast+2,   kfirst:klast) )
    allocate(   dpt(im,jfirst-1:   jlast+1,   kfirst:klast) )
    allocate(   dwz(im,jfirst-1:    jlast,    kfirst:klast+1) )
-   allocate(   pkc(im,jfirst-1:   jlast+1,   kfirst:klast+1) ) 
+   allocate(   pkc(im,jfirst-1:   jlast+1,   kfirst:klast+1) )
    allocate(    wz(im,jfirst-1:   jlast+1,   kfirst:klast+1) )
-   allocate(  pkcc(im,jfirst  :   jlast  ,   kfirst:klast+1) ) 
-   allocate(   wzc(im,jfirst  :   jlast  ,   kfirst:klast+1) ) 
+   allocate(  pkcc(im,jfirst  :   jlast  ,   kfirst:klast+1) )
+   allocate(   wzc(im,jfirst  :   jlast  ,   kfirst:klast+1) )
    allocate(pkkp(im,jfirst:jlast,kfirst:klast+1))
    allocate(wzkp(im,jfirst:jlast,kfirst:klast+1))
    allocate(wzxy(ifirstxy:ilastxy,jfirstxy:jlastxy,km+1))
@@ -1667,7 +1676,7 @@ subroutine dyn_run(ptop, ndt, te0, dyn_state, dyn_in, dyn_out, rc)
 #if defined( OFFLINE_DYN )
                      u(i,j,k)    = (1._r8-met_rlx(k))*uxy(i,j,k) + met_rlx(k)*u(i,j,k)
                      v(i,j,k)    = (1._r8-met_rlx(k))*vxy(i,j,k) + met_rlx(k)*v(i,j,k)
-#else 
+#else
                      u(i,j,k)    = uxy(i,j,k)
                      v(i,j,k)    = vxy(i,j,k)
 #endif
@@ -1725,7 +1734,7 @@ subroutine dyn_run(ptop, ndt, te0, dyn_state, dyn_in, dyn_out, rc)
 
       omgaxy(:,:,:) = 0._r8
 
-      if (am_fixer .or. am_diag) then 
+      if (am_fixer .or. am_diag) then
          du_fix_s (:)  = 0._r8
          uc_s (:,:,:)  = 0._r8
          vc_s (:,:,:)  = 0._r8
@@ -1796,7 +1805,7 @@ subroutine dyn_run(ptop, ndt, te0, dyn_state, dyn_in, dyn_out, rc)
                ipe = 0
             end if
 
-            ! determine whether this is the second to last call to cd_core or not 
+            ! determine whether this is the second to last call to cd_core or not
             cd_penul = .false.
             if ( nsplit > 1 ) then
                if ( (n == n2) .and. (it == nsplit-1) ) cd_penul = .true.
@@ -1878,15 +1887,15 @@ subroutine dyn_run(ptop, ndt, te0, dyn_state, dyn_in, dyn_out, rc)
                         avgpk(k)=me0/im/sum(grid%cose)
                         taper(k)=.5_r8*(1._r8+(1._r8-(ptapk/avgpk(k))**xdlt2)/(1._r8+(ptapk/avgpk(k))**xdlt2))
                      enddo
-                  else 
+                  else
                      do k=kfirst,klast
                         taper(k)=1._r8
                      enddo
                   endif
 
                   ! always exclude fixer at top levels if top is not high order
-                  if (.not.high_order_top) then 
-                     taper(1:kmtp)=0._r8 
+                  if (.not.high_order_top) then
+                     taper(1:kmtp)=0._r8
                   endif
 
                   do k = kfirst, klast
@@ -1899,7 +1908,7 @@ subroutine dyn_run(ptop, ndt, te0, dyn_state, dyn_in, dyn_out, rc)
                      dods(k) = me0
                   end do
 
-                  if (am_fix_lbl) then 
+                  if (am_fix_lbl) then
 !$omp parallel do private(i, j, k)
                      do k = kfirst, klast
                         do j = jfirst, jlast
@@ -1948,19 +1957,19 @@ subroutine dyn_run(ptop, ndt, te0, dyn_state, dyn_in, dyn_out, rc)
 
 !$omp parallel do private(k)
                      do k = kfirst, klast
-                        du_fix_s(k)=du_fix_s(k)-am1/me0*taper(k) 
+                        du_fix_s(k)=du_fix_s(k)-am1/me0*taper(k)
                      end do
-                  end if  ! (am_fix_lbl) 
+                  end if  ! (am_fix_lbl)
 
                   du_fix_g =du_fix_g -am1/me0
-                  if (masterproc) then 
+                  if (masterproc) then
                      if ((it == nsplit) .and. (n == n2) .and. (iv == nv)) then
-                        write(iulog,'(1x,a21,1x,1x,e25.17)') "AM GLOBAL FIXER: ", du_fix_g 
+                        write(iulog,'(1x,a21,1x,1x,e25.17)') "AM GLOBAL FIXER: ", du_fix_g
                      endif
                   endif
                   ! the following call is blocking, but probably cheaper than 3D transposition for du_fix
-                  if ((it == nsplit) .and. (n == n2)) then 
-                     call par_vecsum(km, kfirst, klast, du_fix_s, tmp, grid%comm_z, grid%npr_z, return_sum_in=.true.) 
+                  if ((it == nsplit) .and. (n == n2)) then
+                     call par_vecsum(km, kfirst, klast, du_fix_s, tmp, grid%comm_z, grid%npr_z, return_sum_in=.true.)
                   endif
                end if     ! (grid%iam .lt. grid%npes_yz)
                call t_stopf  ('lfix')
@@ -2016,7 +2025,7 @@ subroutine dyn_run(ptop, ndt, te0, dyn_state, dyn_in, dyn_out, rc)
                ! get the observed PS interpolated to current substep
                call get_met_fields(grid, ps_obs, n2, n)
 
-               ! adjust mass fluxes and edge pressures to be consistent with observed PS 
+               ! adjust mass fluxes and edge pressures to be consistent with observed PS
                call adjust_press(grid, ps_mod, ps_obs, mfx, mfy, pexy)
 
                if (high_alt) then
@@ -2131,7 +2140,7 @@ subroutine dyn_run(ptop, ndt, te0, dyn_state, dyn_in, dyn_out, rc)
 
             ! Perform large-tme-step scalar transport using the accumulated CFL and
             ! mass fluxes
- 
+
             call t_barrierf('sync_trac2d', grid%commdyn)
             call t_startf ('trac2d')
 
@@ -2195,7 +2204,7 @@ subroutine dyn_run(ptop, ndt, te0, dyn_state, dyn_in, dyn_out, rc)
                      call mpiwait(ctreqs(4,1), ctstats(1,4,1))
                      call mpiwait(ctreqs(5,1), ctstats(1,5,1))
                   endif
-                  
+
                   if (trac_decomp .gt. 1) then
 
                      do kt = 2, trac_decomp
@@ -2274,7 +2283,7 @@ subroutine dyn_run(ptop, ndt, te0, dyn_state, dyn_in, dyn_out, rc)
 
             ! Call tracer advection
 
-            c_dotrac = ct_overlap .gt. 0 .and.    &                       
+            c_dotrac = ct_overlap .gt. 0 .and.    &
                       ((n .lt. n2 .and. kaux .eq. 1) .or. (n .eq. n2 .and. kaux .eq. 0))
             t_dotrac = ct_overlap .eq. 0 .and. kaux .lt. trac_decomp
             high_alt1: if (high_alt) then
@@ -2291,7 +2300,7 @@ subroutine dyn_run(ptop, ndt, te0, dyn_state, dyn_in, dyn_out, rc)
                end do
             endif high_alt1
             if (c_dotrac .or. t_dotrac) then
-               call trac2d( grid, dp0(:,jfirst:jlast,:),    q_internal,         &  
+               call trac2d( grid, dp0(:,jfirst:jlast,:),    q_internal,         &
                            cx,    cy,     mfx,    mfy,    iord,   jord,        &
                            fill,  ktlo,   kthi,   workb,  worka  )
             endif
@@ -2370,7 +2379,7 @@ subroutine dyn_run(ptop, ndt, te0, dyn_state, dyn_in, dyn_out, rc)
             end if trans_pexy
 
             high_alt2: if (high_alt) then
-               
+
                !+hi-waccm: perform potential temperature correction:
                !           1. Update kappa according to new major species
                !           2. calculate the difference between kappa from step 1 and kappa from advection
@@ -2607,11 +2616,11 @@ subroutine dyn_run(ptop, ndt, te0, dyn_state, dyn_in, dyn_out, rc)
 
             call te_map(grid,     consv,   convt_local, psxy, omgaxy,       &
                         pexy,     delpxy,  pkzxy,  pkxy,   ndt,             &
-                        nx,       uxy,     vxy,    ptxy,   dyn_out%tracer,  & 
+                        nx,       uxy,     vxy,    ptxy,   dyn_out%tracer,  &
                         phisxy,   cp3v,    cap3v,  kord,   pelnxy,          &
                         te0,      tempxy,  dp0xy,  mfxxy,  mfyxy,           &
                         uc_i,     vc_i,  du_fix_s, du_fix_i,                &
-                        am_correction, (am_fixer.or.am_diag) ) 
+                        am_correction, (am_fixer.or.am_diag) )
 
             if (am_diag) then
 !$omp parallel do private(i,j,k)
@@ -2711,7 +2720,7 @@ subroutine dyn_run(ptop, ndt, te0, dyn_state, dyn_in, dyn_out, rc)
    deallocate( u_tmp )
    deallocate( v_tmp )
 #endif
-   
+
    if (am_fix_taper) then
       deallocate(zpkck)
    end if
@@ -2825,6 +2834,11 @@ subroutine read_inidat(dyn_in)
   integer                         :: nglon, nglat
   integer                         :: i, j
   integer                         :: jf, gf, uf ! First indices for setting u3s
+  integer                         :: ierr
+  integer                         :: lonid
+  integer                         :: latid
+  integer                         :: mlon ! longitude dimension length from dataset
+  integer                         :: mlat            ! latitude dimension length from dataset
   real(r8), parameter             :: deg2rad = pi/180._r8
 
   character(len=*), parameter     :: sub='read_inidat'
@@ -2887,6 +2901,20 @@ subroutine read_inidat(dyn_in)
     deallocate(clon_st)
   else
     !-----------
+    ! Check coord sizes
+    !-----------
+     ierr = pio_inq_dimid(fh_ini, 'lon' , lonid)
+     ierr = pio_inq_dimid(fh_ini, 'lat' , latid)
+     ierr = pio_inq_dimlen(fh_ini, lonid , mlon)
+     ierr = pio_inq_dimlen(fh_ini, latid , mlat)
+     if (mlon /= plon .or. mlat /= plat) then
+        write(iulog,*) sub//': ERROR: model parameters do not match initial dataset parameters'
+        write(iulog,*)'Model Parameters:    plon = ',plon,' plat = ',plat
+        write(iulog,*)'Dataset Parameters:  dlon = ',mlon,' dlat = ',mlat
+        call endrun(sub//': ERROR: model parameters do not match initial dataset parameters')
+     end if
+
+    !-----------
     ! 2-D fields
     !-----------
 
@@ -2897,7 +2925,7 @@ subroutine read_inidat(dyn_in)
 
     fieldname = 'PHIS'
     readvar   = .false.
-    if (ideal_phys .or. aqua_planet .or. .not. associated(fh_topo)) then
+    if (.not. associated(fh_topo)) then
       dyn_in%phis(:,:) = 0._r8
     else
       call infld(fieldname, fh_topo, 'lon', 'lat', ifirstxy, ilastxy, jfirstxy, jlastxy, &
@@ -2937,7 +2965,7 @@ subroutine read_inidat(dyn_in)
   end if
 
   ! Set u3s(:,1,:) to zero as it is used in interpolation routines
-  if (jfirstxy == 1) then
+  if ((jfirstxy == 1) .and. (size(dyn_in%u3s) > 0)) then
     dyn_in%u3s(ifirstxy:ilastxy,jfirstxy,1:km) = 0.0_r8
   end if
 
@@ -3029,7 +3057,7 @@ subroutine process_inidat(fh_ini, grid, dyn_in, fieldname, m_cnst)
                end do
             end do
          end do
-             
+
          deallocate(rndm_seed)
       end if
 
@@ -3058,7 +3086,7 @@ subroutine process_inidat(fh_ini, grid, dyn_in, fieldname, m_cnst)
                      ' argument list')
       end if
 
-      tracer => dyn_in%tracer	
+      tracer => dyn_in%tracer
 
       if (readvar) then
 
@@ -3072,7 +3100,9 @@ subroutine process_inidat(fh_ini, grid, dyn_in, fieldname, m_cnst)
 
       else if (.not. analytic_ic_active()) then
 
-         ! Constituents not read from initial file are initialized by the package that implements them.
+         ! Constituents not read from initial file are initialized by the
+         ! package that implements them.  Note that the analytic IC code calls
+         ! cnst_init_default internally.
 
          if (iam >= npes_xy) return
 
@@ -3086,7 +3116,7 @@ subroutine process_inidat(fh_ini, grid, dyn_in, fieldname, m_cnst)
       if (.not. analytic_ic_active()) then
          do k = 1, km
             do j = jfirstxy, jlastxy
-               do i = ifirstxy, ilastxy                
+               do i = ifirstxy, ilastxy
                   tracer(i,j,k,m_cnst) = max(tracer(i,j,k,m_cnst), qmin(m_cnst))
                end do
             end do

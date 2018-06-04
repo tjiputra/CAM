@@ -1769,10 +1769,7 @@ end subroutine clubb_init_cnst
       
       !  Surface fluxes provided by host model
       wpthlp_sfc = cam_in%shf(i)/(cpair*rho_ds_zm(1))       ! Sensible heat flux
-!++ag
-!      wprtp_sfc  = cam_in%lhf(i)/(latvap*rho_ds_zm(1))      ! Latent heat flux     ! beta07
-      wprtp_sfc  = cam_in%cflx(i,1)/rho_ds_zm(1)      ! Moisture flux  (check rho)  ! beta08
-!--ag
+      wprtp_sfc  = cam_in%cflx(i,1)/rho_ds_zm(1)            ! Moisture flux  (check rho)
       upwp_sfc   = cam_in%wsx(i)/rho_ds_zm(1)               ! Surface meridional momentum flux
       vpwp_sfc   = cam_in%wsy(i)/rho_ds_zm(1)               ! Surface zonal momentum flux  
       
@@ -2124,10 +2121,9 @@ end subroutine clubb_init_cnst
       te_b(i) = se_b(i) + ke_b(i) + (latvap+latice)*wv_b(i)+latice*wl_b(i)
       
       ! Take into account the surface fluxes of heat and moisture
-!++ag  Use correct qflux from cam_in, not lhf/latvap
-!      te_b(i) = te_b(i)+(cam_in%shf(i)+(cam_in%lhf(i)/latvap)*(latvap+latice))*hdtime  ! beta07    
-      te_b(i) = te_b(i)+(cam_in%shf(i)+cam_in%cflx(i,1)*(latvap+latice))*hdtime         ! beta08
-!--ag 
+      !  Use correct qflux from cam_in, not lhf/latvap as was done previously
+      te_b(i) = te_b(i)+(cam_in%shf(i)+cam_in%cflx(i,1)*(latvap+latice))*hdtime      
+
       ! Compute the disbalance of total energy, over depth where CLUBB is active
       se_dis = (te_a(i) - te_b(i))/(state1%pint(i,pverp)-state1%pint(i,clubbtop+1))
 
@@ -2379,7 +2375,7 @@ end subroutine clubb_init_cnst
    call outfld( 'DPDLFICE', ptend_loc%q(:,:,ixcldice), pcols, lchnk)
    
    temp2dp(:ncol,:pver) =  ptend_loc%s(:ncol,:pver)/cpair
-   call outfld( 'DPDLFT',   temp2d, pcols, lchnk)
+   call outfld( 'DPDLFT',   temp2dp, pcols, lchnk)
   
    call physics_ptend_sum(ptend_loc,ptend_all,ncol)
    call physics_update(state1,ptend_loc,hdtime)
@@ -2578,10 +2574,8 @@ end subroutine clubb_init_cnst
    ! diagnose surface friction and obukhov length (inputs to diagnose PBL depth)
    call calc_ustar( ncol, state1%t(1:ncol,pver), state1%pmid(1:ncol,pver), cam_in%wsx(1:ncol), cam_in%wsy(1:ncol), &
                     rrho(1:ncol), ustar2(1:ncol))
-!++ag use correct qflux from coupler
-!   call calc_obklen( ncol, th(1:ncol,pver), thv(1:ncol,pver), cam_in%lhf(1:ncol)/latvap, cam_in%shf(1:ncol), & ! beta07
-   call calc_obklen( ncol, th(1:ncol,pver), thv(1:ncol,pver), cam_in%cflx(1:ncol,1), cam_in%shf(1:ncol), &      ! beta08
-!--ag
+   ! use correct qflux from coupler
+   call calc_obklen( ncol, th(1:ncol,pver), thv(1:ncol,pver), cam_in%cflx(1:ncol,1), cam_in%shf(1:ncol), &
                      rrho(1:ncol), ustar2(1:ncol), kinheat(1:ncol), kinwat(1:ncol), kbfs(1:ncol), &
                      obklen(1:ncol))
    

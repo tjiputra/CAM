@@ -563,16 +563,10 @@ subroutine gw_init()
           'Zonal gravity wave surface stress')
      call addfld ('TAUGWY',     horiz_only,  'A','N/m2', &
           'Meridional gravity wave surface stress')
-     call addfld ('UTGW_TOTAL',    (/ 'lev' /), 'A','m/s2', &
-          'Total U tendency due to gravity wave drag')
 
      if (history_amwg) then
         call add_default('TAUGWX  ', 1, ' ')
         call add_default('TAUGWY  ', 1, ' ')
-     end if
-
-     if (history_budget ) then
-        call add_default('TTGWORO', history_budget_histfile_num, ' ')
      end if
 
      if (history_waccm) then
@@ -957,6 +951,9 @@ subroutine gw_init()
   if (history_waccm) then
      call add_default('EKGW', 1, ' ')
   end if
+
+  call addfld ('UTGW_TOTAL',    (/ 'lev' /), 'A','m/s2', &
+       'Total U tendency due to gravity wave drag')
 
   ! Total temperature tendency output.
   call addfld ('TTGW', (/ 'lev' /), 'A', 'K/s',  &
@@ -1887,7 +1884,7 @@ subroutine gw_rdg_calc( &
    ptend, flx_heat)
 
    use coords_1d,  only: Coords1D
-   use gw_rdg,     only: gw_rdg_src, gw_rdg_belowpeak, gw_rdg_break_trap
+   use gw_rdg,     only: gw_rdg_src, gw_rdg_belowpeak, gw_rdg_break_trap, gw_rdg_do_vdiff
    use gw_common,  only: gw_drag_prof, energy_change
 
    character(len=5), intent(in) :: type         ! BETA or GAMMA
@@ -2067,7 +2064,7 @@ subroutine gw_rdg_calc( &
          effgw, c, kvtt, q, dse, tau, utgw, vtgw, &
          ttgw, qtgw, egwdffi,   gwut, dttdf, dttke, &
          kwvrdg=kwvrdg, & 
-         satfac_in = 1._r8 )
+         satfac_in = 1._r8, lapply_vdiff=gw_rdg_do_vdiff )
 
       ! Add the tendencies from each ridge to the totals.
       do k = 1, pver
@@ -2175,7 +2172,7 @@ subroutine gw_spec_addflds(prefix, scheme, band, history_defaults)
        trim(scheme)//' U tendency - gravity wave spectrum')
   call addfld (trim(prefix)//'VTGWSPEC',(/ 'lev' /), 'A','m/s2', &
        trim(scheme)//' V tendency - gravity wave spectrum')
-  call addfld (trim(prefix)//'TTGWSPEC',(/ 'lev' /), 'A',   'K', &
+  call addfld (trim(prefix)//'TTGWSPEC',(/ 'lev' /), 'A','K/s', &
        trim(scheme)//' T tendency - gravity wave spectrum')
 
   ! Wind tendencies broken across five spectral bins.

@@ -91,9 +91,7 @@ fi
 ./xmlchange  STOP_N=$run_length
 ./xmlchange  STOP_OPTION=$stop_option
 ./xmlchange  DOUT_S=FALSE
-./xmlchange  RUN_WITH_SUBMIT=TRUE
-runscript=`ls *.run` 
-CIMEROOT=${CAM_ROOT}/cime ./$runscript > ${CAM_TESTDIR}/${test_name}/test.log 2>&1
+CIMEROOT=${CAM_ROOT}/cime ./case.submit --no-batch > ${CAM_TESTDIR}/${test_name}/test.log 2>&1
 rc=$?
 cd ${rundir}
 if [ -e ${CAM_TESTDIR}/case.$1.$2/logs/atm.log* ]; then

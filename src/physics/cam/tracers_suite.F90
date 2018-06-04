@@ -93,8 +93,8 @@ subroutine init_cnst_tr(m, latvals, lonvals, mask, q)
    ! calls initialization routine for tracer m, returns mixing ratio in q
 
    integer,  intent(in)  :: m          ! index of tracer
-   real(r8), intent(in)  :: latvals(:) ! lat in degrees (ncol)
-   real(r8), intent(in)  :: lonvals(:) ! lon in degrees (ncol)
+   real(r8), intent(in)  :: latvals(:) ! lat in radians (ncol)
+   real(r8), intent(in)  :: lonvals(:) ! lon in radians (ncol)
    logical,  intent(in)  :: mask(:)    ! Only initialize where .true.
    real(r8), intent(out) :: q(:,:)     ! kg tracer/kg dry air (gcol,plev)
 
@@ -135,8 +135,8 @@ subroutine init_cnst_lw(latvals, lonvals, mask, q)
    ! Initialize low tracer to zero except at 800 level
 
    ! Arguments
-   real(r8), intent(in)  :: latvals(:) ! lat in degrees (ncol)
-   real(r8), intent(in)  :: lonvals(:) ! lon in degrees (ncol)
+   real(r8), intent(in)  :: latvals(:) ! lat in radians (ncol)
+   real(r8), intent(in)  :: lonvals(:) ! lon in radians (ncol)
    logical,  intent(in)  :: mask(:)    ! Only initialize where .true.
    real(r8), intent(out) :: q(:,:)    ! kg tracer/kg dry air (gcol,plev)
 
@@ -172,8 +172,8 @@ subroutine init_cnst_md(latvals, lonvals, mask, q, rev_in)
    ! Initialize med tracer to zero except at 500 level
 
    ! Arguments
-   real(r8), intent(in)  :: latvals(:) ! lat in degrees (ncol)
-   real(r8), intent(in)  :: lonvals(:) ! lon in degrees (ncol)
+   real(r8), intent(in)  :: latvals(:) ! lat in radians (ncol)
+   real(r8), intent(in)  :: lonvals(:) ! lon in radians (ncol)
    logical,  intent(in)  :: mask(:)    ! Only initialize where .true.
    real(r8), intent(out) :: q(:,:)    ! kg tracer/kg dry air
    integer,  intent(in), optional :: rev_in         ! reverse the mixing ratio
@@ -230,8 +230,8 @@ subroutine init_cnst_hi(latvals, lonvals, mask, q)
    ! Initialize high tracer to zero except at 200 level
 
    ! Arguments
-   real(r8), intent(in)  :: latvals(:) ! lat in degrees (ncol)
-   real(r8), intent(in)  :: lonvals(:) ! lon in degrees (ncol)
+   real(r8), intent(in)  :: latvals(:) ! lat in radians (ncol)
+   real(r8), intent(in)  :: lonvals(:) ! lon in radians (ncol)
    logical,  intent(in)  :: mask(:)    ! Only initialize where .true.
    real(r8), intent(out) :: q(:,:)    ! kg tracer/kg dry air
 
@@ -265,8 +265,8 @@ subroutine init_cnst_un(latvals, lonvals, mask, q)
 
    ! Initialize test unit tracer TT_UN
 
-   real(r8), intent(in)  :: latvals(:) ! lat in degrees (ncol)
-   real(r8), intent(in)  :: lonvals(:) ! lon in degrees (ncol)
+   real(r8), intent(in)  :: latvals(:) ! lat in radians (ncol)
+   real(r8), intent(in)  :: lonvals(:) ! lon in radians (ncol)
    logical,  intent(in)  :: mask(:)    ! Only initialize where .true.
    real(r8), intent(out) :: q(:,:)    ! kg tracer/kg dry air
    !-----------------------------------------------------------------------

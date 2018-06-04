@@ -1,18 +1,17 @@
 module ncdio_atm
 
-  !----------------------------------------------------------------------- 
+  !-----------------------------------------------------------------------
   !BOP
   !
   ! !MODULE: ncdio_atm
   !
-  ! !DESCRIPTION: 
+  ! !DESCRIPTION:
   ! Generic interfaces to write fields to PIO files
   !
   ! !USES:
 
   use pio, only: pio_offset_kind, file_desc_t, var_desc_t, pio_double,        &
-       pio_inq_dimlen, pio_inq_dimid, pio_max_var_dims,                       &
-       pio_inq_vardimid, pio_inq_varndims, io_desc_t, pio_setframe
+       pio_inq_dimid, pio_max_var_dims, io_desc_t, pio_setframe
   use shr_kind_mod,   only: r8 => shr_kind_r8
   use shr_sys_mod,    only: shr_sys_flush      ! Standardized system subroutines
   use shr_scam_mod,   only: shr_scam_getCloseLatLon  ! Standardized system subroutines
@@ -58,7 +57,7 @@ contains
   subroutine infld_real_1d_2d(varname, ncid, dimname1,                        &
        dim1b, dim1e, dim2b, dim2e, field, readvar, gridname, timelevel)
     !
-    ! !DESCRIPTION: 
+    ! !DESCRIPTION:
     ! Netcdf I/O of initial real field from netCDF file
     ! Read a 1-D field (or slice) into a 2-D variable
     !
@@ -67,7 +66,8 @@ contains
 
     use pio,              only: pio_get_var, pio_read_darray, pio_setdebuglevel
     use pio,              only: PIO_MAX_NAME, pio_inquire, pio_inq_dimname
-    use cam_grid_support, only: cam_grid_check, cam_grid_get_decomp, cam_grid_id
+    use cam_grid_support, only: cam_grid_check, cam_grid_get_decomp, cam_grid_id, &
+                                cam_grid_dimensions
     use cam_pio_utils,    only: cam_pio_check_var
 
     !
@@ -89,17 +89,17 @@ contains
     !
     ! !LOCAL VARIABLES:
     type(io_desc_t), pointer  :: iodesc
-    integer                   :: grid_map  ! grid ID for data mapping
+    integer                   :: grid_id   ! grid ID for data mapping
     integer                   :: i, j      ! indices
     integer                   :: ierr      ! error status
     type(var_desc_t)          :: varid     ! variable id
 
     integer                   :: arraydimsize(2) ! field dimension lengths
-    integer                   :: arraydimid      ! Dimension ID
 
     integer                   :: ndims ! number of dimensions
     integer                   :: dimids(PIO_MAX_VAR_DIMS) ! file variable dims
     integer                   :: dimlens(PIO_MAX_VAR_DIMS) ! file variable shape
+    integer                   :: grid_dimlens(2)
 
     ! Offsets for reading global variables
     integer                   :: strt(1) = 1 ! start ncol index for netcdf 1-d
@@ -108,7 +108,7 @@ contains
     character(len=128)        :: errormsg
 
     logical                   :: readvar_tmp ! if true, variable is on tape
-    character(len=32)         :: subname='INFLD_REAL_1D_2D' ! subroutine name
+    character(len=*), parameter :: subname='INFLD_REAL_1D_2D' ! subroutine name
 
     ! For SCAM
     real(r8)                  :: closelat, closelon
@@ -125,11 +125,11 @@ contains
     ! Error conditions
     !
     if (present(gridname)) then
-      grid_map = cam_grid_id(trim(gridname))
+      grid_id = cam_grid_id(trim(gridname))
     else
-      grid_map = cam_grid_id('physgrid')
+      grid_id = cam_grid_id('physgrid')
     end if
-    if (.not. cam_grid_check(grid_map)) then
+    if (.not. cam_grid_check(grid_id)) then
       if(masterproc) then
         if (present(gridname)) then
           write(errormsg, *)': invalid gridname, "',trim(gridname),'", specified for field ',trim(varname)
@@ -139,6 +139,9 @@ contains
       end if
       call endrun(trim(subname)//errormsg)
     end if
+
+    ! Get the number of columns in the global grid.
+    call cam_grid_dimensions(grid_id, grid_dimlens)
 
     if (debug .and. masterproc) then
       if (present(gridname)) then
@@ -167,7 +170,6 @@ contains
       !
       ! Get array dimension id's and sizes
       !
-      ierr = PIO_inq_dimid(ncid, dimname1, arraydimid)
       arraydimsize(1) = (dim1e - dim1b + 1)
       arraydimsize(2) = (dim2e - dim2b + 1)
       do j = 1, 2
@@ -183,6 +185,13 @@ contains
       else if (ndims < 1) then
         call endrun(trim(subname)//': too few dimensions for '//trim(varname))
       else
+         ! Check that the number of columns in the file matches the number of
+         ! columns in the grid object.
+         if (dimlens(1) /= grid_dimlens(1)) then
+            readvar = .false.
+            return
+         end if
+
         ! Check to make sure that the second dimension is time
         if (ndims == 2) then
           ierr = pio_inq_dimname(ncid, dimids(2), tmpname)
@@ -195,19 +204,24 @@ contains
       if(ndims == 2) then
         if(present(timelevel)) then
           call pio_setframe(ncid, varid, int(timelevel,kind=pio_offset_kind))
+        else
+          call pio_setframe(ncid, varid, int(1,kind=pio_offset_kind))
         end if
       end if
 
       ! NB: strt and cnt were initialized to 1
-      if (single_column) then	
+      if (single_column) then
         !!XXgoldyXX: Clearly, this will not work for an unstructured dycore
         call endrun(trim(subname)//': SCAM not supported in this configuration')
       else
         ! All distributed array processing
-        call cam_grid_get_decomp(grid_map, arraydimsize, dimlens(1:ndims),    &
+        call cam_grid_get_decomp(grid_id, arraydimsize, dimlens(1:ndims),    &
              pio_double, iodesc)
         call pio_read_darray(ncid, varid, iodesc, field, ierr)
       end if
+
+      if (masterproc) write(iulog,*) subname//': read field '//trim(varname)
+
     end if  ! end of readvar_tmp
 
     readvar = readvar_tmp
@@ -225,7 +239,7 @@ contains
   subroutine infld_real_2d_2d(varname, ncid, dimname1, dimname2,              &
        dim1b, dim1e, dim2b, dim2e, field, readvar, gridname, timelevel)
     !
-    ! !DESCRIPTION: 
+    ! !DESCRIPTION:
     ! Netcdf I/O of initial real field from netCDF file
     ! Read a 2-D field (or slice) into a 2-D variable
     !
@@ -257,7 +271,7 @@ contains
     !
     ! !LOCAL VARIABLES:
     type(io_desc_t), pointer  :: iodesc
-    integer                   :: grid_map  ! grid ID for data mapping
+    integer                   :: grid_id   ! grid ID for data mapping
     integer                   :: i, j      ! indices
     integer                   :: ierr      ! error status
     type(var_desc_t)          :: varid     ! variable id
@@ -280,7 +294,7 @@ contains
     real(r8), pointer         :: tmp2d(:,:) ! input data for permutation
 
     logical                   :: readvar_tmp ! if true, variable is on tape
-    character(len=32)         :: subname='INFLD_REAL_2D_2D' ! subroutine name
+    character(len=*), parameter :: subname='INFLD_REAL_2D_2D' ! subroutine name
     character(len=PIO_MAX_NAME) :: field_dnames(2)
 
     ! For SCAM
@@ -304,11 +318,11 @@ contains
       ! Error conditions
       !
       if (present(gridname)) then
-        grid_map = cam_grid_id(trim(gridname))
+        grid_id = cam_grid_id(trim(gridname))
       else
-        grid_map = cam_grid_id('physgrid')
+        grid_id = cam_grid_id('physgrid')
       end if
-      if (.not. cam_grid_check(grid_map)) then
+      if (.not. cam_grid_check(grid_id)) then
         if(masterproc) then
           if (present(gridname)) then
             write(errormsg, *)': invalid gridname, "',trim(gridname),'", specified for field ',trim(varname)
@@ -377,12 +391,14 @@ contains
         if(ndims == 3) then
           if(present(timelevel)) then
             call pio_setframe(ncid, varid, int(timelevel,kind=pio_offset_kind))
+          else
+            call pio_setframe(ncid, varid, int(1,kind=pio_offset_kind))
           end if
         end if
 
         field_dnames(1) = dimname1
         field_dnames(2) = dimname2
-        if (single_column) then	
+        if (single_column) then
           ! This could be generalized but for now only handles a single point
           strt(1) = dim1b
           strt(2) = dim2b
@@ -421,10 +437,13 @@ contains
           end if
         else
           ! All distributed array processing
-          call cam_grid_get_decomp(grid_map, arraydimsize, dimlens(1:2),      &
+          call cam_grid_get_decomp(grid_id, arraydimsize, dimlens(1:2),      &
                pio_double, iodesc, field_dnames=field_dnames)
           call pio_read_darray(ncid, varid, iodesc, field, ierr)
         end if
+
+        if (masterproc) write(iulog,*) subname//': read field '//trim(varname)
+
       end if  ! end of readvar_tmp
 
       readvar = readvar_tmp
@@ -444,7 +463,7 @@ contains
        dim1b, dim1e, dim2b, dim2e, dim3b, dim3e,                              &
        field, readvar, gridname, timelevel)
     !
-    ! !DESCRIPTION: 
+    ! !DESCRIPTION:
     ! Netcdf I/O of initial real field from netCDF file
     ! Read a 2-D field (or slice) into a 3-D variable
     !
@@ -453,7 +472,8 @@ contains
 
     use pio,              only: pio_get_var, pio_read_darray, pio_setdebuglevel
     use pio,              only: PIO_MAX_NAME, pio_inquire, pio_inq_dimname
-    use cam_grid_support, only: cam_grid_check, cam_grid_get_decomp, cam_grid_id
+    use cam_grid_support, only: cam_grid_check, cam_grid_get_decomp, cam_grid_id, &
+                                cam_grid_dimensions
     use cam_pio_utils,    only: cam_permute_array, calc_permutation, cam_pio_check_var
 
     !
@@ -478,7 +498,7 @@ contains
     !
     ! !LOCAL VARIABLES:
     type(io_desc_t), pointer  :: iodesc
-    integer                   :: grid_map  ! grid ID for data mapping
+    integer                   :: grid_id   ! grid ID for data mapping
     integer                   :: i, j, k   ! indices
     integer                   :: ierr      ! error status
     type(var_desc_t)          :: varid     ! variable id
@@ -491,6 +511,7 @@ contains
     integer                   :: ndims ! number of dimensions
     integer                   :: dimids(PIO_MAX_VAR_DIMS) ! file variable dims
     integer                   :: dimlens(PIO_MAX_VAR_DIMS) ! file variable shape
+    integer                   :: grid_dimlens(2)
 
     ! Offsets for reading global variables
     integer                   :: strt(3) = 1 ! start ncol, lev indices for netcdf 2-d
@@ -500,7 +521,7 @@ contains
     real(r8), pointer         :: tmp3d(:,:,:) ! input data for permutation
 
     logical                   :: readvar_tmp ! if true, variable is on tape
-    character(len=32)         :: subname='INFLD_REAL_2D_3D' ! subroutine name
+    character(len=*), parameter :: subname='INFLD_REAL_2D_3D' ! subroutine name
     character(len=128)        :: errormsg
     character(len=PIO_MAX_NAME) :: field_dnames(2)
 
@@ -519,11 +540,11 @@ contains
     ! Error conditions
     !
     if (present(gridname)) then
-      grid_map = cam_grid_id(trim(gridname))
+      grid_id = cam_grid_id(trim(gridname))
     else
-      grid_map = cam_grid_id('physgrid')
+      grid_id = cam_grid_id('physgrid')
     end if
-    if (.not. cam_grid_check(grid_map)) then
+    if (.not. cam_grid_check(grid_id)) then
       if(masterproc) then
         if (present(gridname)) then
           write(errormsg, *)': invalid gridname, "',trim(gridname),'", specified for field ',trim(varname)
@@ -533,6 +554,9 @@ contains
       end if
       call endrun(trim(subname)//errormsg)
     end if
+
+    ! Get the number of columns in the global grid.
+    call cam_grid_dimensions(grid_id, grid_dimlens)
 
     if (debug .and. masterproc) then
       if (present(gridname)) then
@@ -550,7 +574,7 @@ contains
     ! Check if field is on file; get netCDF variable id
     !
     call cam_pio_check_var(ncid, varname, varid, ndims, dimids, dimlens, readvar_tmp)
-    !
+
     ! If field is on file:
     !
     if (readvar_tmp) then
@@ -563,8 +587,6 @@ contains
       !
       ! Get array dimension id's and sizes
       !
-      ierr = PIO_inq_dimid(ncid, dimname1, arraydimids(1))
-      ierr = PIO_inq_dimid(ncid, dimname2, arraydimids(2))
       arraydimsize(1) = (dim1e - dim1b + 1)
       arraydimsize(2) = (dim2e - dim2b + 1)
       arraydimsize(3) = (dim3e - dim3b + 1)
@@ -581,7 +603,14 @@ contains
       else if (ndims < 2) then
         call endrun(trim(subname)//': too few dimensions for '//trim(varname))
       else
-        ! Check to make sure that the fourth dimension is time
+         ! Check that the number of columns in the file matches the number of
+         ! columns in the grid object.
+         if (dimlens(1) /= grid_dimlens(1)) then
+            readvar = .false.
+            return
+         end if
+
+        ! Check to make sure that the 3rd dimension is time
         if (ndims == 3) then
           ierr = pio_inq_dimname(ncid, dimids(3), tmpname)
           if (trim(tmpname) /= 'time') then
@@ -593,23 +622,28 @@ contains
       if(ndims == 3) then
         if(present(timelevel)) then
           call pio_setframe(ncid, varid, int(timelevel,kind=pio_offset_kind))
+        else
+          call pio_setframe(ncid, varid, int(1,kind=pio_offset_kind))
         end if
       end if
 
       field_dnames(1) = dimname1
       field_dnames(2) = dimname2
       ! NB: strt and cnt were initialized to 1
-      if (single_column) then	
+      if (single_column) then
         !!XXgoldyXX: Clearly, this will not work for an unstructured dycore
         ! Check for permuted dimensions ('out of order' array)
 !       call calc_permutation(dimids(1:2), arraydimids, permutation, ispermuted)
         call endrun(trim(subname)//': SCAM not supported in this configuration')
       else
         ! All distributed array processing
-        call cam_grid_get_decomp(grid_map, arraydimsize, dimlens(1:2),        &
+        call cam_grid_get_decomp(grid_id, arraydimsize, dimlens(1:2),        &
              pio_double, iodesc, field_dnames=field_dnames)
         call pio_read_darray(ncid, varid, iodesc, field, ierr)
       end if
+
+      if (masterproc) write(iulog,*) subname//': read field '//trim(varname)
+
     end if  ! end of readvar_tmp
 
     readvar = readvar_tmp
@@ -628,7 +662,7 @@ contains
        dim1b, dim1e, dim2b, dim2e, dim3b, dim3e,                              &
        field, readvar, gridname, timelevel)
     !
-    ! !DESCRIPTION: 
+    ! !DESCRIPTION:
     ! Netcdf I/O of initial real field from netCDF file
     ! Read a 3-D field (or slice) into a 3-D variable
     !
@@ -663,7 +697,7 @@ contains
     !
     ! !LOCAL VARIABLES:
     type(io_desc_t), pointer  :: iodesc
-    integer                   :: grid_map  ! grid ID for data mapping
+    integer                   :: grid_id   ! grid ID for data mapping
     integer                   :: i, j, k   ! indices
     integer                   :: ierr      ! error status
     type(var_desc_t)          :: varid     ! variable id
@@ -686,7 +720,7 @@ contains
     real(r8), pointer         :: tmp3d(:,:,:) ! input data for permutation
 
     logical                   :: readvar_tmp ! if true, variable is on tape
-    character(len=32)         :: subname='INFLD_REAL_3D_3D' ! subroutine name
+    character(len=*), parameter :: subname='INFLD_REAL_3D_3D' ! subroutine name
     character(len=128)        :: errormsg
     character(len=PIO_MAX_NAME) :: field_dnames(3)
     character(len=PIO_MAX_NAME) :: file_dnames(4)
@@ -717,11 +751,11 @@ contains
       ! Error conditions
       !
       if (present(gridname)) then
-        grid_map = cam_grid_id(trim(gridname))
+        grid_id = cam_grid_id(trim(gridname))
       else
-        grid_map = cam_grid_id('physgrid')
+        grid_id = cam_grid_id('physgrid')
       end if
-      if (.not. cam_grid_check(grid_map)) then
+      if (.not. cam_grid_check(grid_id)) then
         if(masterproc) then
           if (present(gridname)) then
             write(errormsg, *)': invalid gridname, "',trim(gridname),'", specified for field ',trim(varname)
@@ -796,6 +830,8 @@ contains
         if(ndims == 4) then
           if(present(timelevel)) then
             call pio_setframe(ncid, varid, int(timelevel,kind=pio_offset_kind))
+          else
+            call pio_setframe(ncid, varid, int(1,kind=pio_offset_kind))
           end if
         end if
 
@@ -803,7 +839,7 @@ contains
         field_dnames(2) = dimname2
         field_dnames(3) = dimname3
 
-        if (single_column) then	
+        if (single_column) then
           ! This could be generalized but for now only handles a single point
           strt(1) = dim1b
           strt(2) = dim2b
@@ -848,10 +884,13 @@ contains
           end if
         else
           ! All distributed array processing
-          call cam_grid_get_decomp(grid_map, arraydimsize, dimlens(1:pdims),  &
+          call cam_grid_get_decomp(grid_id, arraydimsize, dimlens(1:pdims),  &
                pio_double, iodesc, field_dnames=field_dnames, file_dnames=file_dnames(1:3))
           call pio_read_darray(ncid, varid, iodesc, field, ierr)
         end if ! end of single column
+
+        if (masterproc) write(iulog,*) subname//': read field '//trim(varname)
+
       end if  ! end of readvar_tmp
 
       readvar = readvar_tmp
@@ -862,6 +901,3 @@ contains
 
 
 end module ncdio_atm
-
-
-

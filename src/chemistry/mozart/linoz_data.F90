@@ -32,7 +32,7 @@ module linoz_data
   integer, parameter, public :: N_FLDS = 8
   integer :: number_flds
 
-  character(len=256) :: filename = ''
+  character(len=256) :: filename = 'NONE'
   character(len=256) :: filelist = ''
   character(len=256) :: datapath = ''
   character(len=32)  :: datatype = 'CYCLICAL'
@@ -164,7 +164,7 @@ contains
        fixed_tod = linoz_data_fixed_tod_in
     endif
 
-    if (len_trim(filename) > 0 ) has_linoz_data = .true.
+    if (len_trim(filename) > 0 .and. filename.ne.'NONE') has_linoz_data = .true.
 
   endsubroutine linoz_data_setopts
 

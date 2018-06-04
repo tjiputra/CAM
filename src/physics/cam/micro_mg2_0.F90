@@ -176,6 +176,10 @@ real(r8) :: dcs
 ! externally (kg)
 real(r8), parameter :: mi0l_min = 4._r8/3._r8*pi*rhow*(4.e-6_r8)**3
 
+! Ice number sublimation parameter. Assume some decrease in ice number with sublimation if non-zero. Else, no decrease in number with sublimation. 
+  real(r8), parameter :: sublim_factor =0.0_r8      !number sublimation factor.  
+
+
 !=========================================================
 ! Constants set in initialization
 !=========================================================
@@ -722,8 +726,7 @@ subroutine micro_mg_tend ( &
   ! bergeron process
   real(r8) :: berg(mgncol,nlev)   ! mass mixing ratio (cloud ice)
   real(r8) :: bergs(mgncol,nlev)  ! mass mixing ratio (snow)
-
-
+ 
   ! fallspeeds
   ! number-weighted
   real(r8) :: uns(mgncol,nlev)    ! snow
@@ -1290,8 +1293,8 @@ subroutine micro_mg_tend ( &
      ! cloud liquid
      !-------------------------------------------
 
-     call size_dist_param_liq(mg_liq_props, qcic(:,k), ncic(:,k), rho(:,k), &
-          pgam(:,k), lamc(:,k), mgncol)
+     call size_dist_param_liq(mg_liq_props, qcic(1:mgncol,k), ncic(1:mgncol,k),&
+          rho(1:mgncol,k), pgam(1:mgncol,k), lamc(1:mgncol,k), mgncol)
 
 
      !========================================================================
@@ -1300,7 +1303,7 @@ subroutine micro_mg_tend ( &
      ! minimum qc of 1 x 10^-8 prevents floating point error
 
      if (.not. do_sb_physics) then
-       call kk2000_liq_autoconversion(microp_uniform, qcic(:,k), &
+       call kk2000_liq_autoconversion(microp_uniform, qcic(1:mgncol,k), &
           ncic(:,k), rho(:,k), relvar(:,k), prc(:,k), nprc(:,k), nprc1(:,k), mgncol)
      endif
 
@@ -1332,7 +1335,7 @@ subroutine micro_mg_tend ( &
 	  
      ! Alternative autoconversion 
      if (do_sb_physics) then
-       call sb2001v2_liq_autoconversion(pgam(:,k),qcic(:,k),ncic(:,k), &
+       call sb2001v2_liq_autoconversion(pgam(:,k),qcic(1:mgncol,k),ncic(:,k), &
             qric(:,k),rho(:,k),relvar(:,k),prc(:,k),nprc(:,k),nprc1(:,k), mgncol)     
      endif	  
 
@@ -1416,12 +1419,12 @@ subroutine micro_mg_tend ( &
            !----------------------------------------------
 
            call immersion_freezing(microp_uniform, t(:,k), pgam(:,k), lamc(:,k), &
-                qcic(:,k), ncic(:,k), relvar(:,k), mnuccc(:,k), nnuccc(:,k), mgncol)
+                qcic(1:mgncol,k), ncic(:,k), relvar(:,k), mnuccc(:,k), nnuccc(:,k), mgncol)
 
            ! make sure number of droplets frozen does not exceed available ice nuclei concentration
            ! this prevents 'runaway' droplet freezing
 
-           where (qcic(:,k).ge.qsmall .and. t(:,k).lt.269.15_r8)
+           where (qcic(1:mgncol,k).ge.qsmall .and. t(:,k).lt.269.15_r8)
               where (nnuccc(:,k)*lcldm(:,k).gt.nnuccd(:,k))
                  ! scale mixing ratio of droplet freezing with limit
                  mnuccc(:,k)=mnuccc(:,k)*(nnuccd(:,k)/(nnuccc(:,k)*lcldm(:,k)))
@@ -1431,7 +1434,7 @@ subroutine micro_mg_tend ( &
 
            mdust = size(rndst,3)
            call contact_freezing(microp_uniform, t(:,k), p(:,k), rndst(:,k,:), &
-                nacon(:,k,:), pgam(:,k), lamc(:,k), qcic(:,k), ncic(:,k), &
+                nacon(:,k,:), pgam(:,k), lamc(:,k), qcic(1:mgncol,k), ncic(:,k), &
                 relvar(:,k), mnucct(:,k), nnucct(:,k), mgncol, mdust)
 
            mnudep(:,k)=0._r8
@@ -1442,10 +1445,10 @@ subroutine micro_mg_tend ( &
            ! Mass of droplets frozen is the average droplet mass, except
            ! with two limiters: concentration must be at least 1/cm^3, and
            ! mass must be at least the minimum defined above.
-           mi0l = qcic(:,k)/max(ncic(:,k), 1.0e6_r8/rho(:,k))
+           mi0l = qcic(1:mgncol,k)/max(ncic(:,k), 1.0e6_r8/rho(:,k))
            mi0l = max(mi0l_min, mi0l)
 
-           where (qcic(:,k) >= qsmall)
+           where (qcic(1:mgncol,k) >= qsmall)
               nnuccc(:,k) = frzimm(:,k)*1.0e6_r8/rho(:,k)
               mnuccc(:,k) = nnuccc(:,k)*mi0l
 
@@ -1480,7 +1483,7 @@ subroutine micro_mg_tend ( &
           nsagg(:,k), mgncol)
 
      call accrete_cloud_water_snow(t(:,k), rho(:,k), asn(:,k), uns(:,k), mu(:,k), &
-          qcic(:,k), ncic(:,k), qsic(:,k), pgam(:,k), lamc(:,k), lams(:,k), n0s(:,k), &
+          qcic(1:mgncol,k), ncic(:,k), qsic(:,k), pgam(:,k), lamc(:,k), lams(:,k), n0s(:,k), &
           psacws(:,k), npsacws(:,k), mgncol)
 
      if (do_cldice) then
@@ -1498,10 +1501,10 @@ subroutine micro_mg_tend ( &
           mnuccr(:,k), nnuccr(:,k), mgncol)
 
      if (do_sb_physics) then
-       call sb2001v2_accre_cld_water_rain(qcic(:,k), ncic(:,k), qric(:,k), &
+       call sb2001v2_accre_cld_water_rain(qcic(1:mgncol,k), ncic(:,k), qric(:,k), &
             rho(:,k), relvar(:,k), pra(:,k), npra(:,k), mgncol)     
      else
-       call accrete_cloud_water_rain(microp_uniform, qric(:,k), qcic(:,k), &
+       call accrete_cloud_water_rain(microp_uniform, qric(:,k), qcic(1:mgncol,k), &
             ncic(:,k), relvar(:,k), accre_enhan(:,k), pra(:,k), npra(:,k), mgncol)
      endif
 
@@ -1517,12 +1520,12 @@ subroutine micro_mg_tend ( &
 
      call evaporate_sublimate_precip(t(:,k), rho(:,k), &
           dv(:,k), mu(:,k), sc(:,k), q(:,k), qvl(:,k), qvi(:,k), &
-          lcldm(:,k), precip_frac(:,k), arn(:,k), asn(:,k), qcic(:,k), qiic(:,k), &
+          lcldm(:,k), precip_frac(:,k), arn(:,k), asn(:,k), qcic(1:mgncol,k), qiic(:,k), &
           qric(:,k), qsic(:,k), lamr(:,k), n0r(:,k), lams(:,k), n0s(:,k), &
           pre(:,k), prds(:,k), am_evp_st(:,k), mgncol)
 
      call bergeron_process_snow(t(:,k), rho(:,k), dv(:,k), mu(:,k), sc(:,k), &
-          qvl(:,k), qvi(:,k), asn(:,k), qcic(:,k), qsic(:,k), lams(:,k), n0s(:,k), &
+          qvl(:,k), qvi(:,k), asn(:,k), qcic(1:mgncol,k), qsic(:,k), lams(:,k), n0s(:,k), &
           bergs(:,k), mgncol)
 
      bergs(:,k)=bergs(:,k)*micro_mg_berg_eff_factor
@@ -1536,8 +1539,9 @@ subroutine micro_mg_tend ( &
 
         berg(:,k)=berg(:,k)*micro_mg_berg_eff_factor
 
-        where (vap_dep(:,k) < 0._r8 .and. qi(:,k) > qsmall .and. icldm(:,k) > mincld)
-           nsubi(:,k) = vap_dep(:,k) / qi(:,k) * ni(:,k) / icldm(:,k)
+        where (ice_sublim(:,k) < 0._r8 .and. qi(:,k) > qsmall .and. icldm(:,k) > mincld)
+           nsubi(:,k) = sublim_factor*ice_sublim(:,k) / qi(:,k) * ni(:,k) / icldm(:,k)
+
         elsewhere
            nsubi(:,k) = 0._r8
         end where
@@ -2000,7 +2004,7 @@ subroutine micro_mg_tend ( &
 
      ! calculate mean size of combined rain and cloud water
 
-     call calc_rercld(lamr(:,k), n0r(:,k), lamc(:,k), pgam(:,k), qric(:,k), qcic(:,k), ncic(:,k), &
+     call calc_rercld(lamr(:,k), n0r(:,k), lamc(:,k), pgam(:,k), qric(:,k), qcic(1:mgncol,k), ncic(:,k), &
           rercld(:,k), mgncol)
 
   enddo

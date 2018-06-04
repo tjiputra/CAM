@@ -434,7 +434,7 @@ contains
 
   end subroutine usrrxt_inti
 
-  subroutine usrrxt( rxt, temp, tempi, tempe, invariants, h2ovmr,  ps, &
+  subroutine usrrxt( rxt, temp, tempi, tempe, invariants, h2ovmr,  &
                      pmid, m, sulfate, mmr, relhum, strato_sad, &
                      tropchemlev, dlat, ncol, sad_trop, reff_trop, cwat, mbar, pbuf )
 
@@ -467,7 +467,6 @@ contains
     real(r8), intent(in)    :: h2ovmr(ncol,pver)          ! water vapor (mol/mol)
     real(r8), intent(in)    :: relhum(ncol,pver)          ! relative humidity
     real(r8), intent(in)    :: pmid(pcols,pver)           ! midpoint pressure (Pa)
-    real(r8), intent(in)    :: ps(pcols)                  ! surface pressure (Pa)
     real(r8), intent(in)    :: invariants(ncol,pver,nfs)  ! invariants density (/cm^3)
     real(r8), intent(in)    :: mmr(pcols,pver,gas_pcnst)  ! species concentrations (kg/kg)
     real(r8), intent(in)    :: cwat(ncol,pver) !PJC Condensed Water (liquid+ice) (kg/kg)

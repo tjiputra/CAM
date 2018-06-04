@@ -5,7 +5,7 @@ module mo_gas_phase_chemdr
   use constituents,     only : pcnst
   use cam_history,      only : fieldname_len
   use chem_mods,        only : phtcnt, rxntot, gas_pcnst
-  use chem_mods,        only : rxt_tag_cnt, rxt_tag_lst, rxt_tag_map, extcnt
+  use chem_mods,        only : rxt_tag_cnt, rxt_tag_lst, rxt_tag_map, extcnt, num_rnts
   use dust_model,       only : dust_names, ndust => dust_nbin
   use ppgrid,           only : pcols, pver
   use phys_control,     only : phys_getopts
@@ -40,8 +40,6 @@ module mo_gas_phase_chemdr
   integer :: cb1_ndx,cb2_ndx,oc1_ndx,oc2_ndx,dst1_ndx,dst2_ndx,sslt1_ndx,sslt2_ndx
   integer :: soa_ndx,soai_ndx,soam_ndx,soat_ndx,soab_ndx,soax_ndx
 
-  character(len=fieldname_len),dimension(rxntot-phtcnt) :: rxn_names
-  character(len=fieldname_len),dimension(phtcnt)        :: pht_names
   character(len=fieldname_len),dimension(rxt_tag_cnt)   :: tag_names
   character(len=fieldname_len),dimension(extcnt)        :: extfrc_name
 
@@ -61,14 +59,18 @@ contains
     use constituents,      only : cnst_get_ind
     use physics_buffer,    only : pbuf_get_index
     use rate_diags,        only : rate_diags_init
+    use cam_abortutils,    only : endrun
 
     implicit none
 
     character(len=3) :: string
-    integer          :: n, m, err
+    integer          :: n, m, err, ii
     logical :: history_cesm_forcing
-
+    character(len=16) :: unitstr
     !-----------------------------------------------------------------------
+    logical :: history_scwaccm_forcing
+
+    call phys_getopts( history_scwaccm_forcing_out = history_scwaccm_forcing )
 
     call phys_getopts( convproc_do_aer_out = convproc_do_aer, history_cesm_forcing_out=history_cesm_forcing )
    
@@ -138,22 +140,27 @@ contains
     do n = 1,rxt_tag_cnt
        tag_names(n) = trim(rxt_tag_lst(n))
        if (n<=phtcnt) then
-          call addfld( tag_names(n), (/ 'lev' /), 'I', '/s', 'photolysis rate' )
+          call addfld( tag_names(n), (/ 'lev' /), 'I', '/s', 'photolysis rate constant' )
        else
-          call addfld( tag_names(n), (/ 'lev' /), 'I', '/cm3/s', 'reaction rate' )
+          ii = n-phtcnt
+          select case(num_rnts(ii))
+          case(1)
+             unitstr='/s'
+          case(2)
+             unitstr='cm3/molecules/s'
+          case(3)
+             unitstr='cm6/molecules2/s'
+          case default
+             call endrun('gas_phase_chemdr_inti: invalid value in num_rnts used to set units in reaction rate constant')
+          end select
+          call addfld( tag_names(n), (/ 'lev' /), 'I', unitstr, 'reaction rate constant' )
        endif
-    enddo
-
-    do n = 1,phtcnt
-       WRITE(UNIT=string, FMT='(I3.3)') n
-       pht_names(n) = 'J_' // trim(string)
-       call addfld( pht_names(n), (/ 'lev' /), 'I', '/s', 'photolysis rate' )
-    enddo
-
-    do n = 1,rxntot-phtcnt
-       WRITE(UNIT=string, FMT='(I3.3)') n
-       rxn_names(n) = 'R_' // trim(string)
-       call addfld( rxn_names(n), (/ 'lev' /), 'I', '/cm3/s', 'reaction rate' )
+       if (history_scwaccm_forcing) then
+          select case (trim(tag_names(n)))
+          case ('jh2o_a', 'jh2o_b', 'jh2o_c' )
+             call add_default( tag_names(n), 1, ' ')
+          end select
+       endif
     enddo
 
     call addfld( 'DTCBS',   horiz_only, 'I', ' ','photolysis diagnostic black carbon OD' )
@@ -500,10 +507,7 @@ contains
     !        ... Calculate cosine of zenith angle
     !            then cast back to angle (radians)
     !-----------------------------------------------------------------------      
-!+tht
-   !call zenith( calday, rlats, rlons, zen_angle, ncol )
-    call zenith( calday, rlats, rlons, zen_angle, ncol ,delt) !+tht delt
-!-tht
+    call zenith( calday, rlats, rlons, zen_angle, ncol , delt) !+tht delt
     zen_angle(:) = acos( zen_angle(:) )
 
     sza(:) = zen_angle(:) * rad2deg
@@ -559,14 +563,35 @@ contains
 !
 ! reset AOA_NH, NH_5, NH_50, NH_50W surface mixing ratios between 30N and 50N
 !
-    if ( aoa_nh_ndx>0 .and. nh_5_ndx>0 .and. nh_50_ndx>0 .and. nh_50w_ndx>0 ) then
+    if ( aoa_nh_ndx>0 ) then
+      do j=1,ncol
+        xlat = dlats(j)
+        if ( xlat >= 30._r8 .and. xlat <= 50._r8 ) then
+           vmr(j,pver,aoa_nh_ndx) = 0._r8
+        end if
+      end do
+    end if
+    if ( nh_5_ndx>0 ) then
       do j=1,ncol
         xlat = dlats(j)
         if ( xlat >= 30._r8 .and. xlat <= 50._r8 ) then
            vmr(j,pver,nh_5_ndx)   = 100.e-9_r8
+        end if
+      end do
+    end if
+    if ( nh_50_ndx>0 ) then
+      do j=1,ncol
+        xlat = dlats(j)
+        if ( xlat >= 30._r8 .and. xlat <= 50._r8 ) then
            vmr(j,pver,nh_50_ndx)  = 100.e-9_r8
+        end if
+      end do
+    end if
+    if ( nh_50w_ndx>0 ) then
+      do j=1,ncol
+        xlat = dlats(j)
+        if ( xlat >= 30._r8 .and. xlat <= 50._r8 ) then
            vmr(j,pver,nh_50w_ndx) = 100.e-9_r8
-           vmr(j,pver,aoa_nh_ndx) = 0._r8
         end if
       end do
     end if
@@ -765,8 +790,8 @@ contains
        call ghg_chem_set_rates( reaction_rates, latmapback, zen_angle, ncol, lchnk )
     endif
 
-    do i = phtcnt+1,rxntot
-       call outfld( rxn_names(i-phtcnt), reaction_rates(:,:,i), ncol, lchnk )
+    do i = phtcnt+1,rxt_tag_cnt
+       call outfld( tag_names(i), reaction_rates(:ncol,:,rxt_tag_map(i)), ncol, lchnk )
     enddo
 
     call adjrxt( reaction_rates, invariants, invariants(1,1,indexm), ncol,pver )
@@ -823,7 +848,6 @@ contains
     endif
 
     do i = 1,phtcnt
-       call outfld( pht_names(i), reaction_rates(:ncol,:,i), ncol, lchnk )
        call outfld( tag_names(i), reaction_rates(:ncol,:,rxt_tag_map(i)), ncol, lchnk )
     enddo
 
@@ -880,12 +904,6 @@ contains
           reaction_rates(i,1:troplev(i),st80_25_tau_ndx) = 0._r8
        enddo
     end if
-
-!
-
-    do i = phtcnt+1,rxt_tag_cnt
-       call outfld( tag_names(i), reaction_rates(:ncol,:,rxt_tag_map(i)), ncol, lchnk )
-    enddo
 
     if ( has_linoz_data ) then
        ltrop_sol(:ncol) = troplev(:ncol)

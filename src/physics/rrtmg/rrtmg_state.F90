@@ -9,6 +9,7 @@ module rrtmg_state
 
   use shr_kind_mod,    only: r8 => shr_kind_r8
   use ppgrid,          only: pcols, pver, pverp
+  use cam_history,     only: outfld
 
   implicit none
   private
@@ -141,7 +142,7 @@ contains
        rstate%pmidmb(:ncol,1) = 0.5_r8 * rstate%pintmb(:ncol,2) 
        rstate%pintmb(:ncol,1) = 1.e-4_r8 ! mbar
     endif
-
+    
   endfunction rrtmg_state_create
 
 !--------------------------------------------------------------------------------
@@ -168,9 +169,12 @@ contains
     real(r8), pointer, dimension(:,:) :: o3     ! Ozone mass mixing ratio
     real(r8), pointer, dimension(:,:) :: co2    ! co2   mass mixing ratio
     
-    integer  :: ncol, i, kk, k
+    integer  :: ncol, i, kk, k, lchnk
+    real(r8) :: H, P_top, P_surface
+    real(r8), dimension(pcols) :: P_int, P_mid, alpha, beta, a, b, chi_mid, chi_0, chi_eff
 
     ncol = pstate%ncol
+    lchnk = pstate%lchnk
 
     ! Get specific humidity
     call rad_cnst_get_gas(icall,'H2O', pstate, pbuf, sp_hum)
@@ -205,6 +209,33 @@ contains
        rstate%ccl4vmr(:ncol,k)  = 0._r8
 
     enddo
+     
+    ! For the purpose of attenuating solar fluxes above the CAM model top, we assume that ozone 
+    ! mixing decreases linearly in each column from the value in the top layer of CAM to zero at 
+    ! the pressure level set by P_top. P_top has been set to 50 Pa (0.5 hPa) based on model tuning 
+    ! to produce temperatures at the top of CAM that are most consistent with WACCM at similar pressure levels. 
+
+    P_top = 50.0_r8                     ! pressure (Pa) at which we assume O3 = 0 in linear decay from CAM top
+    P_int(:ncol) = pstate%pint(:ncol,1) ! pressure (Pa) at upper interface of CAM
+    P_mid(:ncol) = pstate%pmid(:ncol,1) ! pressure (Pa) at midpoint of top layer of CAM
+    alpha(:) = 0.0_r8
+    beta(:) = 0.0_r8
+    alpha(:ncol) = log(P_int(:ncol)/P_top)
+    beta(:ncol) =  log(P_mid(:ncol)/P_int(:ncol))/log(P_mid(:ncol)/P_top)
+
+    a(:ncol) =  ( (1._r8 + alpha(:ncol)) * exp(-alpha(:ncol)) - 1._r8 ) / alpha(:ncol)
+    b(:ncol) =  1_r8 - exp(-alpha(:ncol))
+
+    where(alpha .gt. 0)                               ! only apply where top level is below 80 km
+      chi_mid(:) = o3(:,1)*amdo                       ! molar mixing ratio of O3 at midpoint of top layer
+      chi_0(:) = chi_mid(:) /  (1._r8 + beta(:))
+      chi_eff(:) = chi_0(:) * (a(:) + b(:))
+      rstate%o3vmr(:,1) = chi_eff(:)
+      chi_eff(:) = chi_eff(:) * P_int(:) / amdo / 9.8 ! O3 column above in kg m-2
+      chi_eff(:) = chi_eff(:) / 2.1415e-5             ! O3 column above in DU
+    endwhere
+    
+    call outfld('O3colAbove', chi_eff(:ncol), pcols, lchnk)
 
   end subroutine rrtmg_state_update
 

@@ -13,7 +13,7 @@
       use chem_mods,     only : phtcnt, rxt_tag_cnt, rxt_tag_lst, rxt_tag_map
       use chem_mods,     only : pht_alias_lst, pht_alias_mult
       use chem_mods,     only : extfrc_lst, inv_lst, slvd_lst
-      use chem_mods,     only : enthalpy_cnt, cph_enthalpy, cph_rid
+      use chem_mods,     only : enthalpy_cnt, cph_enthalpy, cph_rid, num_rnts, rxntot
       use cam_abortutils,only : endrun
       use mo_tracname,   only : solsym
       use chem_mods,     only : frc_from_dataset
@@ -129,84 +129,84 @@
          write(iulog,*) 'set_sim_dat: failed to allocate rxt_tag_map; error = ',ios
          call endrun
       end if
-      rxt_tag_lst(:rxt_tag_cnt) = (/ 'jo2_a                           ', 'jo2_b                           ', &
-                                     'jo3_a                           ', 'jo3_b                           ', &
-                                     'jn2o                            ', 'jno                             ', &
-                                     'jno_i                           ', 'jno2                            ', &
-                                     'jn2o5_a                         ', 'jn2o5_b                         ', &
-                                     'jhno3                           ', 'jno3_a                          ', &
-                                     'jno3_b                          ', 'jho2no2_a                       ', &
-                                     'jho2no2_b                       ', 'jch3ooh                         ', &
-                                     'jch2o_a                         ', 'jch2o_b                         ', &
-                                     'jh2o_a                          ', 'jh2o_b                          ', &
-                                     'jh2o_c                          ', 'jh2o2                           ', &
-                                     'jcl2                            ', 'jclo                            ', &
-                                     'joclo                           ', 'jcl2o2                          ', &
-                                     'jhocl                           ', 'jhcl                            ', &
-                                     'jclono2_a                       ', 'jclono2_b                       ', &
-                                     'jbrcl                           ', 'jbro                            ', &
-                                     'jhobr                           ', 'jbrono2_a                       ', &
-                                     'jbrono2_b                       ', 'jch3cl                          ', &
-                                     'jccl4                           ', 'jch3ccl3                        ', &
-                                     'jcfcl3                          ', 'jcf2cl2                         ', &
-                                     'jcfc113                         ', 'jhcfc22                         ', &
-                                     'jch3br                          ', 'jcf3br                          ', &
-                                     'jcf2clbr                        ', 'jco2                            ', &
-                                     'jch4_a                          ', 'jch4_b                          ', &
-                                     'jh2so4                          ', 'jso2                            ', &
-                                     'jso3                            ', 'jocs                            ', &
-                                     'jso                             ', 'jeuv_1                          ', &
-                                     'jeuv_2                          ', 'jeuv_3                          ', &
-                                     'jeuv_4                          ', 'jeuv_5                          ', &
-                                     'jeuv_6                          ', 'jeuv_7                          ', &
-                                     'jeuv_8                          ', 'jeuv_9                          ', &
-                                     'jeuv_10                         ', 'jeuv_11                         ', &
-                                     'jeuv_12                         ', 'jeuv_13                         ', &
-                                     'jeuv_14                         ', 'jeuv_15                         ', &
-                                     'jeuv_16                         ', 'jeuv_17                         ', &
-                                     'jeuv_18                         ', 'jeuv_19                         ', &
-                                     'jeuv_20                         ', 'jeuv_21                         ', &
-                                     'jeuv_22                         ', 'jeuv_23                         ', &
-                                     'jeuv_24                         ', 'jeuv_25                         ', &
-                                     'jeuv_26                         ', 'usr_O_O2                        ', &
-                                     'O_O3                            ', 'usr_O_O                         ', &
-                                     'O2_1S_O                         ', 'O2_1S_O2                        ', &
-                                     'O2_1S_N2                        ', 'O2_1S_O3                        ', &
-                                     'O2_1S_CO2                       ', 'ag2                             ', &
-                                     'O2_1D_O                         ', 'O2_1D_O2                        ', &
-                                     'O2_1D_N2                        ', 'ag1                             ', &
-                                     'O1D_N2                          ', 'O1D_O2                          ', &
-                                     'O1D_O2b                         ', 'N2D_O2                          ', &
-                                     'N2D_O                           ', 'N_O2                            ', &
-                                     'N_NO                            ', 'NO_HO2                          ', &
-                                     'NO_O3                           ', 'NO2_O                           ', &
-                                     'tag_NO2_NO3                     ', 'usr_N2O5_M                      ', &
-                                     'tag_NO2_OH                      ', 'usr_HNO3_OH                     ', &
-                                     'tag_NO2_HO2                     ', 'usr_HO2NO2_M                    ', &
-                                     'usr_CO_OH_b                     ', 'H_O2                            ', &
-                                     'H_O3                            ', 'tag_H_HO2_a                     ', &
-                                     'H_HO2                           ', 'tag_H_HO2_b                     ', &
-                                     'OH_O                            ', 'OH_O3                           ', &
-                                     'OH_HO2                          ', 'tag_OH_H2O2                     ', &
-                                     'HO2_O                           ', 'HO2_O3                          ', &
-                                     'usr_HO2_HO2                     ', 'tag_H2O2_O                      ', &
-                                     'tag_CLO_CLO                     ', 'usr_CL2O2_M                     ', &
-                                     'usr_SO3_H2O                     ', 'het1                            ', &
-                                     'het2                            ', 'het3                            ', &
-                                     'het4                            ', 'het5                            ', &
-                                     'het6                            ', 'het7                            ', &
-                                     'het8                            ', 'het9                            ', &
-                                     'het10                           ', 'het11                           ', &
-                                     'het12                           ', 'het13                           ', &
-                                     'het14                           ', 'het15                           ', &
-                                     'het16                           ', 'het17                           ', &
-                                     'ion_Op_O2                       ', 'ion_Op_N2                       ', &
-                                     'ion_N2p_Oa                      ', 'ion_O2p_N                       ', &
-                                     'ion_O2p_NO                      ', 'ion_Np_O2a                      ', &
-                                     'ion_Np_O2b                      ', 'ion_Np_O                        ', &
-                                     'ion_N2p_O2                      ', 'ion_N2p_Ob                      ', &
-                                     'elec1                           ', 'elec2                           ', &
-                                     'elec3                           ' /)
+      rxt_tag_lst(     1:   155) = (/ 'jo2_a                           ', 'jo2_b                           ', &
+                                      'jo3_a                           ', 'jo3_b                           ', &
+                                      'jn2o                            ', 'jno                             ', &
+                                      'jno_i                           ', 'jno2                            ', &
+                                      'jn2o5_a                         ', 'jn2o5_b                         ', &
+                                      'jhno3                           ', 'jno3_a                          ', &
+                                      'jno3_b                          ', 'jho2no2_a                       ', &
+                                      'jho2no2_b                       ', 'jch3ooh                         ', &
+                                      'jch2o_a                         ', 'jch2o_b                         ', &
+                                      'jh2o_a                          ', 'jh2o_b                          ', &
+                                      'jh2o_c                          ', 'jh2o2                           ', &
+                                      'jcl2                            ', 'jclo                            ', &
+                                      'joclo                           ', 'jcl2o2                          ', &
+                                      'jhocl                           ', 'jhcl                            ', &
+                                      'jclono2_a                       ', 'jclono2_b                       ', &
+                                      'jbrcl                           ', 'jbro                            ', &
+                                      'jhobr                           ', 'jbrono2_a                       ', &
+                                      'jbrono2_b                       ', 'jch3cl                          ', &
+                                      'jccl4                           ', 'jch3ccl3                        ', &
+                                      'jcfcl3                          ', 'jcf2cl2                         ', &
+                                      'jcfc113                         ', 'jhcfc22                         ', &
+                                      'jch3br                          ', 'jcf3br                          ', &
+                                      'jcf2clbr                        ', 'jco2                            ', &
+                                      'jch4_a                          ', 'jch4_b                          ', &
+                                      'jh2so4                          ', 'jso2                            ', &
+                                      'jso3                            ', 'jocs                            ', &
+                                      'jso                             ', 'jeuv_1                          ', &
+                                      'jeuv_2                          ', 'jeuv_3                          ', &
+                                      'jeuv_4                          ', 'jeuv_5                          ', &
+                                      'jeuv_6                          ', 'jeuv_7                          ', &
+                                      'jeuv_8                          ', 'jeuv_9                          ', &
+                                      'jeuv_10                         ', 'jeuv_11                         ', &
+                                      'jeuv_12                         ', 'jeuv_13                         ', &
+                                      'jeuv_14                         ', 'jeuv_15                         ', &
+                                      'jeuv_16                         ', 'jeuv_17                         ', &
+                                      'jeuv_18                         ', 'jeuv_19                         ', &
+                                      'jeuv_20                         ', 'jeuv_21                         ', &
+                                      'jeuv_22                         ', 'jeuv_23                         ', &
+                                      'jeuv_24                         ', 'jeuv_25                         ', &
+                                      'jeuv_26                         ', 'usr_O_O2                        ', &
+                                      'O_O3                            ', 'usr_O_O                         ', &
+                                      'O2_1S_O                         ', 'O2_1S_O2                        ', &
+                                      'O2_1S_N2                        ', 'O2_1S_O3                        ', &
+                                      'O2_1S_CO2                       ', 'ag2                             ', &
+                                      'O2_1D_O                         ', 'O2_1D_O2                        ', &
+                                      'O2_1D_N2                        ', 'ag1                             ', &
+                                      'O1D_N2                          ', 'O1D_O2                          ', &
+                                      'O1D_O2b                         ', 'N2D_O2                          ', &
+                                      'N2D_O                           ', 'N_O2                            ', &
+                                      'N_NO                            ', 'NO_HO2                          ', &
+                                      'NO_O3                           ', 'NO2_O                           ', &
+                                      'tag_NO2_NO3                     ', 'usr_N2O5_M                      ', &
+                                      'tag_NO2_OH                      ', 'usr_HNO3_OH                     ', &
+                                      'tag_NO2_HO2                     ', 'usr_HO2NO2_M                    ', &
+                                      'usr_CO_OH_b                     ', 'H_O2                            ', &
+                                      'H_O3                            ', 'tag_H_HO2_a                     ', &
+                                      'H_HO2                           ', 'tag_H_HO2_b                     ', &
+                                      'OH_O                            ', 'OH_O3                           ', &
+                                      'OH_HO2                          ', 'tag_OH_H2O2                     ', &
+                                      'HO2_O                           ', 'HO2_O3                          ', &
+                                      'usr_HO2_HO2                     ', 'tag_H2O2_O                      ', &
+                                      'tag_CLO_CLO                     ', 'usr_CL2O2_M                     ', &
+                                      'usr_SO3_H2O                     ', 'het1                            ', &
+                                      'het2                            ', 'het3                            ', &
+                                      'het4                            ', 'het5                            ', &
+                                      'het6                            ', 'het7                            ', &
+                                      'het8                            ', 'het9                            ', &
+                                      'het10                           ', 'het11                           ', &
+                                      'het12                           ', 'het13                           ', &
+                                      'het14                           ', 'het15                           ', &
+                                      'het16                           ', 'het17                           ', &
+                                      'ion_Op_O2                       ', 'ion_Op_N2                       ', &
+                                      'ion_N2p_Oa                      ', 'ion_O2p_N                       ', &
+                                      'ion_O2p_NO                      ', 'ion_Np_O2a                      ', &
+                                      'ion_Np_O2b                      ', 'ion_Np_O                        ', &
+                                      'ion_N2p_O2                      ', 'ion_N2p_Ob                      ', &
+                                      'elec1                           ', 'elec2                           ', &
+                                      'elec3                           ' /)
       rxt_tag_map(:rxt_tag_cnt) = (/    1,   2,   3,   4,   5,   6,   7,   8,   9,  10, &
                                        11,  12,  13,  14,  15,  16,  17,  18,  19,  20, &
                                        21,  22,  23,  24,  25,  26,  27,  28,  29,  30, &
@@ -339,6 +339,29 @@
                              105.040000_r8,   67.530000_r8,  406.160000_r8,  271.380000_r8,  239.840000_r8, &
                              646.280000_r8,   95.550000_r8,  339.590000_r8,   82.389000_r8,  508.950000_r8, &
                              354.830000_r8 /)
+      allocate( num_rnts(rxntot-phtcnt),stat=ios )
+      if( ios /= 0 ) then
+         write(iulog,*) 'set_sim_dat: failed to allocate num_rnts; error = ',ios
+         call endrun
+      end if
+      num_rnts(:) = (/      3,     2,     3,     2,     2,     2,     2,     2,     1,     2, &
+                            2,     2,     1,     2,     2,     2,     2,     2,     2,     2, &
+                            2,     2,     2,     2,     2,     2,     2,     2,     2,     2, &
+                            2,     2,     2,     2,     2,     2,     2,     2,     2,     3, &
+                            2,     2,     2,     3,     2,     3,     2,     3,     2,     2, &
+                            2,     2,     2,     3,     2,     2,     2,     2,     2,     2, &
+                            2,     2,     2,     3,     2,     3,     2,     2,     2,     2, &
+                            2,     2,     2,     2,     3,     2,     2,     2,     2,     2, &
+                            2,     2,     2,     2,     2,     2,     2,     2,     2,     2, &
+                            2,     2,     2,     3,     2,     2,     2,     3,     2,     2, &
+                            2,     2,     2,     2,     2,     2,     2,     2,     2,     2, &
+                            2,     2,     2,     2,     3,     2,     2,     2,     2,     2, &
+                            2,     2,     2,     2,     2,     2,     2,     2,     2,     2, &
+                            2,     2,     2,     2,     2,     2,     2,     2,     2,     2, &
+                            3,     2,     2,     1,     1,     1,     2,     2,     2,     1, &
+                            1,     2,     2,     1,     1,     1,     1,     2,     2,     2, &
+                            2,     2,     2,     2,     2,     2,     2,     2,     2,     2, &
+                            2,     2,     2,     2,     2 /)
 
       end subroutine set_sim_dat
 

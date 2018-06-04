@@ -1,5 +1,5 @@
-BEGSIM
-   SPECIES
+BEGSIM 
+  SPECIES
 
       Solution
  SO2, H2SO4
@@ -15,10 +15,11 @@ BEGSIM
  SOA_NA->C10H16O2, SOA_A1->C10H16O2
  SOA_LV ->C10H16O2, SOA_SV->C10H16O2
  monoterp -> C10H16, isoprene -> C5H8
+ H2O
    End Solution
 
       Fixed
- M, N2, O2, H2O, O3, OH, NO3, HO2
+ M, N2, O2, O3, OH, NO3, HO2
       End Fixed
 
       Col-int
@@ -40,7 +41,8 @@ BEGSIM
         DST_A2, DST_A3
         SS_A1, SS_A2, SS_A3 , H2SO4
         SOA_NA, SOA_A1
-	     SOA_LV,SOA_SV, monoterp, isoprene
+	SOA_LV,SOA_SV, monoterp, isoprene
+        H2O
       End Implicit
    End Solution Classes
 
@@ -86,6 +88,7 @@ BEGSIM
           BC_N <-dataset
           OM_NI <-dataset
           SO4_PR <-dataset
+          H2O <- dataset
       End Ext Forcing
 
    END CHEMISTRY

@@ -48,6 +48,7 @@
       use cam_abortutils,    only: endrun
       use cam_logfile,       only: iulog
       use wei96,             only: gecmp, ReadCoef, EpotVal, adjust, get_tilt, SetModel
+      use solar_parms_data,  only: f107d=>solar_parms_f107
 
       implicit none
 
@@ -71,7 +72,6 @@
 !------------------------------------------------------------------------------ 
 ! solar parameters
 !------------------------------------------------------------------------------ 
-      real(r8) ::   f107d           ! 10.7 cm solar flux
       real(r8) ::   by              ! By component of IMF [nT]
       real(r8) ::   bz              ! Bz component of IMF [nT]
 !------------------------------------------------------------------------------ 
@@ -218,7 +218,6 @@
 !-----------------------------------------------------------------------
 
       use time_manager,   only : get_curr_calday, get_curr_date
-      use mo_solar_parms, only : solar_parms_get
       use mag_parms,      only : get_mag_parms
       use mo_apex,        only : geomag_year
 
@@ -239,10 +238,6 @@
 
       ut = tod/3600._r8                   ! UT of day [sec]
 
-!-----------------------------------------------------------------------
-! get solar parms
-!-----------------------------------------------------------------------
-      call solar_parms_get( f107_s = f107d )
 !-----------------------------------------------------------------------
 ! get mag parms
 !-----------------------------------------------------------------------

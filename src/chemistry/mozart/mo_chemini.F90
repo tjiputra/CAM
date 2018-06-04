@@ -77,8 +77,7 @@ contains
     use mo_strato_rates,   only : init_strato_rates
     use mo_cph,            only : init_cph
     use mo_sad,            only : sad_inti
-    use mo_solar_parms,    only : solar_parms_init, solar_parms_get
-    use euvac,             only : euvac_init, euvac_set_etf
+    use euvac,             only : euvac_init
     use mo_heatnirco2,     only : heatnirco2_init
     use mo_waccm_hrates,   only : init_hrates
     use mo_aurora,         only : aurora_inti
@@ -119,9 +118,13 @@ contains
     integer,          intent(in) :: srf_emis_fixed_ymd
     integer,          intent(in) :: srf_emis_fixed_tod
 
-    real(r8)          ::   f107
-    real(r8)          ::   f107a
     type(physics_buffer_desc), pointer :: pbuf2d(:,:)
+
+    !-----------------------------------------------------------------------
+    !	... initialize the implicit solver
+    !-----------------------------------------------------------------------
+    call imp_slv_inti()
+    call exp_sol_inti()
 
     call gas_phase_chemdr_inti()
 
@@ -203,32 +206,17 @@ contains
     !-----------------------------------------------------------------------
     ! 	... initialize photorate module
     !-----------------------------------------------------------------------
-    
-    call solar_parms_init ()
-
-    !-----------------------------------------------------------------------
-    ! 	... initialize the solar parameters module
-    !-----------------------------------------------------------------------
-    call solar_parms_get( f107_s = f107, f107a_s = f107a )
-    if (masterproc) write(iulog,*) 'chemini: f107,f107a = ',f107,f107a
 
     !-----------------------------------------------------------------------
     ! 	... initialize the euvac etf module
     !-----------------------------------------------------------------------
     call euvac_init (euvac_file)
-    call euvac_set_etf( f107, f107a )
 
     call photo_inti( xs_coef_file, xs_short_file, xs_long_file, rsf_file, &
          photon_file, electron_file, &
          exo_coldens_file, tuv_xsect_file, o2_xsect_file, xactive_prates )
 
     if (masterproc) write(iulog,*) 'chemini: after photo_inti on node ',iam
-
-    !-----------------------------------------------------------------------
-    !	... initialize the implicit solver
-    !-----------------------------------------------------------------------
-    call imp_slv_inti()
-    call exp_sol_inti()
 
     !-----------------------------------------------------------------------
     !       ... initialize the stratospheric ozone source

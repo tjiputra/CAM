@@ -1,5 +1,16 @@
   
   
+           |--------------------------------------------------------------------------------------------------|
+           |                                                                                                  |
+           |                                                                                                  |
+           |                              This is a mam-oslo simulation with :                                |
+           |                              (1)  comments to add                                                |
+           |                              (2)  comments to add                                                |
+           |                                                                                                  |
+           |                                                                                                  |
+           |--------------------------------------------------------------------------------------------------|
+  
+  
      Solution species
       (  1)  SO2             
       (  2)  H2SO4           
@@ -30,17 +41,17 @@
       ( 27)  SOA_SV             (C10H16O2)
       ( 28)  monoterp           (C10H16)
       ( 29)  isoprene           (C5H8)
+      ( 30)  H2O             
   
   
      Invariant species
       (  1)  M               
       (  2)  N2              
       (  3)  O2              
-      (  4)  H2O             
-      (  5)  O3              
-      (  6)  OH              
-      (  7)  NO3             
-      (  8)  HO2             
+      (  4)  O3              
+      (  5)  OH              
+      (  6)  NO3             
+      (  7)  HO2             
   
   
      Column integrals
@@ -81,6 +92,7 @@ Class List
       ( 27)  SOA_SV          
       ( 28)  monoterp        
       ( 29)  isoprene        
+      ( 30)  H2O             
   
      Photolysis
   jh2o2            (  1)   H2O2 + hv -> (No products)                                           rate = ** User defined **         (  1)
@@ -110,6 +122,7 @@ Extraneous prod/loss species
  ( 4)   BC_N   (dataset)
  ( 5)   OM_NI   (dataset)
  ( 6)   SO4_PR   (dataset)
+ ( 7)   H2O   (dataset)
   
   
  Equation Report
@@ -146,8 +159,4 @@ Extraneous prod/loss species
                     + .05*r11*OH*isoprene  + .05*r12*NO3*isoprene                                                       
     d(monoterp)/dt =  - r7*O3*monoterp  - r8*OH*monoterp  - r9*NO3*monoterp                                             
     d(isoprene)/dt =  - r10*O3*isoprene  - r11*OH*isoprene  - r12*NO3*isoprene                                          
-  
- ================================================
- CAM-Chem preprocessor has successfully completed
- ================================================
-  
+    d(H2O)/dt = r2*OH*H2O2                                                                                              

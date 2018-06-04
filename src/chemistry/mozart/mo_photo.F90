@@ -13,6 +13,7 @@ module mo_photo
   use spmd_utils,       only : masterproc
   use cam_logfile,      only : iulog
   use phys_control,     only : waccmx_is
+  use solar_parms_data, only : f107=>solar_parms_f107, f107a=>solar_parms_f107a
 
   implicit none
 
@@ -122,10 +123,9 @@ contains
     use mo_jshort,     only : jshort_init
     use mo_jeuv,       only : jeuv_init, neuv
     use phys_grid,     only : get_ncols_p, get_rlat_all_p    
-    use solar_data,    only : has_spectrum
+    use solar_irrad_data,only : has_spectrum
     use photo_bkgrnd,  only : photo_bkgrnd_init
     use cam_history,   only : addfld
-    use solar_euv_data,only : solar_euv_data_init
 
     implicit none
 
@@ -188,7 +188,7 @@ contains
     ! how to determine if shrt calc is needed ?? -- use top level pressure => waccm = true ? false
 
     if ( .not. has_spectrum ) then
-       write(iulog,*) 'photo_inti: solar_data file needs to contain irradiance spectrum'
+       write(iulog,*) 'photo_inti: solar_irrad_data file needs to contain irradiance spectrum'
        call endrun('photo_inti: ERROR -- solar irradiance spectrum is missing')
     endif
     
@@ -288,7 +288,6 @@ contains
 
     do_jshort = o_ndx>0 .and. o2_ndx>0 .and. (o3_ndx>0.or.o3_inv_ndx>0) .and. n2_ndx>0 .and. no_ndx>0
     
-    call solar_euv_data_init()
     call jeuv_init( photon_file, electron_file, euv_indexer )
     do_jeuv = any(euv_indexer(:)>0)
 
@@ -919,7 +918,7 @@ contains
           ! include background ionization ...
           ! outside daylight block so this is applied in all columns
           !-----------------------------------------------------------------
-          call photo_bkgrnd_calc( o_den, o2_den, n2_den, no_den, zint(i,:),&
+          call photo_bkgrnd_calc( f107, o_den, o2_den, n2_den, no_den, zint(i,:),&
                     photos(i,:,:), qbko1_out=qbko1(i,:), qbko2_out=qbko2(i,:), &
                     qbkn2_out=qbkn2(i,:), qbkn1_out=qbkn1(i,:), qbkno_out=qbkno(i,:) )
        endif
@@ -1654,12 +1653,10 @@ secant_in_bounds : &
   end subroutine setcol
 
   subroutine photo_timestep_init( calday )
-    use time_manager,   only : is_end_curr_day
     use euvac,          only : euvac_set_etf
-    use mo_solar_parms, only : solar_parms_get
     use mo_jshort,      only : jshort_timestep_init
     use mo_jlong,       only : jlong_timestep_init
-    use solar_euv_data, only : solar_euv_data_advance, solar_euv_data_active
+    use solar_euv_data, only : solar_euv_data_active
 
     !-----------------------------------------------------------------------------
     !	... setup the time interpolation
@@ -1676,14 +1673,9 @@ secant_in_bounds : &
     !	... local variables
     !-----------------------------------------------------------------------------
     integer :: m
-    real(r8) :: f107
-    real(r8) :: f107a
 
     if ( do_jeuv ) then
-       if (solar_euv_data_active) then
-          call solar_euv_data_advance()
-       else if( is_end_curr_day() ) then
-          call solar_parms_get( f107_s = f107, f107a_s = f107a )
+       if (.not.solar_euv_data_active) then
           call euvac_set_etf( f107, f107a )
        end if
     endif

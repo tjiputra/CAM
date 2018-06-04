@@ -84,7 +84,7 @@ module metdata
   real(r8), allocatable :: met_ps_next(:,:)   ! PS interpolated to next timestep
   real(r8), allocatable :: met_ps_curr(:,:)   ! PS interpolated to next timestep
 
-  logical :: met_cell_wall_winds = .false.  ! true => met data winds are cell centered
+  logical :: met_cell_wall_winds = .false.  ! true => met data winds are defined on model grid cell walls
   logical :: met_remove_file = .false.  ! delete metdata file when finished with it
 
   character(len=16) :: met_shflx_name = 'SHFLX'

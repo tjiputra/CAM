@@ -88,9 +88,10 @@ module cam_pio_utils
   end interface
 
   interface cam_pio_dump_field
-    module procedure dump_field_2d
-    module procedure dump_field_3d
-    module procedure dump_field_6d
+    module procedure dump_field_2d_d
+    module procedure dump_field_3d_d
+    module procedure dump_field_4d_d
+    module procedure dump_field_6d_d
   end interface
 
 contains
@@ -1192,11 +1193,11 @@ contains
     end do
   end subroutine find_dump_filename
 
-  subroutine dump_field_2d(fieldname, dim1b, dim1e, dim2b, dim2e, field,      &
-       compute_maxdim_in)
+  subroutine dump_field_2d_d(fieldname, dim1b, dim1e, dim2b, dim2e, field,    &
+       compute_maxdim_in, fill_value)
     use pio,            only: pio_offset_kind
     use pio,            only: pio_double, pio_int, pio_write_darray
-    use pio,            only: pio_initdecomp, pio_enddef
+    use pio,            only: pio_put_att, pio_initdecomp, pio_enddef
     use spmd_utils,     only: iam, npes, mpi_max, mpi_integer, mpicom
 
     ! Dummy arguments
@@ -1205,8 +1206,9 @@ contains
     integer,            intent(in)        :: dim1e
     integer,            intent(in)        :: dim2b
     integer,            intent(in)        :: dim2e
-    real(r8), target,   intent(in)       :: field(dim1b:dim1e,dim2b:dim2e)
+    real(r8), target,   intent(in)        :: field(dim1b:dim1e,dim2b:dim2e)
     logical,  optional, intent(in)        :: compute_maxdim_in
+    real(r8), optional, intent(in)        :: fill_value
 
     ! Local variables
     type(file_desc_t)                     :: file
@@ -1214,6 +1216,7 @@ contains
     type(var_desc_t)                      :: bnddesc
     type(io_desc_t)                       :: iodesc
     character(len=64)                     :: filename
+    real(r8)                              :: fillval
     integer(PIO_OFFSET_KIND), allocatable :: ldof(:)
     integer                               :: dimids(3)
     integer                               :: bnddimid
@@ -1231,6 +1234,12 @@ contains
       compute_maxdim = compute_maxdim_in
     else
       compute_maxdim = .true.
+    end if
+
+    if (present(fill_value)) then
+      fillval = fill_value
+    else
+      fillval = -900._r8
     end if
 
     ! Open the file for writing
@@ -1256,6 +1265,9 @@ contains
     call cam_pio_def_var(file, trim(fieldname), pio_double, dimids, vdesc)
     call cam_pio_def_var(file, 'field_bounds', pio_int,                   &
          (/ bnddimid, dimids(size(dimids, 1)) /), bnddesc)
+    if (present(fill_value)) then
+      ierr = pio_put_att(file, vdesc, '_FillValue', fill_value)
+    end if
     ierr = pio_enddef(file)
 
     ! Compute the variable decomposition and write field
@@ -1270,7 +1282,7 @@ contains
     end do
     call pio_initdecomp(pio_subsystem, PIO_DOUBLE, dimsizes, ldof, iodesc)
     call pio_write_darray(file, vdesc, iodesc,                                &
-         field(dim1b:dim1e,dim2b:dim2e), ierr, -900._r8)
+         field(dim1b:dim1e,dim2b:dim2e), ierr, fillval)
     call pio_freedecomp(file, iodesc)
     deallocate(ldof)
     ! Compute the bounds decomposition and write field bounds
@@ -1291,13 +1303,13 @@ contains
 
     ! All done
     call cam_pio_closefile(file)
-  end subroutine dump_field_2d
+  end subroutine dump_field_2d_d
 
-  subroutine dump_field_3d(fieldname, dim1b, dim1e, dim2b, dim2e,             &
-       dim3b, dim3e, field, compute_maxdim_in)
+  subroutine dump_field_3d_d(fieldname, dim1b, dim1e, dim2b, dim2e,           &
+       dim3b, dim3e, field, compute_maxdim_in, fill_value)
     use pio,            only: pio_offset_kind
     use pio,            only: pio_double, pio_int, pio_write_darray
-    use pio,            only: pio_initdecomp, pio_enddef
+    use pio,            only: pio_put_att, pio_initdecomp, pio_enddef
     use spmd_utils,     only: iam, npes, mpi_max, mpi_integer, mpicom
 
     ! Dummy arguments
@@ -1310,6 +1322,7 @@ contains
     integer,            intent(in)        :: dim3e
     real(r8), target,   intent(in)        :: field(dim1b:dim1e,dim2b:dim2e,dim3b:dim3e)
     logical,  optional, intent(in)        :: compute_maxdim_in
+    real(r8), optional, intent(in)        :: fill_value
 
     ! Local variables
     type(file_desc_t)                     :: file
@@ -1317,6 +1330,7 @@ contains
     type(var_desc_t)                      :: bnddesc
     type(io_desc_t)                       :: iodesc
     character(len=64)                     :: filename
+    real(r8)                              :: fillval
     integer(PIO_OFFSET_KIND), allocatable :: ldof(:)
     integer                               :: dimids(4)
     integer                               :: bnddimid
@@ -1334,6 +1348,12 @@ contains
       compute_maxdim = compute_maxdim_in
     else
       compute_maxdim = .true.
+    end if
+
+    if (present(fill_value)) then
+      fillval = fill_value
+    else
+      fillval = -900._r8
     end if
 
     ! Open the file for writing
@@ -1362,6 +1382,7 @@ contains
     call cam_pio_def_var(file, trim(fieldname), pio_double, dimids, vdesc)
     call cam_pio_def_var(file, 'field_bounds', pio_int,                   &
          (/ bnddimid, dimids(size(dimids, 1)) /), bnddesc)
+    ierr = pio_put_att(file, vdesc, '_FillValue', fillval)
     ierr = pio_enddef(file)
 
     ! Compute the variable decomposition
@@ -1379,7 +1400,7 @@ contains
     end do
     call pio_initdecomp(pio_subsystem, PIO_DOUBLE, dimsizes, ldof, iodesc)
     call pio_write_darray(file, vdesc, iodesc,                                &
-         field(dim1b:dim1e,dim2b:dim2e,dim3b:dim3e), ierr, -900._r8)
+         field(dim1b:dim1e,dim2b:dim2e,dim3b:dim3e), ierr, fillval)
     call pio_freedecomp(file, iodesc)
     deallocate(ldof)
     ! Compute the bounds decomposition and write field bounds
@@ -1402,12 +1423,143 @@ contains
 
     ! All done
     call cam_pio_closefile(file)
-  end subroutine dump_field_3d
+  end subroutine dump_field_3d_d
 
-  subroutine dump_field_6d(fieldname, dimbs, dimes, field, compute_maxdim_in)
+  subroutine dump_field_4d_d(fieldname, dim1b, dim1e, dim2b, dim2e,           &
+       dim3b, dim3e, dim4b, dim4e, field, compute_maxdim_in, fill_value)
     use pio,            only: pio_offset_kind
     use pio,            only: pio_double, pio_int, pio_write_darray
-    use pio,            only: pio_initdecomp, pio_enddef
+    use pio,            only: pio_put_att, pio_initdecomp, pio_enddef
+    use spmd_utils,     only: iam, npes, mpi_max, mpi_integer, mpicom
+
+    ! Dummy arguments
+    character(len=*),   intent(in)        :: fieldname 
+    integer,            intent(in)        :: dim1b
+    integer,            intent(in)        :: dim1e
+    integer,            intent(in)        :: dim2b
+    integer,            intent(in)        :: dim2e
+    integer,            intent(in)        :: dim3b
+    integer,            intent(in)        :: dim3e
+    integer,            intent(in)        :: dim4b
+    integer,            intent(in)        :: dim4e
+    real(r8), target,   intent(in)        :: field(dim1b:dim1e,dim2b:dim2e,dim3b:dim3e,dim4b:dim4e)
+    logical,  optional, intent(in)        :: compute_maxdim_in
+    real(r8), optional, intent(in)        :: fill_value
+
+    ! Local variables
+    type(file_desc_t)                     :: file
+    type(var_desc_t)                      :: vdesc
+    type(var_desc_t)                      :: bnddesc
+    type(io_desc_t)                       :: iodesc
+    character(len=64)                     :: filename
+    real(r8)                              :: fillval
+    integer(PIO_OFFSET_KIND), allocatable :: ldof(:)
+    integer                               :: dimids(5)
+    integer                               :: bnddimid
+    integer                               :: bounds(8)
+    integer                               :: dimsizes(5)
+    integer                               :: ierr
+    integer                               :: i, j, k, l, m, lsize
+    logical                               :: compute_maxdim
+
+    ! Find an unused filename for this variable
+    call find_dump_filename(fieldname, filename)
+
+    ! Should we compute max dim sizes or assume they are all the same?
+    if (present(compute_maxdim_in)) then
+      compute_maxdim = compute_maxdim_in
+    else
+      compute_maxdim = .true.
+    end if
+
+    if (present(fill_value)) then
+      fillval = fill_value
+    else
+      fillval = -900._r8
+    end if
+
+    ! Open the file for writing
+    call cam_pio_createfile(file, trim(filename))
+
+    ! Define dimensions
+    if (compute_maxdim) then
+      call MPI_allreduce((dim1e - dim1b + 1), dimsizes(1), 1, MPI_integer,    &
+           mpi_max, mpicom, ierr)
+      call MPI_allreduce((dim2e - dim2b + 1), dimsizes(2), 1, MPI_integer,    &
+           mpi_max, mpicom, ierr)
+      call MPI_allreduce((dim3e - dim3b + 1), dimsizes(3), 1, MPI_integer,    &
+           mpi_max, mpicom, ierr)
+      call MPI_allreduce((dim4e - dim4b + 1), dimsizes(4), 1, MPI_integer,    &
+           mpi_max, mpicom, ierr)
+    else
+      dimsizes(1) = dim1e - dim1b + 1
+      dimsizes(2) = dim2e - dim2b + 1
+      dimsizes(3) = dim3e - dim3b + 1
+      dimsizes(4) = dim4e - dim4b + 1
+    end if
+    dimsizes(5) = npes
+    do i = 1, size(dimids, 1)
+      write(filename, '(a,i0)') 'dim', i
+      call cam_pio_def_dim(file, trim(filename), dimsizes(i), dimids(i))
+    end do
+    call cam_pio_def_dim(file, 'bounds', size(bounds, 1), bnddimid)
+    ! Define the variables
+    call cam_pio_def_var(file, trim(fieldname), pio_double, dimids, vdesc)
+    call cam_pio_def_var(file, 'field_bounds', pio_int,                   &
+         (/ bnddimid, dimids(size(dimids, 1)) /), bnddesc)
+    ierr = pio_put_att(file, vdesc, '_FillValue', fillval)
+    ierr = pio_enddef(file)
+
+    ! Compute the variable decomposition
+    lsize = product(dimsizes(1:4))
+    allocate(ldof((dim4e-dim4b+1) * (dim3e-dim3b+1) * (dim2e-dim2b+1) * (dim1e-dim1b+1)))
+    m = 0
+    do l = dim4b, dim4e
+      do k = dim3b, dim3e
+        do j = dim2b, dim2e
+          do i = dim1b, dim1e
+            m = m + 1
+            ldof(m) = (iam * lsize) + (i - dim1b + 1) +                       &
+                 (dimsizes(1)*((j - dim2b) +                                  &
+                 (dimsizes(2)*((k - dim3b) + dimsizes(3)*(l - dim4b)))))
+          end do
+        end do
+      end do
+    end do
+    call pio_initdecomp(pio_subsystem, PIO_DOUBLE, dimsizes, ldof, iodesc)
+    call pio_write_darray(file, vdesc, iodesc,                                &
+         field(dim1b:dim1e,dim2b:dim2e,dim3b:dim3e,dim4b:dim4e), ierr, fillval)
+    call pio_freedecomp(file, iodesc)
+    deallocate(ldof)
+    ! Compute the bounds decomposition and write field bounds
+    bounds(1) = dim1b
+    bounds(2) = dim1e
+    bounds(3) = dim2b
+    bounds(4) = dim2e
+    bounds(5) = dim3b
+    bounds(6) = dim3e
+    bounds(7) = dim4b
+    bounds(8) = dim4e
+    dimsizes(1) = size(bounds, 1)
+    dimsizes(2) = npes
+    allocate(ldof(size(bounds, 1)))
+    do i = 1, size(bounds, 1)
+      ldof(i) = (iam * size(bounds, 1)) + i
+    end do
+    call pio_initdecomp(pio_subsystem, PIO_INT, dimsizes(1:2), ldof, iodesc)
+    call pio_write_darray(file, bnddesc, iodesc, bounds, ierr, -900)
+    call pio_freedecomp(file, iodesc)
+    deallocate(ldof)
+
+    ! All done
+    call cam_pio_closefile(file)
+  end subroutine dump_field_4d_d
+
+  subroutine dump_field_6d_d(fieldname, dimbs, dimes, field,                  &
+       compute_maxdim_in, fill_value)
+    use pio,            only: pio_offset_kind
+    use pio,            only: pio_double, pio_int, pio_write_darray
+    use pio,            only: pio_put_att, pio_initdecomp, pio_enddef
     use spmd_utils,     only: iam, npes, mpi_max, mpi_integer, mpicom
 
     ! Dummy arguments
@@ -1416,6 +1568,7 @@ contains
     integer,            intent(in)        :: dimes(:)
     real(r8), target,   intent(in)        :: field(:,:,:,:,:,:)
     logical,  optional, intent(in)        :: compute_maxdim_in
+    real(r8), optional, intent(in)        :: fill_value
 
     ! Local variables
     type(file_desc_t)                     :: file
@@ -1423,6 +1576,7 @@ contains
     type(var_desc_t)                      :: bnddesc
     type(io_desc_t)                       :: iodesc
     character(len=64)                     :: filename
+    real(r8)                              :: fillval
     integer(PIO_OFFSET_KIND), allocatable :: ldof(:)
     integer                               :: dimids(7)
     integer                               :: bnddimid
@@ -1441,6 +1595,12 @@ contains
       compute_maxdim = compute_maxdim_in
     else
       compute_maxdim = .true.
+    end if
+
+    if (present(fill_value)) then
+      fillval = fill_value
+    else
+      fillval = -900._r8
     end if
 
     ! Open the file for writing
@@ -1467,6 +1627,7 @@ contains
     call cam_pio_def_var(file, 'field_bounds', pio_int,                   &
          (/ bnddimid, dimids(size(dimids, 1)) /), bnddesc)
     call cam_pio_def_var(file, trim(fieldname), pio_double, dimids, vdesc)
+    ierr = pio_put_att(file, vdesc, '_FillValue', fillval)
     ierr = pio_enddef(file)
 
     ! Compute the variable decomposition
@@ -1502,7 +1663,7 @@ contains
     call pio_initdecomp(pio_subsystem, PIO_DOUBLE, dimsizes, ldof, iodesc)
     call pio_write_darray(file, vdesc, iodesc,                                &
          field(dimbs(1):dimes(1),dimbs(2):dimes(2),dimbs(3):dimes(3),         &
-         dimbs(4):dimes(4),dimbs(5):dimes(5),dimbs(6):dimes(6)), ierr, -900._r8)
+         dimbs(4):dimes(4),dimbs(5):dimes(5),dimbs(6):dimes(6)), ierr, fillval)
     call pio_freedecomp(file, iodesc)
     deallocate(ldof)
     ! Compute the bounds decomposition and write field bounds
@@ -1526,6 +1687,6 @@ contains
     ! All done
     call cam_pio_closefile(file)
 
-  end subroutine dump_field_6d
+  end subroutine dump_field_6d_d
 
 end module cam_pio_utils

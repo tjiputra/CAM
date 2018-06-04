@@ -51,8 +51,7 @@ module wei05sc
   real(r8) :: bndya(na), bndyb(nb), ex_bndy(nex), ex_epot(nex),ex_bpot(nex)
   real(r8) :: th0s(n3_scha), allnkm(n1_scha,n2_scha,n3_scha)
   integer :: ab(csize), ls(csize), ms(csize)
-  real(r8) :: epot_alschfits(n_alschfits,csize),&
-    bpot_alschfits(n_alschfits,csize)
+  real(r8) :: epot_alschfits(n_alschfits,csize), bpot_alschfits(n_alschfits,csize)
   real(r8) :: bpot_schfits(n_schfits,csize),epot_schfits(n_schfits,csize)
 !
 ! Intermediate calculations:
@@ -76,15 +75,40 @@ module wei05sc
 ! (dpie_coupling calls the weimer05 driver, but efield calls the individual
 !  routines, not the driver)
 !
-  public :: weimer05,read_wei05_ncfile
+  public :: weimer05
+  public :: weimer05_init
+
 #endif
   public :: ctpoten_weimer
 
   real(r8),protected :: ctpoten_weimer = huge(1.0_r8)
 
   contains
+
 !-----------------------------------------------------------------------
-  subroutine weimer05(by,bz,swvel,swden,sunlons,wei05_ncfile,ctpoten_out)
+  subroutine weimer05_init(wei05_ncfile)
+    use infnan, only: nan, assignment(=)
+
+    character(len=*),intent(in) :: wei05_ncfile
+
+    ctpoten_weimer = nan
+    bndya = nan
+    bndyb = nan
+    ex_bndy = nan
+    ex_bpot = nan
+    th0s = nan
+    allnkm = nan
+    bpot_schfits = nan
+    bpot_alschfits = nan
+
+    if (wei05_ncfile.ne.'NONE') then
+      call read_wei05_ncfile(wei05_ncfile)
+    endif
+
+  end subroutine weimer05_init
+
+!-----------------------------------------------------------------------
+  subroutine weimer05(by,bz_in,swvel,swden,sunlons,ctpoten_out)
 !
 ! 9/16/15 btf: Driver to call Weimer 2005 model for waccm[x].
 !
@@ -100,9 +124,7 @@ module wei05sc
   implicit none
 !
 ! Args:
-  real(r8),intent(in) :: by,swvel,swden
-  real(r8),intent(inout) :: bz
-  character(len=*),intent(in) :: wei05_ncfile
+  real(r8),intent(in) :: bz_in,by,swvel,swden
   real(r8),intent(in) :: sunlons(:)
   real(r8),intent(out) :: ctpoten_out  ! Cross-tail potential output
 #ifdef WACCMX_IONOS
@@ -115,8 +137,9 @@ module wei05sc
   real(r8),parameter :: fill=0._r8
   integer :: iyear,imon,iday,isecs
   logical :: debug = .false.
-  logical,save :: first=.true.
+  real(r8) :: bz
 
+  bz = bz_in
   pi = 4._r8*atan(1._r8)
   rtd = 180._r8/pi       ! radians to degrees
 !
@@ -134,18 +157,11 @@ module wei05sc
   if (by==0._r8.and.bz==0._r8) then
     write(iulog,"(/,'>>> WARNING: by and bz cannot both be zero',&
       ' when calling the Weimer model: am setting bz=0.01')")
-    bz = 0.01_r8 ! note intent(inout) above
+    bz = 0.01_r8
   endif
 !
   bt = sqrt(by**2+bz**2)
   angl = atan2(by,bz)*rtd
-!
-! Read netcdf data file if this is first step:
-!
-  if (first) then
-    call read_wei05_ncfile(wei05_ncfile)
-    first = .false.
-  endif
 !
 ! Convert from day-of-year to month,day and get tilt from date and ut:
 !

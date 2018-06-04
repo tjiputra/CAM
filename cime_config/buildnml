@@ -112,7 +112,7 @@ def buildnml(case, caseroot, compname):
                 ncdata = create_ic_filename('', 'i')
             infile_lines.append(" ncdata = '" + ncdata + "'")
             if ninst > 1:
-                logger.debug("%s is being used for ncdata" % ncdata)
+                logger.info("%s is being used for ncdata" % ncdata)
 
         if RUN_TYPE == 'branch':
             cam_branch_file = create_ic_filename(inst_string, 'r')
@@ -121,7 +121,7 @@ def buildnml(case, caseroot, compname):
                 cam_branch_file = create_ic_filename('', 'r')
             infile_lines.append(" cam_branch_file = '" + cam_branch_file + "'")
             if ninst > 1:
-                logger.debug("%s is being used for cam_branch_file" % cam_branch_file)
+                logger.info("%s is being used for cam_branch_file" % cam_branch_file)
 
         dtime = ( 3600 * 24 ) / int(atm_ncpl)
         infile_lines.append(" dtime = " + str(dtime))
@@ -178,7 +178,7 @@ def buildnml(case, caseroot, compname):
             file2 = os.path.join(rundir, "atm_in")
             if ninst > 1:
                 file2 += inst_string
-            logger.debug("CAM namelist copy: file1 %s file2 %s " %(file1, file2))
+            logger.info("CAM namelist copy: file1 %s file2 %s " %(file1, file2))
             shutil.copy(file1,file2)
 
         # -----------------------------------------------------

@@ -6,7 +6,7 @@
 <aerodep_flx_type>'SERIAL'</aerodep_flx_type>
 
 <!-- Solar data from Lean (via Caspar Ammann) -->
-<solar_data_file>atm/cam/solar/spectral_irradiance_Lean_1950-2140_daily_c100804.nc</solar_data_file>
+<solar_irrad_data_file>atm/cam/solar/spectral_irradiance_Lean_1950-2140_daily_c100804.nc</solar_irrad_data_file>
 
 <!-- Solar Proton Events -->
 <epp_spe_filepath>atm/waccm/solar/spe_data_1963-2140_c100823.nc</epp_spe_filepath>
@@ -68,7 +68,7 @@
 <srf_emis_type>'SERIAL'</srf_emis_type>
 
 <!-- Kp Ap indices -->
-<solar_parms_file>atm/waccm/solar/wasolar_1948-2140_daily_c120306.nc</solar_parms_file>
+<solar_parms_data_file>atm/waccm/solar/wasolar_1948-2140_daily_c120306.nc</solar_parms_data_file>
 
 <!-- History Files -->
 

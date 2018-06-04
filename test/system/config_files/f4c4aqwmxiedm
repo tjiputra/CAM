@@ -6,6 +6,6 @@
 -ionosphere wxie
 -esmf_libdir /home/fvitt/esmf/lib/libg/Linux.nag.64.mvapich2.default
 -dyn fv
--res 4x5
+-hgrid 4x5
 -debug
 -s

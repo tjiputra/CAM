@@ -168,6 +168,11 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
    real(r8), intent(out) ::   &
       ptk(grid%im,grid%jfirst:grid%jlast,grid%kfirst:grid%klast)
 
+!+diag 3/7/2017 local array
+   real(r8)                ::   &
+      ucc(grid%im,grid%jfirst-grid%ng_d:grid%jlast+grid%ng_d,grid%kfirst:grid%klast)   ! u-Winds correction
+!-diag
+
 ! C.-C. Chen, omega calculation
    real(r8), intent(out) ::   &
       cx_om(grid%im,grid%jfirst:grid%jlast,grid%kfirst:grid%klast)   ! Courant in X
@@ -229,7 +234,7 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
    integer :: npes_yz
 
    integer i, j, k, ml
-   integer js1g1, js2g0, js2g1, jn2g1  ,js4g0,jn3g0
+   integer js1g1, js2g0, js2g1, jn2g1 ,js4g0 ,jn3g0 
    integer jn2g0, jn1g1
    integer iord , jord
 
@@ -290,6 +295,10 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
    real(r8) :: ptr(grid%im,grid%jfirst-1:grid%jlast+1,grid%kfirst:grid%klast+1)
 
    logical :: sw_am_corr
+
+!+tht 12.10.2017
+   real(r8) tpr
+!-tht 12.10.2017
 
    !******************************************************************
    !******************************************************************
@@ -407,6 +416,10 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
          dpns(grid%jfirst:grid%jlast,grid%kfirst:grid%klast), &
          ddus(grid%jfirst:grid%jlast,grid%kfirst:grid%klast) )
       xakap      = 1._r8/cap3vc(1,jfirst,kfirst)
+!+tht 04.07.2017
+      ddus = 0._r8
+      ucc  = 0._r8
+!-tht 04.07.2017
    else
       xakap      = 1._r8
    endif
@@ -454,6 +467,7 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
       jn2g0  = min(jm-1,jlast)
       jn1g1  = min(jm,jlast+1)
       jn2g1 = min(jm-1,jlast+1)
+
       js4g0  = max(4,jfirst)
       jn3g0  = min(jm-2,jlast)
 
@@ -1309,7 +1323,7 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
                end do
             end do
          end do
- 
+
          if (am_correction) then 
 !$omp parallel do private(i, j, k) 
             do k = kfirst, klast
@@ -1341,6 +1355,11 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
                      dpns(j,k) = dpns(j,k) + dpn(i,j,k)
                   end do
                   ddus(j,k) = ddus(j,k)/dpns(j,k)  
+!+tht 12.10.2017 taper beyond 72S/N
+                  tpr = max(abs(-2.5_r8 + ((j-1)-0.5_r8)*(5._r8/(jm-1))),2._r8)
+                  tpr = cos(pi*tpr)**2
+                  ddus(j,k)=ddus(j,k)*tpr
+!-tht 12.10.2017
                end do
             end do
 
@@ -1349,6 +1368,9 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
                do j = js4g0, jn3g0
                   do i = 1, im !+++++++++++++++++++++++++++++++++++++++++++++
                      uc(i,j,k) = uc(i,j,k) + ddus(j,k) !  APPLY AM CORRECTION
+!+tht correction diagnostic
+                     ucc(i,j,k)= ddus(j,k)
+!-tht
                   enddo        !+++++++++++++++++++++++++++++++++++++++++++++
                enddo
             enddo
@@ -1912,6 +1934,15 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
             wk3(im,j) = uc(im,j,k)  +  grid%dtdxe(j)/(wk(im,j) + wk(1,j))       &
                         * (wk2(im,j)-wk2(1,j)+wz3(im,j,k+1)-wz3(im,j,k))
          end do
+
+!+tht replace in output adv.tend. diag with correction diag 3/7/2017
+        !do j = js2g0, jlast
+        !   do i = 1, im-1
+        !      uc(i,j,k) = ucc(i,j,k)
+        !   end do
+        !   uc(im,j,k) = ucc(im,j,k)
+        !end do
+!-tht
 
          if (am_correction) then
             ! apply cos-weighted avg'ing

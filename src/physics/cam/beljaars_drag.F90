@@ -111,8 +111,8 @@ contains
     k1    = 0.003_r8    ! m-1
     IH    = 0.00102_r8  ! m-1
 
-    a1    = (sgh*sgh) / ( IH* (kflt**n1) )
-    a2    = a1 * k1**(n1-n2)
+    a1(1:ncol)    = (sgh(1:ncol)*sgh(1:ncol)) / ( IH* (kflt**n1) )
+    a2(1:ncol)    = a1(1:ncol) * k1**(n1-n2)
 
 
     ! ----------------------- !

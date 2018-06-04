@@ -190,11 +190,7 @@ subroutine cldfrc_init
    ! Initialize cloud fraction run-time parameters
 
    use cam_history,   only:  addfld
-   use dycore,        only:  get_resolution
    use phys_control,  only:  phys_getopts
-
-   ! horizontal grid specifier
-   character(len=32) :: hgrid
 
    ! query interfaces for scheme settings
    character(len=16) :: shallow_scheme, eddy_scheme, macrop_scheme
@@ -208,8 +204,6 @@ subroutine cldfrc_init
 
    ! Limit CAM5 cloud physics to below top cloud level.
    if ( .not. (macrop_scheme == "rk" .or. macrop_scheme == "SPCAM_sam1mom")) top_lev = trop_cloud_top_lev
-
-   hgrid = get_resolution()
 
    ! Turn off inversion_cld if any UW PBL scheme is being used
    if ( (eddy_scheme .eq. 'diag_TKE' ) .or. (shallow_scheme .eq.  'UW' ) .or.&

@@ -330,7 +330,7 @@ subroutine vertical_diffusion_init(pbuf2d)
      ! Get the constituent indices of the number and mass mixing ratios of the modal
      ! aerosols.
      !
-     ! N.B. - This implementation assumes that the prognostic modal aerosols are 
+     ! N.B. - This implementation assumes that the prognostic modal aerosols are
      !        impacting the climate calculation (i.e., can get info from list 0).
      !
 #ifndef OSLO_AERO
@@ -819,7 +819,7 @@ subroutine vertical_diffusion_tend( &
   ! Upper boundary conditions
   real(r8) :: ubc_t(pcols)            ! Temperature [ K ]
   real(r8) :: ubc_mmr(pcols,pcnst)    ! Mixing ratios [ kg/kg ]
-  real(r8) :: ubc_flux(pcols,pcnst)  ! Constituent flux [ kg/s/m^2 ]
+  real(r8) :: ubc_flux(pcols,pcnst)   ! Constituent upper boundary flux (kg/s/m^2)
 
   ! Pressure coordinates used by the solver.
   type(Coords1D) :: p
@@ -1018,10 +1018,8 @@ subroutine vertical_diffusion_tend( &
 
      call calc_ustar( ncol, state%t(:ncol,pver), state%pmid(:ncol,pver), &
           cam_in%wsx(:ncol), cam_in%wsy(:ncol), rrho(:ncol), ustar(:ncol))
-!++ag Use actual qflux, not lhf/latvap
-!     call calc_obklen( ncol, th(:ncol,pver), thvs(:ncol), cam_in%lhf(:ncol)/latvap, &  ! beta07
-     call calc_obklen( ncol, th(:ncol,pver), thvs(:ncol), cam_in%cflx(:ncol,1), &       ! beta08
-!--ag
+     ! Use actual qflux, not lhf/latvap as was done previously
+     call calc_obklen( ncol, th(:ncol,pver), thvs(:ncol), cam_in%cflx(:ncol,1), &
           cam_in%shf(:ncol), rrho(:ncol), ustar(:ncol),  &
           khfs(:ncol), kqfs(:ncol), kbfs(:ncol), obklen(:ncol))
 

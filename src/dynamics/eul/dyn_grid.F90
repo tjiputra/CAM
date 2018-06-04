@@ -1,10 +1,10 @@
 module dyn_grid
-!----------------------------------------------------------------------- 
-! 
+!-----------------------------------------------------------------------
+!
 ! Define grid and decomposition for Eulerian spectral dynamics.
 !
 ! Original code: John Drake and Patrick Worley
-! 
+!
 !-----------------------------------------------------------------------
 
 use shr_kind_mod,     only: r8 => shr_kind_r8
@@ -12,7 +12,7 @@ use pmgrid,           only: plat, plev, plon, plevp
 use physconst,        only: rair, rearth, ra
 use spmd_utils,       only: masterproc, iam
 
-use pio,              only: file_desc_t, pio_inq_dimid, pio_inq_dimlen
+use pio,              only: file_desc_t
 use cam_initfiles,    only: initial_file_get_id
 
 use cam_abortutils,   only: endrun
@@ -48,7 +48,7 @@ public :: &
    get_horiz_grid_d,         &! horizontal grid coordinates
    get_horiz_grid_dim_d,     &! horizontal dimensions of dynamics grid
    physgrid_copy_attributes_d
-   
+
 ! The Eulerian dynamics grids
 integer, parameter, public :: dyn_decomp       = 101
 
@@ -79,12 +79,6 @@ subroutine dyn_grid_init
 
    ! Local variables
    type(file_desc_t), pointer :: fh_ini
-
-   integer :: ierr
-   integer :: lonid
-   integer :: latid
-   integer :: mlon             ! longitude dimension length from dataset
-   integer :: morec            ! latitude dimension length from dataset
 
    real(r8) zsi(plat)      ! sine of latitudes
    real(r8) zw(plat)       ! Gaussian weights
@@ -117,26 +111,15 @@ subroutine dyn_grid_init
    character(len=*), parameter :: sub='dyn_grid_init'
    !-----------------------------------------------------------------------
 
-   ! Get file handle for initial file and first consistency check
+   ! File handle for initial file.  Needed for vertical coordinate data.
    fh_ini => initial_file_get_id()
-
-   ierr = pio_inq_dimid(fh_ini, 'lon' , lonid)
-   ierr = pio_inq_dimid(fh_ini, 'lat' , latid)
-   ierr = pio_inq_dimlen(fh_ini, lonid , mlon)
-   ierr = pio_inq_dimlen(fh_ini, latid , morec)
-   if (.not. single_column .and. (mlon /= plon .or. morec /= plat)) then
-       write(iulog,*) sub//': ERROR: model parameters do not match initial dataset parameters'
-       write(iulog,*)'Model Parameters:    plon = ',plon,' plat = ',plat
-       write(iulog,*)'Dataset Parameters:  dlon = ',mlon,' dlat = ',morec
-       call endrun(sub//': ERROR: model parameters do not match initial dataset parameters')
-    end if
 
    ! Compute truncation parameters
    call trunc()
 
 #if (defined SPMD)
    call spmdinit_dyn()
-#endif 
+#endif
 
    ! Initialize hybrid coordinate arrays
    call hycoef_init(fh_ini)
@@ -195,7 +178,7 @@ subroutine dyn_grid_init
    end do
 
    ! Reference hydrostatic integration matrix consistent with conversion
-   ! term for energy conservation.  In href, 1st index = column; 
+   ! term for energy conservation.  In href, 1st index = column;
    ! 2nd index = row of matrix.
 
    do k = 1, plev
@@ -330,15 +313,15 @@ end subroutine dyn_grid_init
 
    subroutine get_block_bounds_d(block_first,block_last)
 
-!----------------------------------------------------------------------- 
-! 
-!                          
+!-----------------------------------------------------------------------
+!
+!
 ! Purpose: Return first and last indices used in global block ordering
-! 
-! Method: 
-! 
+!
+! Method:
+!
 ! Author: Patrick Worley
-! 
+!
 !-----------------------------------------------------------------------
    use pmgrid, only: plat
 
@@ -360,15 +343,15 @@ end subroutine dyn_grid_init
 !
    subroutine get_block_gcol_d(blockid,size,cdex)
 
-!----------------------------------------------------------------------- 
-! 
-!                          
+!-----------------------------------------------------------------------
+!
+!
 ! Purpose: Return list of dynamics column indices in given block
-! 
-! Method: 
-! 
+!
+! Method:
+!
 ! Author: Patrick Worley
-! 
+!
 !-----------------------------------------------------------------------
    use pmgrid,     only: plat, plon
 
@@ -403,15 +386,15 @@ end subroutine dyn_grid_init
 !
    integer function get_block_gcol_cnt_d(blockid)
 
-!----------------------------------------------------------------------- 
-! 
-!                          
+!-----------------------------------------------------------------------
+!
+!
 ! Purpose: Return number of dynamics columns in indicated block
-! 
-! Method: 
-! 
+!
+! Method:
+!
 ! Author: Patrick Worley
-! 
+!
 !-----------------------------------------------------------------------
    use pmgrid, only: plon
 
@@ -431,17 +414,17 @@ end subroutine dyn_grid_init
 !
    integer function get_block_lvl_cnt_d(blockid,bcid)
 
-!----------------------------------------------------------------------- 
-! 
-!                          
+!-----------------------------------------------------------------------
+!
+!
 ! Purpose: Return number of levels in indicated column. If column
 !          includes surface fields, then it is defined to also
 !          include level 0.
-! 
-! Method: 
-! 
+!
+! Method:
+!
 ! Author: Patrick Worley
-! 
+!
 !-----------------------------------------------------------------------
 
    implicit none
@@ -460,17 +443,17 @@ end subroutine dyn_grid_init
 !
    subroutine get_block_levels_d(blockid, bcid, lvlsiz, levels)
 
-!----------------------------------------------------------------------- 
-! 
-!                          
+!-----------------------------------------------------------------------
+!
+!
 ! Purpose: Return level indices in indicated column. If column
 !          includes surface fields, then it is defined to also
 !          include level 0.
-! 
-! Method: 
-! 
+!
+! Method:
+!
 ! Author: Patrick Worley
-! 
+!
 !-----------------------------------------------------------------------
 
    implicit none
@@ -507,16 +490,16 @@ end subroutine dyn_grid_init
 !
    subroutine get_gcol_block_d(gcol,cnt,blockid,bcid,localblockid)
 
-!----------------------------------------------------------------------- 
-! 
-!                          
+!-----------------------------------------------------------------------
+!
+!
 ! Purpose: Return global block index and local column index
 !          for global column index
-! 
-! Method: 
-! 
+!
+! Method:
+!
 ! Author: Patrick Worley
-! 
+!
 !-----------------------------------------------------------------------
    use pmgrid,     only: plat, plon
 
@@ -553,16 +536,16 @@ end subroutine dyn_grid_init
 !
    integer function get_gcol_block_cnt_d(gcol)
 
-!----------------------------------------------------------------------- 
-! 
-!                          
+!-----------------------------------------------------------------------
+!
+!
 ! Purpose: Return number of blocks contain data for the vertical column
 !          with the given global column index
-! 
-! Method: 
-! 
+!
+! Method:
+!
 ! Author: Patrick Worley
-! 
+!
 !-----------------------------------------------------------------------
 
    implicit none
@@ -579,15 +562,15 @@ end subroutine dyn_grid_init
 !
    integer function get_block_owner_d(blockid)
 
-!----------------------------------------------------------------------- 
-! 
-!                          
+!-----------------------------------------------------------------------
+!
+!
 ! Purpose: Return id of processor that "owns" the indicated block
-! 
-! Method: 
-! 
+!
+! Method:
+!
 ! Author: Patrick Worley
-! 
+!
 !-----------------------------------------------------------------------
 #if ( defined SPMD )
    use spmd_dyn, only: proc
@@ -612,17 +595,17 @@ end subroutine dyn_grid_init
 !
    subroutine get_horiz_grid_dim_d(hdim1_d,hdim2_d)
 
-!----------------------------------------------------------------------- 
-! 
-!                          
+!-----------------------------------------------------------------------
+!
+!
 ! Purpose: Returns declared horizontal dimensions of computational grid.
 !          Note that global column ordering is assumed to be compatible
 !          with the first dimension major ordering of the 2D array.
-! 
-! Method: 
-! 
+!
+! Method:
+!
 ! Author: Patrick Worley
-! 
+!
 !-----------------------------------------------------------------------
    use pmgrid,     only: plat, plon
 
@@ -644,17 +627,17 @@ end subroutine dyn_grid_init
    subroutine get_horiz_grid_d(size,clat_d_out,clon_d_out,area_d_out, &
                                wght_d_out,lat_d_out,lon_d_out)
 
-!----------------------------------------------------------------------- 
-! 
-!                          
+!-----------------------------------------------------------------------
+!
+!
 ! Purpose: Return latitude and longitude (in radians), column surface
 !          area (in radians squared) and surface integration weights
 !          for global column indices that will be passed to/from physics
-! 
-! Method: 
-! 
+!
+! Method:
+!
 ! Author: Patrick Worley
-! 
+!
 !-----------------------------------------------------------------------
    use pmgrid,        only: plat, plon
    use commap,        only: clat, clon, londeg, latdeg, w
@@ -665,7 +648,7 @@ end subroutine dyn_grid_init
 
    real(r8), intent(out), optional :: clat_d_out(size) ! column latitudes
    real(r8), intent(out), optional :: clon_d_out(size) ! column longitudes
-   real(r8), intent(out), optional :: area_d_out(size) ! column surface 
+   real(r8), intent(out), optional :: area_d_out(size) ! column surface
                                                        !  area
    real(r8), intent(out), optional :: wght_d_out(size) ! column integration
                                                        !  weight
@@ -738,8 +721,8 @@ end subroutine dyn_grid_init
        n = 0
        do j = 1,plat
 
-          ! First, determine vertices of each grid point. 
-          ! Verticies are ordered as follows: 
+          ! First, determine vertices of each grid point.
+          ! Verticies are ordered as follows:
           ! ns_vert: 1=lower left, 2 = upper left
           ! ew_vert: 1=lower left, 2 = lower right
 
@@ -750,7 +733,7 @@ end subroutine dyn_grid_init
           else
              ns_vert(1,:plon) = (latdeg(j) + latdeg(j-1) )*0.5_r8
           end if
-          
+
           if (j .eq. plat) then
              ns_vert(2,:plon) =  90.0_r8
           else
@@ -763,7 +746,7 @@ end subroutine dyn_grid_init
           ew_vert(1,2:plon)  = (londeg(1:plon-1,j)+ londeg(2:plon,j))*0.5_r8
           ew_vert(2,:plon-1) = ew_vert(1,2:plon)
           ew_vert(2,plon)    = (londeg(plon,j) + (360.0_r8 + londeg(1,j)))*0.5_r8
-          
+
           do i = 1, plon
              n = n + 1
              del_phi = sin( ns_vert(2,i)*degtorad ) - sin( ns_vert(1,i)*degtorad )
@@ -875,10 +858,10 @@ end subroutine dyn_grid_init
 !#######################################################################
 
 !-------------------------------------------------------------------------------
-! This returns the lat/lon information (and corresponding MPI task numbers (owners)) 
+! This returns the lat/lon information (and corresponding MPI task numbers (owners))
 ! of the global model grid columns nearest to the input satellite coordinate (lat,lon)
 !-------------------------------------------------------------------------------
-subroutine dyn_grid_find_gcols( lat, lon, nclosest, owners, indx, jndx, rlat, rlon, idyn_dists ) 
+subroutine dyn_grid_find_gcols( lat, lon, nclosest, owners, indx, jndx, rlat, rlon, idyn_dists )
   use spmd_utils,     only: iam
   use shr_const_mod,  only: SHR_CONST_PI, SHR_CONST_REARTH
   use pmgrid,         only: plon, plat
@@ -920,50 +903,50 @@ subroutine dyn_grid_find_gcols( lat, lon, nclosest, owners, indx, jndx, rlat, rl
   distmin(:) = 1.e10_r8
 
   do i = 1,ngcols
-     
+
      ! Use the Spherical Law of Cosines to find the great-circle distance.
      dist = acos(sin(latr) * sin(clat_d(i)) + cos(latr) * cos(clat_d(i)) * cos(clon_d(i) - lonr)) * SHR_CONST_REARTH
      do j = nclosest, 1, -1
         if (dist < distmin(j)) then
-           
+
            if (j < nclosest) then
               distmin(j+1) = distmin(j)
               igcol(j+1)    = igcol(j)
            end if
-           
+
            distmin(j) = dist
            igcol(j)    = i
         else
            exit
         end if
      end do
-     
+
   end do
 
   do i = 1,nclosest
 
      call  get_gcol_block_d( igcol(i), 1, blockid, bcid, lclblockid )
      owners(i) = get_block_owner_d(blockid(1))
-     
+
      if ( iam==owners(i) ) then
         ! get global lat and lon coordinate indices from global column index
         ! -- plon is global number of longitude grid points
-        jndx(i) = (igcol(i)-1)/plon + 1 
+        jndx(i) = (igcol(i)-1)/plon + 1
         indx(i) = igcol(i) - (jndx(i)-1)*plon
      else
         jndx(i) = -1
         indx(i) = -1
      end if
-     
+
      if ( present(rlat) ) rlat(i) = clat_d(igcol(i)) * rad2deg
      if ( present(rlon) ) rlon(i) = clon_d(igcol(i)) * rad2deg
-     
+
      if (present(idyn_dists)) then
         idyn_dists(i) = distmin(i)
      end if
-     
+
   end do
-     
+
   deallocate( clat_d )
   deallocate( clon_d )
   deallocate( igcol )
@@ -972,7 +955,7 @@ subroutine dyn_grid_find_gcols( lat, lon, nclosest, owners, indx, jndx, rlat, rl
 end subroutine dyn_grid_find_gcols
 
 !#######################################################################
-subroutine dyn_grid_get_colndx( igcol, nclosest, owners, indx, jndx ) 
+subroutine dyn_grid_get_colndx( igcol, nclosest, owners, indx, jndx )
   use spmd_utils, only: iam
   use pmgrid,     only: plon
 
@@ -993,7 +976,7 @@ subroutine dyn_grid_get_colndx( igcol, nclosest, owners, indx, jndx )
      if ( iam==owners(i) ) then
         ! get global lat and lon coordinate indices from global column index
         ! -- plon is global number of longitude grid points
-        jndx(i) = (igcol(i)-1)/plon + 1 
+        jndx(i) = (igcol(i)-1)/plon + 1
         indx(i) = igcol(i) - (jndx(i)-1)*plon
      else
         jndx(i) = -1
@@ -1005,9 +988,9 @@ subroutine dyn_grid_get_colndx( igcol, nclosest, owners, indx, jndx )
 end subroutine dyn_grid_get_colndx
 !#######################################################################
 
-! this returns coordinates of a latitude slice of the block corresponding 
-! to latitude index latndx 
- 
+! this returns coordinates of a latitude slice of the block corresponding
+! to latitude index latndx
+
 subroutine dyn_grid_get_elem_coords( latndx, rlon, rlat, cdex )
   use commap, only : clat, clon
   use pmgrid, only : plon
@@ -1059,15 +1042,15 @@ end subroutine physgrid_copy_attributes_d
 
 
 subroutine trunc()
-!----------------------------------------------------------------------- 
-! 
-! Purpose: 
+!-----------------------------------------------------------------------
+!
+! Purpose:
 ! Check consistency of truncation parameters and evaluate pointers
 ! and displacements for spectral arrays
-! 
-! Method: 
-! 
-! Author: 
+!
+! Method:
+!
+! Author:
 ! Original version:  CCM1
 ! Standardized:      L. Bath, June 1992
 !                    T. Acker, March 1996
@@ -1084,7 +1067,7 @@ subroutine trunc()
 !
 !-----------------------------------------------------------------------
 !
-! trunc first evaluates truncation parameters for a general pentagonal 
+! trunc first evaluates truncation parameters for a general pentagonal
 ! truncation for which the following parameter relationships are true
 !
 ! 0 .le. |m| .le. ptrm
@@ -1153,7 +1136,7 @@ subroutine define_cam_grids()
   ! Dynamics Grid
   ! Make grid and lat maps (need to do this because lat indices are distributed)
   ! Note that for this dycore, some pes may be inactive
-  if(endlat >= beglat) then 
+  if(endlat >= beglat) then
     allocate(grid_map(4, (plon * (endlat - beglat + 1))))
     ind = 0
     do i = beglat, endlat

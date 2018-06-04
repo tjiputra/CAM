@@ -29,7 +29,7 @@ module noy_ubc
   character(len=16) :: ubc_name(MAXTRCRS)
   integer :: map(MAXTRCRS) = -1
 
-  character(len=256) :: noy_ubc_filename  = ' '
+  character(len=256) :: noy_ubc_filename  = 'NONE'
   character(len=256) :: noy_ubc_filelist  = ' '
   character(len=256) :: noy_ubc_datapath  = ' '
   character(len=32)  :: noy_ubc_datatype  = 'SERIAL'
@@ -86,7 +86,7 @@ contains
     call mpi_bcast(noy_ubc_fixed_ymd, 1, mpi_integer, masterprocid, mpicom, ierr)
     call mpi_bcast(noy_ubc_fixed_tod, 1, mpi_integer, masterprocid, mpicom, ierr)
 
-    has_noy_ubc = len_trim(noy_ubc_filename) > 0
+    has_noy_ubc = len_trim(noy_ubc_filename) > 0 .and. noy_ubc_filename.ne.'NONE'
 
   end subroutine noy_ubc_readnl
 

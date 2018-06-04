@@ -265,13 +265,13 @@ contains
 subroutine tphysbc_spcam (ztodt, state,   &
        tend,    pbuf,                     &
        cam_out, cam_in )
-    !----------------------------------------------------------------------- 
-    ! 
-    ! Purpose: 
-    ! Evaluate and apply physical processes that are calculated BEFORE 
-    ! coupling to land, sea, and ice models.  
+    !-----------------------------------------------------------------------
     !
-    ! Processes currently included are: 
+    ! Purpose:
+    ! Evaluate and apply physical processes that are calculated BEFORE
+    ! coupling to land, sea, and ice models.
+    !
+    ! Processes currently included are:
     !
     !  o Resetting Negative Tracers to Positive
     !  o Global Mean Total Energy Fixer
@@ -281,15 +281,15 @@ subroutine tphysbc_spcam (ztodt, state,   &
     !  o Wet Scavenging of Aerosol
     !  o Radiation
     !
-    ! Method: 
+    ! Method:
     !
     ! Each parameterization should be implemented with this sequence of calls:
     !  1)  Call physics interface
     !  2)  Check energy
     !  3)  Call physics_update
-    ! See Interface to Column Physics and Chemistry Packages 
+    ! See Interface to Column Physics and Chemistry Packages
     !   http://www.ccsm.ucar.edu/models/atm-cam/docs/phys-interface/index.html
-    ! 
+    !
     !-----------------------------------------------------------------------
 
     use physics_buffer,  only : pbuf_old_tim_idx, dyn_time_lvls
@@ -313,6 +313,7 @@ subroutine tphysbc_spcam (ztodt, state,   &
 #endif
     use phys_control,    only: phys_getopts
     use sslt_rebin,      only: sslt_rebin_adv
+    use qneg_module,     only: qneg3
 
     implicit none
 
@@ -377,14 +378,14 @@ subroutine tphysbc_spcam (ztodt, state,   &
     type(rad_avgdata_type_m2005)     :: rad_avgdata_m2005
     type(rad_out_t)                  :: rd
 
-    integer :: teout_idx, qini_idx, cldliqini_idx, cldiceini_idx 
-    integer :: ii, jj 
-    !----------------------------------------------------------------------- 
-    call t_startf('bc_init') 
-    zero = 0._r8 
+    integer :: teout_idx, qini_idx, cldliqini_idx, cldiceini_idx
+    integer :: ii, jj
+    !-----------------------------------------------------------------------
+    call t_startf('bc_init')
+    zero = 0._r8
 
-    lchnk = state%lchnk 
-    ncol  = state%ncol 
+    lchnk = state%lchnk
+    ncol  = state%ncol
 
     nstep = get_nstep()
 
@@ -461,13 +462,13 @@ subroutine tphysbc_spcam (ztodt, state,   &
 
     ! T tendency due to dynamics
     if( nstep > dyn_time_lvls-1 ) then
-       dtcore(:ncol,:pver) = (state%t(:ncol,:pver) - dtcore(:ncol,:pver))/(ztodt) 
+       dtcore(:ncol,:pver) = (state%t(:ncol,:pver) - dtcore(:ncol,:pver))/(ztodt)
        call outfld( 'DTCORE', dtcore, pcols, lchnk )
     end if
 
     call t_stopf('energy_fixer')
 
-    call sslt_rebin_adv(pbuf, state) 
+    call sslt_rebin_adv(pbuf, state)
 
     !
     !===================================================
@@ -484,12 +485,12 @@ subroutine tphysbc_spcam (ztodt, state,   &
     ! -------------------------------------------------------------------------------
     ! Call cloud resolving model
     ! -------------------------------------------------------------------------------
- 
+
     call crm_physics_tend(ztodt, state, tend, ptend, pbuf, cam_in)
     call physics_update(state, ptend, ztodt, tend)
 
     !===================================================
-    ! Moist physical parameteriztions complete: 
+    ! Moist physical parameteriztions complete:
     ! send dynamical variables, and derived variables to history file
     !===================================================
 
@@ -556,7 +557,7 @@ subroutine tphysbc_spcam (ztodt, state,   &
 
     call physics_update(state, ptend, ztodt, tend)
 
-    call check_energy_chng(state, tend, "spradheat", nstep, ztodt, zero, zero, zero, zero) 
+    call check_energy_chng(state, tend, "spradheat", nstep, ztodt, zero, zero, zero, zero)
 
     call t_stopf('radiation')
 
@@ -619,13 +620,13 @@ subroutine spcam_init(pbuf2d)
    use crm_physics,      only: crm_physics_init
 #endif
    use rad_constituents, only: rad_cnst_get_info
-   
+
    type(physics_buffer_desc), pointer :: pbuf2d(:,:)
 
 #ifdef CRM
 
    call phys_getopts(prog_modal_aero_out     = prog_modal_aero)
-  
+
    call rad_cnst_get_info(0, nmodes=nmodes)
 
    dei_idx         = pbuf_get_index('DEI')
@@ -711,7 +712,7 @@ subroutine spcam_radiation_setup_m2005(state, pbuf, rad_avgdata,  state_loc)
    integer :: itim_old
 
    ncol  = state%ncol
-   
+
    call physics_state_copy(state, state_loc)
 
    allocate(rad_avgdata%solin_m      (pcols))
@@ -949,7 +950,7 @@ subroutine spcam_radiation_col_setup_m2005(ii, jj, ixcldice, ixcldliq, state_loc
    call pbuf_get_field(pbuf, mu_idx, mu)
    call pbuf_get_field(pbuf, lambdac_idx, lambdac)
    call pbuf_get_field(pbuf, des_idx, des)
-   if (prog_modal_aero) then 
+   if (prog_modal_aero) then
       call pbuf_get_field(pbuf, dgnumwet_crm_idx, dgnumwet_crm)
       call pbuf_get_field(pbuf, qaerwat_crm_idx,  qaerwat_crm)
       call pbuf_get_field(pbuf, dgnumwet_idx, dgnumwet)
@@ -968,7 +969,7 @@ subroutine spcam_radiation_col_setup_m2005(ii, jj, ixcldice, ixcldliq, state_loc
 
    crm_qrad=0._r8
 
-   
+
    call pbuf_get_field(pbuf, iciwp_idx, cicewp)
    call pbuf_get_field(pbuf, iclwp_idx, cliqwp)
    call pbuf_get_field(pbuf, icswp_idx, csnowp)
@@ -991,9 +992,9 @@ subroutine spcam_radiation_col_setup_m2005(ii, jj, ixcldice, ixcldliq, state_loc
              cld(i,k)           = min(0.99_r8, cld_rad(i,ii,jj,m))
 
              ! In-cloud ice water path.
-             cicewp(i,k)        = qi_rad(i,ii,jj,m)*state_loc%pdel(i,k)/gravit / max(0.01_r8,cld(i,k))      
+             cicewp(i,k)        = qi_rad(i,ii,jj,m)*state_loc%pdel(i,k)/gravit / max(0.01_r8,cld(i,k))
              ! In-cloud liquid water path.
-             cliqwp(i,k)        = qc_rad(i,ii,jj,m)*state_loc%pdel(i,k)/gravit / max(0.01_r8,cld(i,k))      
+             cliqwp(i,k)        = qc_rad(i,ii,jj,m)*state_loc%pdel(i,k)/gravit / max(0.01_r8,cld(i,k))
           else
              cld(i,k)           = 0._r8
              cicewp(i,k)        = 0._r8           ! In-cloud ice water path.
@@ -1007,7 +1008,7 @@ subroutine spcam_radiation_col_setup_m2005(ii, jj, ixcldice, ixcldliq, state_loc
           !
           if( qs_rad(i, ii, jj, m).gt.1.0e-7_r8) then
              cldfsnow(i,k) = 0.99_r8
-             csnowp(i,k)   = qs_rad(i,ii,jj,m)*state_loc%pdel(i,k)/gravit / max(0.001_r8,cldfsnow(i,k)) 
+             csnowp(i,k)   = qs_rad(i,ii,jj,m)*state_loc%pdel(i,k)/gravit / max(0.001_r8,cldfsnow(i,k))
           else
              cldfsnow(i,k) = 0.0_r8
              csnowp(i,k)   = 0.0_r8
@@ -1067,7 +1068,7 @@ end subroutine spcam_radiation_col_setup_m2005
 
 !===============================================================================
 
-subroutine spcam_radiation_finalize_m2005(cam_in, state, pbuf, rad_avgdata, cam_out, net_flx, ptend)    
+subroutine spcam_radiation_finalize_m2005(cam_in, state, pbuf, rad_avgdata, cam_out, net_flx, ptend)
 
    use physconst,       only: cpair
    use rad_constituents,only: rad_cnst_out
@@ -1292,7 +1293,7 @@ subroutine spcam_radiation_finalize_m2005(cam_in, state, pbuf, rad_avgdata, cam_
    ! Output aerosol mmr
    call rad_cnst_out(0, state, pbuf)
 
- 
+
    ! restore to the non-spcam values
 
    call pbuf_get_field(pbuf, iciwp_idx,    cicewp)
@@ -1360,7 +1361,7 @@ subroutine spcam_radiation_finalize_m2005(cam_in, state, pbuf, rad_avgdata, cam_
    cam_out%solsd(:ncol)  = rad_avgdata%solsd_m(:ncol)
    cam_out%solld(:ncol)  = rad_avgdata%solld_m(:ncol)
 
-   
+
     call pbuf_get_field(pbuf, fsns_idx, fsns)
     call pbuf_get_field(pbuf, fsnt_idx, fsnt)
     call pbuf_get_field(pbuf, flns_idx, flns)
@@ -1615,7 +1616,7 @@ subroutine spcam_radiation_col_finalize_m2005(state, ii, jj, pbuf, rd, cam_out, 
           end do
 
        end do
-  
+
     end if  !dolw
 
 
@@ -1634,7 +1635,7 @@ subroutine spcam_radiation_setup_sam1mom(cam_in, cldn, state, pbuf, rad_avgdata,
     real(r8), dimension(:,:),        intent(out)            :: cldn
     type(physics_state),             intent(in)             :: state
     type(physics_buffer_desc),       intent(inout), pointer :: pbuf(:)
-    
+
     type(rad_avgdata_type_sam1mom) :: rad_avgdata
     type(physics_state),             intent(inout)          :: state_loc
 
@@ -1665,7 +1666,7 @@ subroutine spcam_radiation_setup_sam1mom(cam_in, cldn, state, pbuf, rad_avgdata,
     call pbuf_get_field(pbuf, cld_idx,    cld,    start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
 
     ! Save the grid level cld values as cld will be overwritten with each crm-scale level value during radiation
-    cldn = cld  
+    cldn = cld
 
     allocate(rad_avgdata%solin_m      (pcols))
     allocate(rad_avgdata%fsntoa_m     (pcols))
@@ -1896,7 +1897,7 @@ subroutine spcam_radiation_col_setup_sam1mom(ii, jj, state_loc, pbuf, rad_avgdat
     end do ! m
 
     !  Cloud emissivity.
-     
+
     tmp(:ncol,:) = cicewp(:ncol,:) + cliqwp(:ncol,:)
     call cldems(lchnk, ncol, tmp, fice, rei, emis, cldtau)
 
@@ -1917,7 +1918,7 @@ end subroutine spcam_radiation_col_setup_sam1mom
 
 !===============================================================================
 
-subroutine spcam_radiation_finalize_sam1mom(cam_in, state, pbuf, rad_avgdata, cam_out, cldn, net_flx, ptend)    
+subroutine spcam_radiation_finalize_sam1mom(cam_in, state, pbuf, rad_avgdata, cam_out, cldn, net_flx, ptend)
 
     use physconst,       only: cpair
     use rad_constituents,only: rad_cnst_out
@@ -1942,7 +1943,7 @@ subroutine spcam_radiation_finalize_sam1mom(cam_in, state, pbuf, rad_avgdata, ca
     type(physics_ptend),               intent(out)   :: ptend            ! indivdual parameterization tendencies
 
 #ifdef sam1mom
-	    
+
     integer  :: lchnk                    ! chunk identifier
     integer  :: ncol                     ! number of atmospheric columns
     integer  :: i, k, m
@@ -2053,7 +2054,7 @@ subroutine spcam_radiation_finalize_sam1mom(cam_in, state, pbuf, rad_avgdata, ca
     call outfld('FSN200C ',rad_avgdata%fsn200c_m(:),pcols,lchnk)
     call outfld('FSNR'    ,rad_avgdata%fsnr_m(:)  ,pcols,lchnk)
     call outfld('SWCF    ',rad_avgdata%fsntoa_m(:ncol)-rad_avgdata%fsntoac_m(:ncol)  ,pcols,lchnk)
- 
+
     do i=1, Nday
        do k=1, pver
 	  rad_avgdata%tot_cld_vistau_m(IdxDay(i),k) = rad_avgdata%tot_icld_vistau_m(IdxDay(i),k) *  factor_xy
@@ -2109,7 +2110,7 @@ subroutine spcam_radiation_finalize_sam1mom(cam_in, state, pbuf, rad_avgdata, ca
     call outfld('FLN200  ',rad_avgdata%fln200_m,                    pcols, lchnk)
     call outfld('FLN200C ',rad_avgdata%fln200c_m,                   pcols, lchnk)
     call outfld('FLNR '   ,rad_avgdata%flnr_m,                      pcols, lchnk)
- 
+
     ! Output aerosol mmr
     call rad_cnst_out(0, state, pbuf)
 
@@ -2244,7 +2245,7 @@ subroutine spcam_radiation_col_finalize_sam1mom(state, ii, jj, pbuf, rd, cam_out
     integer :: Nnite                     ! Number of night columns
     integer, dimension(pcols) :: IdxDay  ! Indicies of daylight coumns
 
-    
+
     real(r8) :: calday                   ! current calendar day
     real(r8) :: clat(pcols)              ! current latitudes(radians)
     real(r8) :: clon(pcols)              ! current longitudes(radians)
@@ -2297,7 +2298,7 @@ subroutine spcam_radiation_col_finalize_sam1mom(state, ii, jj, pbuf, rd, cam_out
        end do
     end do
 
-    if (dosw) then 
+    if (dosw) then
        call pbuf_get_field(pbuf, fsds_idx, fsds)
        call pbuf_get_field(pbuf, fsns_idx, fsns)
        call pbuf_get_field(pbuf, fsnt_idx, fsnt)
@@ -2393,4 +2394,3 @@ subroutine spcam_radiation_col_finalize_sam1mom(state, ii, jj, pbuf, rd, cam_out
 end subroutine spcam_radiation_col_finalize_sam1mom
 
 end module spcam_drivers
-

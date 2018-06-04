@@ -392,10 +392,7 @@ elemental subroutine size_dist_param_liq_line(props, qcic, ncic, rho, pgam, lamc
      props_loc = props
 
      ! Get pgam from fit to observations of martin et al. 1994
-!++ag
-!     pgam = 0.0005714_r8*1.e-6_r8*ncic*rho + 0.2714_r8
      pgam = 1.0_r8 - 0.7_r8 * exp(-0.008_r8*1.e-6_r8*ncic*rho)
-!--ag
      pgam = 1._r8/(pgam**2) - 1._r8
      pgam = max(pgam, 2._r8)
 
@@ -445,11 +442,7 @@ subroutine size_dist_param_liq_vect(props, qcic, ncic, rho, pgam, lamc, mgncol)
         ! arguments.)
         props_loc = props
         ! Get pgam from fit to observations of martin et al. 1994
-!++ag
         pgam(i) = 1.0_r8 - 0.7_r8 * exp(-0.008_r8*1.e-6_r8*ncic(i)*rho(i))
-
-!        pgam(i) = 0.0005714_r8*1.e-6_r8*ncic(i)*rho(i) + 0.2714_r8
-!--ag
         pgam(i) = 1._r8/(pgam(i)**2) - 1._r8
         pgam(i) = max(pgam(i), 2._r8)
      endif

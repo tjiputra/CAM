@@ -1,7 +1,7 @@
 -nospmd -nosmp
 -scam
 -dyn eul
--res 64x128 
+-hgrid 64x128 
 -phys cam4
 -aquaplanet
 -debug

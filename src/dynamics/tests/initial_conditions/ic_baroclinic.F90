@@ -10,10 +10,9 @@ module ic_baroclinic
   use shr_kind_mod,        only: r8 => shr_kind_r8
   use cam_abortutils,      only: endrun
   use spmd_utils,          only: masterproc
-  use shr_sys_mod,         only: shr_sys_flush
 
-  use physconst, only : rair, cpair, gravit, rearth, pi, omega
-  use hycoef,     only: hyai, hybi, hyam, hybm, ps0
+  use physconst, only : rair, gravit, rearth, pi, omega, epsilo
+  use hycoef,    only : hyai, hybi, hyam, hybm, ps0
 
   implicit none
   private
@@ -23,15 +22,15 @@ module ic_baroclinic
   !=======================================================================
   !    Baroclinic wave test case parameters
   !=======================================================================
-  real(r8), parameter, private :: Mvap = 0.608_r8   ! Ratio of molar mass dry air/water vapor
-  real(r8), parameter, private :: psurf_moist = 100000.0_r8 !moist surface pressure
+  real(r8), parameter, private :: Mvap = 0.608_r8           ! Ratio of molar mass dry air/water vapor
+  real(r8), parameter, private :: psurf_moist = 100000.0_r8 ! Moist surface pressure
 
   real(r8), parameter, private ::     &
-       T0E        = 310.0_r8,         & ! temperature at equatorial surface (K)
-       T0P        = 240.0_r8,         & ! temperature at polar surface (K)
-       B          = 2.0_r8,           & ! jet half-width parameter
-       KK         = 3.0_r8,           & ! jet width parameter
-       lapse      = 0.005_r8             ! lapse rate parameter
+       T0E        = 310.0_r8,         & ! Temperature at equatorial surface (K)
+       T0P        = 240.0_r8,         & ! Temperature at polar surface (K)
+       B          = 2.0_r8,           & ! Jet half-width parameter
+       KK         = 3.0_r8,           & ! Jet width parameter
+       lapse      = 0.005_r8            ! Lapse rate parameter
 
   real(r8), parameter, private ::     &
        pertu0     = 0.5_r8,           & ! SF Perturbation wind velocity (m/s)
@@ -46,13 +45,28 @@ module ic_baroclinic
   real(r8), parameter, private ::     &
        moistqlat  = 2.0_r8*pi/9.0_r8, & ! Humidity latitudinal width
        moistqp    = 34000.0_r8,       & ! Humidity vertical pressure width
-       moistq0    = 0.018_r8             ! Maximum specific humidity
+       moistq0    = 0.018_r8            ! Maximum specific humidity
+
+  real(r8), parameter, private ::     &
+       eps        = 1.0e-13_r8,       & ! Iteration threshold
+       qv_min     = 1.0e-12_r8          ! Min specific humidity value
 
 
-  integer,  parameter :: deep  = 0! Deep (1) or Shallow (0) test case
-  integer,  parameter :: pertt = 0!! 0: exponential, 1: streamfunction
-  real(r8), parameter :: bigx  = 1.0  ! factor for a reduced size earth
-  integer,  parameter :: moist = 1 ! moist (1) or dry (0) baroclinic wave
+  integer,  parameter :: deep  = 0   ! Deep (1) or Shallow (0) test case
+  integer,  parameter :: pertt = 0   ! 0: exponential, 1: streamfunction
+  real(r8), parameter :: bigx  = 1.0 ! Factor for a reduced size earth
+
+  !
+  ! Gauss nodes and weights
+  !
+  integer , parameter :: num_gauss = 10
+  real(r8), parameter, dimension(num_gauss), private :: gaussx =(/&
+       -0.97390652851717_r8,-0.865063366689_r8,-0.67940956829902_r8,-0.4333953941292_r8,-0.14887433898163_r8,&
+       0.14887433898163_r8,0.4333953941292_r8,0.679409568299_r8,0.86506336668898_r8,0.97390652851717_r8/)
+
+  real(r8), parameter, dimension(num_gauss), private :: gaussw =(/&
+       0.06667134430869_r8,0.1494513491506_r8,0.219086362516_r8,0.26926671931_r8,0.29552422471475_r8,        &
+       0.2955242247148_r8,0.26926671931_r8,0.21908636251598_r8,0.1494513491506_r8,0.0666713443087_r8/)
 
   ! Public interface
   public :: bc_wav_set_ic
@@ -61,9 +75,10 @@ contains
 
   subroutine bc_wav_set_ic(vcoord,latvals, lonvals, U, V, T, PS, PHIS, &
        Q, m_cnst, mask, verbose)
-    use dyn_tests_utils, only: vc_moist_pressure, vc_dry_pressure, vc_height
-    use constituents,    only: cnst_name
-    use const_init,      only: cnst_init_default
+    use dyn_tests_utils,     only: vc_moist_pressure, vc_dry_pressure, vc_height
+    use constituents,        only: cnst_name
+    use const_init,          only: cnst_init_default
+    use inic_analytic_utils, only: analytic_ic_is_moist
 
     !-----------------------------------------------------------------------
     !
@@ -83,8 +98,8 @@ contains
     real(r8), optional, intent(inout) :: PHIS(:)    ! surface geopotential
     real(r8), optional, intent(inout) :: Q(:,:,:)   ! tracer (ncol, lev, m)
     integer,  optional, intent(in)    :: m_cnst(:)  ! tracer indices (reqd. if Q)
-    logical,  optional, intent(in)    :: mask(:)    ! Only init where .true.
-    logical,  optional, intent(in)    :: verbose    ! For internal use
+    logical,  optional, intent(in)    :: mask(:)    ! only init where .true.
+    logical,  optional, intent(in)    :: verbose    ! for internal use
     ! Local variables
     logical, allocatable              :: mask_use(:)
     logical                           :: verbose_use
@@ -94,11 +109,11 @@ contains
     integer                           :: ncnst
     character(len=*), parameter       :: subname = 'BC_WAV_SET_IC'
     real(r8)                          :: ztop,ptop
-    real(r8)                          :: uk,vk,Tk,qk,rhok,zk,pk !mid-level state
-    real(r8)                          :: thetav,surface_geo,psurface,eta
-    real(r8)                          :: wvp,zdummy,qdry
-    logical                           :: lU, lV, lT, lPS, lPHIS, lQ, l3d_vars
-    real(r8), allocatable             :: pdry_half(:), pwet_half(:)
+    real(r8)                          :: uk,vk,Tvk,qk,pk !mid-level state
+    real(r8)                          :: psurface
+    real(r8)                          :: wvp,qdry
+    logical                           :: lU, lV, lT, lQ, l3d_vars
+    real(r8), allocatable             :: pdry_half(:), pwet_half(:),zdry_half(:),zk(:)
 
     if ((vcoord == vc_moist_pressure) .or. (vcoord == vc_dry_pressure)) then
       !
@@ -108,12 +123,11 @@ contains
       if (ptop > 1.0e5_r8) then
         call endrun(subname//' ERROR: For iterate_z_given_pressure to work ptop must be less than 100hPa')
       end if
-      ztop = iterate_z_given_pressure(ptop,.false.,ptop,0.0_r8,0.0_r8,-1000._r8) !Find height of top pressure surface
+      ztop      = iterate_z_given_pressure(ptop,.false.,ptop,0.0_r8,-1000._r8) !Find height of top pressure surface
     else if (vcoord == vc_height) then
       !
       ! height-based vertical coordinate
       !
-!      ztop=
       call endrun(subname//' ERROR: z-based vertical coordinate not coded yet')
     else
       call endrun(subname//' ERROR: vcoord value out of range')
@@ -159,7 +173,7 @@ contains
         !
         do i=1,ncol
           if (mask_use(i)) then
-            wvp = weight_of_water_vapor_given_z(0.0_r8,latvals(i),lonvals(i),ztop)
+            wvp = weight_of_water_vapor_given_z(0.0_r8,latvals(i),ztop)
             ps(i) = psurf_moist-wvp
           end if
         end do
@@ -203,9 +217,11 @@ contains
       if (lv) nlev = size(V, 2)
       if (lt) nlev = size(T, 2)
       if (lq) nlev = size(Q, 2)
-      if (lq .and. (vcoord == vc_dry_pressure)) then
+      allocate(zk(nlev+1))
+      if ((lq.or.lt) .and. (vcoord == vc_dry_pressure)) then
         allocate(pdry_half(nlev+1))
         allocate(pwet_half(nlev+1))
+        allocate(zdry_half(nlev+1))
       end if
       do i=1,ncol
         if (mask_use(i)) then
@@ -216,37 +232,74 @@ contains
             !
             ! convert surface pressure to dry
             !
-            wvp = weight_of_water_vapor_given_z(0.0_r8,latvals(i),lonvals(i),ztop)
+            wvp = weight_of_water_vapor_given_z(0.0_r8,latvals(i),ztop)
             psurface = psurf_moist-wvp
           end if
 
           do k=1,nlev
-            pk =  hyam(k)*ps0 + hybm(k)*psurface
-            call baroclinic_wave_test(moist,pk,ptop,zk,uk,vk,tk,thetav,&
-                 surface_geo,rhok,qk,&
-                 (vcoord==vc_dry_pressure),latvals(i),lonvals(i),ztop)
-            if (lt) T(i,k)   = tk
+            ! compute pressure levels
+            pk = hyam(k)*ps0 + hybm(k)*psurface
+            ! find height of pressure surface
+            zk(k) = iterate_z_given_pressure(pk,(vcoord == vc_dry_pressure),ptop,latvals(i),ztop)
+          end do
+          do k=1,nlev
+            !
+            ! wind components
+            !
+            if (lu.or.lv) call uv_given_z(zk(k),uk,vk,latvals(i),lonvals(i))
             if (lu) U(i,k)   = uk
             if (lv) V(i,k)   = vk
-            if (lq) Q(i,k,1) = qk
+            !
+            ! temperature and moisture for moist vertical coordinates
+            !
+            if ((lq.or.lt).and.(vcoord == vc_moist_pressure)) then
+              if (analytic_ic_is_moist()) then
+                pk = moist_pressure_given_z(zk(k),latvals(i))
+                qk = qv_given_moist_pressure(pk,latvals(i))
+              else
+                qk = 0.d0
+              end if
+              if (lq) Q(i,k,1) = qk
+              if (lt) then
+                tvk    = Tv_given_z(zk(k),latvals(i))
+                T(i,k) = tvk / (1.d0 + Mvap * qk)
+              end if
+            end if
           end do
-          if (lq .and. (vcoord==vc_dry_pressure) .and. (moist/= 0)) then
+          !
+          ! temperature and moisture for dry-mass vertical coordinates
+          !
+          if ((lq.or.lt).and. (vcoord==vc_dry_pressure)) then
             !
-            ! for dry pressure vertical coordinate
+            ! compute dry pressure vertical coordinate
             !
-            do k=1,nlev+1
-              pdry_half(k) =  hyai(k)*ps0 + hybi(k)*psurf_moist!psurface
-              !Find height of pressu!re surface
-              zdummy = iterate_z_given_pressure(pdry_half(k),.true.,ptop,latvals(i),lonvals(i),ztop)
-              pwet_half(k) = moist_pressure_given_z(zdummy,latvals(i),lonvals(i))
+            pdry_half(1) = hyai(1)*ps0 + hybi(1)*psurface
+            pwet_half(1) = pdry_half(1)
+            zdry_half(1) = ztop
+            do k=2,nlev+1
+              pdry_half(k) =  hyai(k)*ps0 + hybi(k)*psurface
+              ! find height of pressure surfaces corresponding moist pressure
+              zdry_half(k) = iterate_z_given_pressure(pdry_half(k),.true.,ptop,latvals(i),ztop)
+              pwet_half(k) = pdry_half(k)+weight_of_water_vapor_given_z(zdry_half(k),latvals(i),ztop)
             end do
+
             do k=1,nlev
-              qdry =((pwet_half(k+1)-pwet_half(k))/(pdry_half(k+1)-pdry_half(k)))-1.0_r8
-              !
-              ! CAM expects water vapor mixing ratio to be wet - convert from dry to wet:
-              !
-              Q(i,k,1) = qdry / (1.0_r8 + qdry)
-              Q(i,k,1) = max(1.0e-12_r8, Q(i,k,1))
+              if (analytic_ic_is_moist()) then
+                qdry =((pwet_half(k+1)-pwet_half(k))/(pdry_half(k+1)-pdry_half(k)))-1.0_r8
+                qdry = MAX(qdry,qv_min/(1.0_r8-qv_min))
+              else
+                qdry = 0.0_r8
+              end if
+              if (lq) then
+                Q(i,k,1) = qdry
+              end if
+              if (lt) then
+                !
+                ! convert virtual temperature to temperature
+                !
+                tvk    = Tv_given_z(zk(k),latvals(i))
+                T(i,k) = tvk*(1.0_r8+qdry)/(1.0_r8+(1.0_r8/epsilo)*qdry)
+              end if
             end do
           end if
         end if
@@ -279,104 +332,23 @@ contains
         end do
       end if
     end if
-
     deallocate(mask_use)
-
+    if (l3d_vars) then
+      deallocate(zk)
+      if ((lq.or.lt) .and. (vcoord == vc_dry_pressure)) then
+        deallocate(pdry_half)
+        deallocate(pwet_half)
+        deallocate(zdry_half)
+      end if
+    end if
   end subroutine bc_wav_set_ic
 
-  !-----------------------------------------------------------------------
-  !  SUBROUTINE baroclinic_wave_test(
-  !    moist,pertt,X,lon,lat,p,z,zcoords,u,v,w,t,phis,ps,rho,q)
-  !
-  !  Options:
-  !    moist    include moisture (1 = yes or 0 = no)
-  !    pertt    type of perturbation (0 = exponential, 1 = stream function)
-  !        X    Earth scaling factor1
-  !
-  !  Given a point specified by: 
-  !      lon    longitude (radians) 
-  !      lat    latitude (radians) 
-  !      p/z    pressure (Pa) / height (m)
-  !  zcoords    1 if z is specified, 0 if p is specified
-  !
-  !  the functions will return:
-  !        p    pressure if z is specified and zcoords = 1 (Pa)
-  !        u    zonal wind (m s^-1)
-  !        v    meridional wind (m s^-1)
-  !        t    temperature (K)
-  !   thetav    virtual potential temperature (K)
-  !     phis    surface geopotential (m^2 s^-2)
-  !       ps    surface pressure (Pa)
-  !      rho    density (kj m^-3)
-  !        q    water vapor mixing ratio (kg/kg)
-  !
-  !
-  !  Author: Paul Ullrich
-  !          University of California, Davis
-  !          Email: paullrich@ucdavis.edu
-  !
-  !-----------------------------------------------------------------------
+  real(r8) FUNCTION iterate_z_given_pressure(p,ldry_mass_vertical_coordinates,ptop,lat,ztop)
 
-
-  SUBROUTINE baroclinic_wave_test(moist,p,ptop,z,u,v,temp,thetav,phis,rho,q,&
-       ldry_mass_vertical_coordinates,lat,lon,ztop)
-    IMPLICIT NONE
-    
-    !-----------------------------------------------------------------------
-    !     input/output params parameters at given location
-    !-----------------------------------------------------------------------
-    integer, INTENT(IN)  :: &
-         moist        ! Moist (1) or Dry (0) test case
-    
-    
-    real(r8), INTENT(IN) :: &
-         p            ,&! Pressure at the full model level (Pa)
-         ptop         ,&!
-         lat          ,&! latitude
-         lon          ,&! longitude
-         ztop           ! model top height
-
-    logical, intent(in) :: ldry_mass_vertical_coordinates
-    
-    real(r8), INTENT(OUT) :: &
-         u,          & ! Zonal wind (m s^-1)
-         v,          & ! Meridional wind (m s^-1)
-         temp,       & ! Temperature (K)
-         thetav,     & ! Virtual potential temperature (K)
-         phis,       & ! Surface Geopotential (m^2 s^-2)
-!         ps,         & ! Surface Pressure (Pa)
-         rho,        & ! density (kg m^-3)
-         q,          & ! water vapor mixing ratio (kg/kg)
-         z             ! Altitude (m)
-
-
-    z = iterate_z_given_pressure(p,ldry_mass_vertical_coordinates,ptop,lat,lon,ztop) !Find height of pressure surface
-    call uv_given_z(z,u,v,lat,lon)
-    temp = Tv_given_z(z,lat,lon)
-    phis = 0.d0
-    if (moist .eq. 1) then
-       q = qv_given_moist_pressure(moist_pressure_given_z(z,lat,lon),lat,lon)       
-    else
-       q = 0.d0                  ! dry
-    end if
-    !
-    ! Convert virtual temperature to temperature
-    !
-    temp = temp / (1.d0 + Mvap * q)
-    rho = p / (Rair * temp * (1.d0 + 0.61d0 * q))
-    thetav = temp * (1.d0 + 0.61d0 * q) * (psurf_moist / p)**(Rair / cpair)
-!    if (ldry_mass_vertical_coordinates) then
-!       q=q/(1-q)! CAM expects water vapor to be 'wet' mixing ratio so do not convert to dry
-!    end if
-  END SUBROUTINE baroclinic_wave_test
-
-  real(r8) FUNCTION iterate_z_given_pressure(p,ldry_mass_vertical_coordinates,ptop,lat,lon,ztop)
-    implicit none
     real(r8), INTENT(IN)  :: &
          p,              &! Pressure (Pa)
          ptop,&! Pressure (Pa)
          lat,&! latitude
-         lon,&! longitude
          ztop
 
     logical, INTENT(IN)  :: ldry_mass_vertical_coordinates
@@ -387,24 +359,23 @@ contains
     real(r8) :: p0, p1, p2
     z0 = 0.0_r8
     z1 = 10000.0_r8
-
     if (ldry_mass_vertical_coordinates) then
-       p0 = weight_of_dry_air_given_z(z0,ptop,lat,lon,ztop)
-       p1 = weight_of_dry_air_given_z(z1,ptop,lat,lon,ztop)
+       p0 = weight_of_dry_air_given_z(z0,ptop,lat,ztop)
+       p1 = weight_of_dry_air_given_z(z1,ptop,lat,ztop)
     else
-       p0 =  moist_pressure_given_z(z0,lat,lon)
-       p1 =  moist_pressure_given_z(z1,lat,lon)
+       p0 =  moist_pressure_given_z(z0,lat)
+       p1 =  moist_pressure_given_z(z1,lat)
     endif
 
-    DO ix = 1, 100
+    DO ix = 1, 1000
        z2 = z1 - (p1 - p) * (z1 - z0) / (p1 - p0)
        if (ldry_mass_vertical_coordinates) then
-          p2 = weight_of_dry_air_given_z(z2,ptop,lat,lon,ztop)
+          p2 = weight_of_dry_air_given_z(z2,ptop,lat,ztop)
        else
-          p2 = moist_pressure_given_z(z2,lat,lon)
+          p2 = moist_pressure_given_z(z2,lat)
        end if
 
-       IF (ABS((p2 - p)/p) < 1.0e-13_r8) THEN
+       IF (ABS(p2 - p)/p < eps.or.ABS(z1-z2)<eps.or.ABS(p1-p2)<eps) THEN
           EXIT
        END IF
 
@@ -414,24 +385,24 @@ contains
        z1 = z2
        p1 = p2
     END DO
-    if (ix==101) then
+    if (ix==1001) then
+      write(*,*) "p,p1,z1",p,p1,z1
       call endrun('iteration did not converge in iterate_z_given_pressure')
     end if
     iterate_z_given_pressure = z2
   END FUNCTION iterate_z_given_pressure
 
-  real(r8) FUNCTION moist_pressure_given_z(z,lat,lon)
-    IMPLICIT NONE
-    real(r8), INTENT(IN) :: z,lat,lon
-    real(r8) :: aref, omegaref
-    real(r8) :: T0, constA, constB, constC, constH, scaledZ
-    real(r8) :: tau1, tau2, inttau1, inttau2
-    real(r8) :: rratio, inttermT,pwet,wvp
+  real(r8) FUNCTION moist_pressure_given_z(z,lat)
+
+    real(r8), INTENT(IN) :: z,lat
+    real(r8)             :: aref
+    real(r8)             :: T0, constA, constB, constC, constH, scaledZ
+    real(r8)             :: inttau1, inttau2
+    real(r8)             :: rratio, inttermT
     !--------------------------------------------
     ! Constants
     !--------------------------------------------
     aref = rearth / bigX
-    omegaref = omega * bigX
 
     T0 = 0.5_r8 * (T0E + T0P)
     constA = 1.0_r8 / lapse
@@ -444,9 +415,6 @@ contains
     !--------------------------------------------
     !    tau values
     !--------------------------------------------
-    tau1 = constA * lapse / T0 * exp(lapse * z / T0) &
-         + constB * (1.0_r8 - 2.0_r8 * scaledZ**2) * exp(- scaledZ**2)
-    tau2 = constC * (1.0_r8 - 2.0_r8 * scaledZ**2) * exp(- scaledZ**2)
 
     inttau1 = constA * (exp(lapse * z / T0) - 1.0_r8) &
          + constB * z * exp(- scaledZ**2)
@@ -472,18 +440,15 @@ contains
     moist_pressure_given_z = psurf_moist * exp(- gravit / Rair * (inttau1 - inttau2 * inttermT))
   END FUNCTION moist_pressure_given_z
 
-  real(r8) FUNCTION Tv_given_z(z,lat,lon)
-    IMPLICIT NONE
-    real(r8), INTENT(IN) :: z, lat, lon
-    real(r8) :: aref, omegaref
-    real(r8) :: T0, constA, constB, constC, constH, scaledZ
-    real(r8) :: tau1, tau2, inttau1, inttau2
-    real(r8) :: rratio, inttermT
+  real(r8) FUNCTION Tv_given_z(z,lat)
+
+    real(r8), INTENT(IN) :: z, lat
+    real(r8)             :: aref,T0, constA, constB, constC, constH, scaledZ
+    real(r8)             :: tau1, tau2, rratio, inttermT
     !--------------------------------------------
     ! Constants
     !--------------------------------------------
     aref = rearth / bigX
-    omegaref = omega * bigX
 
     T0 = 0.5_r8 * (T0E + T0P)
     constA = 1.0_r8 / lapse
@@ -499,10 +464,6 @@ contains
     tau1 = constA * lapse / T0 * exp(lapse * z / T0) &
          + constB * (1.0_r8 - 2.0_r8 * scaledZ**2) * exp(- scaledZ**2)
     tau2 = constC * (1.0_r8 - 2.0_r8 * scaledZ**2) * exp(- scaledZ**2)
-
-    inttau1 = constA * (exp(lapse * z / T0) - 1.0_r8) &
-         + constB * z * exp(- scaledZ**2)
-    inttau2 = constC * z * exp(- scaledZ**2)
 
     !--------------------------------------------
     !    radius ratio
@@ -526,12 +487,12 @@ contains
   END FUNCTION Tv_given_z
 
   SUBROUTINE uv_given_z(z,u,v,lat,lon)
-    IMPLICIT NONE
+
     real(r8), INTENT(IN)  :: z, lat, lon
     real(r8), INTENT(OUT) :: u,v
-    real(r8) :: aref, omegaref
-    real(r8) :: T0, constH, constC, scaledZ, inttau2, rratio
-    real(r8) :: inttermU, bigU, rcoslat, omegarcoslat
+    real(r8)              :: aref, omegaref
+    real(r8)              :: T0, constH, constC, scaledZ, inttau2, rratio
+    real(r8)              :: inttermU, bigU, rcoslat, omegarcoslat
     !------------------------------------------------
     !   Compute test case constants
     !------------------------------------------------
@@ -558,7 +519,7 @@ contains
     !   Initialize velocity field
     !-----------------------------------------------------
     inttermU = (rratio * cos(lat))**(KK - 1.0_r8) - (rratio * cos(lat))**(KK + 1.0_r8)
-    bigU = gravit / aref * KK * inttau2 * inttermU * Tv_given_z(z,lat,lon)
+    bigU = gravit / aref * KK * inttau2 * inttermU * Tv_given_z(z,lat)
     if (deep .eq. 0) then
        rcoslat = aref * cos(lat)
     else
@@ -573,7 +534,7 @@ contains
     !-----------------------------------------------------
     !   Add perturbation to the velocity field
     !-----------------------------------------------------
-!    if (.false.) then !xxxx
+
     ! Exponential type
     if (pertt .eq. 0) then
        u = u + evaluate_exponential(z,lat,lon)
@@ -588,16 +549,16 @@ contains
             ( evaluate_streamfunction(lon + dxepsilon, lat, z)    &
             - evaluate_streamfunction(lon - dxepsilon, lat, z))
     end if
-!    endif!xxx
   END SUBROUTINE uv_given_z
 
   !-----------------------------------------------------------------------
   !    Exponential perturbation function
   !-----------------------------------------------------------------------
   real(r8) FUNCTION evaluate_exponential(z,lat,lon)
-    real(r8), INTENT(IN)  :: &
-         z,&! Altitude (meters)
-         lat,lon
+
+    real(r8), INTENT(IN)  :: z ! Altitude (meters)
+    real(r8), INTENT(IN)  :: lat
+    real(r8), INTENT(IN)  :: lon
 
     real(r8) :: greatcircler, perttaper
 
@@ -626,9 +587,9 @@ contains
   !-----------------------------------------------------------------------
   real(r8) FUNCTION evaluate_streamfunction(z,lon_local,lat_local)
 
-    real(r8), INTENT(IN)  :: &
-         lon_local, lat_local,&
-         z             ! Altitude (meters)
+    real(r8), INTENT(IN)  :: lon_local
+    real(r8), INTENT(IN)  :: lat_local
+    real(r8), INTENT(IN)  :: z             ! Altitude (meters)
 
     real(r8) :: greatcircler, perttaper, cospert
 
@@ -655,12 +616,13 @@ contains
 
   END FUNCTION evaluate_streamfunction
 
-  real(r8) FUNCTION qv_given_moist_pressure(pwet,lat,lon)
-    implicit none
-    real(r8), INTENT(IN)  :: pwet, lat, lon
+  real(r8) FUNCTION qv_given_moist_pressure(pwet,lat)
+    use inic_analytic_utils, only: analytic_ic_is_moist
+
+    real(r8), INTENT(IN)  :: pwet, lat
 
     real(r8)  :: eta
-    if (moist==0) then
+    if (.not. analytic_ic_is_moist()) then
       qv_given_moist_pressure = 0.0_r8
     else
       eta = pwet/psurf_moist
@@ -668,24 +630,20 @@ contains
         qv_given_moist_pressure = moistq0 * exp(- (lat/moistqlat)**4)          &
              * exp(- ((eta-1.0_r8)*psurf_moist/moistqp)**2)
       else
-        qv_given_moist_pressure = 1.0e-12_r8 ! above 100 hPa set q to 1e-12 to avoid supersaturation
+        qv_given_moist_pressure = qv_min ! above 100 hPa set q to 1e-12 to avoid supersaturation
       endif
     end if
   END FUNCTION qv_given_moist_pressure
 
-  real(r8) FUNCTION weight_of_water_vapor_given_z(z,lat, lon,ztop)
-    implicit none
-    real(r8), INTENT(IN)  :: z,lat, lon, ztop
-    real (r8)  :: dx,xm,xr,gaussw(10),gaussx(10),integral, tmp1, tmp2
-    real(r8)   :: temp, rho, qv, pressure, z1, z2, Tv,pwet, ztmp
-    integer   :: jgw
-    SAVE gaussw,gaussx
-    DATA gaussw/0.1527533871307258_r8,0.1491729864726037_r8,0.1420961093183820_r8,0.1316886384491766_r8,0.1181945319615184_r8,&
-         0.1019301198172404_r8,0.0832767415767048_r8,0.0626720483341091_r8,0.0406014298003869_r8,0.0176140071391521_r8/
-    DATA gaussx/0.0765265211334973_r8,0.2277858511416451_r8,0.3737060887154195_r8,0.5108670019508271_r8,0.6360536807265150_r8,&
-         0.7463319064601508_r8,0.8391169718222188_r8,0.9122344282513259_r8,0.9639719272779138_r8,0.9931285991850949_r8/
+  real(r8) FUNCTION weight_of_water_vapor_given_z(z,lat, ztop)
+    use inic_analytic_utils, only: analytic_ic_is_moist
 
-    if (moist==0) then
+    real(r8), INTENT(IN) :: z,lat, ztop
+    real (r8)            :: xm,xr,integral
+    real(r8)             :: qv, z1, z2, Tv,pwet, ztmp
+    integer              :: jgw
+
+    if (.not. analytic_ic_is_moist()) then
       !
       ! dry case
       !
@@ -696,139 +654,36 @@ contains
       xm=0.5_r8*(z1+z2)
       xr=0.5_r8*(z2-z1)
       integral=0
-      do jgw=1,10
-        dx=xr*gaussx(jgw)
-        ztmp=xm+dx
-        pwet = moist_pressure_given_z(ztmp,lat,lon); qv= qv_given_moist_pressure(pwet,lat,lon);Tv= Tv_given_z(ztmp,lat,lon)
-        tmp1=gravit*pwet*qv/(Rair*Tv)
-
-        ztmp=xm-dx
-        pwet = moist_pressure_given_z(ztmp,lat,lon); qv= qv_given_moist_pressure(pwet,lat,lon);Tv= Tv_given_z(ztmp,lat,lon)
-        tmp2=gravit*pwet*qv/(Rair*Tv)
-        integral=integral+gaussw(jgw)*(tmp1+tmp2)
+      do jgw=1,num_gauss
+        ztmp=xm+gaussx(jgw)*xr
+        pwet = moist_pressure_given_z(ztmp,lat); qv= qv_given_moist_pressure(pwet,lat);Tv= Tv_given_z(ztmp,lat)
+        integral=integral+gaussw(jgw)*gravit*pwet*qv/(Rair*Tv)
       enddo
-      integral=xr*integral    ! Scale the answer to the range of integration.
-
+      integral=0.5_r8*(z2-z1)*integral    ! Scale the answer to the range of integration.
       weight_of_water_vapor_given_z = integral
     end if
   end FUNCTION weight_of_water_vapor_given_z
 
 
-  real(r8) FUNCTION weight_of_dry_air_given_z(z,ptop,lat,lon,ztop)
-    implicit none
-    real (r8), INTENT(IN)  :: z,ptop, lat, lon, ztop
-    real (r8)  :: dx,xm,xr,gaussw(10),gaussx(10),integral, tmp1, tmp2
-    real(r8)   :: temp, rho, qv, pressure, z1, z2, Tv,pwet, ztmp
-    integer    :: jgw
-    SAVE gaussw,gaussx
-    DATA gaussw/0.1527533871307258_r8,0.1491729864726037_r8,0.1420961093183820_r8,0.1316886384491766_r8,0.1181945319615184_r8,&
-         0.1019301198172404_r8,0.0832767415767048_r8,0.0626720483341091_r8,0.0406014298003869_r8,0.0176140071391521_r8/
-    DATA gaussx/0.0765265211334973_r8,0.2277858511416451_r8,0.3737060887154195_r8,0.5108670019508271_r8,0.6360536807265150_r8,&
-         0.7463319064601508_r8,0.8391169718222188_r8,0.9122344282513259_r8,0.9639719272779138_r8,0.9931285991850949_r8/
+  real(r8) FUNCTION weight_of_dry_air_given_z(z,ptop,lat,ztop)
+
+    real (r8), INTENT(IN) :: z,ptop, lat, ztop
+    real (r8)             :: xm,xr,integral
+    real(r8)              :: qv, z1, z2, Tv,pwet, ztmp
+    integer               :: jgw
 
     z1=z
     z2=ztop
     xm=0.5*(z1+z2)
     xr=0.5*(z2-z1)
     integral=0
-    do jgw=1,10
-       dx=xr*gaussx(jgw)
-       ztmp=xm+dx
-       pwet = moist_pressure_given_z(ztmp,lat,lon); qv= qv_given_moist_pressure(pwet,lat,lon);Tv= Tv_given_z(ztmp,lat,lon)
-       tmp1=gravit*pwet*(1-qv)/(Rair*Tv)
-
-       ztmp=xm-dx
-       pwet = moist_pressure_given_z(ztmp,lat,lon); qv= qv_given_moist_pressure(pwet,lat,lon);Tv= Tv_given_z(ztmp,lat,lon)
-       tmp2=gravit*pwet*(1-qv)/(Rair*Tv)
-       integral=integral+gaussw(jgw)*(tmp1+tmp2)
+    do jgw=1,num_gauss
+       ztmp=xm+gaussx(jgw)*xr
+       pwet = moist_pressure_given_z(ztmp,lat); qv= qv_given_moist_pressure(pwet,lat);Tv= Tv_given_z(ztmp,lat)
+       integral=integral+gaussw(jgw)*gravit*pwet*(1-qv)/(Rair*Tv)
     enddo
-    integral=xr*integral    ! Scale the answer to the range of integration.
-
+    integral=0.5_r8*(z2-z1)*integral    ! Scale the answer to the range of integration.
     weight_of_dry_air_given_z = integral+ptop
   end FUNCTION weight_of_dry_air_given_z
-
-  ! Some simple analytic functions
-  ! All functions multiplied by factor (default 1.0)
-  function test_func(lat, lon, k, funcnum) result(fout)
-    use shr_sys_mod,     only: shr_sys_flush
-
-    real(r8), intent(in) :: lon
-    real(r8), intent(in) :: lat
-    integer,  intent(in) :: k
-    integer,  intent(in) :: funcnum
-    real(r8)             :: fout
-    real(r8)             :: lon1,lat1,R0,Rg1,Rg2,lon2,lat2,cl,cl2
-    real(r8)             :: eta_c
-
-    real(r8)             :: radius      = 10.0_r8 ! radius of the perturbation
-    real(r8)             :: perturb_lon = 20.0_r8 ! longitudinal position, 20E
-    real(r8)             :: perturb_lat = 40.0_r8 ! latitudinal position, 40N
-    real(r8)             :: cos_tmp, sin_tmp, eta
-
-    select case(funcnum)
-    case(4)
-      !
-      !   Non-smooth scalar field (slotted cylinder)
-      !
-      R0 = 0.5_r8
-      lon1 = 4.0_r8 * PI / 5.0_r8
-      lat1 = 0.0_r8
-      Rg1 = acos(sin(lat1)*sin(lat)+cos(lat1)*cos(lat)*cos(lon-lon1))
-      lon2 = 6.0_r8 * PI / 5.0_r8
-      lat2 = 0.0_r8
-      Rg2 = acos(sin(lat2)*sin(lat)+cos(lat2)*cos(lat)*cos(lon-lon2))
-
-      if ((Rg1 <= R0) .AND. (abs(lon-lon1) >= R0/6)) then
-        fout = 2.0_r8
-      elseif ((Rg2 <= R0) .AND. (abs(lon-lon2) >= R0/6)) then
-        fout = 2.0_r8
-      elseif ((Rg1 <= R0) .AND. (abs(lon-lon1) < R0/6) &
-           .AND. (lat-lat1 < -5.0_r8*R0/12.0_r8)) then
-        fout = 2.0_r8
-      elseif ((Rg2 <= R0) .AND. (abs(lon-lon2) < R0/6) &
-           .AND. (lat-lat2 > 5.0_r8*R0/12.0_r8)) then
-        fout = 2.0_r8
-      else
-        fout = 1.0_r8
-      endif
-    case(5)
-      !
-      ! Smooth Gaussian "ball"
-      !
-      R0    = 10.0_r8           ! radius of the perturbation
-      lon1  = 20.0_r8*deg2rad   ! longitudinal position, 20E
-      lat1  = 40.0_r8 *deg2rad  ! latitudinal position, 40N
-      eta_c = 0.6_r8
-      sin_tmp = SIN(lat1)*SIN(lat)
-      cos_tmp = COS(lat1)*COS(lat)
-      Rg1 = ACOS( sin_tmp + cos_tmp*COS(lon-lon1) )    ! great circle distance
-      eta =  (hyam(k)*ps0 + hybm(k)*psurf_moist)/psurf_moist
-      fout = EXP(- ((Rg1*R0)**2 + ((eta-eta_c)/0.1_r8)**2))
-      IF (ABS(fout) < 1.0E-8) fout = 0.0_r8
-    case(6)
-      !
-      !
-      !
-      fout = 0.5_r8 * ( tanh( 3.0_r8*abs(lat)-pi ) + 1.0_r8)
-    case(7)
-      fout = 1.0e-8_r8
-    case(8)
-      !
-      ! approximately Y^2_2 spherical harmonic
-      !
-      fout = 0.5_r8 + 0.5_r8*(cos(lat)*cos(lat)*cos(2.0_r8*lon))
-    case(9)
-      !
-      ! approximately Y32_16 spherical harmonic
-      !
-      fout = 0.5_r8 + 0.5_r8*(cos(16*lon)*(sin(2_r8*lat)**16))
-    case(10)
-      fout = 2.0_r8 + lat
-    case(11)
-      fout = 2.0_r8 + cos(lon)
-    case default
-      call endrun("Illegal funcnum_arg in test_func")
-    end select
-  end function test_func
 
 end module ic_baroclinic

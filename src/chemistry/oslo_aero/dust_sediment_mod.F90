@@ -9,10 +9,10 @@ module dust_sediment_mod
 !
 !---------------------------------------------------------------------------------
 
-  use shr_kind_mod,  only: r8=>shr_kind_r8
-  use ppgrid,        only: pcols, pver, pverp
-  use physconst,     only: gravit, rair
-  use cam_logfile,   only: iulog
+  use shr_kind_mod,      only: r8=>shr_kind_r8
+  use ppgrid,            only: pcols, pver, pverp
+  use physconst,         only: gravit, rair
+  use cam_logfile,       only: iulog
   use cam_abortutils,    only: endrun
 
   private
@@ -107,7 +107,7 @@ contains
 
     real(r8),intent(out),optional  :: dusttend_to_ll_out(pcols)                     ! fluxes at the interfaces, dust (positive = down)
 ! Local variables
-   real(r8)                        :: fxdust(pcols,pverp)
+    real(r8) :: fxdust(pcols,pverp)                     ! fluxes at the interfaces, dust (positive = down)
 
     integer :: i,k
 !----------------------------------------------------------------------
@@ -281,14 +281,14 @@ contains
 ! first find the interval 
     do k =  1,pverp-1
        do i = 1,ncol
-          if ((xins(i)-x(i,k))*(x(i,k+1)-xins(i)).ge.0) then
+          if ((xins(i)-x(i,k))*(x(i,k+1)-xins(i)).ge.0._r8) then
              intz(i) = k
           endif
        end do
     end do
 
     do i = 1,ncol
-       if (intz(i).eq.0._r8) then
+       if (intz(i).eq.0) then
           write(iulog,*) ' interval was not found for col i ', i
           call endrun('DUST_SEDIMENT_MOD:cfint2 -- interval was not found ')
        endif

@@ -21,6 +21,7 @@ public :: gw_rdg_readnl
 public :: gw_rdg_src
 public :: gw_rdg_belowpeak
 public :: gw_rdg_break_trap
+public :: gw_rdg_do_vdiff
 
 ! Tunable Parameters
 !--------------------
@@ -55,6 +56,7 @@ real(r8), protected :: C_BetaMax_SM
 ! (should be <= 1)
 real(r8), protected :: Fr_c
 
+logical, protected :: gw_rdg_do_vdiff=.true.
 
 logical :: do_smooth_regimes
 logical :: do_adjust_tauoro
@@ -99,7 +101,7 @@ subroutine gw_rdg_readnl(nlfile)
                        gw_rdg_Frx0, gw_rdg_Frx1, gw_rdg_C_BetaMax_SM, gw_rdg_Fr_c, &
                        gw_rdg_do_smooth_regimes, gw_rdg_do_adjust_tauoro, &
                        gw_rdg_do_backward_compat, gw_rdg_orohmin, gw_rdg_orovmin, &
-                       gw_rdg_orostratmin, gw_rdg_orom2min
+                       gw_rdg_orostratmin, gw_rdg_orom2min, gw_rdg_do_vdiff
 
   !----------------------------------------------------------------------
 
@@ -165,6 +167,8 @@ subroutine gw_rdg_readnl(nlfile)
   call mpi_bcast(orom2min, 1, mpi_real8, mstrid, mpicom, ierr)
   if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: orom2min")
 
+  call mpi_bcast(gw_rdg_do_vdiff, 1, mpi_logical, mstrid, mpicom, ierr)
+  if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: gw_rdg_do_vdiff")
 
   if (Fr_c > 1.0_r8) call endrun(sub//": FATAL: Fr_c must be <= 1")
 

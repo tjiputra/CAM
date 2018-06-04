@@ -24,7 +24,7 @@ module carma_model_flags_mod
   !
   ! Create a public definition of any new namelist variables that you wish to have,
   ! and default them to an inital value.
-  character(len=256), public     :: carma_mice_file      = 'mice_warren_2008.nc'   ! name of the ice refractive index file
+  character(len=256), public     :: carma_mice_file      = 'mice_warren2008.nc'   ! name of the ice refractive index file
   character(len=32), public      :: carma_sulfate_method = "fixed"                 ! prescribed sulfate method
   ! name of the dust erosion factor file
   character(len=256), public     ::  carma_soilerosion_file  = 'soil_erosion_factor_1x1_c120907.nc'

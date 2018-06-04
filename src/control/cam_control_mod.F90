@@ -37,6 +37,7 @@ logical, protected :: kessler_phys      ! true => run Kessler physics
 logical, protected :: aqua_planet       ! Flag to run model in "aqua planet" mode
 logical, protected :: moist_physics     ! true => moist physics enabled, i.e.,
                                         ! (.not. ideal_phys) .and. (.not. adiabatic)
+logical, protected :: dart_mode         ! Flag to run model with DART
 
 logical, protected :: brnch_retain_casename ! true => branch run may use same caseid as
                                             !         the run being branched from
@@ -53,15 +54,17 @@ contains
 !================================================================================================
 
 subroutine cam_ctrl_init( &
-   caseid_in, ctitle_in, start_type, &
+   caseid_in, ctitle_in, start_type, dart_mode_in, &
    aqua_planet_in, brnch_retain_casename_in)
 
    character(len=cl), intent(in) :: caseid_in            ! case ID
    character(len=cl), intent(in) :: ctitle_in            ! case title
    character(len=cs), intent(in) :: start_type           ! start type: initial, restart, or branch
+   logical,           intent(in) :: dart_mode_in         ! Flag to run model with DART
    logical,           intent(in) :: aqua_planet_in       ! Flag to run model in "aqua planet" mode
    logical,           intent(in) :: brnch_retain_casename_in ! Flag to allow a branch to use the same
                                                              ! caseid as the run being branched from.
+
    integer :: unitn, ierr
 
    character(len=*), parameter :: sub='cam_ctrl_init'
@@ -70,21 +73,26 @@ subroutine cam_ctrl_init( &
 
    caseid = caseid_in
    ctitle = ctitle_in
+   dart_mode = dart_mode_in
 
    initial_run = .false.
    restart_run = .false.
    branch_run  = .false.
-   select case (trim(start_type))
-   case (seq_infodata_start_type_start)
+   if (dart_mode) then
       initial_run = .true.
-   case (seq_infodata_start_type_cont)
-      restart_run = .true.
-   case (seq_infodata_start_type_brnch)
-      branch_run = .true.
-   case default
-      write(errmsg,*) sub // ': FATAL: unknown start type: ', trim(start_type)
-      call endrun(errmsg)
-   end select
+   else
+      select case (trim(start_type))
+      case (seq_infodata_start_type_start)
+         initial_run = .true.
+      case (seq_infodata_start_type_cont)
+         restart_run = .true.
+      case (seq_infodata_start_type_brnch)
+         branch_run = .true.
+      case default
+         write(errmsg,*) sub // ': FATAL: unknown start type: ', trim(start_type)
+         call endrun(errmsg)
+      end select
+   end if
 
    aqua_planet = aqua_planet_in
 
@@ -100,7 +108,11 @@ subroutine cam_ctrl_init( &
       else if (branch_run) then
          write(iulog,*) '  Branch of an earlier run'
       else
-         write(iulog,*) '         Initial run'
+         if (dart_mode) then
+            write(iulog,*) '  DART run using CAM initial mode'
+         else
+            write(iulog,*) '         Initial run'
+         end if
       end if
       write(iulog,*) ' ********** CASE = ',trim(caseid),' **********'
       write(iulog,'(1x,a)') ctitle

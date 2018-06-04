@@ -124,7 +124,6 @@ subroutine inimc( tmeltx, rhonotx, gravitx, rh2ox)
 ! 
 !-----------------------------------------------------------------------
    use pmgrid,       only: plev, plevp
-   use dycore,       only: get_resolution
    use ref_pres,     only: pref_mid
 
    integer k

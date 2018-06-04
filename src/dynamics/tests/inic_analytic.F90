@@ -10,12 +10,12 @@ module inic_analytic
   use shr_kind_mod,        only: r8 => shr_kind_r8
   use cam_abortutils,      only: endrun
   use shr_sys_mod,         only: shr_sys_flush
+  use inic_analytic_utils, only: analytic_ic_active, analytic_ic_type
 
   implicit none
   private
 
-  public :: analytic_ic_readnl ! Read dyn_test_nl namelist
-  public :: analytic_ic_active ! .true. if analytic IC should be set
+  public :: analytic_ic_active ! forwarded from init_analytic_utils
   public :: analytic_ic_set_ic ! Set analytic initial conditions
 
   interface analytic_ic_set_ic
@@ -23,9 +23,6 @@ module inic_analytic
   end interface analytic_ic_set_ic
 
   ! Private module variables
-  integer,                   parameter :: scheme_len = 16
-  character(len=scheme_len), parameter :: unset_str = 'unset'
-  character(len=scheme_len)            :: analytic_ic_type = 'none'
   integer                              :: call_num = 0
 
   ! Private interface
@@ -39,85 +36,6 @@ module inic_analytic
 !==============================================================================
 CONTAINS
 !==============================================================================
-
-  subroutine analytic_ic_readnl(nlfile)
-
-    use namelist_utils, only: find_group_name
-    use units,          only: getunit, freeunit
-    use spmd_utils,     only: masterproc, masterprocid, mpicom, mpi_character, mpi_logical
-    use shr_string_mod, only: shr_string_toLower
-
-    ! Dummy argument
-    character(len=*), intent(in)   :: nlfile  ! filepath of namelist input file
-
-    !
-    ! Local variables
-    integer                        :: unitn, ierr
-    logical                        :: nl_not_found
-    character(len=128)             :: msg
-    character(len=*), parameter    :: subname = 'ANALYTIC_IC_READNL'
-
-    ! History namelist items
-    namelist /analytic_ic_nl/ analytic_ic_type
-
-    if (masterproc) then
-      unitn = getunit()
-      open(unitn, file=trim(nlfile), status='old')
-      call find_group_name(unitn, 'analytic_ic_nl', status=ierr)
-      if (ierr == 0) then
-        nl_not_found = .false.
-        write(iulog, *) 'Read in analytic_ic_nl namelist from: ',trim(nlfile)
-        read(unitn, analytic_ic_nl, iostat=ierr)
-        if (ierr /= 0) then
-          write(msg, '(a,i0)')                                             &
-               ': ERROR reading namelist, analytic_ic_nl, iostat = ', ierr
-          call endrun(subname//trim(msg))
-        end if
-      else
-        nl_not_found = .true.
-      end if
-      close(unitn)
-      call freeunit(unitn)
-
-      analytic_ic_type = shr_string_toLower(analytic_ic_type)
-    end if
-
-    ! Broadcast namelist variables
-    call mpi_bcast(analytic_ic_type,len(analytic_ic_type), mpi_character, masterprocid, mpicom, ierr)
-    call mpi_bcast(nl_not_found, 1, mpi_logical, masterprocid, mpicom, ierr)
-
-    if (nl_not_found) then
-       ! If analytic IC functionality is turned on (via a configure switch), then
-       ! build-namelist supplies the namelist group.  If not found then nothing
-       ! to do.
-       return
-    else
-       select case(trim(analytic_ic_type))
-       case('held_suarez_1994')
-          msg = 'Dynamics state will be set to Held-Suarez (1994) initial conditions.'
-       case('baroclinic_wave')
-          msg = 'Dynamics state will be set to a baroclinic wave initial condition.'
-       case('none')
-          msg = subname//': ERROR: analytic_ic_type must be set'
-          write(iulog, *) msg
-          call endrun(msg)
-       case default
-          msg = subname//': ERROR: analytic_ic_type not recognized: '//trim(analytic_ic_type)
-          write(iulog, *) msg
-          call endrun(msg)
-       end select
-    end if
-
-    ! Write out initial condition scheme info
-    if (masterproc) then
-       write(iulog, *) msg
-    end if
-
-  end subroutine analytic_ic_readnl
-
-  logical function analytic_ic_active()
-    analytic_ic_active = (trim(analytic_ic_type) /= 'none')
-  end function analytic_ic_active
 
   subroutine dyn_set_inic_col(vcoord, latvals, lonvals, glob_ind, U, V, T,    &
        PS, PHIS, Q, m_cnst, mask, verbose)
@@ -180,19 +98,39 @@ CONTAINS
       call endrun(subname//'latvals and lonvals must have same size')
     end if
     if (present(U)) then
-      call check_array_size(U(:,1), 'U', latvals, subname)
+      if (size(U) > 0) then
+        call check_array_size(U(:,1), 'U', latvals, subname)
+      else
+        return
+      end if
     end if
     if (present(V)) then
-      call check_array_size(V(:,1), 'V', latvals, subname)
+      if (size(V) > 0) then
+        call check_array_size(V(:,1), 'V', latvals, subname)
+      else
+        return
+      end if
     end if
     if (present(T)) then
-      call check_array_size(T(:,1), 'T', latvals, subname)
+      if (size(T) > 0) then
+        call check_array_size(T(:,1), 'T', latvals, subname)
+      else
+        return
+      end if
     end if
     if (present(PS)) then
-      call check_array_size(PS, 'PS', latvals, subname)
+      if (size(PS) > 0) then
+        call check_array_size(PS, 'PS', latvals, subname)
+      else
+        return
+      end if
     end if
     if (present(PHIS)) then
-      call check_array_size(PHIS, 'PHIS', latvals, subname)
+      if (size(PHIS) > 0) then
+        call check_array_size(PHIS, 'PHIS', latvals, subname)
+      else
+        return
+      end if
     end if
     ! Some special checks on the tracer argument
     if (present(Q)) then
@@ -202,16 +140,24 @@ CONTAINS
       if (size(Q, 3) /= size(m_cnst, 1)) then
         call endrun(subname//': size of m_cnst must match last dimension of Q')
       end if
-      call check_array_size(Q(:,1,1), 'Q', latvals, subname)
+      if (size(Q) > 0) then
+        call check_array_size(Q(:,1,1), 'Q', latvals, subname)
+      else
+        return
+      end if
     end if
 
     select case(trim(analytic_ic_type))
     case('held_suarez_1994')
       call hs94_set_ic(latvals, lonvals, U=U, V=V, T=T, PS=PS, PHIS=PHIS,     &
            Q=Q, m_cnst=m_cnst, mask=mask_use, verbose=verbose_use)
-    case('baroclinic_wave')
+
+    case('baroclinic_wave', 'dry_baroclinic_wave')
+
+
       call bc_wav_set_ic(vcoord, latvals, lonvals, U=U, V=V, T=T, PS=PS,      &
            PHIS=PHIS, Q=Q, m_cnst=m_cnst, mask=mask_use, verbose=verbose_use)
+
     case default
       call endrun(subname//': Unknown analytic_ic_type, "'//trim(analytic_ic_type)//'"')
     end select
@@ -553,13 +499,19 @@ CONTAINS
     integer,          intent(inout) :: size3
     character(len=*), intent(in)    :: es
 
-    if (size1 < 0) then
+    if ((size1 < 0) .and. (size(array) == 0)) then
+      ! The shape has not yet been set, set it to zero
+      size1 = 0
+      size2 = 0
+      size3 = 0
+      sname = trim(aname)
+    else if (size1 < 0) then
       ! The shape has not yet been set, set it
       size1 = size(array, 1)
       size2 = size(array, 2)
       size3 = 1
       sname = trim(aname)
-    else
+    else if ((size1 * size2 * size3) > 0) then
       ! For 2-D variables, the second dimension is always the block size
       ! However, since the shape may have been set by a 3-D variable, we
       ! need to pass either possibility
@@ -567,6 +519,7 @@ CONTAINS
            ((size2 /= size(array, 2)) .and. (size3 /= size(array, 2)))) then
         call endrun(trim(es)//': shape of '//trim(aname)//' does not match shape of '//trim(sname))
       end if
+    ! No else, we cannot compare to zero size master array
     end if
 
   end subroutine get_input_shape_2d
@@ -580,18 +533,25 @@ CONTAINS
     integer,          intent(inout) :: size3
     character(len=*), intent(in)    :: es
 
-    if (size1 < 0) then
+    if ((size1 < 0) .and. (size(array) == 0)) then
+      ! The shape has not yet been set, set it to zero
+      size1 = 0
+      size2 = 0
+      size3 = 0
+      sname = trim(aname)
+    else if (size1 < 0) then
       ! The shape has not yet been set, set it
       size1 = size(array, 1)
       size2 = size(array, 2)
       size3 = size(array, 3)
       sname = trim(aname)
-    else
+    else if ((size1 * size2 * size3) > 0) then
       ! We have a shape, make sure array matches it
       if ((size1 /= size(array, 1)) .or. (size2 /= size(array, 2)) .or. (size3 /= size(array, 3))) then
         call endrun(trim(es)//': shape of '//trim(aname)//' does not match shape of '//trim(sname))
       end if
     end if
+    ! No else, we cannot compare to zero size master array
   end subroutine get_input_shape_3d
 
   subroutine check_array_size(array, aname, check, subname)

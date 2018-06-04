@@ -36,6 +36,7 @@
       real(r8) :: fix_mass(max(1,nfs))
       real(r8), allocatable :: cph_enthalpy(:)
       integer, allocatable :: cph_rid(:)
+      integer, allocatable :: num_rnts(:)
       integer, allocatable :: rxt_tag_map(:)
       real(r8), allocatable :: pht_alias_mult(:,:)
       character(len=32), allocatable :: rxt_tag_lst(:)

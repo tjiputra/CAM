@@ -30,7 +30,7 @@ module aerodep_flx
   integer, parameter, public :: N_MODAL = 22
   integer :: number_flds
 
-  character(len=256) :: filename = ' '
+  character(len=256) :: filename = 'NONE'
   character(len=256) :: filelist = ' '
   character(len=256) :: datapath = ' '
   character(len=32)  :: datatype = 'SERIAL'
@@ -310,7 +310,7 @@ subroutine aerodep_flx_readnl(nlfile)
    fixed_tod  = aerodep_flx_fixed_tod
 
    ! Turn on prescribed volcanics if user has specified an input dataset.
-   if (len_trim(filename) > 0 ) has_aerodep_flx = .true.
+   if (len_trim(filename) > 0 .and. filename.ne.'NONE' ) has_aerodep_flx = .true.
 
 end subroutine aerodep_flx_readnl
 

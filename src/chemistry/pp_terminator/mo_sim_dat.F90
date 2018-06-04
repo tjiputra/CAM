@@ -13,7 +13,7 @@
       use chem_mods,     only : phtcnt, rxt_tag_cnt, rxt_tag_lst, rxt_tag_map
       use chem_mods,     only : pht_alias_lst, pht_alias_mult
       use chem_mods,     only : extfrc_lst, inv_lst, slvd_lst
-      use chem_mods,     only : enthalpy_cnt, cph_enthalpy, cph_rid
+      use chem_mods,     only : enthalpy_cnt, cph_enthalpy, cph_rid, num_rnts, rxntot
       use cam_abortutils,only : endrun
       use mo_tracname,   only : solsym
       use chem_mods,     only : frc_from_dataset
@@ -67,8 +67,14 @@
          write(iulog,*) 'set_sim_dat: failed to allocate rxt_tag_map; error = ',ios
          call endrun
       end if
-      rxt_tag_lst(:rxt_tag_cnt) = (/ 'toy_k1                          ', 'toy_k2                          ' /)
+      rxt_tag_lst(     1:     2) = (/ 'toy_k1                          ', 'toy_k2                          ' /)
       rxt_tag_map(:rxt_tag_cnt) = (/    1,   2 /)
+      allocate( num_rnts(rxntot-phtcnt),stat=ios )
+      if( ios /= 0 ) then
+         write(iulog,*) 'set_sim_dat: failed to allocate num_rnts; error = ',ios
+         call endrun
+      end if
+      num_rnts(:) = (/      1,     2 /)
 
       end subroutine set_sim_dat
 

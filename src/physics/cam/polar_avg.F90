@@ -80,6 +80,9 @@ module polar_avg
      allocate(lats(pcols), n_pole(plon), s_pole(plon))
      ln=0
      ls=0
+     n_pole = 0._r8
+     s_pole = 0._r8
+
      do c=begchunk,endchunk
         call get_lat_all_p(c,pcols,lats) 
 	ncols = get_ncols_p(c)
@@ -161,6 +164,9 @@ module polar_avg
      allocate(lats(pcols), n_pole(plon,nlev), s_pole(plon,nlev))
      ln=0
      ls=0
+     n_pole = 0._r8
+     s_pole = 0._r8
+
      do c=begchunk,endchunk
         call get_lat_all_p(c,pcols,lats) 
 	ncols = get_ncols_p(c)

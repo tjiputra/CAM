@@ -3,6 +3,8 @@
 ! based on the original code from J. Neu developed for UC Irvine
 ! model
 !
+! LKE 2/23/2018 - correct setting flag for mass-limited (HNO3,etc.) vs Henry's Law washout
+!
 module mo_neu_wetdep
 !
   use shr_kind_mod,     only : r8 => shr_kind_r8
@@ -33,6 +35,7 @@ module mo_neu_wetdep
   integer                     :: index_cldice,index_cldliq,nh3_ndx,co2_ndx
   logical                     :: debug   = .false.
   integer                     :: hno3_ndx = 0
+  integer                     :: h2o2_ndx = 0
 !
 ! diagnostics
 !
@@ -152,7 +155,7 @@ subroutine neu_wetdep_init
     if ( trim(test_name) == 'CO2' ) then
       co2_ndx = m
     end if
-    if ( trim(test_name) == 'HNO3' ) then
+    if ( trim(gas_wetdep_list(m)) == 'HNO3' ) then
       hno3_ndx = m
     end if
 !
@@ -178,16 +181,17 @@ subroutine neu_wetdep_init
     end if
   end do
 !
-! define specie-dependent arrays
+! define species-dependent arrays
 !
   do m=1,gas_wetdep_cnt
 !
-    mol_weight     (m) = cnst_mw(mapping_to_mmr(m))
+    mol_weight(m) = cnst_mw(mapping_to_mmr(m))
     if ( debug ) print '(i4,a,f8.4)',m,' mol_weight ',mol_weight(m)
     ice_uptake(m) = .false.
     if ( trim(gas_wetdep_list(m)) == 'HNO3' ) then
       ice_uptake(m) = .true.
     end if
+!
 !
   end do
 !
@@ -201,6 +205,7 @@ subroutine neu_wetdep_init
   do m=1,gas_wetdep_cnt
     call addfld     ('DTWR_'//trim(gas_wetdep_list(m)),(/ 'lev' /), 'A','kg/kg/s','wet removal Neu scheme tendency')
     call addfld     ('WD_'//trim(gas_wetdep_list(m)),horiz_only, 'A','kg/m2/s','vertical integrated wet deposition flux')
+    call addfld     ('HEFF_'//trim(gas_wetdep_list(m)),(/ 'lev' /), 'A','M/atm','Effective Henrys Law coeff.')
     if (history_chemistry) then
        call add_default('DTWR_'//trim(gas_wetdep_list(m)), 1, ' ')
        call add_default('WD_'//trim(gas_wetdep_list(m)), 1, ' ')
@@ -405,16 +410,6 @@ call phys_getopts( history_aerosol_out = history_aerosol)
     end do
   end do
 !
-! define flag for high effective Henry's law
-!
-  do m=1,gas_wetdep_cnt
-    if ( maxval(heff(:,:,m)) > 1.e4_r8 ) then
-      tckaqb(m) = .true.
-    else
-      tckaqb(m) = .false.
-    end if
-  end do
-!
   if ( debug ) then
     print '(a,50f8.2)','tckaqb     ',tckaqb
     print '(a,50e12.4)','heff      ',heff(1,1,:)
@@ -471,6 +466,8 @@ call phys_getopts( history_aerosol_out = history_aerosol)
   do m=1,gas_wetdep_cnt
     wd_tend(1:ncol,:,mapping_to_mmr(m)) = wd_tend(1:ncol,:,mapping_to_mmr(m)) + dtwr(1:ncol,:,m)
     call outfld( 'DTWR_'//trim(gas_wetdep_list(m)),dtwr(:,:,m),ncol,lchnk )
+    
+    call outfld( 'HEFF_'//trim(gas_wetdep_list(m)),heff(:,pver:1:-1,m),ncol,lchnk )
 !
 ! vertical integrated wet deposition rate [kg/m2/s]
 !
@@ -661,15 +658,7 @@ species_loop : &
          rax_wrk(:lpar,:) = zero
          fax_wrk(:lpar,:) = zero
        endif
-!-----------------------------------------------------------------------
-!  calculate scavenging by large-scale stratiform precipitation
-!  check whether mass-limited or henry's law
-!-----------------------------------------------------------------------
-       if( TCKAQB(N) ) then
-         LWASHTYP = 1
-       else
-         LWASHTYP = 2
-       end if
+
 !-----------------------------------------------------------------------
 !  check whether soluble in ice
 !-----------------------------------------------------------------------
@@ -1139,14 +1128,14 @@ is_freezing : &
 !-----------------------------------------------------------------------
                if( RCA > zero ) then
                  QTPRECIP = FCXA*QTT(L) - QTDISRIME
-                 if( LWASHTYP == 1 ) then
+                 if( HSTAR(L,N) > 1.e4_r8 ) then
                    if( QTPRECIP > zero ) then
                      QTWASHCXA = QTPRECIP*(one - exp( -0.24_r8*COLEFFAER*((RCA)**0.75_r8)*DTSCAV ))   !local
                    else
                      QTWASHCXA = zero
                    endif
                    QTEVAPCXA = zero
-                 elseif( LWASHTYP == 2 ) then
+                 else
                    RWASH = RCA*GAREA                                !kg/s local
                    if( QTPRECIP > zero ) then
                      call WASHGAS( RWASH, FCA, DTSCAV, QTTOPCA+QTRIMECXA, &
@@ -1275,7 +1264,7 @@ is_freezing_a : &
                  QTEVAPCXAP = (RCA - RCXA)/RCA*QTTOPCA
                  DCXA = FOUR
                  QTCXA = FCXA*QTT(L)
-                 if( LWASHTYP == 1 ) then
+                 if( HSTAR(L,N) > 1.e4_r8 ) then
                    if( QTT(L) > zero ) then
                      call DISGAS( CLWX*(FCXA/CFXX(L)), FCXA, TCMASS(N),   &
                                   HSTAR(L,N), TEM(L), POFL(L),            &
@@ -1290,7 +1279,7 @@ is_freezing_a : &
                      QTWASHCXA  = zero
                      QTEVAPCXAW = zero
                    endif
-                 elseif (LWASHTYP == 2 ) then
+                 else
                    RWASH = RCXA*GAREA                         !kg/s local
                    call WASHGAS( RWASH, FCXA, DTSCAV, QTTOPCA, HSTAR(L,N), &
                                  TEM(L), POFL(L), QM(L),                   &
@@ -1309,12 +1298,12 @@ is_freezing_a : &
            if( RAX > zero ) then
              if( .not. freezing(l) ) then
                QTAX = FAX*QTT(L)
-               if( LWASHTYP == 1 ) then
+               if( HSTAR(L,N) > 1.e4_r8 ) then
                  QTWASHAX = QTAX*                        &
                     (one - exp(-0.24_r8*COLEFFAER*       &
                    ((RAX)**0.75_r8)*DTSCAV))  !local
                  QTEVAPAXW = zero
-               elseif( LWASHTYP == 2 ) then
+               else
                  RWASH = RAX*GAREA   !kg/s local
                  call WASHGAS( RWASH, FAX, DTSCAV, QTTOPAA, HSTAR(L,N), &
                                TEM(L), POFL(L), QM(L), QTAX,            &

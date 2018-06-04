@@ -49,7 +49,7 @@ module chem_surfvals
    real(r8) :: f12vmr = -1.0_r8                ! cfc12 volume mixing ratio 
    character(len=16) :: scenario_ghg = 'FIXED' ! 'FIXED','RAMPED' or 'RAMP_CO2_ONLY'
    integer  :: rampYear_ghg = 0                ! ramped gases fixed at this year (if > 0)
-   character(len=256) :: bndtvghg = ' '        ! filename for ramped data
+   character(len=256) :: bndtvghg = 'NONE'     ! filename for ramped data
    integer  :: ramp_co2_start_ymd = 0          ! start date for co2 ramping (yyyymmdd)
    real(r8) :: ramp_co2_annual_rate = 1.0_r8      ! % amount of co2 ramping per yr; default is 1% 
    real(r8) :: ramp_co2_cap = -9999.0_r8          ! co2 ramp cap if rate>0, floor otherwise 
@@ -77,7 +77,7 @@ module chem_surfvals
    
    ! fixed lower boundary 
    
-   character(len=256) :: flbc_file = ' '
+   character(len=256) :: flbc_file = 'NONE'
    character(len=16)  :: flbc_list(pcnst) = ''
    type(time_ramp)    :: flbc_timing     != time_ramp( "CYCLICAL",  19970101, 0 )
 
@@ -160,7 +160,7 @@ subroutine chem_surfvals_readnl(nlfile)
    flbc_timing%fixed_ymd = flbc_fixed_ymd
    flbc_timing%fixed_tod = flbc_fixed_tod
 
-   if ( len_trim(bndtvghg) > 0 .and. len_trim(flbc_file) > 0 ) then
+   if ( (bndtvghg.ne.'NONE') .and. (flbc_file.ne.'NONE') ) then
       call endrun('chem_surfvals_readnl: Cannot specify both bndtvghg and flbc_file ')
    endif
 

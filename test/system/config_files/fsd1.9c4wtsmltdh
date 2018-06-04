@@ -4,7 +4,7 @@
 -nlev 88
 -offline_dyn
 -age_of_air_trcs
--res 1.9x2.5
+-hgrid 1.9x2.5
 -debug
 -phys cam4
 -s

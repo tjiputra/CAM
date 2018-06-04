@@ -1347,7 +1347,8 @@ contains
   ! This routine interpolates the geopotential height in the physics state to
   ! find the geopotential height at the specified tropopause pressure.
   function tropopause_interpolateZ(pstate, icol, tropLev, tropP)
- 
+    use physconst, only: rga
+
     implicit none
 
     type(physics_state), intent(in)     :: pstate 
@@ -1380,7 +1381,7 @@ contains
       tropZ = pstate%zm(icol, tropLev) + (log(tropP) - log(pstate%pmid(icol, tropLev))) * dZdlogP
     end if
     
-    tropopause_interpolateZ = tropZ
+    tropopause_interpolateZ = tropZ + pstate%phis(icol)*rga
   end function tropopause_interpolateZ
 
   

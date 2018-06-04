@@ -1,6 +1,6 @@
 # To run all CAM unit tests on caldera, run the following command:
 #
-# Also note that, on yellowstone/caldera, this requires 'module load all-python-libs'
+# Also note that, on caldera, this requires 'module load all-python-libs'
 #
 # The creation of a temporary directory ensures that you are doing a completely
 # clean build of the unit tests. (The use of the --clean flag to run_tests.py

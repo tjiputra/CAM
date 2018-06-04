@@ -28,7 +28,7 @@ module carma_model_flags_mod
   real(r8), public               :: carma_emis_total  = 16.0_r8  ! Total mass emitted (kt/year)
   character(len=256), public     :: carma_emis_file   = 'meteor_smoke_kalashnikova.nc'   ! name of the emission file
   character(len=256), public     :: carma_escale_file = 'smoke_grf_frentzke.nc'   ! name of the emission scale file
-  character(len=256), public     :: carma_mice_file   = 'mice_warren_2008.nc'   ! name of the ice refractive index file
+  character(len=256), public     :: carma_mice_file   = 'mice_warren2008.nc'   ! name of the ice refractive index file
 
 contains
 

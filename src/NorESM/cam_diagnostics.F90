@@ -199,13 +199,16 @@ contains
 !-
 
     ! outfld calls in diag_phys_writeout
-    call addfld ('NSTEP',horiz_only,    'A','timestep',       'Model timestep')
-    call addfld ('PHIS', horiz_only,    'I','m2/s2',          'Surface geopotential')
+    call addfld (cnst_name(1), (/ 'lev' /), 'A', 'kg/kg',    cnst_longname(1))
+    call addfld ('NSTEP',      horiz_only,  'A', 'timestep', 'Model timestep')
+    call addfld ('PHIS',       horiz_only,  'I', 'm2/s2',    'Surface geopotential')
 
-    call addfld ('PS',         horiz_only,  'A','Pa',         'Surface pressure')
-    call addfld ('T',          (/ 'lev' /), 'A','K',          'Temperature')
-    call addfld ('U',          (/ 'lev' /), 'A','m/s',        'Zonal wind')
-    call addfld ('V',          (/ 'lev' /), 'A','m/s',        'Meridional wind')
+    call addfld ('PS',         horiz_only,  'A', 'Pa',       'Surface pressure')
+    call addfld ('T',          (/ 'lev' /), 'A', 'K',        'Temperature')
+    call addfld ('U',          (/ 'lev' /), 'A', 'm/s',      'Zonal wind')
+    call addfld ('V',          (/ 'lev' /), 'A', 'm/s',      'Meridional wind')
+
+    call register_vector_field('U','V')
 
     ! State before physics
     call addfld ('TBP',     (/ 'lev' /), 'A','K',             'Temperature (before physics)')
@@ -214,9 +217,13 @@ contains
     call addfld ('TAP',     (/ 'lev' /), 'A','K',             'Temperature (after physics)'       )
     call addfld ('UAP',     (/ 'lev' /), 'A','m/s',           'Zonal wind (after physics)'        )
     call addfld ('VAP',     (/ 'lev' /), 'A','m/s',           'Meridional wind (after physics)'   )
+
+    call register_vector_field('UAP','VAP')
+
     call addfld (apcnst(1), (/ 'lev' /), 'A','kg/kg',         trim(cnst_longname(1))//' (after physics)')
     if ( dycore_is('LR') .or. dycore_is('SE') ) then
-      call addfld ('TFIX',   horiz_only, 'A','K/s',           'T fixer (T equivalent of Energy correction)')
+      call addfld ('TFIX',    horiz_only,  'A', 'K/s',        'T fixer (T equivalent of Energy correction)')
+!+tht
       call addfld ('EBREAK', horiz_only, 'A','W/m2',          'Global-mean energy-nonconservation (W/m2)')
       call addfld ('PTTEND_DME', (/ 'lev' /), 'A', 'K/s ', &
                    'T-tendency due to dry mass adjustment at the end of tphysac'    )
@@ -224,11 +231,12 @@ contains
                    'Column DSE tendency due to mass adjustment at end of tphysac'   )
       call addfld ('EFLX    '  ,  horiz_only, 'A','W/m2 ', &
                    'Material enthalpy flux due to mass adjustment at end of tphysac')
+!-tht
     end if
     call addfld ('TTEND_TOT', (/ 'lev' /), 'A', 'K/s',        'Total temperature tendency')
 
     call addfld ('Z3',         (/ 'lev' /), 'A', 'm',         'Geopotential Height (above sea level)')
-    call addfld ('Z1000',      horiz_only,  'A', 'm',         'Geopotential Z at 700 mbar pressure surface')
+    call addfld ('Z1000',      horiz_only,  'A', 'm',         'Geopotential Z at 1000 mbar pressure surface')
     call addfld ('Z700',       horiz_only,  'A', 'm',         'Geopotential Z at 700 mbar pressure surface')
     call addfld ('Z500',       horiz_only,  'A', 'm',         'Geopotential Z at 500 mbar pressure surface')
     call addfld ('Z300',       horiz_only,  'A', 'm',         'Geopotential Z at 300 mbar pressure surface')
@@ -237,7 +245,7 @@ contains
     call addfld ('Z050',       horiz_only,  'A', 'm',         'Geopotential Z at 50 mbar pressure surface')
 
     call addfld ('ZZ',         (/ 'lev' /), 'A', 'm2',        'Eddy height variance' )
-    call addfld ('VZ',         (/ 'lev' /), 'A', 'm2/s',      'Meridional transport of geopotential energy')
+    call addfld ('VZ',         (/ 'lev' /), 'A', 'm2/s',      'Meridional transport of geopotential height')
     call addfld ('VT',         (/ 'lev' /), 'A', 'K m/s   ',  'Meridional heat transport')
     call addfld ('VU',         (/ 'lev' /), 'A', 'm2/s2',     'Meridional flux of zonal momentum' )
     call addfld ('VV',         (/ 'lev' /), 'A', 'm2/s2',     'Meridional velocity squared' )
@@ -621,14 +629,16 @@ contains
       ! State after physics (FV)
       call add_default ('TAP     '  , history_budget_histfile_num, ' ')
       call add_default ('UAP     '  , history_budget_histfile_num, ' ')
-      call add_default ('VAP     '  , history_budget_histfile_num, ' ')
+      call add_default ('VAP     '  , history_budget_histfile_num, ' ')  
       call add_default (apcnst(1)   , history_budget_histfile_num, ' ')
       if ( dycore_is('LR') .or. dycore_is('SE') ) then
-        call add_default ('TFIX    '  , history_budget_histfile_num, ' ')
-        call add_default ('EBREAK  '  , history_budget_histfile_num, ' ') !+tht
-        call add_default ('PTTEND_DME', history_budget_histfile_num, ' ') !+tht
-        call add_default ('IETEND_DME', history_budget_histfile_num, ' ') !+tht
-        call add_default ('EFLX    '  , history_budget_histfile_num, ' ') !+tht
+        call add_default ('TFIX    '    , history_budget_histfile_num, ' ')
+!+tht
+        call add_default ('EBREAK  '  , history_budget_histfile_num, ' ')
+        call add_default ('PTTEND_DME', history_budget_histfile_num, ' ')
+        call add_default ('IETEND_DME', history_budget_histfile_num, ' ')
+        call add_default ('EFLX    '  , history_budget_histfile_num, ' ')
+!-tht
       end if
     end if
 
@@ -937,7 +947,6 @@ contains
     call cnst_get_ind('CLDICE', ixcldice, abort=.false.)
 
     ! outfld calls in diag_phys_writeout
-    call addfld (cnst_name(1), (/ 'lev' /), 'A', 'kg/kg',    cnst_longname(1))
     call addfld ('OMEGAQ',     (/ 'lev' /), 'A', 'kgPa/kgs', 'Vertical water transport' )
     call addfld ('VQ',         (/ 'lev' /), 'A', 'm/skg/kg',  'Meridional water transport')
     call addfld ('QQ',         (/ 'lev' /), 'A', 'kg2/kg2',   'Eddy moisture variance')
@@ -958,8 +967,9 @@ contains
     call addfld ('Q200',       horiz_only,  'A', 'kg/kg','Specific Humidity at 700 mbar pressure surface')
     call addfld ('QBOT',       horiz_only,  'A', 'kg/kg','Lowest model level water vapor mixing ratio')
 
-    call addfld ('PDELDRY',(/ 'lev' /), 'A','Pa','Dry pressure difference between levels')
-    call addfld ('PSDRY',  horiz_only,  'A','Pa','Surface pressure')
+    call addfld ('PSDRY',      horiz_only,  'A', 'Pa', 'Dry surface pressure')
+    call addfld ('PMID',       (/ 'lev' /), 'A', 'Pa', 'Pressure at layer midpoints')
+    call addfld ('PDELDRY',    (/ 'lev' /), 'A','Pa','Dry pressure difference between levels')
 
     ! outfld calls in diag_conv
 
@@ -1020,6 +1030,58 @@ contains
     call addfld ('ALDIR',    horiz_only, 'A', '1','albedo: longwave, direct')
     call addfld ('ALDIF',    horiz_only, 'A', '1','albedo: longwave, diffuse')
     call addfld ('SST',      horiz_only, 'A', 'K','sea surface temperature')
+    !
+    ! energy diagnostics
+    !
+    call addfld ('SE_pBF',   horiz_only, 'A', 'J/m2','Dry Static Energy before energy fixer')
+    call addfld ('SE_pBP',   horiz_only, 'A', 'J/m2','Dry Static Energy before parameterizations')
+    call addfld ('SE_pAP',   horiz_only, 'A', 'J/m2','Dry Static Energy after parameterizations')
+    call addfld ('SE_pAM',   horiz_only, 'A', 'J/m2','Dry Static Energy after dry mass correction')
+
+    call addfld ('KE_pBF',   horiz_only, 'A', 'J/m2','Kinetic Energy before energy fixer')
+    call addfld ('KE_pBP',   horiz_only, 'A', 'J/m2','Kinetic Energy before parameterizations')
+    call addfld ('KE_pAP',   horiz_only, 'A', 'J/m2','Kinetic Energy after parameterizations')
+    call addfld ('KE_pAM',   horiz_only, 'A', 'J/m2','Kinetic Energy after dry mass correction')
+
+    call addfld ('TT_pBF',   horiz_only, 'A', 'kg/m2','Total column test tracer before energy fixer')
+    call addfld ('TT_pBP',   horiz_only, 'A', 'kg/m2','Total column test tracer before parameterizations')
+    call addfld ('TT_pAP',   horiz_only, 'A', 'kg/m2','Total column test tracer after parameterizations')
+    call addfld ('TT_pAM',   horiz_only, 'A', 'kg/m2','Total column test tracer after dry mass correction')
+
+    call addfld ('WV_pBF',   horiz_only, 'A', 'kg/m2','Total column water vapor before energy fixer')
+    call addfld ('WV_pBP',   horiz_only, 'A', 'kg/m2','Total column water vapor before parameterizations')
+    call addfld ('WV_pAP',   horiz_only, 'A', 'kg/m2','Total column water vapor after parameterizations')
+    call addfld ('WV_pAM',   horiz_only, 'A', 'kg/m2','Total column water vapor after dry mass correction')
+
+    call addfld ('WL_pBF',   horiz_only, 'A', 'kg/m2','Total column cloud water before energy fixer')
+    call addfld ('WL_pBP',   horiz_only, 'A', 'kg/m2','Total column cloud water before parameterizations')
+    call addfld ('WL_pAP',   horiz_only, 'A', 'kg/m2','Total column cloud water after parameterizations')
+    call addfld ('WL_pAM',   horiz_only, 'A', 'kg/m2','Total column cloud water after dry mass correction')
+
+    call addfld ('WI_pBF',   horiz_only, 'A', 'kg/m2','Total column cloud ice before energy fixer')
+    call addfld ('WI_pBP',   horiz_only, 'A', 'kg/m2','Total column cloud ice before parameterizations')
+    call addfld ('WI_pAP',   horiz_only, 'A', 'kg/m2','Total column cloud ice after parameterizations')
+    call addfld ('WI_pAM',   horiz_only, 'A', 'kg/m2','Total column cloud ice after dry mass correction')
+    !
+    ! Axial Angular Momentum diagnostics
+    !
+    call addfld ('MR_pBF',   horiz_only, 'A', 'kg*m2/s*rad2',&
+    'Total column wind axial angular momentum before energy fixer')
+    call addfld ('MR_pBP',   horiz_only, 'A', 'kg*m2/s*rad2',&
+    'Total column wind axial angular momentum before parameterizations')
+    call addfld ('MR_pAP',   horiz_only, 'A', 'kg*m2/s*rad2',&
+         'Total column wind axial angular momentum after parameterizations')
+    call addfld ('MR_pAM',   horiz_only, 'A', 'kg*m2/s*rad2',&
+         'Total column wind axial angular momentum after dry mass correction')
+
+    call addfld ('MO_pBF',   horiz_only, 'A', 'kg*m2/s*rad2',&
+    'Total column mass axial angular momentum before energy fixer')
+    call addfld ('MO_pBP',   horiz_only, 'A', 'kg*m2/s*rad2',&
+    'Total column mass axial angular momentum before parameterizations')
+    call addfld ('MO_pAP',   horiz_only, 'A', 'kg*m2/s*rad2',&
+         'Total column mass axial angular momentum after parameterizations')
+    call addfld ('MO_pAM',   horiz_only, 'A', 'kg*m2/s*rad2',&
+         'Total column mass axial angular momentum after dry mass correction')
 
     ! outfld calls in diag_phys_tend_writeout
 
@@ -1120,6 +1182,11 @@ contains
       call add_default ('TSMX    ', 1, ' ')
       call add_default ('SNOWHLND', 1, ' ')
       call add_default ('SNOWHICE', 1, ' ')
+    end if
+
+    if (dycore_is('SE')) then
+       call add_default ('PSDRY', 1, ' ')
+       call add_default ('PMID',  1, ' ')
     end if
 
     if (history_eddy) then
@@ -1235,6 +1302,7 @@ contains
   end subroutine diag_init_moist
 
   subroutine diag_init(pbuf2d)
+    use cam_history,        only: addfld
 
     ! Declare the history fields for which this module contains outfld calls.
 
@@ -1463,6 +1531,12 @@ contains
     call outfld('phis    ',state%phis,    pcols,   lchnk     )
 #endif
 
+    do m = 1, pcnst
+      if (cnst_cam_outfld(m)) then
+        call outfld(cnst_name(m), state%q(1,1,m), pcols, lchnk)
+      end if
+    end do
+
     !
     ! Add height of surface to midpoint height above surface
     !
@@ -1474,31 +1548,34 @@ contains
     ! Output Z3 on pressure surfaces
     !
     if (hist_fld_active('Z1000')) then
-      call vertinterp(ncol, pcols, pver, state%pmid, 100000._r8, z3, p_surf)
+      call vertinterp(ncol, pcols, pver, state%pmid, 100000._r8, z3, p_surf, &
+          extrapolate='Z', ln_interp=.true., ps=state%ps, phis=state%phis, tbot=state%t(:,pver))
       call outfld('Z1000    ', p_surf, pcols, lchnk)
     end if
     if (hist_fld_active('Z700')) then
-      call vertinterp(ncol, pcols, pver, state%pmid, 70000._r8, z3, p_surf)
+      call vertinterp(ncol, pcols, pver, state%pmid, 70000._r8, z3, p_surf, &
+          extrapolate='Z', ln_interp=.true., ps=state%ps, phis=state%phis, tbot=state%t(:,pver))
       call outfld('Z700    ', p_surf, pcols, lchnk)
     end if
     if (hist_fld_active('Z500')) then
-      call vertinterp(ncol, pcols, pver, state%pmid, 50000._r8, z3, p_surf)
+      call vertinterp(ncol, pcols, pver, state%pmid, 50000._r8, z3, p_surf, &
+          extrapolate='Z', ln_interp=.true., ps=state%ps, phis=state%phis, tbot=state%t(:,pver))
       call outfld('Z500    ', p_surf, pcols, lchnk)
     end if
     if (hist_fld_active('Z300')) then
-      call vertinterp(ncol, pcols, pver, state%pmid, 30000._r8, z3, p_surf)
+      call vertinterp(ncol, pcols, pver, state%pmid, 30000._r8, z3, p_surf, ln_interp=.true.)
       call outfld('Z300    ', p_surf, pcols, lchnk)
     end if
     if (hist_fld_active('Z200')) then
-      call vertinterp(ncol, pcols, pver, state%pmid, 20000._r8, z3, p_surf)
+      call vertinterp(ncol, pcols, pver, state%pmid, 20000._r8, z3, p_surf, ln_interp=.true.)
       call outfld('Z200    ', p_surf, pcols, lchnk)
     end if
     if (hist_fld_active('Z100')) then
-      call vertinterp(ncol, pcols, pver, state%pmid, 10000._r8, z3, p_surf)
+      call vertinterp(ncol, pcols, pver, state%pmid, 10000._r8, z3, p_surf, ln_interp=.true.)
       call outfld('Z100    ', p_surf, pcols, lchnk)
     end if
     if (hist_fld_active('Z050')) then
-      call vertinterp(ncol, pcols, pver, state%pmid,  5000._r8, z3, p_surf)
+      call vertinterp(ncol, pcols, pver, state%pmid,  5000._r8, z3, p_surf, ln_interp=.true.)
       call outfld('Z050    ', p_surf, pcols, lchnk)
     end if
     !
@@ -1507,7 +1584,7 @@ contains
     ftem(:ncol,:) = z3(:ncol,:)*z3(:ncol,:)
     call outfld('ZZ      ',ftem,pcols,lchnk)
 
-    ftem(:ncol,:) = z3(:ncol,:)*state%v(:ncol,:)*gravit
+    ftem(:ncol,:) = z3(:ncol,:)*state%v(:ncol,:)
     call outfld('VZ      ',ftem,  pcols,lchnk)
     !
     ! Meridional advection fields
@@ -1577,15 +1654,18 @@ contains
     ! Output T,u,v fields on pressure surfaces
     !
     if (hist_fld_active('T850')) then
-      call vertinterp(ncol, pcols, pver, state%pmid, 85000._r8, state%t, p_surf)
+      call vertinterp(ncol, pcols, pver, state%pmid, 85000._r8, state%t, p_surf, &
+          extrapolate='T', ps=state%ps, phis=state%phis)
       call outfld('T850    ', p_surf, pcols, lchnk )
     end if
     if (hist_fld_active('T500')) then
-      call vertinterp(ncol, pcols, pver, state%pmid, 50000._r8, state%t, p_surf)
+      call vertinterp(ncol, pcols, pver, state%pmid, 50000._r8, state%t, p_surf, &
+          extrapolate='T', ps=state%ps, phis=state%phis)
       call outfld('T500    ', p_surf, pcols, lchnk )
     end if
     if (hist_fld_active('T400')) then
-      call vertinterp(ncol, pcols, pver, state%pmid, 40000._r8, state%t, p_surf)
+      call vertinterp(ncol, pcols, pver, state%pmid, 40000._r8, state%t, p_surf, &
+          extrapolate='T', ps=state%ps, phis=state%phis)
       call outfld('T400    ', p_surf, pcols, lchnk )
     end if
     if (hist_fld_active('T300')) then
@@ -1723,7 +1803,6 @@ contains
       call outfld('T010           ', p_surf, pcols, lchnk )
     end if
 
-
     !---------------------------------------------------------
     ! tidal diagnostics
     !---------------------------------------------------------
@@ -1789,8 +1868,9 @@ contains
     ! column burdens of all constituents except water vapor
     call constituent_burden_comp(state)
 
-    call outfld('PDELDRY ',state%pdeldry, pcols, lchnk)
     call outfld('PSDRY',   state%psdry,   pcols, lchnk)
+    call outfld('PMID',    state%pmid,    pcols, lchnk)
+    call outfld('PDELDRY ',state%pdeldry, pcols, lchnk)
 
     !
     ! Meridional advection fields
@@ -2487,11 +2567,11 @@ contains
     integer  :: ncol              ! number of columns in chunk
     real(r8) :: ftem2(pcols)      ! Temporary workspace for outfld variables
     real(r8) :: ftem3(pcols,pver) ! Temporary workspace for outfld variables
-    real(r8) :: heat_glob         ! global energy integral (FV only)
-    real(r8) :: tedif_glob        !+tht global energy integral fixer increment
+    real(r8) :: heat_glob         ! T-tend from fixer (FV only)
+    real(r8) :: tedif_glob        !+tht energy flux from fixer (FV only)
     ! CAM pointers to get variables from the physics buffer
     real(r8), pointer, dimension(:,:) :: t_ttend
-    integer  :: itim_old
+    integer  :: itim_old,m
 
     !-----------------------------------------------------------------------
 
@@ -2514,15 +2594,15 @@ contains
 
     ! Total physics tendency for Temperature
     ! (remove global fixer tendency from total for FV and SE dycores)
+
     if (dycore_is('LR') .or. dycore_is('SE')) then
-!+tht call check_energy_get_integrals( heat_glob_out=heat_glob )
-      call check_energy_get_integrals( heat_glob_out=heat_glob , tedif_glob_out=tedif_glob )
+      call check_energy_get_integrals( heat_glob_out=heat_glob , tedif_glob_out=tedif_glob ) !+tht tedif
       ftem2(:ncol)  = heat_glob/cpair
       call outfld('TFIX', ftem2, pcols, lchnk   )
-     !+tht
+!+tht
       ftem2(:ncol)  = tedif_glob/ztodt
       call outfld('EBREAK', ftem2, pcols, lchnk   )
-     !-tht
+!-tht
       ftem3(:ncol,:pver)  = tend%dtdt(:ncol,:pver) - heat_glob/cpair
     else
       ftem3(:ncol,:pver)  = tend%dtdt(:ncol,:pver)
@@ -2719,7 +2799,6 @@ contains
 
    !call diag_phys_tend_writeout_dry(state, pbuf, tend, ztodt)
     call diag_phys_tend_writeout_dry(state, pbuf, tend, ztodt, tmp_t, eflx, dsema) !tht
-
     if (moist_physics) then
       call diag_phys_tend_writeout_moist(state, pbuf,  tend, ztodt,           &
            tmp_q, tmp_cldliq, tmp_cldice, tmp_cldnc, tmp_cldni                &

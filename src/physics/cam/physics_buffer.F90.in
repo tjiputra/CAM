@@ -1,15 +1,15 @@
 !#define DEBUG 1
 module physics_buffer
 
-  !----------------------------------------------------------------------- 
-  ! 
-  ! Purpose: 
-  !    Buffer managment for persistant variables 
+  !-----------------------------------------------------------------------
+  !
+  ! Purpose:
+  !    Buffer managment for persistant variables
   !
   ! Author: J. Edwards
   !
-  ! This file is used with genf90.pl to generate buffer.F90  
-  ! 
+  ! This file is used with genf90.pl to generate buffer.F90
+  !
   !-----------------------------------------------------------------------
 
   use shr_kind_mod,   only: r8 => shr_kind_r8, r4=> shr_kind_r4, i4=> shr_kind_i4
@@ -26,7 +26,7 @@ module physics_buffer
 
   ! ngrid_types is a private parameter denoting how many types of a field
   ! (e.g., grid, subcol) a pbuf can hold
-  integer, parameter :: ngrid_types = 2 
+  integer, parameter :: ngrid_types = 2
 
   ! --col_type parameters -- see pbuf_add_field and pbuf_get_field
   ! -- These indices should start at 1 and increment by 1 so that they
@@ -54,9 +54,9 @@ module physics_buffer
   integer, parameter :: persistence_physpkg = 2
   logical            :: global_allocate_all = .true.
 
-  ! 
-  ! physics_buffer_hdr carries the description info for each buffer, only one header 
-  ! is allocated for each field and each chunk of the field points to it. 
+  !
+  ! physics_buffer_hdr carries the description info for each buffer, only one header
+  ! is allocated for each field and each chunk of the field points to it.
   ! It is carried as a linkedlist for initialization only.
   !
 
@@ -73,10 +73,10 @@ module physics_buffer
   end type physics_buffer_hdr
 
   !
-  ! The default type for a buffer field is buffer_field_double (r8) since that is the 
+  ! The default type for a buffer field is buffer_field_double (r8) since that is the
   ! type most often used in the model.   The F90 transfer function is used to move
   ! data of other types into and out of the pbuf2d
-  ! 
+  !
 
   type physics_buffer_desc
      private
@@ -86,34 +86,34 @@ module physics_buffer
   end type physics_buffer_desc
 
   interface pbuf_get_field
-     ! TYPE int,double,real 
+     ! TYPE int,double,real
      ! DIMS 1,2,3,4,5
      module procedure get_pbuf1d_field_by_index_{DIMS}d_{TYPE}
-     ! TYPE int,double,real 
+     ! TYPE int,double,real
      ! DIMS 1,2,3,4,5
      module procedure get_pbuf2d_field_by_index_{DIMS}d_{TYPE}
   end interface
 
   interface pbuf_get_field_restart
-     ! TYPE int,double,real 
+     ! TYPE int,double,real
      module procedure get_pbuf2d_field_restart_{TYPE}
   end interface
 
   interface pbuf_set_field
-     ! TYPE int,double,real 
+     ! TYPE int,double,real
      ! DIMS 1,2,3,4,5
      module procedure  set_pbuf2d_field_by_index_{DIMS}d_{TYPE}
-     ! TYPE int,double,real 
+     ! TYPE int,double,real
      ! DIMS 1,2,3,4,5
      module procedure  set_pbuf1d_field_by_index_{DIMS}d_{TYPE}
-     ! TYPE int,double,real 
+     ! TYPE int,double,real
      module procedure  set_pbuf1d_field_const_by_index_{TYPE}
-     ! TYPE int,double,real 
+     ! TYPE int,double,real
      module procedure  set_pbuf2d_field_const_by_index_{TYPE}
   end interface
 
   interface pbuf_add_field
-     ! TYPE int,double,real 
+     ! TYPE int,double,real
      module procedure pbuf_add_field_{TYPE}
   end interface
 
@@ -152,7 +152,7 @@ module physics_buffer
   integer :: currentpbufflds=0
   type(physics_buffer_hdr), pointer :: hdrbuffertop => null()
 
-  ! 
+  !
   ! Insures that we do not attempt to allocate physics_buffer more than once
   !
 
@@ -244,7 +244,7 @@ end subroutine pbuf_readnl
   ! pbuf_col_type_index returns an index for use with pbuf calls
   !
   ! * col_type:         is set to col_type_grid (if use_subcol=.false.) or
-  !                     col_type_subcol (if (use_subcol=.true.). 
+  !                     col_type_subcol (if (use_subcol=.true.).
   !
 
   subroutine pbuf_col_type_index(use_subcol, col_type)
@@ -260,7 +260,7 @@ end subroutine pbuf_readnl
 
   end subroutine pbuf_col_type_index
 
-  ! 
+  !
   !  Return a pointer to the current chunks physics_buffer.
   !
 
@@ -290,7 +290,7 @@ end subroutine pbuf_readnl
 
   end function pbuf_get_chunk
 
-  ! 
+  !
   !  Return .true. iff pbuf has an allocated grid field
   !
 
@@ -308,7 +308,7 @@ end subroutine pbuf_readnl
 
   end function pbuf_field_has_gridcols
 
-  ! 
+  !
   !  Return .true. iff pbuf has an allocated subcolumn field
   !
 
@@ -326,7 +326,7 @@ end subroutine pbuf_readnl
 
   end function pbuf_field_has_subcols
 
-  ! 
+  !
   !  Return .true. iff pbuf has an allocated col_type column field
   !
 
@@ -347,12 +347,12 @@ end subroutine pbuf_readnl
   end function pbuf_field_has_col_type
 
   !
-  !  Initialize the buffer, should be called after all pbuf_add_field calls 
+  !  Initialize the buffer, should be called after all pbuf_add_field calls
   !  have been completed and should only be called once in a run
   !
   subroutine pbuf_initialize(pbuf2d)
     type(physics_buffer_desc), pointer :: pbuf2d(:,:)
-    
+
     integer :: i, c
     type(physics_buffer_hdr), pointer :: hdrbuffer
 
@@ -361,7 +361,7 @@ end subroutine pbuf_readnl
     !
     if(buffer_initialized) return
     ! Allocate at least 1 to avoid unallocated error in ideal physics
-    allocate(pbuf2d(max(1,currentpbufflds),begchunk:endchunk)) 
+    allocate(pbuf2d(max(1,currentpbufflds),begchunk:endchunk))
     if(currentpbufflds<1) return
 
     do c = begchunk, endchunk
@@ -375,7 +375,7 @@ end subroutine pbuf_readnl
         hdrbuffer => hdrbuffer%nexthdr
       end do
     end do
-    
+
     buffer_initialized=.true.
     call pbuf_allocate(pbuf2d, 'global')
 #ifdef DEBUG
@@ -449,7 +449,7 @@ end subroutine pbuf_readnl
     end if
   end subroutine pbuf_allocate
 
-  ! TYPE int,double,real 
+  ! TYPE int,double,real
   subroutine pbuf_allocate_field_{TYPE}(pbuf2d, index, dtype)
     {VTYPE},                            intent(in)    :: dtype
     type(physics_buffer_desc), pointer                :: pbuf2d(:,:)
@@ -476,7 +476,7 @@ end subroutine pbuf_readnl
           end do
        end if
     end do
-    
+
   end subroutine pbuf_allocate_field_{TYPE}
 
   pure logical function pbuf_do_deallocate(hdr, persistence, col_type) result(rval)
@@ -580,7 +580,7 @@ end subroutine pbuf_readnl
   !
   !  Register a field in the pbuf
   !  This should be called from physics register routines.
-  !  persistence must be 'global' or 'physpkg' 
+  !  persistence must be 'global' or 'physpkg'
   !  dtype can be any of r8, r4, i4 as defined in shr_kinds_mod.F90
   !  col_type is either col_type_grid or col_type_subcol.
   !  If no col_type, then grid field is defined (i.e., dimsizes set)
@@ -684,12 +684,12 @@ end subroutine pbuf_readnl
 
   !
   !  Add a field to the pbuf, this should be called from physics register routines
-  !  name is required to be unique, 
-  !  persistence must be 'global' or 'physpkg' 
+  !  name is required to be unique,
+  !  persistence must be 'global' or 'physpkg'
   !  dtype can be any of r8, r4, i4 as defined in shr_kinds_mod.F90
   !  If present, col_type must be either col_type_grid or col_type_subcol
 
-  ! TYPE int,double,real 
+  ! TYPE int,double,real
   subroutine pbuf_add_field_{TYPE}(name, persistence, dtype, dimsizes, index, col_type)
 
     character(len=*), intent(in)  :: name, persistence
@@ -760,10 +760,10 @@ end subroutine pbuf_readnl
 
   end subroutine pbuf1d_print
   !
-  ! Given a pbuf field name return an integer index to the field.  
+  ! Given a pbuf field name return an integer index to the field.
   ! This index can be used to retrieve the field and is much faster
-  ! than using the name in most cases  
-  ! 
+  ! than using the name in most cases
+  !
 
   function pbuf_get_index(name, errcode) result(index)
     character(len=*), intent(in)     :: name
@@ -784,7 +784,7 @@ end subroutine pbuf_readnl
     end do
 
     if (present(errcode)) then
-        errcode = index 
+        errcode = index
     else if(index<0) then
        call endrun('Attempt to find undefined name in pbuf '//trim(name))
     end if
@@ -794,13 +794,13 @@ end subroutine pbuf_readnl
 
   !=========================================================================================
 
-  ! 
-  ! Given a pbuf2d chunk and an index return a pointer to a field chunk 
-  ! 
+  !
+  ! Given a pbuf2d chunk and an index return a pointer to a field chunk
+  !
   !
 
 
-  ! TYPE int,double,real 
+  ! TYPE int,double,real
   ! DIMS 1,2,3,4,5
   subroutine get_pbuf1d_field_by_index_{DIMS}d_{TYPE}(pbuf, index, field, start,kount, col_type, copy_if_needed, errcode)
 
@@ -884,7 +884,7 @@ end subroutine pbuf_readnl
           ! Only do the copy if we did the alloc (i.e., set the is_copy flag)
           ! Only copy the portion we are going to hand back (i.e., start, kount)
           ! Chances are that kount(1) = pcols*psubcols because we are looking
-          ! for a subcolumn field (or we wouldn't be here). Now, 
+          ! for a subcolumn field (or we wouldn't be here). Now,
           ! subcol_field_copy requires kount(1) = pcols for the input and
           ! therefore, kount(1) = pcols*psubcols for the output. Check and
           ! make it work
@@ -956,7 +956,7 @@ end subroutine pbuf_readnl
 
   end subroutine get_pbuf1d_field_by_index_{DIMS}d_{TYPE}
 
-  ! TYPE int,double,real 
+  ! TYPE int,double,real
   ! DIMS 1,2,3,4,5
   subroutine get_pbuf2d_field_by_index_{DIMS}d_{TYPE}(pbuf2d, lchnk, index, field, start, kount, col_type, errcode)
 
@@ -980,9 +980,9 @@ end subroutine pbuf_readnl
          start=start, kount=kount, col_type=col_type, errcode=errcode)
   end subroutine get_pbuf2d_field_by_index_{DIMS}d_{TYPE}
 
-  ! TYPE int,double,real 
+  ! TYPE int,double,real
   subroutine get_pbuf2d_field_restart_{TYPE}(pbuf2d, lchnk, index, field, mdimsize, col_type)
-    use subcol_utils,    only: subcol_unpack
+    use subcol_pack_mod, only: subcol_unpack
 
     ! NB: This routine is really only useful for write_restart_field
     ! Get the data based on the col_type which is specified.
@@ -1033,7 +1033,7 @@ end subroutine pbuf_readnl
     end if
   end subroutine get_pbuf2d_field_restart_{TYPE}
 
-  ! TYPE int,double,real 
+  ! TYPE int,double,real
   ! DIMS 1,2,3,4,5
   subroutine set_pbuf2d_field_const_by_index_{TYPE}(pbuf2d,index,const, col_type)
 
@@ -1045,7 +1045,7 @@ end subroutine pbuf_readnl
     integer,intent(in)  ,optional      :: col_type
 
     integer :: c
-    
+
     do c=begchunk,endchunk
        if(present(col_type)) then
           call set_pbuf1d_field_const_by_index_{TYPE}(pbuf_get_chunk(pbuf2d,c),index,const, col_type=col_type)
@@ -1056,7 +1056,7 @@ end subroutine pbuf_readnl
 
   end subroutine set_pbuf2d_field_const_by_index_{TYPE}
 
-  ! TYPE int,double,real 
+  ! TYPE int,double,real
   ! DIMS 1,2,3,4,5
   subroutine set_pbuf1d_field_const_by_index_{TYPE}(pbuf,index,const,start,kount, col_type)
 
@@ -1066,7 +1066,7 @@ end subroutine pbuf_readnl
     {VTYPE},intent(in) :: const
     integer, intent(in), optional :: start(:),kount(:)
     integer, intent(in), optional :: col_type
-   
+
     integer :: col_type_use
     logical :: subset
 
@@ -1086,16 +1086,16 @@ end subroutine pbuf_readnl
          (.not. present(start) .and. present(kount)) ) then
        call endrun('pbuf_set_field: Both start and kount must be present for '//trim(pbuf(index)%hdr%name))
     end if
-    
+
     ! Set the appropriate grid or sub-column field.  Check that the fields have been allocated.
-    if(subset) then 
+    if(subset) then
 
        if (col_type_use == col_type_subcol) then
          ! Set sub-column field
          if (.not. buffer_field_is_alloc(pbuf(index)%bfg(col_type_subcol))) &
               call endrun('pbuf_set_field: sub-column field not allocated for '//trim(pbuf(index)%hdr%name))
          call buffer_set_field(pbuf(index)%bfg(col_type_subcol),const,start,kount)
-       
+
        else if (col_type_use == col_type_grid) then
          ! Set grid field
          if (.not. buffer_field_is_alloc(pbuf(index)%bfg(col_type_grid))) &
@@ -1106,7 +1106,7 @@ end subroutine pbuf_readnl
               ' but col_type is neither col_type_grid nor col_type_subcol')
        end if
 
-     else 
+     else
 
        if (col_type_use == col_type_subcol) then
          ! Set sub-column field
@@ -1128,7 +1128,7 @@ end subroutine pbuf_readnl
 
    end subroutine set_pbuf1d_field_const_by_index_{TYPE}
 
-  ! TYPE int,double,real 
+  ! TYPE int,double,real
   ! DIMS 1,2,3,4,5
   subroutine set_pbuf2d_field_by_index_{DIMS}d_{TYPE}(pbuf2d,index,field, start, kount, col_type)
 
@@ -1180,9 +1180,9 @@ end subroutine pbuf_readnl
     end do
   end subroutine set_pbuf2d_field_by_index_{DIMS}d_{TYPE}
 
-  ! TYPE int,double,real 
+  ! TYPE int,double,real
   ! DIMS 1,2,3,4,5
-  function get_field_chunk_{DIMS}d_{TYPE}(field, c) result(fld) 
+  function get_field_chunk_{DIMS}d_{TYPE}(field, c) result(fld)
     ! module private helper function
     {VTYPE}, pointer :: fld{DIMSTR}
     integer, intent(in) :: c
@@ -1202,13 +1202,13 @@ end subroutine pbuf_readnl
 #elif ({DIMS}==5)
     {VTYPE},pointer :: field(:,:,:,:,:,:)
     fld => field(:,:,:,:,:,c)
-#endif    
+#endif
 
   end function get_field_chunk_{DIMS}d_{TYPE}
 
 
 
-  ! TYPE int,double,real 
+  ! TYPE int,double,real
   ! DIMS 1,2,3,4,5
   subroutine set_pbuf1d_field_by_index_{DIMS}d_{TYPE}(pbuf,index,field, start, kount, col_type)
 
@@ -1244,7 +1244,7 @@ end subroutine pbuf_readnl
        if (col_type_use == col_type_subcol) then
           if (.not. buffer_field_is_alloc(pbuf(index)%bfg(col_type_subcol))) &
               call endrun('pbuf_set_field: sub-column field not allocated for '//trim(pbuf(index)%hdr%name))
-          call buffer_set_field(pbuf(index)%bfg(col_type_subcol),field,start,kount)      
+          call buffer_set_field(pbuf(index)%bfg(col_type_subcol),field,start,kount)
 
        ! Set grid field
        else if (col_type_use == col_type_grid) then
@@ -1255,7 +1255,7 @@ end subroutine pbuf_readnl
          call endrun('pbuf_set_field: Trying to set '//trim(pbuf(index)%hdr%name)//&
                     ' but col_type is neigher col_type_grid nor col_type_subcol ')
        end if
-    else 
+    else
 
        ! Set sub-column field
        if (col_type_use == col_type_subcol) then
@@ -1302,7 +1302,7 @@ end subroutine pbuf_readnl
 !
 ! Initialize a restart file to write - all additional dims in a field are
 ! bundled into a single dimension for output and a dim pbuf_xxxxx is declared
-! in the file if it does not already exist.   
+! in the file if it does not already exist.
 !
   subroutine pbuf_init_restart(File, pbuf2d)
     use pio,              only: file_desc_t, pio_int
@@ -1438,7 +1438,7 @@ end subroutine pbuf_readnl
 
   end subroutine pbuf_restart_dimsizes
 
-  ! TYPE int,double,real 
+  ! TYPE int,double,real
   subroutine write_restart_field_{TYPE}(File, pbuf2d, index, gdimlens, grank)
     use cam_grid_support, only: cam_grid_write_dist_array
     use phys_grid,        only: phys_decomp
@@ -1505,7 +1505,7 @@ end subroutine pbuf_readnl
     integer                                          :: grank
 
     call pbuf_initialize(pbuf2d)
-    
+
     pbufhdr => pbuf_get_chunk(pbuf2d, begchunk)
 
     gdimlens = 1
@@ -1529,13 +1529,13 @@ end subroutine pbuf_readnl
 
   end subroutine pbuf_read_restart
 
-  ! TYPE int,double,real 
+  ! TYPE int,double,real
   subroutine read_restart_field_{TYPE} (File, pbuf2d, index, gdimlens, grank)
     use pio,              only: file_desc_t
     use pio,              only: pio_inq_varid
     use cam_pio_utils,    only: cam_pio_handle_error
     use cam_grid_support, only: cam_grid_read_dist_array
-    use subcol_utils,     only: subcol_pack
+    use subcol_pack_mod,  only: subcol_pack
     use phys_grid,        only: phys_decomp
 
     ! Dummy Variables

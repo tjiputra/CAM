@@ -6,50 +6,32 @@
 
 <fixed_geomag_year>1850</fixed_geomag_year>
 
+<!--Species IC -->
+<ncdata dyn="fv"  hgrid="0.9x1.25">atm/waccm/ic/f.e20.FW1850.f09_f09.CESMpiControlForcingSST141.003.veclen64.cam.i.0021-01-01-00000_c170426.nc</ncdata>
+<ncdata dyn="fv"  hgrid="1.9x2.5" >atm/waccm/ic/b.e20.BW1850.f19_g17.alpha07b.002.cam.i.1851-01-01-00000_c170911.nc</ncdata>
+<ncdata dyn="fv"  hgrid="4x5"     >atm/waccm/ic/b1850.waccm-mam3_4x5_L70.cam2.i.0156-01-01.c141201.nc</ncdata>
+
 <!-- Solar data -->
-<solar_data_file>atm/cam/solar/SolarForcingCMIP6_18500101-22991231_c160830.nc</solar_data_file>
+<solar_irrad_data_file>atm/cam/solar/SolarForcingCMIP6piControl_c160921.nc</solar_irrad_data_file>
 <solar_data_ymd>18500101</solar_data_ymd>
 <solar_data_type>FIXED</solar_data_type>
 
 <!-- Kp and F10.7 -->
-<solar_parms_file>atm/waccm/phot/wasolar_ave.nc</solar_parms_file>
+<solar_parms_data_file>atm/cam/solar/SolarForcingCMIP6piControl_c160921.nc</solar_parms_data_file>
 
-<!--Species IC -->
+<!-- Energetic Particle forcings -->
+<epp_all_filepath>atm/cam/solar/SolarForcingCMIP6piControl_c160921.nc</epp_all_filepath>
+<epp_all_varname>epp_ion_rates</epp_all_varname>
 
-<ncdata dyn="fv"  hgrid="0.9x1.25">atm/waccm/ic/f.e20.FW1850.f09_f09.CESMpiControlForcingSST141.003.veclen64.cam.i.0021-01-01-00000_c170426.nc</ncdata>
-<ncdata dyn="fv"  hgrid="1.9x2.5" >atm/waccm/ic/b1850.waccm-mam3_1.9x2.5_L70.cam2.i.0156-01-01.c120523.nc</ncdata>
-<ncdata dyn="fv"  hgrid="4x5"     >atm/waccm/ic/b1850.waccm-mam3_4x5_L70.cam2.i.0156-01-01.c141201.nc</ncdata>
-
-<micro_do_sb_physics>.true.</micro_do_sb_physics>
-
-<do_tms hgrid="0.9x1.25">.false.</do_tms>
-<do_tms hgrid="1.9x2.5" >.false.</do_tms>
-<do_beljaars hgrid="0.9x1.25">.true.</do_beljaars>  
-<do_beljaars hgrid="1.9x2.5" >.true.</do_beljaars>  
-<bnd_topo hgrid="0.9x1.25">atm/cam/topo/fv_0.9x1.25_nc3000_Nsw042_Co060_Fi001_GRNL_c170405.nc</bnd_topo>
-<bnd_topo hgrid="1.9x2.5" >atm/cam/topo/fv_1.9x2.5_nc3000_Nsw084_Nrs016_Co120_Fi001_ZR_061116.nc</bnd_topo>
-
-<use_gw_oro hgrid="0.9x1.25">.false.</use_gw_oro>
-<use_gw_oro hgrid="1.9x2.5" >.false.</use_gw_oro>
-<use_gw_rdg_beta hgrid="0.9x1.25">.true.</use_gw_rdg_beta>
-<use_gw_rdg_beta hgrid="1.9x2.5" >.true.</use_gw_rdg_beta>
-
-<zmconv_num_cin>1</zmconv_num_cin>
- 
-<effgw_oro>0.125D0</effgw_oro>
-<effgw_beres_dp>0.5D0</effgw_beres_dp>
-<frontgfc>3.0D-15</frontgfc>
-<gw_qbo_hdepth_scaling>0.25D0</gw_qbo_hdepth_scaling>
-<taubgnd>2.5D-3</taubgnd>
-
-<dust_emis_fact hgrid="0.9x1.25">1.5D0</dust_emis_fact>
-
-<lght_no_prd_factor dyn="fv" hgrid="0.9x1.25">1.5</lght_no_prd_factor>
 
 <!-- LBC, UBC Files -->
 <flbc_type>CYCLICAL</flbc_type>
 <flbc_cycle_yr>1850</flbc_cycle_yr>
-<flbc_file>atm/waccm/lb/LBC_1750-2014_CMIP6_0p5degLat_c170126.nc</flbc_file>
+<flbc_file>atm/waccm/lb/LBC_17500116-20150116_CMIP6_0p5degLat_c180227.nc</flbc_file>
+<flbc_list>
+ 'CCL4', 'CF2CLBR', 'CF3BR', 'CFC11', 'CFC113', 'CFC12', 'CH3BR', 'CH3CCL3', 'CH3CL', 'CH4', 'CO2', 'H2',
+ 'HCFC22', 'N2O', 'CFC114', 'CFC115', 'HCFC141B', 'HCFC142B', 'CH2BR2', 'CHBR3', 'H2402', 'H1202', 'OCS', 'CFC11eq'
+</flbc_list>
 
 <!-- Upper Boundary -->
 <tgcm_ubc_file>atm/waccm/ub/tgcm_ubc_1850_c100204.nc</tgcm_ubc_file>
@@ -61,60 +43,14 @@
 <qbo_cyclic>.false.</qbo_cyclic>
 <qbo_forcing_file>atm/waccm/qbo/qbocoefficients_c091230.nc</qbo_forcing_file>
 
-<!-- turn off prescribed volcanic aerosol heating, now handled by MAM sulfates -->
-<prescribed_strataero_feedback>.false.</prescribed_strataero_feedback> 
 
 <!-- emissions -->
 
 <!-- External forcing -->
-<ext_frc_specifier>
-  'bc_a4  -> $INPUTDATA_ROOT/atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_bc_a4_aircraft_vertical_1750-2015_0.9x1.25_c20170322.nc',
-  'bc_a4  -> $INPUTDATA_ROOT/atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_bc_a4_bb_vertical_1750-2015_0.9x1.25_c20170322.nc',
-  'pom_a4 -> $INPUTDATA_ROOT/atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_pom_a4_bb_vertical_1750-2015_0.9x1.25_c20170322.nc',
-  'so4_a1 -> $INPUTDATA_ROOT/atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_so4_a1_anthro_vertical_1750-2015_0.9x1.25_c20170322.nc',
-  'so4_a1 -> $INPUTDATA_ROOT/atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_so4_a1_bb_vertical_1750-2015_0.9x1.25_c20170322.nc',
-  'so4_a1 -> $INPUTDATA_ROOT/atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_so4_a1_contvolcano_vertical_1750-2100_0.9x1.25_c20170322.nc',
-  'so4_a2 -> $INPUTDATA_ROOT/atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_so4_a2_contvolcano_vertical_1750-2100_0.9x1.25_c20170322.nc',
-  'num_a1 -> $INPUTDATA_ROOT/atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_num_so4_a1_anthro_vertical_1750-2015_0.9x1.25_c20170322.nc',
-  'num_a1 -> $INPUTDATA_ROOT/atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_num_so4_a1_bb_vertical_1750-2015_0.9x1.25_c20170322.nc',
-  'num_a1 -> $INPUTDATA_ROOT/atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_num_so4_a1_contvolcano_vertical_1750-2100_0.9x1.25_c20170322.nc',
-  'num_a2 -> $INPUTDATA_ROOT/atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_num_so4_a2_contvolcano_vertical_1750-2100_0.9x1.25_c20170322.nc',
-  'num_a4 -> $INPUTDATA_ROOT/atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_num_bc_a4_aircraft_vertical_1750-2015_0.9x1.25_c20170322.nc',
-  'num_a4 -> $INPUTDATA_ROOT/atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_num_bc_a4_bb_vertical_1750-2015_0.9x1.25_c20170322.nc',
-  'num_a4 -> $INPUTDATA_ROOT/atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_num_pom_a4_bb_vertical_1750-2015_0.9x1.25_c20170322.nc',
-  'NO2    -> $INPUTDATA_ROOT/atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_NO2_aircraft_vertical_1750-2015_0.9x1.25_c20170322.nc',
-  'SO2    -> $INPUTDATA_ROOT/atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_SO2_bb_vertical_1750-2015_0.9x1.25_c20170322.nc',
-  'SO2    -> $INPUTDATA_ROOT/atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_SO2_anthro_vertical_1750-2015_0.9x1.25_c20170322.nc',
-  'SO2    -> $INPUTDATA_ROOT/atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_SO2_contvolcano_vertical_1750-2100_0.9x1.25_c20170322.nc',
-  'SO2    -> $INPUTDATA_ROOT/atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_SO2_aircraft_vertical_1750-2015_0.9x1.25_c20170322.nc',
-</ext_frc_specifier>
 <ext_frc_type>CYCLICAL</ext_frc_type>
 <ext_frc_cycle_yr>1850</ext_frc_cycle_yr>
 
 <!-- Surface emissions -->
-<srf_emis_specifier>
-  'DMS      -> $INPUTDATA_ROOT/atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_DMS_other_surface_1750-2015_0.9x1.25_c20170322.nc',
-  'DMS      -> $INPUTDATA_ROOT/atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_DMS_bb_surface_1750-2015_0.9x1.25_c20170322.nc',
-  'SO2      -> $INPUTDATA_ROOT/atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_SO2_anthro_surface_1750-2015_0.9x1.25_c20170322.nc',
-  'so4_a1   -> $INPUTDATA_ROOT/atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_so4_a1_anthro_surface_1750-2015_0.9x1.25_c20170322.nc',
-  'so4_a2   -> $INPUTDATA_ROOT/atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_so4_a2_anthro_surface_1750-2015_0.9x1.25_c20170322.nc',
-  'num_a1   -> $INPUTDATA_ROOT/atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_num_so4_a1_anthro_surface_1750-2015_0.9x1.25_c20170322.nc',
-  'num_a1   -> $INPUTDATA_ROOT/atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_num_so4_a1_ship_surface_1750-2015_0.9x1.25_c20170322.nc',
-  'num_a2   -> $INPUTDATA_ROOT/atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_num_so4_a2_anthro_surface_1750-2015_0.9x1.25_c20170322.nc',
-  'bc_a4    -> $INPUTDATA_ROOT/atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_bc_a4_anthro_surface_1750-2015_0.9x1.25_c20170322.nc',
-  'num_a4   -> $INPUTDATA_ROOT/atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_num_bc_a4_anthro_surface_1750-2015_0.9x1.25_c20170322.nc',
-  'pom_a4   -> $INPUTDATA_ROOT/atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_pom_a4_anthro_surface_1750-2015_0.9x1.25_c20170322.nc',
-  'num_a4   -> $INPUTDATA_ROOT/atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_num_pom_a4_anthro_surface_1750-2015_0.9x1.25_c20170322.nc',
-  'NO       -> $INPUTDATA_ROOT/atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_NO_anthro_surface_1750-2015_0.9x1.25_c20170322.nc',
-  'NO       -> $INPUTDATA_ROOT/atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_NO_bb_surface_1750-2015_0.9x1.25_c20170322.nc',
-  'NO       -> $INPUTDATA_ROOT/atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_NO_other_surface_1750-2015_0.9x1.25_c20170322.nc',
-  'CO       -> $INPUTDATA_ROOT/atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_CO_anthro_surface_1750-2015_0.9x1.25_c20170322.nc',
-  'CO       -> $INPUTDATA_ROOT/atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_CO_bb_surface_1750-2015_0.9x1.25_c20170322.nc',
-  'CO       -> $INPUTDATA_ROOT/atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_CO_other_surface_1750-2015_0.9x1.25_c20170322.nc',
-  'SOAG     -> $INPUTDATA_ROOT/atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_SOAG_anthro_surface_1750-2015_0.9x1.25_c20170322.nc',
-  'SOAG     -> $INPUTDATA_ROOT/atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_SOAG_bb_surface_1750-2015_0.9x1.25_c20170322.nc',
-  'SOAG     -> $INPUTDATA_ROOT/atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_SOAG_biogenic_surface_1750-2015_0.9x1.25_c20170322.nc'
-</srf_emis_specifier>
 <srf_emis_type>CYCLICAL</srf_emis_type>
 <srf_emis_cycle_yr>1850</srf_emis_cycle_yr>
 
@@ -132,7 +68,7 @@
   'QRS', 'RELHUM', 'SHFLX', 'SOLIN', 'SWCF', 'QCP', 'QTHERMAL', 'QRL_TOT', 'QRS_TOT',
   'QJOULE', 'PSL', 'HNO3_STS', 'HNO3_NAT', 'HNO3_GAS', 'NO_Lightning', 'QNO', 'QRS_AUR',
   'QRS_CO2NIR', 'QRS_EUV', 'SAD_ICE', 'SAD_LNAT', 'SAD_SULFC', 'TREFHT', 'TTGW',
-  'UTGWORO', 'UTGWSPEC', 'VERT', 'VTGWORO', 'VTGWSPEC', 'Z3', 'NOX', 'NOY', 'CLOX',
+  'UTGWORO', 'UTGWSPEC', 'VERT', 'VTGWORO', 'VTGWSPEC', 'Z3', 'HOX', 'NOX', 'NOY', 'CLOX',
   'CLOY', 'BROX', 'BROY', 'TCLY', 'TOTH', 'QJOULE', 'UI', 'VI', 'UIONTEND', 'VIONTEND',
   'DTCORE', 'T_24_COS', 'T_24_SIN', 'T_12_COS', 'T_12_SIN', 'OMEGA_24_COS', 'OMEGA_24_SIN',
   'OMEGA_12_COS', 'OMEGA_12_SIN', 'U_24_COS', 'U_24_SIN', 'U_12_COS', 'U_12_SIN',
@@ -148,10 +84,11 @@
   'soa_a2', 'bc_c1', 'bc_c4', 'dst_c1', 'dst_c2', 'dst_c3', 'ncl_c1', 'ncl_c1',
   'ncl_c2', 'ncl_c3', 'pom_c1', 'pom_c4', 'so4_c1', 'so4_c2', 'so4_c3', 'soa_c1', 'soa_c2', 
   'num_a1','num_a2','num_a3','num_a4','num_c1','num_c2','num_c3','num_c4',
+  'CO2', 'H2O', 'N2O', 'CH4', 'N2O5', 'NO2',  'NO',
   'dgnumwet1', 'dgnumwet2', 'dgnumwet3', 'LNO_PROD', 'LNO_COL_PROD', 'dry_deposition_NHx_as_N', 'dry_deposition_NOy_as_N',
   'wet_deposition_NHx_as_N', 'wet_deposition_NOy_as_N'
 </fincl1>
-<fincl7>
+<fincl7 dyn="fv">
   'MSKtem','PS','PSL','VTHzm','UVzm','UWzm','Uzm','Vzm','THzm','Wzm','PHIS'
 </fincl7>
 <fincl8>
@@ -167,7 +104,10 @@
 <history_carma>.false.</history_carma>
 <history_clubb>.false.</history_clubb>
 <history_chemistry>.false.</history_chemistry>
+<history_chemspecies_srf>.false.</history_chemspecies_srf>
 <history_aerosol>.false.</history_aerosol>
 <history_aero_optics>.false.</history_aero_optics>
+
+<sim_year>1850</sim_year>
 
 </namelist_defaults>

@@ -1,6 +1,6 @@
 module dyn_comp
-!----------------------------------------------------------------------- 
-! 
+!-----------------------------------------------------------------------
+!
 ! Eulerian dycore interface module
 !
 !-----------------------------------------------------------------------
@@ -15,13 +15,13 @@ use dyn_grid,        only: ptimelevels
 
 use prognostics,     only: n3, ps, u3, v3, t3, q3, phis, pdeld, dpsm, dpsl, div, vort
 
-use cam_control_mod, only: initial_run, ideal_phys, aqua_planet, moist_physics, &
-                           adiabatic
+use cam_control_mod, only: initial_run, ideal_phys, moist_physics, adiabatic
 use phys_control,    only: phys_getopts
 use constituents,    only: pcnst, cnst_name, cnst_longname, sflxnam, tendnam, &
                            fixcnam, tottnam, hadvnam, vadvnam, cnst_get_ind,  &
                            cnst_read_iv, qmin
 use cam_initfiles,   only: initial_file_get_id, topo_file_get_id, pertlim
+use inic_analytic,   only: analytic_ic_active, analytic_ic_set_ic
 use cam_history,     only: addfld, add_default, horiz_only
 
 use eul_control_mod, only: dif2, hdif_order, kmnhdn, hdif_coef, divdampn, eps, &
@@ -56,7 +56,7 @@ public :: &
    dyn_init
 
 ! these structures are not used in this dycore, but are included
-! for interface compatibility.  
+! for interface compatibility.
 type dyn_import_t
    integer :: placeholder
 end type dyn_import_t
@@ -88,10 +88,10 @@ subroutine dyn_readnl(nlfile)
 
    ! args
    character(len=*), intent(in) :: nlfile  ! filepath for file containing namelist input
-    
+
    ! local vars
    integer :: unitn, ierr
-     
+
    real(r8) :: eul_dif2_coef     ! del2 horizontal diffusion coeff.
    integer  :: eul_hdif_order    ! Order of horizontal diffusion operator
    integer  :: eul_hdif_kmnhdn   ! Nth order horizontal diffusion operator top level.
@@ -99,14 +99,14 @@ subroutine dyn_readnl(nlfile)
    real(r8) :: eul_divdampn      ! Number of days to invoke divergence damper
    real(r8) :: eul_tfilt_eps     ! Time filter coefficient. Defaults to 0.06.
    integer  :: eul_kmxhdc        ! Number of levels to apply Courant limiter
-    
+
    namelist /dyn_eul_inparm/ eul_dif2_coef, eul_hdif_order, eul_hdif_kmnhdn, &
       eul_hdif_coef, eul_divdampn, eul_tfilt_eps, eul_kmxhdc, eul_nsplit
 
    character(len=*), parameter :: sub = 'dyn_readnl'
    !-----------------------------------------------------------------------------
 
-   ! Read namelist 
+   ! Read namelist
    if (masterproc) then
       unitn = getunit()
       open( unitn, file=trim(nlfile), status='old' )
@@ -188,7 +188,7 @@ subroutine dyn_readnl(nlfile)
 
 #if (defined SPMD)
    call spmd_readnl(nlfile)
-#endif 
+#endif
 
 9108 format('   Time filter coefficient (EPS)                 ',f10.3,/,&
             '   Horizontal diffusion order (N)                ',i10/, &
@@ -312,7 +312,7 @@ subroutine dyn_init(dyn_in, dyn_out)
          call cnst_get_ind('CLDICE', ixcldice)
       end if
       ! The following variables are not defined for single column
-      if (.not. single_column) then 
+      if (.not. single_column) then
          call add_default(hadvnam(       1), history_budget_histfile_num, ' ')
          call add_default(vadvnam(       1), history_budget_histfile_num, ' ')
          if (.not.adiabatic) then
@@ -348,7 +348,7 @@ end subroutine dyn_init
 
 subroutine read_inidat()
    ! Read initial dataset and spectrally truncate as appropriate.
-   ! Read and process the fields one at a time to minimize 
+   ! Read and process the fields one at a time to minimize
    ! memory usage.
 
    use ppgrid,           only: begchunk, endchunk, pcols
@@ -358,7 +358,6 @@ subroutine read_inidat()
 
    use ncdio_atm,        only: infld
    use cam_pio_utils,    only: cam_pio_get_var
-   use inic_analytic,    only: analytic_ic_active, analytic_ic_set_ic
    use dyn_tests_utils,  only: vc_moist_pressure
 
    use iop,              only: setiopupdate,readiopdata
@@ -368,6 +367,10 @@ subroutine read_inidat()
    integer i,c,m,n,lat                     ! indices
    integer ncol
    integer ixcldice, ixcldliq  ! indices into q3 array for cloud liq and cloud ice
+
+   integer :: ierr, pio_errtype
+   integer :: lonid, latid
+   integer :: mlon, morec      ! lon/lat dimension lengths from IC file
 
    type(file_desc_t), pointer :: fh_ini, fh_topo
 
@@ -379,7 +382,7 @@ subroutine read_inidat()
    character*16 fieldname                  ! field name
 
    real(r8) :: clat2d(plon,plat),clon2d(plon,plat)
-   integer :: ierr
+
    ! variables for analytic initial conditions
    integer,  allocatable       :: glob_ind(:)
    integer                     :: m_cnst(1)
@@ -439,6 +442,20 @@ subroutine read_inidat()
       ! Read required fields
       !---------------------
 
+      call pio_seterrorhandling(fh_ini, PIO_BCAST_ERROR, pio_errtype)
+
+      ierr = pio_inq_dimid(fh_ini, 'lon', lonid)
+      ierr = pio_inq_dimid(fh_ini, 'lat', latid)
+      ierr = pio_inq_dimlen(fh_ini, lonid, mlon)
+      ierr = pio_inq_dimlen(fh_ini, latid, morec)
+      if (.not. single_column .and. (mlon /= plon .or. morec /= plat)) then
+         write(iulog,*) sub//': ERROR: model parameters do not match initial dataset parameters'
+         write(iulog,*)'Model Parameters:    plon = ',plon,' plat = ',plat
+         write(iulog,*)'Dataset Parameters:  dlon = ',mlon,' dlat = ',morec
+         call endrun(sub//': ERROR: model parameters do not match initial dataset parameters')
+      end if
+
+      call pio_seterrorhandling(fh_ini, pio_errtype)
       !-----------
       ! 3-D fields
       !-----------
@@ -493,7 +510,8 @@ subroutine read_inidat()
       call process_inidat('PS')
    end if
 
-   ! PHIS processing for cases without analytic initial conditions
+   ! PHIS processing.  This code allows an analytic specification of PHIS to be
+   ! overridden by one from a specified topo file.
    fieldname = 'PHIS'
    readvar   = .false.
    if (associated(fh_topo)) then
@@ -509,7 +527,7 @@ subroutine read_inidat()
 
    if (single_column) then
       ps(:,:,1) = ps_tmp(:,:)
-   else	
+   else
       ! Integrals of mass, moisture and geopotential height
       ! (fix mass of moisture as well)
       call global_int
@@ -530,7 +548,7 @@ subroutine read_inidat()
             clat(:) = clat2d(1,:)
             clat_p(:)=clat(:)
          end if
-          
+
          fieldname = 'CLON1'
          call infld(fieldname, fh_ini, 'lon', 'lat', 1, pcols, begchunk, endchunk, &
             clon2d, readvar, gridname='physgrid')
@@ -540,7 +558,7 @@ subroutine read_inidat()
             clon = clon2d
             clon_p(:)=clon(:,1)
          end if
-          
+
          ! Get latdeg/londeg from initial file for bfb calculations
          ! needed for dyn_grid to determine bounding area and verticies
          ierr = pio_inq_dimid  (fh_ini, 'lon'  , londimid)
@@ -603,6 +621,7 @@ subroutine process_inidat(fieldname, m_cnst, fh)
    use spetru
    use dyn_grid,            only: get_horiz_grid_dim_d
    use const_init,          only: cnst_init_default
+   use qneg_module,         only: qneg3
 
 #if ( defined SPMD )
    use spmd_dyn,     only: compute_gsfactors
@@ -663,8 +682,8 @@ subroutine process_inidat(fieldname, m_cnst, fh)
          tmp3d_b(:,:,:) = 0._r8
       else
 #if (( defined BFB_CAM_SCAM_IOP )  && ( ! defined DO_SPETRU ))
-         allocate ( u3_sav (plon,plev,plat) )             
-         allocate ( v3_sav (plon,plev,plat) )             
+         allocate ( u3_sav (plon,plev,plat) )
+         allocate ( v3_sav (plon,plev,plat) )
          u3_sav(:plon,:plev,:plat) = arr3d_a(:plon,:plev,:plat)
          v3_sav(:plon,:plev,:plat) = arr3d_b(:plon,:plev,:plat)
          call spetru_uv(u3_sav  ,v3_sav  ,vort=tmp3d_a, div=tmp3d_b)
@@ -678,7 +697,7 @@ subroutine process_inidat(fieldname, m_cnst, fh)
 #if ( defined SPMD )
       numperlat = plnlv
       call compute_gsfactors (numperlat, numrecv, numsend, displs)
-       
+
       call mpiscatterv (arr3d_a ,numsend, displs, mpir8,u3  (:,:,beglat:endlat,1)  ,numrecv, mpir8,0,mpicom)
       call mpiscatterv (arr3d_b ,numsend, displs, mpir8,v3  (:,:,beglat:endlat,1)  ,numrecv, mpir8,0,mpicom)
       call mpiscatterv (tmp3d_a ,numsend, displs, mpir8,vort(:,:,beglat:endlat,1) ,numrecv, mpir8,0,mpicom)
@@ -728,9 +747,9 @@ subroutine process_inidat(fieldname, m_cnst, fh)
       if (.not. single_column) then
 #if ( ( ! defined BFB_CAM_SCAM_IOP ) || ( defined DO_SPETRU ) )
          call spetru_3d_scalar(t3_tmp)
-#endif 
+#endif
       end if
-      
+
 #if ( defined SPMD )
       numperlat = plnlv
       call compute_gsfactors (numperlat, numrecv, numsend, displs)
@@ -760,11 +779,14 @@ subroutine process_inidat(fieldname, m_cnst, fh)
             call endrun(sub//': ERROR:  Units for tracer ' &
                //trim(cnst_name(m_cnst))//' must be in KG/KG')
          end if
-         
-      else
-         ! Constituents not read from initial file are initialized by the package that implements them.
 
-         if(m_cnst == 1 .and. moist_physics) then
+      else if (.not. analytic_ic_active()) then
+
+         ! Constituents not read from initial file are initialized by the
+         ! package that implements them.  Note that the analytic IC code calls
+         ! cnst_init_default internally
+
+         if (m_cnst == 1 .and. moist_physics) then
             call endrun(sub//': ERROR:  Q must be on Initial File')
          end if
 
@@ -806,7 +828,7 @@ subroutine process_inidat(fieldname, m_cnst, fh)
          tmp2d_b(:,:) = 0._r8
       else
 #if (( defined BFB_CAM_SCAM_IOP ) && ( ! defined DO_SPETRU ))
-         allocate ( ps_sav(plon,plat) )                   
+         allocate ( ps_sav(plon,plat) )
          ps_sav(:plon,:plat)=ps_tmp(:plon,:plat)
          call spetru_ps(ps_sav, tmp2d_a, tmp2d_b)
          deallocate ( ps_sav )
@@ -853,10 +875,10 @@ subroutine process_inidat(fieldname, m_cnst, fh)
                'from_hires is either false or not present'
          end if
          call pio_seterrorhandling(fh, PIO_INTERNAL_ERROR)
-          
+
       else
          phis_hires = .false.
-          
+
       end if
 
       ! Spectral truncation
@@ -920,8 +942,13 @@ subroutine global_int()
    integer :: numrecv           ! number of items to be received
    integer :: displs(0:npes-1)  ! displacement array
 #endif
+
+   type(file_desc_t), pointer :: fh_topo
+
    character(len=*), parameter :: sub='global_int'
    !-----------------------------------------------------------------------
+
+   fh_topo => topo_file_get_id()
 
    if (masterproc) then
 
@@ -995,9 +1022,9 @@ subroutine global_int()
 
       ! Globally avgd sfc. partial pressure of dry air (i.e. global dry mass):
       tmass0 = 98222._r8/gravit
-      if (adiabatic)   tmass0 =  tmassf_tmp
-      if (ideal_phys ) tmass0 =  100000._r8/gravit
-      if (aqua_planet) tmass0 = (101325._r8-245._r8)/gravit
+      if (.not. associated(fh_topo)) tmass0 = (101325._r8-245._r8)/gravit
+      if (adiabatic)                 tmass0 =  tmassf_tmp
+      if (ideal_phys )               tmass0 =  100000._r8/gravit
 
       if (masterproc) then
          write(iulog,*) sub//': INFO:'

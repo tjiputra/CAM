@@ -5,10 +5,11 @@ module mo_extfrc
 
   use shr_kind_mod,  only : r8 => shr_kind_r8
   use ppgrid,        only : pver, pverp
-  use chem_mods,     only : gas_pcnst, extcnt, extfrc_lst, frc_from_dataset
+  use chem_mods,     only : gas_pcnst, extcnt, extfrc_lst, frc_from_dataset, adv_mass
   use spmd_utils,    only : masterproc
   use cam_abortutils,only : endrun
   use cam_history,   only : addfld, outfld, add_default, horiz_only
+  use cam_history_support,only : max_fieldname_len
   use cam_logfile,   only : iulog
   use tracer_data,   only : trfld,trfile
   use mo_constants,  only : avogadro
@@ -89,7 +90,7 @@ contains
     character(len=1), parameter :: filelist = ''
     character(len=1), parameter :: datapath = ''
     logical         , parameter :: rmv_file = .false.
-    logical  :: history_aerosol      ! Output the MAM aerosol tendencies
+    logical  :: history_aerosol
     logical  :: history_chemistry
     logical  :: history_cesm_forcing
 
@@ -198,15 +199,15 @@ contains
                'external forcing for '//trim(spc_name) )
           call addfld( trim(spc_name)//'_CLXF', horiz_only,  'A',  'molec/cm2/s', &
                'vertically integrated external forcing for '//trim(spc_name) )
-          call addfld( trim(spc_name)//'_XFRC_COL', horiz_only,  'A',  'kg/m2/s', &
+          call addfld( trim(spc_name)//'_CMXF', horiz_only,  'A',  'kg/m2/s', &
                'vertically integrated external forcing for '//trim(spc_name) )
           if ( history_aerosol .or. history_chemistry ) then 
              call add_default( trim(spc_name)//'_CLXF', 1, ' ' )
-             call add_default( trim(spc_name)//'_XFRC_COL', 1, ' ' )
+             call add_default( trim(spc_name)//'_CMXF', 1, ' ' )
           endif
           if ( history_cesm_forcing .and. spc_name == 'NO2' ) then
              call add_default( trim(spc_name)//'_CLXF', 1, ' ' )
-             call add_default( trim(spc_name)//'_XFRC_COL', 1, ' ' )
+             call add_default( trim(spc_name)//'_CMXF', 1, ' ' )
           endif
        endif
     enddo
@@ -343,9 +344,6 @@ contains
     !	... form the external forcing
     !--------------------------------------------------------
     use mo_chem_utls,  only : get_spc_ndx
-#ifdef OSLO_AERO
-    use chem_mods,     only : adv_mass
-#endif
 
     implicit none
 
@@ -361,7 +359,7 @@ contains
     !	... local variables
     !--------------------------------------------------------
     integer  ::  m, n
-    character(len=16) :: xfcname
+    character(len=max_fieldname_len) :: xfcname
     real(r8) :: frcing_col(1:ncol), frcing_col_kg(1:ncol)
     integer  :: k, isec
     real(r8),parameter :: km_to_cm = 1.e5_r8
@@ -407,7 +405,7 @@ contains
 
           xfcname = trim(extfrc_lst(n))//'_CLXF'
           call outfld( xfcname, frcing_col(:ncol), ncol, lchnk )
-          xfcname = trim(extfrc_lst(n))//'_XFRC_COL'
+          xfcname = trim(extfrc_lst(n))//'_CMXF'
           call outfld( xfcname, frcing_col_kg(:ncol), ncol, lchnk )
        endif
     end do frc_loop

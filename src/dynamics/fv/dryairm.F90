@@ -20,7 +20,10 @@ subroutine dryairm( grid,  moun,  ps,   tracer,  delp,                   &
 !fvitt
  use constituents,        only: cnst_type
  use mean_module,         only: gmeanxy
- use cam_control_mod,     only: aqua_planet
+
+ use pio,                 only: file_desc_t
+ use cam_initfiles,       only: topo_file_get_id
+ 
  use cam_logfile,         only: iulog
  implicit   none
 
@@ -75,10 +78,14 @@ subroutine dryairm( grid,  moun,  ps,   tracer,  delp,                   &
       real(r8), parameter ::  D245_0        = 245._r8
       real(r8), parameter ::  D101325_0     = 101325._r8
 
+      type(file_desc_t), pointer :: fh_topo
+
       integer  i, j, k, ic
       real(r8) psm0, psm1
       real(r8) psdry
       real(r8) dpd
+
+    fh_topo => topo_file_get_id()
 
     im       = grid%im
     jm       = grid%jm
@@ -92,7 +99,7 @@ subroutine dryairm( grid,  moun,  ps,   tracer,  delp,                   &
     ptop       = grid%ptop
 
     drym_loc = drym
-    if (aqua_planet) then
+    if (.not. associated(fh_topo)) then
        drym_loc = D101325_0 - D245_0
     end if
 

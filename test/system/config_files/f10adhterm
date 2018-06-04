@@ -1,6 +1,6 @@
 -nosmp -spmd
 -dyn fv
--res 10x15
+-hgrid 10x15
 -phys adiabatic
 -chem terminator
 -debug

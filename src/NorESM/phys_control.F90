@@ -35,7 +35,7 @@ character(len=16), parameter :: unset_str = 'UNSET'
 integer,           parameter :: unset_int = huge(1)
 
 ! Namelist variables:
-character(len=16) :: cam_physpkg          = unset_str  ! CAM physics package [cam3 | cam4 | cam5 |
+character(len=16) :: cam_physpkg          = unset_str  ! CAM physics package
 character(len=32) :: cam_chempkg          = unset_str  ! CAM chemistry package 
 character(len=16) :: waccmx_opt           = unset_str  ! WACCMX run option [ionosphere | neutral | off
 character(len=16) :: deep_scheme          = unset_str  ! deep convection package
@@ -100,7 +100,7 @@ logical, public, protected :: use_gw_convect_sh = .false. ! Shallow convection.
 logical, public, protected :: fv_am_correction = .false.
 
 !tht: energy adjustment in dry mass adjustment
-logical :: dme_energy_adjust = .false.
+logical, public, protected :: dme_energy_adjust = .false.
 
 !======================================================================= 
 contains
@@ -185,7 +185,7 @@ subroutine phys_ctl_readnl(nlfile)
    call mpi_bcast(cld_macmic_num_steps,        1,                     mpi_integer,   masterprocid, mpicom, ierr)
    call mpi_bcast(offline_driver,              1,                     mpi_logical,   masterprocid, mpicom, ierr)
    call mpi_bcast(convproc_do_aer,             1,                     mpi_logical,   masterprocid, mpicom, ierr)
-   call mpi_bcast(dme_energy_adjust,           1,                     mpi_logical,   masterprocid, mpicom, ierr)
+   call mpi_bcast(dme_energy_adjust,           1,                     mpi_logical,   masterprocid, mpicom, ierr) !+tht
 
    use_spcam       = (     cam_physpkg_is('spcam_sam1mom') &
                       .or. cam_physpkg_is('spcam_m2005'))
@@ -326,7 +326,7 @@ subroutine phys_getopts(deep_scheme_out, shallow_scheme_out, eddy_scheme_out, mi
    integer,           intent(out), optional :: cld_macmic_num_steps_out
    logical,           intent(out), optional :: offline_driver_out
    logical,           intent(out), optional :: convproc_do_aer_out
-   logical,           intent(out), optional :: dme_energy_adjust_out
+   logical,           intent(out), optional :: dme_energy_adjust_out !+tht
 
    if ( present(deep_scheme_out         ) ) deep_scheme_out          = deep_scheme
    if ( present(shallow_scheme_out      ) ) shallow_scheme_out       = shallow_scheme
@@ -360,7 +360,8 @@ subroutine phys_getopts(deep_scheme_out, shallow_scheme_out, eddy_scheme_out, mi
    if ( present(cld_macmic_num_steps_out) ) cld_macmic_num_steps_out = cld_macmic_num_steps
    if ( present(offline_driver_out      ) ) offline_driver_out       = offline_driver
    if ( present(convproc_do_aer_out     ) ) convproc_do_aer_out      = convproc_do_aer
-   if ( present(dme_energy_adjust_out   ) ) dme_energy_adjust_out    = dme_energy_adjust
+   if ( present(dme_energy_adjust_out   ) ) dme_energy_adjust_out    = dme_energy_adjust !+tht
+
 end subroutine phys_getopts
 
 !===============================================================================

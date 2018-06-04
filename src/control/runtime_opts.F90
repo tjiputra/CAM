@@ -1,10 +1,10 @@
 module runtime_opts
 
-!----------------------------------------------------------------------- 
-! 
+!-----------------------------------------------------------------------
+!
 ! Provide driver level routine for making calls to the namelist readers
 ! for the infrastructure and the dycore and physics parameterizations.
-! 
+!
 !-----------------------------------------------------------------------
 
 use shr_kind_mod,    only: r8=>shr_kind_r8
@@ -72,7 +72,6 @@ subroutine read_namelist(nlfilename, single_column, scmlat, scmlon)
    use prescribed_strataero,only: prescribed_strataero_readnl
    use aerodep_flx,         only: aerodep_flx_readnl
    use solar_data,          only: solar_data_readnl
-   use solar_euv_data,      only: solar_euv_data_readnl
    use tropopause,          only: tropopause_readnl
    use aoa_tracers,         only: aoa_tracers_readnl
    use prescribed_ozone,    only: prescribed_ozone_readnl
@@ -89,12 +88,13 @@ subroutine read_namelist(nlfilename, single_column, scmlat, scmlon)
    use metdata,             only: metdata_readnl
 #endif
    use offline_driver,      only: offline_driver_readnl
-   use inic_analytic,       only: analytic_ic_readnl
+   use inic_analytic_utils, only: analytic_ic_readnl
    use rate_diags,          only: rate_diags_readnl
    use tracers,             only: tracers_readnl
 
    use dyn_comp,            only: dyn_readnl
    use ionosphere_interface,only: ionosphere_readnl
+   use qneg_module,         only: qneg_readnl
 
    !---------------------------Arguments-----------------------------------
 
@@ -161,7 +161,6 @@ subroutine read_namelist(nlfilename, single_column, scmlat, scmlon)
    call prescribed_volcaero_readnl(nlfilename)
    call prescribed_strataero_readnl(nlfilename)
    call solar_data_readnl(nlfilename)
-   call solar_euv_data_readnl(nlfilename)
    call carma_readnl(nlfilename)
    call tropopause_readnl(nlfilename)
    call aoa_tracers_readnl(nlfilename)
@@ -191,6 +190,7 @@ subroutine read_namelist(nlfilename, single_column, scmlat, scmlon)
 
    call dyn_readnl(nlfilename)
    call ionosphere_readnl(nlfilename)
+   call qneg_readnl(nlfilename)
 
 end subroutine read_namelist
 

@@ -9,7 +9,6 @@ module photo_bkgrnd
   use shr_kind_mod,   only : r8 => shr_kind_r8
   use mo_chem_utls,   only : get_rxt_ndx
   use ppgrid,         only : pver
-  use mo_solar_parms, only : solar_parms_get
 
   implicit none
 
@@ -35,10 +34,11 @@ contains
   !----------------------------------------------------------------------------
   ! Adds background ionization rates to WACCM's photolysis rates
   !----------------------------------------------------------------------------
-  subroutine photo_bkgrnd_calc( o_den, o2_den, n2_den, no_den, zint, rates, & 
+  subroutine photo_bkgrnd_calc(f107, o_den, o2_den, n2_den, no_den, zint, rates, & 
                                qbko1_out, qbko2_out, qbkn2_out, qbkn1_out, qbkno_out )
 
    ! arguments
+    real(r8), intent(in) :: f107
     real(r8), intent(in) :: o_den(:)           ! N density (molecules/cm^3)
     real(r8), intent(in) :: o2_den(:)          ! O2 density (molecules/cm^3)
     real(r8), intent(in) :: n2_den(:)          ! N2 density (molecules/cm^3)
@@ -68,9 +68,6 @@ contains
     real(r8) :: qbkno(pver)
 
     integer :: k
-    real(r8) :: f107
-
-    call solar_parms_get( f107_s = f107 )
 
     zmaj(1,:) = o_den(:) 
     zmaj(2,:) = o2_den(:) 

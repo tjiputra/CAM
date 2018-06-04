@@ -116,14 +116,14 @@
       use set_cp,            only : calc_cp
       use cam_history,       only : outfld
       use shr_orb_mod,       only : shr_orb_decl
-      use time_manager,      only : get_curr_calday
+      use time_manager,      only : get_curr_calday, get_step_size !+tht step_size
       use cam_control_mod,   only : lambm0, eccen, mvelpp, obliqr
       use mo_constants,      only : r2d
       use short_lived_species,only: get_short_lived_species
       use physics_buffer,    only : physics_buffer_desc
       use phys_control,      only : waccmx_is
       use orbit,             only : zenith
-      use time_manager,      only : is_first_step ,get_step_size !+tht step_size
+      use time_manager,      only : is_first_step
 
 !-----------------------------------------------------------------------
 !        ... dummy arguments

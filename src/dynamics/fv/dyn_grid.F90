@@ -17,7 +17,7 @@ use spmd_utils,         only: iam
 use spmd_dyn,           only: spmdinit_dyn, proc, lonrangexy, latrangexy
 use time_manager,       only: get_step_size
 
-use pio,                only: file_desc_t, pio_inq_dimid, pio_inq_dimlen
+use pio,                only: file_desc_t
 use cam_initfiles,      only: initial_file_get_id
 
 use dynamics_vars,      only: t_fvdycore_state, t_fvdycore_grid, grid_vars_init
@@ -82,12 +82,6 @@ subroutine dyn_grid_init()
 
    type(file_desc_t), pointer :: fh_ini
 
-   integer :: ierr
-   integer :: lonid
-   integer :: latid
-   integer :: mlon             ! longitude dimension length from dataset
-   integer :: morec            ! latitude dimension length from dataset
-
    integer :: i, k, lat
 
    real(r8) :: dt
@@ -104,17 +98,6 @@ subroutine dyn_grid_init()
 
    ! Get file handle for initial file and first consistency check
    fh_ini => initial_file_get_id()
-
-   ierr = pio_inq_dimid(fh_ini, 'lon' , lonid)
-   ierr = pio_inq_dimid(fh_ini, 'lat' , latid)
-   ierr = pio_inq_dimlen(fh_ini, lonid , mlon)
-   ierr = pio_inq_dimlen(fh_ini, latid , morec)
-   if (mlon /= plon .or. morec /= plat) then
-       write(iulog,*) sub//': ERROR: model parameters do not match initial dataset parameters'
-       write(iulog,*)'Model Parameters:    plon = ',plon,' plat = ',plat
-       write(iulog,*)'Dataset Parameters:  dlon = ',mlon,' dlat = ',morec
-       call endrun(sub//': ERROR: model parameters do not match initial dataset parameters')
-    end if
 
    ! Set grid size parameters
    grid%im       = plon
@@ -306,7 +289,7 @@ integer function get_block_gcol_cnt_d(blockid)
    ! Local workspace
    integer :: i, j
    !---------------------------------------------------------------------------
-   
+
    if (spmd_on .eq. 1) then
       j = (blockid-1) / grid%nprxy_x + 1
       i = blockid - (j-1) * grid%nprxy_x
@@ -462,7 +445,7 @@ integer function get_gcol_block_cnt_d(gcol)
    ! Arguments
    integer, intent(in) :: gcol     ! global column index
    !---------------------------------------------------------------------------
-   
+
    !  lon/lat block
    get_gcol_block_cnt_d = 1
 
@@ -1086,6 +1069,8 @@ subroutine define_cam_grids()
 
   call cam_grid_register('fv_u_stagger', dyn_ustag_decomp, slat_coord,        &
        lon_coord, grid_map, unstruct=.false.)
+  call cam_grid_attribute_register('fv_u_stagger', 'w_stag',                  &
+       'staggered latitude weights', 'slat', w_staggered)
   nullify(grid_map) ! Belongs to the grid
 
   ! Staggered grid for V_S
@@ -1122,8 +1107,6 @@ subroutine define_cam_grids()
   end if
   call cam_grid_register('fv_v_stagger', dyn_vstag_decomp, lat_coord,         &
        slon_coord, grid_map, unstruct=.false.)
-  call cam_grid_attribute_register('fv_v_stagger', 'w_stag',                  &
-       'staggered latitude weights', 'lat', w_staggered)
   nullify(grid_map) ! Belongs to the grid
 
   ! Zonal mean grid

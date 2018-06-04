@@ -9,14 +9,11 @@
 <ncdata hgrid="128x256" nlev="60">atm/cam/inic/gaus/HS1994.128x256.L60_c061516.nc</ncdata>
 <ncdata hgrid="64x128"  nlev="30">atm/cam/inic/gaus/HS1994.64x128.L30_c061616.nc</ncdata>
 
-<!-- Force PHIS to be set to zero -->
-<use_topo_file>.false.</use_topo_file>
-
 <!-- Perturb initial temperature -->
 <pertlim> 1.0D-5 </pertlim>
 
 <!-- Modified horizontal diffusion -->
-<eul_hdif_order>      4    </eul_hdif_order>
+<eul_hdif_order dyn="eul"      > 4 </eul_hdif_order>
 <eul_hdif_coef hgrid="64x128"  > 1.17D16 </eul_hdif_coef>
 <eul_hdif_coef hgrid="128x256" > 7.14D14 </eul_hdif_coef>
 

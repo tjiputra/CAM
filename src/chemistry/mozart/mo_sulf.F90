@@ -30,7 +30,7 @@
       logical :: read_sulf = .false.
 
       character(len=16)  :: fld_name = 'SULFATE'
-      character(len=256) :: filename = ' '
+      character(len=256) :: filename = 'NONE'
       character(len=256) :: filelist = ' '
       character(len=256) :: datapath = ' '
       character(len=32)  :: datatype = 'CYCLICAL'
@@ -130,7 +130,7 @@ subroutine sulf_readnl(nlfile)
    fixed_tod  = sulf_fixed_tod
 
    ! Turn on prescribed volcanics if user has specified an input dataset.
-   if (len_trim(filename) > 0 ) has_sulf_file = .true.
+   if (len_trim(filename) > 0 .and. filename.ne.'NONE') has_sulf_file = .true.
 
 end subroutine sulf_readnl
 

@@ -9,11 +9,11 @@ module cfc11star
   use cam_logfile,  only : iulog
   
   use physics_buffer, only : pbuf_add_field, dtype_r8
-  use cam_abortutils, only : endrun
-  use ppgrid,       only : pcols, pver, begchunk, endchunk
-  use spmd_utils,   only : masterproc
-  use constituents, only : cnst_get_ind
-  use mo_chem_utls,only  : get_inv_ndx
+  use ppgrid,         only : pcols, pver, begchunk, endchunk
+  use spmd_utils,     only : masterproc
+  use constituents,   only : cnst_get_ind
+  use mo_chem_utls,   only : get_inv_ndx
+  use mo_flbc,        only : flbc_get_cfc11eq, flbc_has_cfc11eq
 
   implicit none
   save 
@@ -28,8 +28,8 @@ module cfc11star
   integer :: pbf_idx = -1
   integer, parameter :: ncfcs = 14
 
-  integer, target :: indices(ncfcs)
-  integer, target :: inv_indices(ncfcs)
+  integer :: indices(ncfcs)
+  integer :: inv_indices(ncfcs)
   
   real(r8) :: rel_rf(ncfcs)
   character(len=8), parameter :: species(ncfcs) = &
@@ -69,11 +69,9 @@ contains
 !---------------------------------------------------------------------------------
 !---------------------------------------------------------------------------------
   subroutine init_cfc11star(pbuf2d)
-    use cam_history,  only : addfld
+    use cam_history,  only : addfld, horiz_only
     use infnan,       only : nan, assignment(=)
     use physics_buffer, only : physics_buffer_desc, pbuf_set_field
-
-    implicit none
 
     real(r8) :: real_nan
     type(physics_buffer_desc), pointer :: pbuf2d(:,:)
@@ -84,7 +82,12 @@ contains
     call pbuf_set_field(pbuf2d, pbf_idx, real_nan)
 
     call addfld(pbufname,(/ 'lev' /),'A','kg/kg','cfc11star for radiation' )
-    
+
+    if (flbc_has_cfc11eq) then
+       call addfld('CFC11STAR0', (/ 'lev' /), 'A','kg/kg','cfc11star for radiation before scaling' )
+       call addfld('CFC11EQ_LBC', horiz_only, 'A','mole/mole','cfc11eq LBC' )
+    endif
+
     if (masterproc) then
        write(iulog,*) 'init_cfc11star: CFC11STAR is added to pbuf2d for radiation'
     endif
@@ -106,9 +109,12 @@ contains
 
 
     integer :: lchnk, ncol
-    integer :: c, m
+    integer :: c, m, k
     real(r8), pointer :: cf11star(:,:)
     real(r8), pointer :: cnst_offline(:,:)
+    real(r8) :: cfc11eq_vmr(pcols)
+    real(r8) :: scale_factor(pcols)
+    real(r8), parameter :: vmr2mmr = 137.35_r8/28.97_r8
 
     if (.not.do_cfc11star) return
     
@@ -129,6 +135,19 @@ contains
                                + cnst_offline(:ncol,:) * rel_rf(m)               
           endif
        enddo
+
+       if (flbc_has_cfc11eq) then
+          call flbc_get_cfc11eq( cfc11eq_vmr, ncol, lchnk )
+
+          call outfld( 'CFC11EQ_LBC', cfc11eq_vmr(:ncol), ncol, lchnk) 
+          call outfld( 'CFC11STAR0', cf11star(:ncol,:), ncol, lchnk) 
+
+          ! scale according to CAM's CFC11_eq
+          scale_factor(:ncol) = (vmr2mmr*cfc11eq_vmr(:ncol))/cf11star(:ncol,pver)
+          do k = 1,pver
+             cf11star(:ncol,k) = scale_factor(:ncol)*cf11star(:ncol,k)
+          enddo
+       endif
 
        call outfld( pbufname, cf11star(:ncol,:), ncol, lchnk) 
 

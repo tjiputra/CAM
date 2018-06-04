@@ -5,7 +5,7 @@
 module sat_hist
 
   use perf_mod,            only: t_startf, t_stopf
-  use shr_kind_mod,        only: r8 => shr_kind_r8
+  use shr_kind_mod,        only: r8 => shr_kind_r8, cl=>shr_kind_cl
   use cam_logfile,         only: iulog
   use ppgrid,              only: pcols, pver, pverp, begchunk, endchunk
   use cam_history_support, only: fieldname_lenp2, max_string_len, ptapes
@@ -678,6 +678,7 @@ contains
     integer, intent(in) :: nflds
 
     integer :: f
+    character(len=cl) :: msg1, msg2
 
     if (flds_scanned) return
 
@@ -705,6 +706,23 @@ contains
        else
           call endrun('sat_hist::scan_flds decomp_type error : '//tape%hlist(f)%field%name)
        endif
+
+       ! Check that the only "mdim" is the vertical coordinate.
+       if (has_phys_srf_flds .or. has_phys_lev_flds .or. has_phys_ilev_flds .or. &
+           has_dyn_srf_flds .or. has_dyn_lev_flds .or. has_dyn_ilev_flds) then
+          ! The mdims pointer is unassociated on a restart.  The restart initialization
+          ! should be fixed rather than requiring the check to make sure it is associated.
+          if (associated(tape%hlist(f)%field%mdims)) then
+             if (size(tape%hlist(f)%field%mdims) > 1) then
+                msg1 = 'sat_hist::scan_flds mdims error :'//tape%hlist(f)%field%name
+                msg2 = trim(msg1)//' has mdims in addition to the vertical coordinate.'//&
+                   new_line('a')//'  This is not currently supported.'
+                write(iulog,*) msg2
+                call endrun(msg1)
+             end if
+          end if
+       end if
+
     enddo
 
     flds_scanned = .true.

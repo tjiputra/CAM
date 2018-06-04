@@ -197,23 +197,21 @@ end subroutine ubc_setopts
 ! timestep dependent setting
 !-----------------------------------------------------------------------
 
-    use mo_solar_parms, only: solar_parms_get
-    use mo_msis_ubc,    only: msis_timestep_init
-    use mo_tgcm_ubc,    only: tgcm_timestep_init
-    use mo_snoe,        only: snoe_timestep_init
-    use physics_types,  only: physics_state
-    use ppgrid,         only: begchunk, endchunk
-    use physics_buffer, only : physics_buffer_desc
+    use solar_parms_data, only: kp=>solar_parms_kp, ap=>solar_parms_ap, f107=>solar_parms_f107
+    use solar_parms_data, only: f107a=>solar_parms_f107a, f107p=>solar_parms_f107p
+    use mo_msis_ubc,      only: msis_timestep_init
+    use mo_tgcm_ubc,      only: tgcm_timestep_init
+    use mo_snoe,          only: snoe_timestep_init
+    use physics_types,    only: physics_state
+    use ppgrid,           only: begchunk, endchunk
+    use physics_buffer,   only: physics_buffer_desc
 
     type(physics_state), intent(in) :: state(begchunk:endchunk)                 
     type(physics_buffer_desc), pointer :: pbuf2d(:,:)
 
-    real(r8) :: ap, kp, f107, f107a
-
     if (.not.apply_upper_bc) return
 
-    call solar_parms_get( kp_s = kp, f107_s = f107, f107a_s = f107a, ap_s = ap )
-    call msis_timestep_init( ap, f107, f107a )
+    call msis_timestep_init( ap, f107p, f107a )
     call tgcm_timestep_init( pbuf2d, state )
     call snoe_timestep_init( kp, f107 )
 

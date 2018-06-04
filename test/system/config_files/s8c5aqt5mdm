@@ -1,9 +1,0 @@
--spmd -nosmp
--dyn sld
--res 8x16
--phys cam5
--aquaplanet
--nadv_tt 5
--cppdefs -DTRACER_CHECK
--debug
--s

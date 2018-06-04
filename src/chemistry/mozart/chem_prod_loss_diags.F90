@@ -1,9 +1,9 @@
 module chem_prod_loss_diags
   use shr_kind_mod, only : r8 => shr_kind_r8
-  use chem_mods, only : clscnt4, gas_pcnst, clsmap, permute
+  use chem_mods, only : clscnt1, clscnt4, gas_pcnst, clsmap, permute
   use ppgrid, only : pver
   use chem_mods, only : rxntot
-  use cam_history, only : addfld, outfld
+  use cam_history, only : addfld, outfld, add_default
   use mo_tracname, only : solsym
 
   implicit none
@@ -17,13 +17,36 @@ contains
   !-----------------------------------------------------------------------------
   !-----------------------------------------------------------------------------
   subroutine chem_prod_loss_diags_init
+    use phys_control, only : phys_getopts
+
 
     integer :: i,j
+    logical :: history_scwaccm_forcing
+    call phys_getopts( history_scwaccm_forcing_out = history_scwaccm_forcing )
 
     do i = 1,clscnt4
        j = clsmap(i,4)
        call addfld( trim(solsym(j))//'_CHMP', (/ 'lev' /), 'I', '/cm3/s', 'chemical production rate' )
        call addfld( trim(solsym(j))//'_CHML', (/ 'lev' /), 'I', '/cm3/s', 'chemical loss rate' )
+       if (history_scwaccm_forcing ) then
+          if ( trim(solsym(j))=='CH4' .or. &
+               trim(solsym(j))=='CFC11' .or. &
+               trim(solsym(j))=='CFC12' .or. &
+               trim(solsym(j))=='N2O' ) then
+             call add_default( trim(solsym(j))//'_CHML', 1, ' ')
+          endif
+       endif
+    enddo
+    do i = 1,clscnt1
+       j = clsmap(i,1)
+       if (history_scwaccm_forcing ) then
+          if ( trim(solsym(j))=='CH4' .or. &
+               trim(solsym(j))=='CFC11' .or. &
+               trim(solsym(j))=='CFC12' .or. &
+               trim(solsym(j))=='N2O' ) then
+             call add_default( trim(solsym(j))//'_CHML', 1, ' ')
+          endif
+       endif
     enddo
 
     call addfld('H_PEROX_CHMP', (/ 'lev' /), 'I', '/cm3/s', 'total ROOH production rate' ) !PJY changed "RO2" to "ROOH"

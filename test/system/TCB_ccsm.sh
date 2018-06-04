@@ -82,9 +82,6 @@ echo "./xmlchange EXEROOT=${CAM_TESTDIR}/case.$1.$2/bld"
 echo "./xmlchange RUNDIR=${CAM_TESTDIR}/case.$1.$2/run"
 ./xmlchange RUNDIR=${CAM_TESTDIR}/case.$1.$2/run
 
-echo "./xmlchange RUN_WITH_SUBMIT=TRUE"
-./xmlchange RUN_WITH_SUBMIT=TRUE
-
 # chemistry preprocessor
 if [ $usrmech != $2 ]; then
    string1=`grep CAM_CONFIG_OPTS env_build.xml`

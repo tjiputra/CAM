@@ -1,551 +1,382 @@
-!BOP
-!
-! !MODULE: stepon -- FV Dynamics specific time-stepping
-!
-! !INTERFACE:
 module stepon
 
-! !USES:
-! from cam
-   use shr_kind_mod,   only: r8 => shr_kind_r8
-   use shr_sys_mod,    only: shr_sys_flush
-   use pmgrid,         only: plev, plevp, plat
-   use spmd_utils,     only: iam, masterproc, mpicom
-   use constituents,   only: pcnst, cnst_name, cnst_longname
-   use cam_abortutils, only: endrun
-   use ppgrid,         only: begchunk, endchunk
-   use physconst,      only: zvir, cappa
-   use physics_types,  only: physics_state, physics_tend
-   use dyn_comp,       only: dyn_import_t, dyn_export_t
-   use perf_mod,       only: t_startf, t_stopf, t_barrierf
-   use time_manager,   only: get_step_size
-! from SE
-   use derivative_mod, only: derivinit, deriv_print, derivative_t
-   use quadrature_mod, only: gauss, gausslobatto, quadrature_t
-   use edge_mod,       only: EdgeBuffer_t
-   use edge_mod,       only: initEdgeBuffer, FreeEdgeBuffer, edgeVpack, edgeVunpack
-   use parallel_mod,   only : par
+use shr_kind_mod,   only: r8 => shr_kind_r8
+use spmd_utils,     only: iam, mpicom
+use ppgrid,         only: begchunk, endchunk
 
-   implicit none
-   private
-   save
+use physics_types,  only: physics_state, physics_tend
+use dyn_comp,       only: dyn_import_t, dyn_export_t
 
-!
-! !PUBLIC MEMBER FUNCTIONS: 
-!
-  public stepon_init   ! Initialization
-  public stepon_run1    ! run method phase 1
-  public stepon_run2    ! run method phase 2
-  public stepon_run3    ! run method phase 3
-  public stepon_final  ! Finalization
+use perf_mod,       only: t_startf, t_stopf, t_barrierf
+use cam_abortutils, only: endrun
 
-!----------------------------------------------------------------------
-!
-! !DESCRIPTION: Module for dynamics time-stepping.
-!
-! !REVISION HISTORY:
-!
-! 2006.05.31  JPE    Created
-!
-!EOP
-!----------------------------------------------------------------------
-!BOC
-!
-! !PRIVATE DATA MEMBERS:
-!
-  type (derivative_t)   :: deriv           ! derivative struct
-  type (quadrature_t)   :: gv,gp           ! quadratures on velocity and pressure grids
-  type (EdgeBuffer_t) :: edgebuf              ! edge buffer
-!-----------------------------------------------------------------------
+use parallel_mod,   only: par
+use dimensions_mod, only: nelemd
 
+implicit none
+private
+save
 
-CONTAINS
+public stepon_init
+public stepon_run1
+public stepon_run2
+public stepon_run3
+public stepon_final
 
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!=========================================================================================
+contains
+!=========================================================================================
 
-!----------------------------------------------------------------------- 
-!BOP
-! !ROUTINE:  stepon_init --- Time stepping initialization
-!
-! !INTERFACE:
 subroutine stepon_init(dyn_in, dyn_out )
-! !USES:
-  use dimensions_mod, only: nlev, nelemd, npsq
-  use cam_history,    only: addfld, add_default, horiz_only
-  use cam_history,    only: register_vector_field
-  use control_mod,    only: smooth_phis_numcycle
-  use gravity_waves_sources, only: gws_init
-  use phys_control,   only: use_gw_front, use_gw_front_igw
 
-! !OUTPUT PARAMETERS
-!
-  type (dyn_import_t), intent(inout) :: dyn_in  ! Dynamics import container
-  type (dyn_export_t), intent(inout) :: dyn_out ! Dynamics export container
+   use cam_history,    only: addfld, add_default, horiz_only
+   use constituents,   only: pcnst, cnst_name, cnst_longname
+   use dimensions_mod, only: fv_nphys, cnst_name_gll, cnst_longname_gll, qsize
 
-  integer :: m
-! !DESCRIPTION:
-!
-! Allocate data, initialize values, setup grid locations and other
-! work needed to prepare the dynamics to run. Return weights and 
-! vertical coords to atmosphere calling program.
-!
-!EOP
-!-----------------------------------------------------------------------
-!BOC
+   ! arguments
+   type (dyn_import_t), intent(inout) :: dyn_in  ! Dynamics import container
+   type (dyn_export_t), intent(inout) :: dyn_out ! Dynamics export container
 
-  ! This is not done in dyn_init due to a circular dependency issue.
-  if(iam < par%nprocs) then
-     call initEdgeBuffer(par, edgebuf, (3+pcnst)*nlev)
-     if (use_gw_front .or. use_gw_front_igw) call gws_init(dyn_in%elem)
-  end if
+   ! local variables
+   integer :: m, m_cnst
+   !----------------------------------------------------------------------------
+   ! These fields on dynamics grid are output before the call to d_p_coupling.
+   do m_cnst = 1, qsize
+     call addfld(trim(cnst_name_gll(m_cnst))//'_gll',  (/ 'lev' /), 'I', 'kg/kg',   &
+          trim(cnst_longname_gll(m_cnst)), gridname='GLL')
+     call addfld(trim(cnst_name_gll(m_cnst))//'dp_gll',  (/ 'lev' /), 'I', 'kg/kg',   &
+          trim(cnst_longname_gll(m_cnst))//'*dp', gridname='GLL')
+   end do
+   call addfld('U_gll'     ,(/ 'lev' /), 'I', 'm/s ','U wind on gll grid',gridname='GLL')
+   call addfld('V_gll'     ,(/ 'lev' /), 'I', 'm/s ','V wind on gll grid',gridname='GLL')
+   call addfld('T_gll'     ,(/ 'lev' /), 'I', 'K '  ,'T on gll grid'     ,gridname='GLL')
+   call addfld('PSDRY_gll' ,horiz_only , 'I', 'Pa ' ,'psdry on gll grid' ,gridname='GLL')
+   call addfld('PS_gll'    ,horiz_only , 'I', 'Pa ' ,'ps on gll grid'    ,gridname='GLL')
+   call addfld('PHIS_gll'  ,horiz_only , 'I', 'Pa ' ,'PHIS on gll grid'  ,gridname='GLL')
 
-  ! fields that are written by the dycore
-  ! these calls cant be done in dyn_init() because physics grid
-  ! is not initialized at that point if making a restart runs
-  !
-  ! Forcing from physics
-  ! FU, FV, other dycores, doc, says "m/s" but I think that is m/s^2
-  call addfld ('FU',  (/ 'lev' /), 'A', 'm/s2', 'Zonal wind forcing term',     gridname='GLL')
-  call addfld ('FV',  (/ 'lev' /), 'A', 'm/s2', 'Meridional wind forcing term',gridname='GLL')
-  call register_vector_field('FU', 'FV')
-  call addfld ('VOR', (/ 'lev' /), 'A', '1/s',  'Vorticity',                   gridname='GLL')
-  call addfld ('DIV', (/ 'lev' /), 'A', '1/s',  'Divergence',                  gridname='GLL')
+   ! Fields for initial condition files
+   call addfld('U&IC',   (/ 'lev' /),  'I', 'm/s', 'Zonal wind',     gridname='GLL' )
+   call addfld('V&IC',   (/ 'lev' /),  'I', 'm/s', 'Meridional wind',gridname='GLL' )
+   ! Don't need to register U&IC V&IC as vector components since we don't interpolate IC files
+   call add_default('U&IC',0, 'I')
+   call add_default('V&IC',0, 'I')
 
-  if (smooth_phis_numcycle>0) then
-     call addfld ('PHIS_SM',  horiz_only, 'I', 'm2/s2', 'Surface geopotential (smoothed)',                gridname='GLL')
-     call addfld ('SGH_SM',   horiz_only, 'I', 'm',     'Standard deviation of orography (smoothed)',     gridname='GLL')
-     call addfld ('SGH30_SM', horiz_only, 'I', 'm',     'Standard deviation of 30s orography (smoothed)', gridname='GLL')
-  endif
+   call addfld('PS&IC', horiz_only,  'I', 'Pa', 'Surface pressure',       gridname='GLL')
+   call addfld('T&IC',  (/ 'lev' /), 'I', 'K',  'Temperature',            gridname='GLL')
+   call add_default('PS&IC', 0, 'I')
+   call add_default('T&IC',  0, 'I')
 
-  call addfld ('CONVU   ', (/ 'ilev' /),'A', 'm/s2    ','Zonal component IE->KE conversion term',      gridname='physgrid')
-  call addfld ('CONVV   ', (/ 'ilev' /),'A', 'm/s2    ','Meridional component IE->KE conversion term', gridname='physgrid')
-  call register_vector_field('CONVU', 'CONVV')
-  call addfld ('DIFFU   ', (/ 'ilev' /),'A', 'm/s2    ','U horizontal diffusion',                      gridname='physgrid')
-  call addfld ('DIFFV   ', (/ 'ilev' /),'A', 'm/s2    ','V horizontal diffusion',                      gridname='physgrid')
-  call register_vector_field('DIFFU', 'DIFFV')
-  
-  call addfld ('ETADOT', (/ 'ilev' /), 'A', '1/s', 'Vertical (eta) velocity', gridname='physgrid')
-  call addfld ('U&IC',   (/ 'lev' /),  'I', 'm/s', 'Zonal wind',              gridname='physgrid' )
-  call addfld ('V&IC',   (/ 'lev' /),  'I', 'm/s', 'Meridional wind',         gridname='physgrid' )
-  ! Don't need to register U&IC V&IC since we don't interpolate IC files
-  call add_default ('U&IC',0, 'I')
-  call add_default ('V&IC',0, 'I')
-
-  call addfld ('PS&IC', horiz_only,  'I', 'Pa', 'Surface pressure',gridname='physgrid')
-  call addfld ('T&IC',  (/ 'lev' /), 'I', 'K',  'Temperature',     gridname='physgrid')
-
-  call add_default ('PS&IC      ',0, 'I')
-  call add_default ('T&IC       ',0, 'I')
-  do m = 1,pcnst
-     call addfld (trim(cnst_name(m))//'&IC', (/ 'lev' /), 'I', 'kg/kg', cnst_longname(m), gridname='physgrid')
-  end do
-  do m = 1,pcnst
-     call add_default(trim(cnst_name(m))//'&IC',0, 'I')
-  end do
-
+   do m_cnst = 1,pcnst
+      call addfld(trim(cnst_name(m_cnst))//'&IC', (/ 'lev' /), 'I', 'kg/kg', &
+                  trim(cnst_longname(m_cnst)), gridname='GLL')
+      call add_default(trim(cnst_name(m_cnst))//'&IC', 0, 'I')
+   end do
 
 end subroutine stepon_init
 
-!-----------------------------------------------------------------------
-!----------------------------------------------------------------------- 
-!BOP
-! !ROUTINE:  stepon_run1 -- Phase 1 of dynamics run method.
-!
-! !INTERFACE:
+!=========================================================================================
+
 subroutine stepon_run1( dtime_out, phys_state, phys_tend,               &
                         pbuf2d, dyn_in, dyn_out )
-  
-  use dp_coupling, only: d_p_coupling
-  use time_mod,    only: tstep, phys_tscale       ! dynamics timestep
-  use control_mod, only: ftype
-  use physics_buffer, only : physics_buffer_desc
-  implicit none
-!
-! !OUTPUT PARAMETERS:
-!
 
-   real(r8), intent(out) :: dtime_out   ! Time-step
-   type(physics_state), intent(inout) :: phys_state(begchunk:endchunk)
-   type(physics_tend), intent(inout) :: phys_tend(begchunk:endchunk)
-   type (dyn_import_t), intent(inout) :: dyn_in  ! Dynamics import container
-   type (dyn_export_t), intent(inout) :: dyn_out ! Dynamics export container
+   use time_manager,   only: get_step_size
+   use dp_coupling,    only: d_p_coupling
+   use physics_buffer, only: physics_buffer_desc
+
+   use time_mod,       only: tstep                    ! dynamics timestep
+
+   real(r8),             intent(out)   :: dtime_out   ! Time-step
+   type(physics_state),  intent(inout) :: phys_state(begchunk:endchunk)
+   type(physics_tend),   intent(inout) :: phys_tend(begchunk:endchunk)
+   type (dyn_import_t),  intent(inout) :: dyn_in  ! Dynamics import container
+   type (dyn_export_t),  intent(inout) :: dyn_out ! Dynamics export container
    type (physics_buffer_desc), pointer :: pbuf2d(:,:)
+   !----------------------------------------------------------------------------
 
-!-----------------------------------------------------------------------
-
-   ! NOTE: dtime_out computed here must match formula below
    dtime_out = get_step_size()
-   if (phys_tscale/=0) then
-      dtime_out=phys_tscale  ! set by user in namelist
-   endif
 
-   if(iam < par%nprocs) then
-      if(tstep <= 0)  call endrun( 'bad tstep')
-      if(dtime_out <= 0)  call endrun( 'bad dtime')
+   if (iam < par%nprocs) then
+      if (tstep <= 0)      call endrun('stepon_run1: bad tstep')
+      if (dtime_out <= 0)  call endrun('stepon_run1: bad dtime')
+
+      ! write diagnostic fields on gll grid and initial file
+      call diag_dynvar_ic(dyn_out%elem, dyn_out%fvm)
    end if
-   !----------------------------------------------------------
-   ! Move data into phys_state structure.
-   !----------------------------------------------------------
-   
+
    call t_barrierf('sync_d_p_coupling', mpicom)
    call t_startf('d_p_coupling')
-   call d_p_coupling (phys_state, phys_tend,  pbuf2d, dyn_out )
+   ! Move data into phys_state structure.
+   call d_p_coupling(phys_state, phys_tend,  pbuf2d, dyn_out )
    call t_stopf('d_p_coupling')
-   
+
 end subroutine stepon_run1
 
-subroutine stepon_run2(phys_state, phys_tend, dyn_in, dyn_out )
-   use bndry_mod,      only: bndry_exchangeV
-   use dimensions_mod, only: nlev, nelemd, np, npsq
-   use dp_coupling,    only: p_d_coupling
-   use parallel_mod,   only: par
-   use dyn_grid,       only: TimeLevel
-   
-   use time_mod,        only: tstep, phys_tscale, TimeLevel_Qdp   !  dynamics typestep
-   use control_mod,     only: ftype, qsplit, smooth_phis_numcycle
-   use hycoef,          only: hyai, hybi, ps0
-   use cam_history,     only: outfld, hist_fld_active
-   use nctopo_util_mod, only: phisdyn,sghdyn,sgh30dyn
+!=========================================================================================
 
+subroutine stepon_run2(phys_state, phys_tend, dyn_in, dyn_out)
 
+   use dp_coupling,      only: p_d_coupling
+   use dyn_grid,         only: TimeLevel
+
+   use time_mod,         only: TimeLevel_Qdp
+   use control_mod,      only: qsplit
+   use prim_advance_mod, only: calc_tot_energy_dynamics
+
+   ! arguments
    type(physics_state), intent(inout) :: phys_state(begchunk:endchunk)
-   type(physics_tend), intent(inout) :: phys_tend(begchunk:endchunk)
+   type(physics_tend),  intent(inout) :: phys_tend(begchunk:endchunk)
    type (dyn_import_t), intent(inout) :: dyn_in  ! Dynamics import container
    type (dyn_export_t), intent(inout) :: dyn_out ! Dynamics export container
-   integer :: kptr, ie, ic, i, j, k, tl_f, tl_fQdp
-   real(r8) :: rec2dt, dyn_ps0
-   real(r8) :: dp(np,np,nlev),dp_tmp,fq,fq0,qn0, ftmp(npsq,nlev,2)
-   real(r8) :: dtime
 
-   dtime = get_step_size()
+   ! local variables
+   integer :: tl_f, tl_fQdp
+   !----------------------------------------------------------------------------
 
-   ! copy from phys structures -> dynamics structures
+   tl_f = TimeLevel%n0   ! timelevel which was adjusted by physics
+   call TimeLevel_Qdp(TimeLevel, qsplit, tl_fQdp)
+
    call t_barrierf('sync_p_d_coupling', mpicom)
    call t_startf('p_d_coupling')
-   call p_d_coupling(phys_state, phys_tend,  dyn_in)
+   ! copy from phys structures -> dynamics structures
+   call p_d_coupling(phys_state, phys_tend, dyn_in, tl_f, tl_fQdp)
    call t_stopf('p_d_coupling')
 
-   if(iam >= par%nprocs) return
-
-   call t_startf('bndry_exchange')
-   ! do boundary exchange
-   do ie=1,nelemd
-      kptr=0
-      call edgeVpack(edgebuf,dyn_in%elem(ie)%derived%FM(:,:,:,:,1),2*nlev,kptr,dyn_in%elem(ie)%desc)
-      kptr=kptr+2*nlev
-
-      call edgeVpack(edgebuf,dyn_in%elem(ie)%derived%FT(:,:,:,1),nlev,kptr,dyn_in%elem(ie)%desc)
-      kptr=kptr+nlev
-      call edgeVpack(edgebuf,dyn_in%elem(ie)%derived%FQ(:,:,:,:,1),nlev*pcnst,kptr,dyn_in%elem(ie)%desc)
-   end do
-
-   call bndry_exchangeV(par, edgebuf)
-
-   ! NOTE: rec2dt MUST be 1/dtime_out as computed above
-
-   rec2dt = 1._r8/dtime
-   if (phys_tscale/=0) then
-      rec2dt = 1._r8/phys_tscale
-   endif
-
-
-   do ie=1,nelemd
-      kptr=0
-
-      call edgeVunpack(edgebuf,dyn_in%elem(ie)%derived%FM(:,:,:,:,1),2*nlev,kptr,dyn_in%elem(ie)%desc)
-      kptr=kptr+2*nlev
-
-      call edgeVunpack(edgebuf,dyn_in%elem(ie)%derived%FT(:,:,:,1),nlev,kptr,dyn_in%elem(ie)%desc)
-      kptr=kptr+nlev
-
-      call edgeVunpack(edgebuf,dyn_in%elem(ie)%derived%FQ(:,:,:,:,1),nlev*pcnst,kptr,dyn_in%elem(ie)%desc)
-
-      tl_f = TimeLevel%n0   ! timelevel which was adjusted by physics
-
-      call TimeLevel_Qdp(TimeLevel, qsplit, tl_fQdp)
-
-      dyn_ps0=ps0
-
-      !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-      ! ftype=2:  apply forcing to Q,ps.  Return dynamics tendencies
-      !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-      if (ftype==2) then
-         ! apply forcing to states tl_f 
-         ! requires forward-in-time timestepping, checked in namelist_mod.F90
-!$omp parallel do private(k)
-         do k=1,nlev
-            dp(:,:,k) = ( hyai(k+1) - hyai(k) )*dyn_ps0 + &
-                 ( hybi(k+1) - hybi(k) )*dyn_in%elem(ie)%state%ps_v(:,:,tl_f)
-         enddo
-         do k=1,nlev
-            do j=1,np
-               do i=1,np
-
-                  do ic=1,pcnst
-                     ! back out tendency: Qdp*dtime 
-                     fq = dp(i,j,k)*(  dyn_in%elem(ie)%derived%FQ(i,j,k,ic,1) - &
-                          dyn_in%elem(ie)%state%Q(i,j,k,ic))
-                     
-                     ! apply forcing to Qdp
-!                     dyn_in%elem(ie)%state%Qdp(i,j,k,ic,tl_fQdp) = &
-!                          dyn_in%elem(ie)%state%Qdp(i,j,k,ic,tl_fQdp) + fq 
-                     dyn_in%elem(ie)%state%Qdp(i,j,k,ic,tl_fQdp) = &
-                          dp(i,j,k)*dyn_in%elem(ie)%derived%FQ(i,j,k,ic,1) 
-
-! BEWARE critical region if using OpenMP over k (AAM)
-                     if (ic==1) then
-                        ! force ps_v to conserve mass:  
-                        dyn_in%elem(ie)%state%ps_v(i,j,tl_f)= &
-                             dyn_in%elem(ie)%state%ps_v(i,j,tl_f) + fq
-                     endif
-                  enddo
-               end do
-            end do
-         end do
-
-!$omp parallel do private(k, j, i, ic, dp_tmp)
-         do k=1,nlev
-          do ic=1,pcnst
-            do j=1,np
-               do i=1,np
-                  ! make Q consistent now that we have updated ps_v above
-                  ! recompute dp, since ps_v was changed above
-                  dp_tmp = ( hyai(k+1) - hyai(k) )*dyn_ps0 + &
-                       ( hybi(k+1) - hybi(k) )*dyn_in%elem(ie)%state%ps_v(i,j,tl_f)
-                  dyn_in%elem(ie)%state%Q(i,j,k,ic)= &
-                       dyn_in%elem(ie)%state%Qdp(i,j,k,ic,tl_fQdp)/dp_tmp
-
-               end do
-            end do
-          end do
-         end do
-      endif
-
-      !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-      ! ftype=1:  apply all forcings as an adjustment
-      !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-      if (ftype==1) then
-         ! apply forcing to state tl_f
-         ! requires forward-in-time timestepping, checked in namelist_mod.F90
-!$omp parallel do private(k)
-         do k=1,nlev
-            dp(:,:,k) = ( hyai(k+1) - hyai(k) )*dyn_ps0 + &
-                 ( hybi(k+1) - hybi(k) )*dyn_in%elem(ie)%state%ps_v(:,:,tl_f)
-         enddo
-         do k=1,nlev
-            do j=1,np
-               do i=1,np
-
-                  do ic=1,pcnst
-                     ! back out tendency: Qdp*dtime 
-                     fq = dp(i,j,k)*(  dyn_in%elem(ie)%derived%FQ(i,j,k,ic,1) - &
-                          dyn_in%elem(ie)%state%Q(i,j,k,ic))
-                     
-                     ! apply forcing to Qdp
-                     dyn_in%elem(ie)%state%Qdp(i,j,k,ic,tl_fQdp) = &
-                          dyn_in%elem(ie)%state%Qdp(i,j,k,ic,tl_fQdp) + fq 
-
-                     ! BEWARE critical region if using OpenMP over k (AAM)
-                     if (ic==1) then
-                        ! force ps_v to conserve mass:  
-                        dyn_in%elem(ie)%state%ps_v(i,j,tl_f)= &
-                             dyn_in%elem(ie)%state%ps_v(i,j,tl_f) + fq
-                     endif
-                  enddo
-
-                  ! force V, T, both timelevels
-                  dyn_in%elem(ie)%state%v(i,j,:,k,tl_f)= &
-                       dyn_in%elem(ie)%state%v(i,j,:,k,tl_f) +  &
-                       dtime*dyn_in%elem(ie)%derived%FM(i,j,:,k,1)
-                  
-                  dyn_in%elem(ie)%state%T(i,j,k,tl_f)= &
-                       dyn_in%elem(ie)%state%T(i,j,k,tl_f) + &
-                       dtime*dyn_in%elem(ie)%derived%FT(i,j,k,1)
-                  
-               end do
-            end do
-         end do
-
-!$omp parallel do private(k, j, i, ic, dp_tmp)
-         do k=1,nlev
-            do ic=1,pcnst
-               do j=1,np
-                  do i=1,np
-                     ! make Q consistent now that we have updated ps_v above
-                     dp_tmp = ( hyai(k+1) - hyai(k) )*dyn_ps0 + &
-                          ( hybi(k+1) - hybi(k) )*dyn_in%elem(ie)%state%ps_v(i,j,tl_f)
-                     dyn_in%elem(ie)%state%Q(i,j,k,ic)= &
-                          dyn_in%elem(ie)%state%Qdp(i,j,k,ic,tl_fQdp)/dp_tmp
-                  end do
-               end do
-            end do
-         end do
-      endif
-
-      !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-      ! ftype=0 and ftype<0 (debugging options):  just return tendencies to dynamics
-      !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-      if (ftype<=0) then
-
-         do ic=1,pcnst
-            ! Q  =  data used for forcing, at timelevel nm1   t
-            ! FQ =  adjusted Q returned by forcing,  at time  t+dt
-            ! tendency = (FQ*dp - Q*dp) / dt 
-            ! Convert this to a tendency on Qdp:  CAM physics does not change ps
-            ! so use ps_v at t.  (or, if physics worked with Qdp
-            ! and returned FQdp, tendency = (FQdp-Qdp)/2dt and since physics
-            ! did not change dp, dp would be the same in both terms)
-!$omp parallel do private(k, j, i, dp_tmp)
-            do k=1,nlev
-               do j=1,np
-                  do i=1,np
-                     dp_tmp = ( hyai(k+1) - hyai(k) )*dyn_ps0 + &
-                          ( hybi(k+1) - hybi(k) )*dyn_in%elem(ie)%state%ps_v(i,j,tl_f)
-                     
-                     dyn_in%elem(ie)%derived%FQ(i,j,k,ic,1)=&
-                          (  dyn_in%elem(ie)%derived%FQ(i,j,k,ic,1) - &
-                          dyn_in%elem(ie)%state%Q(i,j,k,ic))*rec2dt*dp_tmp
-                  end do
-               end do
-            end do
-         end do
-      endif
-   end do
-   call t_stopf('bndry_exchange')
-
-
-
-   ! Most output is done by physics.  We pass to the physics state variables
-   ! at timelevel "tl_f".  
-   ! we will output dycore variables here to ensure they are always at the same
-   ! time as what the physics is writing.  
-#if 0
-   if (hist_fld_active('VOR')) then
-      call compute_zeta_C0(tmp_dyn,elem,hybrid,1,nelemd,tl_f,k)
-      do ie=1,nelemd
-         do j=1,np
-            do i=1,np
-               ftmp(i+(j-1)*np,1:pver,1) = tmp_dyn(i,j,1:pver)
-            end do
-         end do
-         call outfld('VOR',ftmp(:,:,1),npsq,ie)
-      enddo
-   endif
-   if (hist_fld_active('DIV')) then
-      call compute_div_C0(tmp_dyn,elem,hybrid,1,nelemd,tl_f,k)
-      do ie=1,nelemd
-         do j=1,np
-            do i=1,np
-               ftmp(i+(j-1)*np,1:pver,1) = tmp_dyn(i,j,1:pver)
-            end do
-         end do
-         call outfld('DIV',ftmp(:,:,1),npsq,ie)
-      enddo
-   endif
-#endif
-   if (smooth_phis_numcycle>0) then
-      if (hist_fld_active('PHIS_SM')) then
-         do ie=1,nelemd
-            do j=1,np
-               do i=1,np
-                  ftmp(i+(j-1)*np,1,1) = phisdyn(i,j,ie)
-               end do
-            end do
-            call outfld('PHIS_SM',ftmp(:,1,1),npsq,ie)
-         enddo
-      endif
-      if (hist_fld_active('SGH_SM')) then
-         do ie=1,nelemd
-            do j=1,np
-               do i=1,np
-                  ftmp(i+(j-1)*np,1,1) = sghdyn(i,j,ie)
-               end do
-            end do
-            call outfld('SGH_SM',ftmp(:,1,1),npsq,ie)
-         enddo
-      endif
-      if (hist_fld_active('SGH30_SM')) then
-         do ie=1,nelemd
-            do j=1,np
-               do i=1,np
-                  ftmp(i+(j-1)*np,1,1) = sgh30dyn(i,j,ie)
-               end do
-            end do
-            call outfld('SGH30_SM',ftmp(:,1,1),npsq,ie)
-         enddo
-      endif
+   if (iam < par%nprocs) then
+      call calc_tot_energy_dynamics(dyn_in%elem, 1, nelemd, tl_f, tl_fQdp, 'dED')
    end if
-   
-   if (hist_fld_active('FU') .or. hist_fld_active('FV')) then
-      do ie=1,nelemd
-         do k=1,nlev
-            do j=1,np
-               do i=1,np
-                  ftmp(i+(j-1)*np,k,1) = dyn_in%elem(ie)%derived%FM(i,j,1,k,1)
-                  ftmp(i+(j-1)*np,k,2) = dyn_in%elem(ie)%derived%FM(i,j,2,k,1)
-               end do
-            end do
-         end do
-         
-         call outfld('FU',ftmp(:,:,1),npsq,ie)
-         call outfld('FV',ftmp(:,:,2),npsq,ie)
-      end do
-   endif
-   
-   
-   
-   
-   end subroutine stepon_run2
-   
+
+end subroutine stepon_run2
+
+!=========================================================================================
 
 subroutine stepon_run3(dtime, cam_out, phys_state, dyn_in, dyn_out)
-   use camsrfexch,  only: cam_out_t     
-   use dyn_comp,    only: dyn_run
-   use time_mod,    only: tstep
-   real(r8), intent(in) :: dtime   ! Time-step
+
+   use camsrfexch,     only: cam_out_t
+   use dyn_comp,       only: dyn_run
+
+   ! arguments
+   real(r8),            intent(in)    :: dtime   ! Time-step
    type(cam_out_t),     intent(inout) :: cam_out(:) ! Output from CAM to surface
    type(physics_state), intent(inout) :: phys_state(begchunk:endchunk)
    type (dyn_import_t), intent(inout) :: dyn_in  ! Dynamics import container
    type (dyn_export_t), intent(inout) :: dyn_out ! Dynamics export container
-   integer :: rc
+   !----------------------------------------------------------------------------
 
    call t_barrierf('sync_dyn_run', mpicom)
    call t_startf ('dyn_run')
-   call dyn_run(dyn_out,rc)	
+   call dyn_run(dyn_out)
    call t_stopf  ('dyn_run')
 
 end subroutine stepon_run3
 
+!=========================================================================================
 
-!----------------------------------------------------------------------- 
-!BOP
-! !ROUTINE:  stepon_final --- Dynamics finalization
-!
-! !INTERFACE:
 subroutine stepon_final(dyn_in, dyn_out)
 
-! !PARAMETERS:
-  ! WARNING: intent(out) here means that pointers in dyn_in and dyn_out
-  ! are nullified. Unless this memory is released in some other routine,
-  ! this is a memory leak.
-  ! These currently seem to point to dyn_grid global data.
-  type (dyn_import_t), intent(out) :: dyn_in  ! Dynamics import container
-  type (dyn_export_t), intent(out) :: dyn_out ! Dynamics export container
-!
-! !DESCRIPTION:
-!
-! Deallocate data needed for dynamics. Finalize any dynamics specific
-! files or subroutines.
-!
-!EOP
-!-----------------------------------------------------------------------
-!BOC
+   type (dyn_import_t), intent(inout) :: dyn_in  ! Dynamics import container
+   type (dyn_export_t), intent(inout) :: dyn_out ! Dynamics export container
 
-
-!EOC
 end subroutine stepon_final
 
-!-----------------------------------------------------------------------
+!=========================================================================================
 
+subroutine diag_dynvar_ic(elem, fvm)
+
+   use cam_history,            only: write_inithist, outfld, hist_fld_active, fieldname_len
+   use dyn_grid,               only: TimeLevel
+
+   use time_mod,               only: TimeLevel_Qdp   !  dynamics typestep
+   use control_mod,            only: qsplit
+   use hybrid_mod,             only: config_thread_region, get_loop_ranges
+   use hybrid_mod,             only: hybrid_t
+   use dimensions_mod,         only: np, npsq, nc, nhc, fv_nphys, qsize, ntrac, nlev
+   use dimensions_mod,         only: qsize_condensate_loading, qsize_condensate_loading_idx_gll
+   use dimensions_mod,         only: cnst_name_gll
+   use constituents,           only: cnst_name
+   use element_mod,            only: element_t
+   use fvm_control_volume_mod, only: fvm_struct, n0_fvm
+   use fvm_mapping,            only: fvm2dyn
+
+   ! arguments
+   type(element_t) , intent(in)    :: elem(1:nelemd)
+   type(fvm_struct), intent(inout) :: fvm(:)
+
+   ! local variables
+   integer              :: ie, i, j, m, m_cnst, nq
+   integer              :: tl_f, tl_qdp
+   character(len=fieldname_len) :: tfname
+
+   type(hybrid_t)        :: hybrid
+   integer               :: nets, nete
+   real(r8), allocatable :: ftmp(:,:,:)
+   real(r8), allocatable :: fld_fvm(:,:,:,:,:), fld_gll(:,:,:,:,:)
+   logical,  allocatable :: llimiter(:)
+   real(r8)              :: qtmp(np,np,nlev)
+   !----------------------------------------------------------------------------
+
+   tl_f = timelevel%n0
+   call TimeLevel_Qdp(TimeLevel, qsplit, tl_Qdp)
+
+   allocate(ftmp(npsq,nlev,2))
+
+   ! Output tracer fields for analysis of advection schemes
+   do m_cnst = 1, qsize
+     tfname = trim(cnst_name_gll(m_cnst))//'_gll'
+     if (hist_fld_active(tfname)) then
+       do ie = 1, nelemd
+         qtmp(:,:,:) =  elem(ie)%state%Qdp(:,:,:,m_cnst,tl_qdp)/&
+              elem(ie)%state%dp3d(:,:,:,tl_f)
+         do j = 1, np
+           do i = 1, np
+             ftmp(i+(j-1)*np,:,1) = elem(ie)%state%Qdp(i,j,:,m_cnst,tl_qdp)/&
+                  elem(ie)%state%dp3d(i,j,:,tl_f)
+           end do
+         end do
+         call outfld(tfname, ftmp(:,:,1), npsq, ie)
+       end do
+     end if
+   end do
+
+   do m_cnst = 1, qsize
+     tfname = trim(cnst_name_gll(m_cnst))//'dp_gll'
+     if (hist_fld_active(tfname)) then
+       do ie = 1, nelemd
+         do j = 1, np
+           do i = 1, np
+             ftmp(i+(j-1)*np,:,1) = elem(ie)%state%Qdp(i,j,:,m_cnst,tl_qdp)
+           end do
+         end do
+         call outfld(tfname, ftmp(:,:,1), npsq, ie)
+       end do
+     end if
+    end do
+
+   if (hist_fld_active('U_gll') .or. hist_fld_active('V_gll')) then
+      do ie = 1, nelemd
+         do j = 1, np
+            do i = 1, np
+               ftmp(i+(j-1)*np,:,1) = elem(ie)%state%v(i,j,1,:,tl_f)
+               ftmp(i+(j-1)*np,:,2) = elem(ie)%state%v(i,j,2,:,tl_f)
+            end do
+         end do
+         call outfld('U_gll', ftmp(:,:,1), npsq, ie)
+         call outfld('V_gll', ftmp(:,:,2), npsq, ie)
+      end do
+   end if
+
+   if (hist_fld_active('T_gll')) then
+      do ie = 1, nelemd
+         do j = 1, np
+            do i = 1, np
+               ftmp(i+(j-1)*np,:,1) = elem(ie)%state%T(i,j,:,tl_f)
+            end do
+         end do
+         call outfld('T_gll', ftmp(:,:,1), npsq, ie)
+      end do
+   end if
+
+   if (hist_fld_active('PSDRY_gll')) then
+      do ie = 1, nelemd
+         do j = 1, np
+            do i = 1, np
+               ftmp(i+(j-1)*np,1,1) = elem(ie)%state%psdry(i,j,tl_f)
+            end do
+         end do
+         call outfld('PSDRY_gll', ftmp(:,1,1), npsq, ie)
+      end do
+   end if
+
+   if (hist_fld_active('PS_gll')) then
+      do ie = 1, nelemd
+         do j = 1, np
+            do i = 1, np
+               ftmp(i+(j-1)*np,1,1) = elem(ie)%state%psdry(i,j,tl_f)
+               do nq = 1, qsize_condensate_loading
+                  m_cnst = qsize_condensate_loading_idx_gll(nq)
+                  ftmp(i+(j-1)*np,1,1) = ftmp(i+(j-1)*np,1,1) + &
+                     SUM(elem(ie)%state%Qdp(i,j,:,m_cnst,tl_Qdp))
+               end do
+            end do
+         end do
+         call outfld('PS_gll', ftmp(:,1,1), npsq, ie)
+      end do
+   end if
+
+   if (hist_fld_active('PHIS_gll')) then
+      do ie = 1, nelemd
+         call outfld('PHIS_gll', RESHAPE(elem(ie)%state%phis, (/np*np/)), np*np, ie)
+      end do
+   end if
+
+   if (write_inithist()) then
+
+      do ie = 1, nelemd
+         do j = 1, np
+            do i = 1, np
+               ftmp(i+(j-1)*np,1,1) = elem(ie)%state%psdry(i,j,tl_f)
+               do nq = 1, qsize_condensate_loading
+                  m_cnst = qsize_condensate_loading_idx_gll(nq)
+                  ftmp(i+(j-1)*np,1,1) = ftmp(i+(j-1)*np,1,1) + &
+                     SUM(elem(ie)%state%Qdp(i,j,:,m_cnst,tl_Qdp))
+               end do
+            end do
+         end do
+         call outfld('PS&IC', ftmp(:,1,1), npsq, ie)
+      end do
+
+      do ie = 1, nelemd
+         call outfld('T&IC', RESHAPE(elem(ie)%state%T(:,:,:,tl_f),   (/npsq,nlev/)), npsq, ie)
+         call outfld('U&IC', RESHAPE(elem(ie)%state%v(:,:,1,:,tl_f), (/npsq,nlev/)), npsq, ie)
+         call outfld('V&IC', RESHAPE(elem(ie)%state%v(:,:,2,:,tl_f), (/npsq,nlev/)), npsq, ie)
+
+         if (fv_nphys < 1) then
+            do m_cnst = 1, qsize
+               call outfld(trim(cnst_name(m_cnst))//'&IC', &
+                  RESHAPE(elem(ie)%state%Qdp(:,:,:,m_cnst,tl_qdp)/&
+                       elem(ie)%state%dp3d(:,:,:,tl_f), (/npsq,nlev/)), npsq, ie)
+            end do
+         end if
+      end do
+
+      if (fv_nphys > 0) then
+
+         !JMD $OMP PARALLEL NUM_THREADS(horz_num_threads), DEFAULT(SHARED), PRIVATE(hybrid,nets,nete,n)
+         !JMD        hybrid = config_thread_region(par,'horizontal')
+         hybrid = config_thread_region(par,'serial')
+         call get_loop_ranges(hybrid, ibeg=nets, iend=nete)
+
+         allocate(fld_fvm(1-nhc:nc+nhc,1-nhc:nc+nhc,nlev,ntrac,nets:nete))
+         allocate(fld_gll(np,np,nlev,ntrac,nets:nete))
+         allocate(llimiter(ntrac))
+
+         llimiter = .true.
+         do ie = nets, nete
+            do m_cnst = 1, ntrac
+               fld_fvm(1:nc,1:nc,:,m_cnst,ie) = fvm(ie)%c(1:nc,1:nc,:,m_cnst,n0_fvm)
+            end do
+         end do
+
+         call fvm2dyn(elem(nets:nete), fld_fvm, fld_gll, hybrid, nets, nete, &
+                      nlev, ntrac, fvm(nets:nete), llimiter)
+
+         do ie = nets, nete
+            do m_cnst = 1, ntrac
+               call outfld(trim(cnst_name(m_cnst))//'&IC', &
+                  RESHAPE(fld_gll(:,:,:,m_cnst,ie), (/npsq,nlev/)), npsq, ie)
+            end do
+         end do
+
+         deallocate(fld_fvm)
+         deallocate(fld_gll)
+         deallocate(llimiter)
+      end if
+
+   end if  ! if (write_inithist)
+
+   deallocate(ftmp)
+
+end subroutine diag_dynvar_ic
+
+!=========================================================================================
 
 end module stepon

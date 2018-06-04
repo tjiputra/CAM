@@ -15,7 +15,7 @@ module microp_aero
 !                 Gettelman et al., 2010 J. Geophys. Res. - Atmospheres (G2010)         
 ! for questions contact Andrew Gettelman  (andrew@ucar.edu)
 ! Modifications: A. Gettelman Nov 2010  - changed to support separation of 
-!                microphysics and macrophysics and concentrate aerosol information here
+!                  microphysics and macrophysics and concentrate aerosol information here
 !                B. Eaton, Sep 2014 - Refactored to move CAM interface code into the CAM
 !                  interface modules and preserve just the driver layer functionality here.
 !
@@ -25,7 +25,7 @@ use shr_kind_mod,     only: r8=>shr_kind_r8
 use spmd_utils,       only: masterproc
 use ppgrid,           only: pcols, pver, pverp
 use ref_pres,         only: top_lev => trop_cloud_top_lev
-use physconst,        only: rair, rhoh2o
+use physconst,        only: rair
 use constituents,     only: cnst_get_ind
 use physics_types,    only: physics_state, physics_ptend, physics_ptend_init, physics_ptend_sum, &
                             physics_state_copy, physics_update
@@ -72,7 +72,6 @@ public :: microp_aero_init, microp_aero_run, microp_aero_readnl, microp_aero_reg
 ! Private module data
 
 character(len=16)   :: eddy_scheme
-logical             :: micro_do_icesupersat
 
 ! contact freezing due to dust
 ! dust number mean radius (m), Zender et al JGR 2003 assuming number mode radius of 0.6 micron, sigma=2
@@ -176,7 +175,7 @@ subroutine microp_aero_init
    !-----------------------------------------------------------------------
 
    ! Query the PBL eddy scheme
-   call phys_getopts(eddy_scheme_out          = eddy_scheme, &
+   call phys_getopts(eddy_scheme_out          = eddy_scheme,  &
                      history_amwg_out         = history_amwg )
 
    ! Access the physical properties of the aerosols that are affecting the climate
@@ -190,7 +189,7 @@ subroutine microp_aero_init
 
    select case(trim(eddy_scheme))
    case ('diag_TKE')
-      tke_idx      = pbuf_get_index('tke')
+      tke_idx      = pbuf_get_index('tke')   
    case ('CLUBB_SGS')
       wp2_idx = pbuf_get_index('WP2_nadv')
    case default
@@ -202,7 +201,7 @@ subroutine microp_aero_init
    call rad_cnst_get_info(0, nmodes=nmodes)
    clim_modal_aero = (nmodes > 0)
 
-   ast_idx      = pbuf_get_index('AST')
+   ast_idx = pbuf_get_index('AST')
 
 #if (defined OSLO_AERO)
       cldo_idx     = pbuf_get_index('CLDO')
@@ -325,7 +324,7 @@ subroutine microp_aero_init
 
    call nucleate_ice_oslo_init(mincld, bulk_scale)
    call hetfrz_classnuc_oslo_init(mincld)
-   
+
 end subroutine microp_aero_init
 
 !=========================================================================================
@@ -484,7 +483,7 @@ subroutine microp_aero_run ( &
       !-- MH_2015/04/10
 
    !-------------------------------------------------------------------------------
-   
+
    call physics_state_copy(state,state1)
 
    lchnk = state1%lchnk
@@ -590,7 +589,7 @@ subroutine microp_aero_run ( &
       do m = 1, naer_all
          call rad_cnst_get_aer_mmr(0, m, state1, pbuf, aer_mmr)
          maerosol(:ncol,:,m) = aer_mmr(:ncol,:)*rho(:ncol,:)
-
+         
          if (m .eq. idxsul) then
             naer2(:ncol,:,m) = maerosol(:ncol,:,m)*num_to_mass_aer(m)*bulk_scale
          else
@@ -619,30 +618,30 @@ subroutine microp_aero_run ( &
    ! Set minimum values above top_lev.
    wsub(:ncol,:top_lev-1)  = 0.20_r8
    wsubi(:ncol,:top_lev-1) = 0.001_r8
-   
+
    do k = top_lev, pver
       do i = 1, ncol
 
          select case (trim(eddy_scheme))
          case ('diag_TKE', 'CLUBB_SGS')
-               wsub(i,k) = sqrt(0.5_r8*(tke(i,k) + tke(i,k+1))*(2._r8/3._r8))
-               wsub(i,k) = min(wsub(i,k),10._r8)
+            wsub(i,k) = sqrt(0.5_r8*(tke(i,k) + tke(i,k+1))*(2._r8/3._r8))
+            wsub(i,k) = min(wsub(i,k),10._r8)
          case default 
             ! get sub-grid vertical velocity from diff coef.
             ! following morrison et al. 2005, JAS
             ! assume mixing length of 30 m
-               dum = (kvh(i,k) + kvh(i,k+1))/2._r8/30._r8
+            dum = (kvh(i,k) + kvh(i,k+1))/2._r8/30._r8
             ! use maximum sub-grid vertical vel of 10 m/s
-               dum = min(dum, 10._r8)
+            dum = min(dum, 10._r8)
             ! set wsub to value at current vertical level
-               wsub(i,k)  = dum
-     end select
+            wsub(i,k)  = dum
+         end select
 
          wsubi(i,k) = max(0.001_r8, wsub(i,k))
-            if (.not. use_preexisting_ice) then
-           wsubi(i,k) = min(wsubi(i,k), 0.2_r8)
+         if (.not. use_preexisting_ice) then
+            wsubi(i,k) = min(wsubi(i,k), 0.2_r8)
          endif
-     
+
          wsub(i,k)  = max(0.20_r8, wsub(i,k))
 
       end do
@@ -800,11 +799,10 @@ subroutine microp_aero_run ( &
    call physics_update(state1, ptend_loc, deltatin)
 
 
-
    !cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
    ! Contact freezing  (-40<T<-3 C) (Young, 1974) with hooks into simulated dust
    ! estimate rndst and nanco for 4 dust bins here to pass to MG microphysics
-   
+
    do k = top_lev, pver
       do i = 1, ncol
 
@@ -903,6 +901,6 @@ subroutine microp_aero_run ( &
 
 end subroutine microp_aero_run
 
-!===============================================================================
+!=========================================================================================
 
 end module microp_aero

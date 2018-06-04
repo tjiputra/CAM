@@ -16,6 +16,7 @@ module spmd_dyn
    use pmgrid,           only: plon, plat, numlats, &
                                beglat, endlat, begirow, endirow, plev
    use spmd_utils,       only: iam, masterproc, npes, proc_smp_map
+   use scamMod,          only: single_column
    use scanslt,          only: beglatex, endlatex, numbnd, numlatsex
    use mpishorthand,     only: mpir8, mpicom
    use cam_abortutils,   only: endrun
@@ -362,9 +363,12 @@ contains
 !
       call factor (plat, m2, m3, m5)
 
-      if (m2 < 1) then
-         call endrun ('SPMDINIT_DYN: Problem size is not divisible by 2')
+      if (.not. single_column) then
+         if (m2 < 1) then
+            call endrun('SPMDINIT_DYN: Problem size is not divisible by 2')
+         end if
       end if
+
 
       if (masterproc) then
          write(iulog,*) 'Problem factors: 2**',m2,' * 3**',m3,' * 5**',m5
@@ -382,10 +386,12 @@ contains
          dyn_npes_stride = 1
       endif
 
-      if ((dyn_equi_by_col) .and. (mod(tot_cols,2) /= 0)) then
-         write(iulog,*)'SPMDINIT_DYN: Total number of columns(', &
-                   tot_cols,') must be a multiple of 2'
-         call endrun
+      if (.not. single_column) then
+         if ((dyn_equi_by_col) .and. (mod(tot_cols,2) /= 0)) then
+            write(iulog,*)'SPMDINIT_DYN: Total number of columns(', &
+               tot_cols,') must be a multiple of 2'
+            call endrun('SPMDINIT_DYN: number of columns must be multiple of 2')
+         end if
       end if
 !
 !  Initialization for inactive processes

@@ -414,6 +414,8 @@ subroutine radiation_init(pbuf2d)
       cosp_cnt(begchunk:endchunk) = 0     
    end if
 
+   call addfld('O3colAbove',    horiz_only,   'A', 'DU', 'Column O3 above model top', sampling_seq='rad_lwsw')
+
    call addfld('TOT_CLD_VISTAU',  (/ 'lev' /), 'A',   '1', 'Total gbx cloud extinction visible sw optical depth', &
                                                        sampling_seq='rad_lwsw', flag_xyfill=.true.)
    call addfld('TOT_ICLD_VISTAU', (/ 'lev' /), 'A',  '1', 'Total in-cloud extinction visible sw optical depth', &
@@ -880,7 +882,7 @@ subroutine radiation_tend( &
 
    real(r8) :: ftem(pcols,pver)        ! Temporary workspace for outfld variables
 
-   logical, parameter :: cosz_rad_call=.true.
+   logical, parameter :: cosz_rad_call=.true. !+tht
 
    character(*), parameter :: name = 'radiation_tend'
    !--------------------------------------------------------------------------------------
@@ -907,7 +909,7 @@ subroutine radiation_tend( &
    call shr_orb_decl(calday, eccen, mvelpp, lambm0, obliqr, &
                      delta, eccf)
    do i = 1, ncol
-      coszrs(i) = shr_orb_cosz(calday, clat(i), clon(i), delta, dt_avg, cosz_rad_call)
+      coszrs(i) = shr_orb_cosz(calday, clat(i), clon(i), delta, dt_avg, cosz_rad_call) !+tht
    end do
 
    ! Gather night/day column indices.

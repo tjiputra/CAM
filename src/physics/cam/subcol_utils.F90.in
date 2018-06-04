@@ -13,16 +13,13 @@
    use constituents,    only: pcnst
    use cam_abortutils,  only: endrun
    use pio,             only: var_desc_t
+   use subcol_pack_mod, only: subcol_get_nsubcol, subcol_set_nsubcol, subcol_get_indcol
 
    implicit none
 
    private
    save
 
-   !! Private variable to provide default packing and unpacking of fields
-   !! for use in restart functionality. Allocated as (pcols, begchunk:endchunk)
-   integer, target, allocatable :: nsubcol2d(:,:)
-   integer, target, allocatable :: indcol2d(:,:)
    integer, target, allocatable :: filter2d(:,:)
    real(r8),target, allocatable :: weight2d(:,:)
    logical :: weight_set, filter_set
@@ -33,9 +30,6 @@
    !! Public interface functions which do not depend on the subcolumn scheme
 
    public :: subcol_utils_init       ! Initialize module data (e.g., nsubcol2d)
-   public :: subcol_get_nsubcol      ! Copy chunk from nsubcol2d
-   public :: subcol_set_nsubcol      ! Copy chunk to nsubcol2d
-   public :: subcol_get_indcol       ! Copy chunk from indcol2d
    public :: subcol_get_filter       ! return the filter values
    public :: subcol_set_filter       ! set the filter values
    public :: subcol_get_weight       ! return the weight values
@@ -50,9 +44,6 @@
 
    public :: subcol_field_get_firstsubcol  ! Retrieve the first subcolumn and assign to grid
    public :: subcol_ptend_get_firstsubcol  ! retrieve the first subcolumn from the ptend fields and assign to grid ptend
-
-   public :: subcol_unpack           ! Unpack a subcolumn field
-   public :: subcol_pack             ! Pack a subcolumn field
 
    public :: subcol_utils_init_restart     ! Initialize restart with subcolumn specific fields
    public :: subcol_utils_read_restart     ! Read subcolumn specific fields from restart
@@ -97,19 +88,7 @@
       module procedure subcol_field_copy_{DIMS}d{TYPE}
    end interface
 
-   interface subcol_pack
-      ! TYPE int,double,real
-      ! DIMS 1,2,3,4,5,6
-      module procedure subcol_pack_{DIMS}d_{TYPE}
-   end interface
-
-   interface subcol_unpack
-      ! TYPE int,double,real
-      ! DIMS 1,2,3,4,5,6
-      module procedure subcol_unpack_{DIMS}d_{TYPE}
-   end interface
-
-   type(var_desc_t) :: nsubcol_desc, weight2d_desc, filter2d_desc
+   type(var_desc_t) :: weight2d_desc, filter2d_desc
    integer          :: subcol_dimid = -1 ! subcol dimension for restart
 
    integer :: ret_nan_int
@@ -123,21 +102,10 @@
 contains
 
    subroutine subcol_allocate_internal()
-      use ppgrid,         only: begchunk, endchunk
-   !-----------------------------------------------------------------------
-   ! Allocate nsubcol2d and indcol2d
-   !-----------------------------------------------------------------------
-      if (allocated(nsubcol2d)) then
-         deallocate(nsubcol2d)
-      end if
-      allocate(nsubcol2d(pcols, begchunk:endchunk))
-      nsubcol2d = 0
+      use ppgrid,          only: begchunk, endchunk
+      use subcol_pack_mod, only: subcol_pack_allocate
 
-      if (allocated(indcol2d)) then
-         deallocate(indcol2d)
-      end if
-      allocate(indcol2d(pcols*psubcols, begchunk:endchunk))
-      indcol2d = 0
+      call subcol_pack_allocate()
 
       if (allocated(filter2d)) then
          deallocate(filter2d)
@@ -154,10 +122,7 @@ contains
     end subroutine subcol_allocate_internal
 
    subroutine subcol_utils_init(subcol_scheme_init)
-   !-----------------------------------------------------------------------
-   ! Initialize the nsubcol module variable
-   !-----------------------------------------------------------------------
- 
+
       character(len=*), optional, intent(in) :: subcol_scheme_init ! Name of subcolumn generator
 
       call subcol_allocate_internal()
@@ -169,39 +134,11 @@ contains
       fillval_int    = 0
       fillval_double = 0._r8
       fillval_real   = 0._r4
- 
+
       weight_set = .false.
       filter_set = .false.
 
    end subroutine subcol_utils_init
-
-   subroutine subcol_get_nsubcol(lchnk, nsubcol)
-   !-----------------------------------------------------------------------
-   ! Retrieve a chunk from the nsubcol module variable
-   !-----------------------------------------------------------------------
-
-     integer,    intent(in)    :: lchnk
-     integer,    intent(out)   :: nsubcol(:)
-
-     if (.not. allocated(nsubcol2d)) then
-       call endrun('subcol_get_nsubcol: nsubcol2d not allocated')
-     end if
-     nsubcol(:) = nsubcol2d(:,lchnk)
-   end subroutine subcol_get_nsubcol
-
-   subroutine subcol_get_indcol(lchnk, indcol)
-   !-----------------------------------------------------------------------
-   ! Retrieve a chunk from the nsubcol module variable
-   !-----------------------------------------------------------------------
-
-     integer,    intent(in)    :: lchnk
-     integer,    intent(out)   :: indcol(:)
-
-     if (.not. allocated(indcol2d)) then
-       call endrun('subcol_get_indcol: indcol2d not allocated')
-     end if
-     indcol(:) = indcol2d(:,lchnk)
-  end subroutine subcol_get_indcol
 
    subroutine subcol_get_filter(lchnk, filter)
    !-----------------------------------------------------------------------
@@ -232,47 +169,12 @@ contains
    !-----------------------------------------------------------------------
      integer,    intent(in)    :: lchnk
 
-     ncol = sum(nsubcol2d(:,lchnk))
+     integer :: nsubcol(pcols)
+
+     call subcol_get_nsubcol(lchnk, nsubcol)
+     ncol = SUM(nsubcol)
 
    end function subcol_get_ncol
-
-   subroutine subcol_set_nsubcol(lchnk, ngrdcol, nsubcol)
-   !-----------------------------------------------------------------------
-   ! Set a chunk of the nsubcol module variable
-   ! Also, recompute indcol for lchnk
-   !-----------------------------------------------------------------------
-
-      integer,    intent(in)    :: lchnk
-      integer,    intent(in)    :: ngrdcol
-      integer,    intent(in)    :: nsubcol(:)
-
-      integer                   :: i, j, indx
-
-      if (any(nsubcol(:) > psubcols)) then
-         call endrun('subcol_set_nsubcol: psubcols not set large enough to hold the number of subcolumns requested')
-      end if
-      if (any(nsubcol(:) < 0)) then
-         call endrun('subcol_set_nsubcol: nsubcols must be non-negative')
-      end if
-      if (ngrdcol < pcols) then
-         if (any(nsubcol(ngrdcol+1:) > 0)) then
-            call endrun('subcol_set_nsubcol: Cannot set subcolumns for columns past ngrdcol')
-         end if
-      end if
-      nsubcol2d(:, lchnk) = nsubcol(:)
-      ! Recalculate indcol for the chunk
-      indx = 1
-      do i = 1, pcols
-         do j = 1, nsubcol2d(i, lchnk)
-            indcol2d(indx, lchnk) = i
-            indx = indx + 1
-         end do
-      end do
-      ! Fill with zeros
-      if (indx <= pcols * psubcols) then
-         indcol2d(indx:pcols*psubcols, lchnk) = 0
-      end if
-   end subroutine subcol_set_nsubcol
 
    subroutine subcol_set_filter(lchnk, filter)
    !-----------------------------------------------------------------------
@@ -299,11 +201,11 @@ contains
    end subroutine subcol_set_weight
 
    logical function is_weight_set()
-      is_weight_set=weight_set 
+      is_weight_set=weight_set
    end function is_weight_set
 
    logical function is_filter_set()
-      is_filter_set=filter_set 
+      is_filter_set=filter_set
    end function is_filter_set
 
    logical function is_subcol_on()
@@ -318,7 +220,7 @@ contains
       use namelist_utils,  only: find_group_name
       use units,           only: getunit, freeunit
       use spmd_utils,      only: masterproc, mpi_character, masterprocid, mpicom
-      
+
       character(len=*), intent(in) :: nlfile  ! filepath for file containing namelist input
 
       ! Local variables
@@ -592,7 +494,7 @@ contains
       end if
 
    end subroutine subcol_ptend_copy
-  
+
    subroutine subcol_state_hdrinit(state, state_sc)
    !-----------------------------------------------------------------------
    ! Initialize the subcolumn state header variables
@@ -625,9 +527,9 @@ contains
    ! DIMS 1,2
    subroutine subcol_field_avg_shr_{DIMS}d{TYPE}(field_sc, ngrdcol, lchnk, field,  usefilter, useweight)
    !-----------------------------------------------------------------------
-   ! This is the high level subcol field averaging routine which 
-   ! averages a field dimensioned pcols*psubcols to a grid one dimensioned pcols 
-   !  
+   ! This is the high level subcol field averaging routine which
+   ! averages a field dimensioned pcols*psubcols to a grid one dimensioned pcols
+   !
    ! Its purpose is to check filter and weight settings and to subset the
    ! appropriate subsection of the field array to pass on the averaging routine
    !-----------------------------------------------------------------------
@@ -646,7 +548,7 @@ contains
       integer           :: nsubcols(pcols)
 
       field = ret_nan_{TYPE}
-     
+
       if (usefilter .and. .not. filter_set) then
         call endrun('subcol_field_avg_shr error: Cannot specify using filters when none set')
       end if
@@ -682,7 +584,7 @@ contains
    ! DIMS 1,2
    subroutine subcol_field_get_firstsubcol_{DIMS}d{TYPE}(field_sc, docheck, ngrdcol, lchnk, field)
    !-----------------------------------------------------------------------
-   ! Retrieve the first subcolumn from a field dimensioned pcols*psubcols 
+   ! Retrieve the first subcolumn from a field dimensioned pcols*psubcols
    ! and assign to one with pcols, performing optional checking that all other subcolumns are identical
    !-----------------------------------------------------------------------
 
@@ -737,7 +639,7 @@ contains
    ! Average a subcolumn ptend to a grid ptend
    !-----------------------------------------------------------------------
 
-      type(physics_ptend),  intent(in)    :: ptend_sc      ! subcolumn ptend 
+      type(physics_ptend),  intent(in)    :: ptend_sc      ! subcolumn ptend
       integer,              intent(in)    :: ngrdcol       ! # grid cols
       integer,              intent(in)    :: lchnk         ! chunk index
       type(physics_ptend),  intent(inout) :: ptend         ! grid ptend
@@ -849,11 +751,11 @@ contains
 
    subroutine subcol_ptend_get_firstsubcol(ptend_sc, docheck, ngrdcol, lchnk, ptend)
    !-----------------------------------------------------------------------
-   ! Retrieve the first subcolumn from a ptend field dimensioned pcols*psubcols 
+   ! Retrieve the first subcolumn from a ptend field dimensioned pcols*psubcols
    ! and assign to one with pcols, performing optional check that all other subcolumns are identical
    !-----------------------------------------------------------------------
 
-      type(physics_ptend),  intent(in)    :: ptend_sc      ! subcolumn ptend 
+      type(physics_ptend),  intent(in)    :: ptend_sc      ! subcolumn ptend
       logical,              intent(in)    :: docheck       ! perform check that all subcolumns match
       integer,              intent(in)    :: ngrdcol       ! # grid cols
       integer,              intent(in)    :: lchnk         ! chunk index
@@ -952,132 +854,6 @@ contains
 
    end subroutine subcol_ptend_get_firstsubcol
 
-
-   ! TYPE int,double,real
-   ! DIMS 1,2,3,4,5,6
-   subroutine subcol_pack_{DIMS}d_{TYPE}(lchnk, field, field_sc)
-   !-----------------------------------------------------------------------
-   ! Pack the field defined on (pcols, psubcols, *) into (pcols*psubcols, *)
-   ! Packing is done accoding to the values in the proper chunk from nsubcol2d
-   !-----------------------------------------------------------------------
-
-      integer, intent(in)                     :: lchnk            ! Chunk index
-#if ({DIMS} == 1)
-      {VTYPE}, intent(in)                     :: field(:,:)           ! grid
-#elif ({DIMS} == 2)
-      {VTYPE}, intent(in)                     :: field(:,:,:)         ! grid
-#elif ({DIMS} == 3)
-      {VTYPE}, intent(in)                     :: field(:,:,:,:)       ! grid
-#elif ({DIMS} == 4)
-      {VTYPE}, intent(in)                     :: field(:,:,:,:,:)     ! grid
-#elif ({DIMS} == 5)
-      {VTYPE}, intent(in)                     :: field(:,:,:,:,:,:)   ! grid
-#elif ({DIMS} == 6)
-      {VTYPE}, intent(in)                     :: field(:,:,:,:,:,:,:) ! grid
-#endif
-      {VTYPE}, intent(out)                    :: field_sc{DIMSTR}     ! subcols
-
-      !
-      ! Local variables
-      !
-      integer           :: indx, i, j
-      integer           :: nsubcol(pcols)
-
-      call subcol_get_nsubcol(lchnk, nsubcol)
-      indx = 1
-      do i=1, pcols
-         do j = 1, nsubcol(i)
-#if ({DIMS} == 1)
-            field_sc(indx) = field(i, j)
-#elif ({DIMS} == 2)
-            field_sc(indx, :) = field(i, j, :)
-#elif ({DIMS} == 3)
-            field_sc(indx, :, :) = field(i, j, :, :)
-#elif ({DIMS} == 4)
-            field_sc(indx, :, :, :) = field(i, j, :, :, :)
-#elif ({DIMS} == 5)
-            field_sc(indx, :, :, :, :) = field(i, j, :, :, :, :)
-#elif ({DIMS} == 6)
-            field_sc(indx, :, :, :, :, :) = field(i, j, :, :, :, :, :)
-#endif
-            indx = indx + 1
-         end do
-      end do
-   end subroutine subcol_pack_{DIMS}d_{TYPE}
-
-   ! TYPE int,double,real
-   ! DIMS 1,2,3,4,5,6
-   subroutine subcol_unpack_{DIMS}d_{TYPE}(lchnk, field_sc, field, fillvalue)
-   !-----------------------------------------------------------------------
-   ! UnPack the field defined on (pcols*psubcols, *) into (pcols, psubcols, *)
-   ! Unpacking is done accoding to the values in the proper chunk from nsubcol2d
-   ! If fillvalue is present, unused entries in field are set.
-   ! NB: The output field is not initialized, if fillvalue is not passed, it
-   !     will end up with undefined values for columns where nsubcol < psubcols
-   !-----------------------------------------------------------------------
-
-      integer, intent(in)                     :: lchnk            ! Chunk index
-      {VTYPE}, intent(in)                     :: field_sc{DIMSTR}     ! subcols
-#if ({DIMS} == 1)
-      {VTYPE}, intent(out)                    :: field(:,:)           ! grid
-#elif ({DIMS} == 2)
-      {VTYPE}, intent(out)                    :: field(:,:,:)         ! grid
-#elif ({DIMS} == 3)
-      {VTYPE}, intent(out)                    :: field(:,:,:,:)       ! grid
-#elif ({DIMS} == 4)
-      {VTYPE}, intent(out)                    :: field(:,:,:,:,:)     ! grid
-#elif ({DIMS} == 5)
-      {VTYPE}, intent(out)                    :: field(:,:,:,:,:,:)   ! grid
-#elif ({DIMS} == 6)
-      {VTYPE}, intent(out)                    :: field(:,:,:,:,:,:,:) ! grid
-#endif
-      {VTYPE}, intent(in), optional           :: fillvalue            ! fil
-
-      !
-      ! Local variables
-      !
-      integer           :: indx, i, j
-      integer           :: nsubcol(pcols)
-
-      call subcol_get_nsubcol(lchnk, nsubcol)
-      indx = 1
-      do i=1, pcols
-         do j = 1, nsubcol(i)
-#if ({DIMS} == 1)
-            field(i, j) = field_sc(indx)
-#elif ({DIMS} == 2)
-            field(i, j, :) = field_sc(indx, :)
-#elif ({DIMS} == 3)
-            field(i, j, :, :) = field_sc(indx, :, :)
-#elif ({DIMS} == 4)
-            field(i, j, :, :, :) = field_sc(indx, :, :, :)
-#elif ({DIMS} == 5)
-            field(i, j, :, :, :, :) = field_sc(indx, :, :, :, :)
-#elif ({DIMS} == 6)
-            field(i, j, :, :, :, :, :) = field_sc(indx, :, :, :, :, :)
-#endif
-            indx = indx + 1
-         end do
-         if (present(fillvalue)) then
-            do j = nsubcol(i) + 1, psubcols
-#if ({DIMS} == 1)
-               field(i, j) = fillvalue
-#elif ({DIMS} == 2)
-               field(i, j, :) = fillvalue
-#elif ({DIMS} == 3)
-               field(i, j, :, :) = fillvalue
-#elif ({DIMS} == 4)
-               field(i, j, :, :, :) = fillvalue
-#elif ({DIMS} == 5)
-               field(i, j, :, :, :, :) = fillvalue
-#elif ({DIMS} == 6)
-               field(i, j, :, :, :, :, :) = fillvalue
-#endif
-            end do
-         end if
-      end do
-   end subroutine subcol_unpack_{DIMS}d_{TYPE}
-
    ! TYPE int,double,real
    {VTYPE} function subcol_avg_inter_{TYPE}(vals, lchnk, icol, indx1, indx2, usefilter, useweight) result(avgs)
    !------------------------------------------------------------------
@@ -1098,11 +874,11 @@ contains
       call subcol_get_nsubcol(lchnk, nsubcol)
       if (usefilter .and. useweight) then
          avgs = subcol_avg(vals,nsubcol(icol),filter=filter2d(indx1:indx2,lchnk),weight=weight2d(indx1:indx2,lchnk))
-      else if (useweight) then 
+      else if (useweight) then
          avgs = subcol_avg(vals,nsubcol(icol),weight=weight2d(indx1:indx2,lchnk))
       else if (usefilter) then
          avgs = subcol_avg(vals, nsubcol(icol),filter=filter2d(indx1:indx2,lchnk))
-      else 
+      else
          avgs = subcol_avg(vals,nsubcol(icol))
       end if
 
@@ -1131,7 +907,7 @@ contains
         else
            avgs = fillval
         end if
-     else if (present(weight)) then 
+     else if (present(weight)) then
         if (sum(weight) /=0 ) then
            avgs = sum(vals*weight) / sum(weight)
         else
@@ -1154,8 +930,9 @@ contains
 
    subroutine subcol_utils_init_restart(File, hdimids)
 
-     use pio,           only: file_desc_t, pio_int, pio_double
-     use cam_pio_utils, only: cam_pio_def_dim, cam_pio_def_var
+     use pio,             only: file_desc_t, pio_int, pio_double
+     use cam_pio_utils,   only: cam_pio_def_dim, cam_pio_def_var
+     use subcol_pack_mod, only: subcol_pack_init_restart
 
      ! Dummy arguments
      type(file_desc_t), intent(inout) :: File
@@ -1164,7 +941,8 @@ contains
      ! Local variable
      integer, allocatable          :: adimids(:)
 
-     call cam_pio_def_var(File, 'NSUBCOL2D', pio_int, hdimids, nsubcol_desc)
+     call subcol_pack_init_restart(File, hdimids)
+
      ! Storing filter and weight data even if not being filled by the current
      !     subcolumn generator. While these are 2-D arrays, they don't match
      !     the grid so we will have to recast them as 3-D
@@ -1185,6 +963,8 @@ contains
      use cam_grid_support, only: cam_grid_write_dist_array
      use cam_grid_support, only: cam_grid_id, cam_grid_dimensions
      use ppgrid,           only: begchunk, endchunk
+     use subcol_pack_mod,  only: subcol_unpack
+     use subcol_pack_mod,  only: subcol_pack_write_restart
      use pio,              only: file_desc_t
 
      ! Dummy argument
@@ -1205,10 +985,7 @@ contains
      call cam_grid_dimensions(grid_id, fdimlens(1:2), frank)
 
      ! Write nsubcol2d
-     adimlens(1) = size(nsubcol2d, 1)
-     adimlens(2) = endchunk - begchunk + 1
-     call cam_grid_write_dist_array(File, grid_id, adimlens(1:2),             &
-             fdimlens(1:frank), nsubcol2d, nsubcol_desc)
+     call subcol_pack_write_restart(File, grid_id, fdimlens(1:frank))
 
      ! filter2d and weight2d are 3-D variables
      fdimlens(frank + 1) = psubcols
@@ -1254,6 +1031,8 @@ contains
      use cam_grid_support, only: cam_grid_id, cam_grid_read_dist_array
      use cam_grid_support, only: cam_grid_dimensions
      use ppgrid,           only: begchunk, endchunk
+     use subcol_pack_mod,  only: subcol_pack
+     use subcol_pack_mod,  only: subcol_pack_read_restart
 
      ! Dummy argument
      type(file_desc_t), intent(inout) :: File
@@ -1266,24 +1045,14 @@ contains
      integer,  allocatable            :: unpacked_i(:,:,:)
      real(r8), allocatable            :: unpacked_r(:,:,:)
      character(len=*), parameter      :: subname = 'SUBCOL_UTILS_READ_RESTART'
+     integer,  allocatable            :: nsubcol2d(:,:)
 
      call subcol_allocate_internal()
 
-     ! Array dimensions
-     adimlens(1) = size(nsubcol2d, 1)
-     adimlens(2) = endchunk - begchunk + 1
      ! File dimensions
      grid_id = cam_grid_id('physgrid')
      call cam_grid_dimensions(grid_id, fdimlens(1:2), frank)
-     ierr = pio_inq_varid(File, 'NSUBCOL2D', nsubcol_desc)
-     call cam_pio_handle_error(ierr, trim(subname)//': NSUBCOL2D not found')
-     call cam_grid_read_dist_array(File, grid_id, adimlens(1:2),              &
-          fdimlens(1:frank), nsubcol2d, nsubcol_desc)
-
-     ! We need to update indcol2d so set nsubcol2d to itself
-     do c = begchunk, endchunk
-       call subcol_set_nsubcol(c, pcols, nsubcol2d(:, c))
-     end do
+     call subcol_pack_read_restart(File, grid_id, fdimlens(1:frank))
 
      ierr = pio_inq_varid(File, 'FILTER2D', filter2d_desc)
      call cam_pio_handle_error(ierr, trim(subname)//': FILTER2D not found')

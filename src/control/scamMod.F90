@@ -31,7 +31,6 @@ logical, public ::  use_analysis
 logical, public ::  use_saveinit
 logical, public ::  use_pert_init         ! perturb initial values
 logical, public ::  use_pert_frc          ! perturb forcing 
-logical, public ::  scm_diurnal_avg       ! If using diurnal averaging or not
 logical, public ::  switch(num_switches)  ! Logical flag settings from GUI
 logical, public ::  l_uvphys              ! If true, update u/v after TPHYS
 logical, public ::  l_uvadvect            ! If true, T, U & V will be passed to SLT
@@ -83,6 +82,7 @@ real(r8), public ::      vertdivv(plev)      ! vertical T advection
 real(r8), public ::      ptend               ! surface pressure tendency
 real(r8), public ::      qdiff(plev)         ! model minus observed humidity
 real(r8), public ::      qobs(plev)          ! actual W.V. Mixing ratio
+real(r8), public ::      qinitobs(plev,pcnst)! initial tracer field
 real(r8), public ::      cldliqobs(plev)     ! actual W.V. Mixing ratio
 real(r8), public ::      cldiceobs(plev)     ! actual W.V. Mixing ratio
 real(r8), public ::      numliqobs(plev)     ! actual 
@@ -183,6 +183,7 @@ real*8, public              ::  scm_relax_tau_sec       = 10800._r8  ! relaxatio
 logical, public :: scm_relax_linear = .false.
 real*8, public    :: scm_relax_tau_bot_sec = 10800._r8
 real*8, public    :: scm_relax_tau_top_sec = 10800._r8
+character(len=26), public  :: scm_relax_fincl(pcnst)
 
 !
 ! note that scm_use_obs_uv is set to true to be consistent with CAM BFB testing
@@ -235,12 +236,13 @@ subroutine scam_readnl(nlfile,single_column_in,scmlat_in,scmlon_in)
        scm_cambfb_mode,scm_crm_mode,scm_zadv_uv,scm_zadv_T,scm_zadv_q,&
        scm_use_obs_T, scm_use_obs_uv, scm_use_obs_qv, &
        scm_relax_linear, scm_relax_tau_top_sec, &
-       scm_relax_tau_bot_sec, scm_force_latlon
+       scm_relax_tau_bot_sec, scm_force_latlon, scm_relax_fincl
 
   single_column=single_column_in
 
   iopfile            = ' '
   scm_clubb_iop_name = ' '
+  scm_relax_fincl(:) = ' '
   
   if( single_column ) then
      if( npes.gt.1) call endrun('SCAM_READNL: SCAM doesnt support using more than 1 pe.')

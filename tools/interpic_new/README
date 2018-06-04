@@ -6,7 +6,8 @@ and interpolate all time samples to a new horizontal and/or vertical
 resolution.
 
 The output resolution is determined by the coordinates in a template netcdf
-file ("-t template_file").  If a coordinate for a field in the input file
+file ("-t template_file").  Previously made coordinate files are located in 
+inputdata/atm/cam/coords.  If a coordinate for a field in the input file
 exists in the template file (the coordinate must have the same name in both
 files), then the field that appears in the output file will be interpolated
 from the input file coordinate to the template file coordinate.  By default

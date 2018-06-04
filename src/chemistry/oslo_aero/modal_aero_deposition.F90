@@ -61,9 +61,9 @@ subroutine modal_aero_deposition_init( bcphi_indices, bcpho_indices, ocphi_indic
   ! *_a1 = accumulation mode
   ! *_a2 = aitken mode
   ! *_a3 = coarse mode
-
-   ! can be initialized with user specified indices
-   ! if called from aerodep_flx module (for prescribed modal aerosol fluxes) then these indices are specified
+  
+  ! can be initialized with user specified indices
+  ! if called from aerodep_flx module (for prescribed modal aerosol fluxes) then these indices are specified
   integer, optional, intent(in) :: bcphi_indices(:)     ! hydrophilic black carbon
   integer, optional, intent(in) :: bcpho_indices(:)     ! hydrophobic black carbon
   integer, optional, intent(in) :: ocphi_indices(:)     ! hydrophilic organic carbon
@@ -79,13 +79,13 @@ subroutine modal_aero_deposition_init( bcphi_indices, bcpho_indices, ocphi_indic
   character(len=16), parameter :: hydrophilic_carbon_modes(1) = (/'accum           '/)
   character(len=16), parameter :: hydrophobic_carbon_modes(3) = (/'aitken          ',  'coarse          ', 'primary_carbon  '/)
 
-   ! if already initialized abort the run
-   if (initialized) then
+  ! if already initialized abort the run
+  if (initialized) then
      call endrun('modal_aero_deposition is already initialized')
-   endif
+  endif
 
 
-   initialized = .true.
+  initialized = .true.
 
 end subroutine modal_aero_deposition_init
 
@@ -118,13 +118,21 @@ subroutine set_srf_wetdep(aerdepwetis, aerdepwetcw, cam_out)
    !        dry deposition fluxes are positive into surface.
    !        srf models want positive definite fluxes.
    do i = 1, ncol
+
       ! black carbon fluxes
+      ! djlo : added bc_n and bc_ax contribution
+      ! djlo : bc_ax is assumed not to exist in cloud water
       cam_out%bcphiwet(i) = -(aerdepwetis(i,l_bc_ni)+aerdepwetcw(i,l_bc_ni)+ &
-      aerdepwetis(i,l_bc_ai)+aerdepwetcw(i,l_bc_ai)+aerdepwetis(i,l_bc_a)+aerdepwetcw(i,l_bc_a)+aerdepwetis(i,l_bc_ac)+aerdepwetcw(i,l_bc_ac))
+                              aerdepwetis(i,l_bc_ai)+aerdepwetcw(i,l_bc_ai)+ &
+                              aerdepwetis(i,l_bc_a )+aerdepwetcw(i,l_bc_a )+ &
+                              aerdepwetis(i,l_bc_ac)+aerdepwetcw(i,l_bc_ac)+ &
+                              aerdepwetis(i,l_bc_n )+aerdepwetcw(i,l_bc_n )+ &
+                              aerdepwetis(i,l_bc_ax))
 
       ! organic carbon fluxes
       cam_out%ocphiwet(i) = -(aerdepwetis(i,l_om_ni)+aerdepwetcw(i,l_om_ni)+ &
-      aerdepwetis(i,l_om_ai)+aerdepwetcw(i,l_om_ai)+aerdepwetis(i,l_om_ac)+aerdepwetcw(i,l_om_ac))
+                              aerdepwetis(i,l_om_ai)+aerdepwetcw(i,l_om_ai)+ &
+                              aerdepwetis(i,l_om_ac)+aerdepwetcw(i,l_om_ac))
 
       ! dust fluxes
       !
@@ -173,12 +181,17 @@ subroutine set_srf_drydep(aerdepdryis, aerdepdrycw, cam_out)
    do i = 1, ncol
       ! black carbon fluxes
       cam_out%bcphidry(i) = aerdepdryis(i,l_bc_ni)+aerdepdrycw(i,l_bc_ni)+ &
-      aerdepdryis(i,l_bc_ai)+aerdepdrycw(i,l_bc_ai)+aerdepdryis(i,l_bc_a)+aerdepdrycw(i,l_bc_a)+aerdepdryis(i,l_bc_ac)+aerdepdrycw(i,l_bc_ac)
-      cam_out%bcphodry(i) = aerdepdryis(i,l_bc_n)+aerdepdrycw(i,l_bc_n)+ aerdepdryis(i,l_bc_ax)+aerdepdrycw(i,l_bc_ax)
+                            aerdepdryis(i,l_bc_ai)+aerdepdrycw(i,l_bc_ai)+ &
+                            aerdepdryis(i,l_bc_a )+aerdepdrycw(i,l_bc_a )+ &
+                            aerdepdryis(i,l_bc_ac)+aerdepdrycw(i,l_bc_ac)
+      cam_out%bcphodry(i) = aerdepdryis(i,l_bc_n )+aerdepdrycw(i,l_bc_n )+ &
+                            aerdepdryis(i,l_bc_ax)+aerdepdrycw(i,l_bc_ax)
 
       ! organic carbon fluxes
+      ! djlo : skipped the bc_a contribution (was about om !)
       cam_out%ocphidry(i) = aerdepdryis(i,l_om_ni)+aerdepdrycw(i,l_om_ni)+ &
-      aerdepdryis(i,l_om_ai)+aerdepdrycw(i,l_om_ai)+aerdepdryis(i,l_bc_a)+aerdepdrycw(i,l_bc_a)+aerdepdryis(i,l_om_ac)+aerdepdrycw(i,l_om_ac)
+                            aerdepdryis(i,l_om_ai)+aerdepdrycw(i,l_om_ai)+ &
+                            aerdepdryis(i,l_om_ac)+aerdepdrycw(i,l_om_ac)
       cam_out%ocphidry(i) = 0._r8 !aerdepdryis(i,idx_pom1)+aerdepdryis(i,idx_soa1)+aerdepdrycw(i,idx_pom1)+aerdepdrycw(i,idx_soa1)
       cam_out%ocphodry(i) = 0._r8 !aerdepdryis(i,idx_soa2)+aerdepdrycw(i,idx_soa2)
 
