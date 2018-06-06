@@ -27,11 +27,11 @@ begin
  if (.not. isvar("plot_type")) then      ; is plot_type on command line?
   plot_type = 2                      ; 0 => WAK    Single scattering albedo 
                                      ; 1 => GAK  Assymtery factor
-                                     ; 2 => DUST   Dust mass mixing ratio
-                                     ; 3 => SS     Sea-salt mass mixing ratio
-                                     ; 4 => BC     BC mass mixing ratio
-                                     ; 5 => OM     OM mass mixing ratio
-                                     ; 6 => SO4    SO4 mass mixing ratio
+                                     ; 2 => DUST   Dust mass mixing ratio           skalert pga CAM6-Oslo bug
+                                     ; 3 => SS     Sea-salt mass mixing ratio       skalert pga CAM6-Oslo bug
+                                     ; 4 => BC     BC mass mixing ratio             skalert pga CAM6-Oslo bug
+                                     ; 5 => OM     OM mass mixing ratio             skalert pga CAM6-Oslo bug
+                                     ; 6 => SO4    SO4 mass mixing ratio            skalert pga CAM6-Oslo bug
                                      ; 7 => SO2    SO2 mass mixing ratio
 ; *************************************************************************
  end if
@@ -88,7 +88,7 @@ begin
    var_I = addfiles_GetVar(f1_I,all_files_I,"DST_A2") + addfiles_GetVar(f1_I,all_files_I,"DST_A3") + addfiles_GetVar(f1_I,all_files_I,"DST_A2_OCW") + addfiles_GetVar(f1_I,all_files_I,"DST_A3_OCW")
    var_I = var_I*1.e12
  end if
- var_II = addfiles_GetVar(f1_II,all_files_II,"DST_A2") + addfiles_GetVar(f1_II,all_files_II,"DST_A3") + addfiles_GetVar(f1_II,all_files_II,"DST_A2_OCW") + addfiles_GetVar(f1_II,all_files_II,"DST_A3_OCW")
+ var_II = addfiles_GetVar(f1_II,all_files_II,"DST_A2")*135.06/28.97 + addfiles_GetVar(f1_II,all_files_II,"DST_A3")*135.06/28.97 + addfiles_GetVar(f1_II,all_files_II,"DST_A2_OCW") + addfiles_GetVar(f1_II,all_files_II,"DST_A3_OCW")
  var_II = var_II*1.e12
  else if (plot_type.eq.3) then
  var="SS"                           ; name of main input-variable 
@@ -101,7 +101,7 @@ begin
  var_I = addfiles_GetVar(f1_I,all_files_I,"SS_A1") + addfiles_GetVar(f1_I,all_files_I,"SS_A2") + addfiles_GetVar(f1_I,all_files_I,"SS_A3") + addfiles_GetVar(f1_I,all_files_I,"SS_A1_OCW") + addfiles_GetVar(f1_I,all_files_I,"SS_A2_OCW") + addfiles_GetVar(f1_I,all_files_I,"SS_A3_OCW")
  var_I = var_I*1.e12
  end if
- var_II = addfiles_GetVar(f1_II,all_files_II,"SS_A1") + addfiles_GetVar(f1_II,all_files_II,"SS_A2") + addfiles_GetVar(f1_II,all_files_II,"SS_A3") + addfiles_GetVar(f1_II,all_files_II,"SS_A1_OCW") + addfiles_GetVar(f1_II,all_files_II,"SS_A2_OCW") + addfiles_GetVar(f1_II,all_files_II,"SS_A3_OCW")
+ var_II = addfiles_GetVar(f1_II,all_files_II,"SS_A1")*58.44/28.97 + addfiles_GetVar(f1_II,all_files_II,"SS_A2")*58.44/28.97 + addfiles_GetVar(f1_II,all_files_II,"SS_A3")*58.44/28.97 + addfiles_GetVar(f1_II,all_files_II,"SS_A1_OCW") + addfiles_GetVar(f1_II,all_files_II,"SS_A2_OCW") + addfiles_GetVar(f1_II,all_files_II,"SS_A3_OCW")
  var_II = var_II*1.e12
  else if (plot_type.eq.4) then
  var="BC"                           ; name of main input-variable 
@@ -114,7 +114,7 @@ begin
 var_I = addfiles_GetVar(f1_I,all_files_I,"BC_A") + addfiles_GetVar(f1_I,all_files_I,"BC_AC") + addfiles_GetVar(f1_I,all_files_I,"BC_AX") + addfiles_GetVar(f1_I,all_files_I,"BC_AI") + addfiles_GetVar(f1_I,all_files_I,"BC_NI") + addfiles_GetVar(f1_I,all_files_I,"BC_N") + addfiles_GetVar(f1_I,all_files_I,"BC_A_OCW") + addfiles_GetVar(f1_I,all_files_I,"BC_AC_OCW") + addfiles_GetVar(f1_I,all_files_I,"BC_AI_OCW") + addfiles_GetVar(f1_I,all_files_I,"BC_NI_OCW") + addfiles_GetVar(f1_I,all_files_I,"BC_N_OCW")
  var_I = var_I*1.e12
  end if 
- var_II = addfiles_GetVar(f1_II,all_files_II,"BC_A") + addfiles_GetVar(f1_II,all_files_II,"BC_AC") + addfiles_GetVar(f1_II,all_files_II,"BC_AX") + addfiles_GetVar(f1_II,all_files_II,"BC_AI") + addfiles_GetVar(f1_II,all_files_II,"BC_NI") + addfiles_GetVar(f1_II,all_files_II,"BC_N") + addfiles_GetVar(f1_II,all_files_II,"BC_A_OCW") + addfiles_GetVar(f1_II,all_files_II,"BC_AC_OCW") + addfiles_GetVar(f1_II,all_files_II,"BC_AI_OCW") + addfiles_GetVar(f1_II,all_files_II,"BC_NI_OCW") + addfiles_GetVar(f1_II,all_files_II,"BC_N_OCW")
+ var_II = addfiles_GetVar(f1_II,all_files_II,"BC_A")*12.01/28.97 + addfiles_GetVar(f1_II,all_files_II,"BC_AC")*12.01/28.97 + addfiles_GetVar(f1_II,all_files_II,"BC_AX")*12.01/28.97 + addfiles_GetVar(f1_II,all_files_II,"BC_AI")*12.01/28.97 + addfiles_GetVar(f1_II,all_files_II,"BC_NI")*12.01/28.97 + addfiles_GetVar(f1_II,all_files_II,"BC_N")*12.01/28.97 + addfiles_GetVar(f1_II,all_files_II,"BC_A_OCW") + addfiles_GetVar(f1_II,all_files_II,"BC_AC_OCW") + addfiles_GetVar(f1_II,all_files_II,"BC_AI_OCW") + addfiles_GetVar(f1_II,all_files_II,"BC_NI_OCW") + addfiles_GetVar(f1_II,all_files_II,"BC_N_OCW")
  var_II = var_II*1.e12
  else if (plot_type.eq.5) then
  var="OM"                          ; name of main input-variable 
@@ -130,9 +130,9 @@ var_I = addfiles_GetVar(f1_I,all_files_I,"BC_A") + addfiles_GetVar(f1_I,all_file
          + addfiles_GetVar(f1_I,all_files_I,"SOA_NA_OCW") + addfiles_GetVar(f1_I,all_files_I,"SOA_A1_OCW")
    var_I = var_I*1.e12
  end if
- var_II = addfiles_GetVar(f1_II,all_files_II,"OM_AI") + addfiles_GetVar(f1_II,all_files_II,"OM_AC") + addfiles_GetVar(f1_II,all_files_II,"OM_NI") \
+ var_II = addfiles_GetVar(f1_II,all_files_II,"OM_AI")*12.01/28.97 + addfiles_GetVar(f1_II,all_files_II,"OM_AC")*12.01/28.97 + addfiles_GetVar(f1_II,all_files_II,"OM_NI")*12.01/28.97 \
          + addfiles_GetVar(f1_II,all_files_II,"OM_AI_OCW") + addfiles_GetVar(f1_II,all_files_II,"OM_AC_OCW") + addfiles_GetVar(f1_II,all_files_II,"OM_NI_OCW") \
-         + addfiles_GetVar(f1_II,all_files_II,"SOA_NA") + addfiles_GetVar(f1_II,all_files_II,"SOA_A1") \
+         + addfiles_GetVar(f1_II,all_files_II,"SOA_NA")*168.23/28.97 + addfiles_GetVar(f1_II,all_files_II,"SOA_A1")*168.23/28.97 \
          + addfiles_GetVar(f1_II,all_files_II,"SOA_NA_OCW") + addfiles_GetVar(f1_II,all_files_II,"SOA_A1_OCW") 
  var_II = var_II*1.e12
 else if (plot_type.eq.6) then
@@ -146,7 +146,7 @@ else if (plot_type.eq.6) then
 var_I = addfiles_GetVar(f1_I,all_files_I,"SO4_A1")/3.06 + addfiles_GetVar(f1_I,all_files_I,"SO4_A2")/3.59 + addfiles_GetVar(f1_I,all_files_I,"SO4_AC")/3.06 + addfiles_GetVar(f1_I,all_files_I,"SO4_NA")/3.06 + addfiles_GetVar(f1_I,all_files_I,"SO4_PR")/3.06 + addfiles_GetVar(f1_I,all_files_I,"SO4_A1_OCW")/3.06 + addfiles_GetVar(f1_I,all_files_I,"SO4_A2_OCW")/3.59 + addfiles_GetVar(f1_I,all_files_I,"SO4_AC_OCW")/3.06 + addfiles_GetVar(f1_I,all_files_I,"SO4_NA_OCW")/3.06 + addfiles_GetVar(f1_I,all_files_I,"SO4_PR_OCW")/3.06
  var_I = var_I*1.e12
  end if
- var_II = addfiles_GetVar(f1_II,all_files_II,"SO4_A1")/3.06 + addfiles_GetVar(f1_II,all_files_II,"SO4_A2")/3.59 + addfiles_GetVar(f1_II,all_files_II,"SO4_AC")/3.06 + addfiles_GetVar(f1_II,all_files_II,"SO4_NA")/3.06 + addfiles_GetVar(f1_II,all_files_II,"SO4_PR")/3.06 + addfiles_GetVar(f1_II,all_files_II,"SO4_A1_OCW")/3.06 + addfiles_GetVar(f1_II,all_files_II,"SO4_A2_OCW")/3.59 + addfiles_GetVar(f1_II,all_files_II,"SO4_AC_OCW")/3.06 + addfiles_GetVar(f1_II,all_files_II,"SO4_NA_OCW")/3.06 + addfiles_GetVar(f1_II,all_files_II,"SO4_PR_OCW")/3.06
+ var_II = addfiles_GetVar(f1_II,all_files_II,"SO4_A1")/3.06*96.06/28.97 + addfiles_GetVar(f1_II,all_files_II,"SO4_A2")/3.59 *96.06/28.97+ addfiles_GetVar(f1_II,all_files_II,"SO4_AC")/3.06*96.06/28.97 + addfiles_GetVar(f1_II,all_files_II,"SO4_NA")/3.06*96.06/28.97 + addfiles_GetVar(f1_II,all_files_II,"SO4_PR")/3.06*96.06/28.97 + addfiles_GetVar(f1_II,all_files_II,"SO4_A1_OCW")/3.06 + addfiles_GetVar(f1_II,all_files_II,"SO4_A2_OCW")/3.59 + addfiles_GetVar(f1_II,all_files_II,"SO4_AC_OCW")/3.06 + addfiles_GetVar(f1_II,all_files_II,"SO4_NA_OCW")/3.06 + addfiles_GetVar(f1_II,all_files_II,"SO4_PR_OCW")/3.06
  var_II = var_II*1.e12
 else if (plot_type.eq.7) then
  var="SO2"                          ; name of main input-variable 

@@ -5,40 +5,37 @@
 <BODY BGCOLOR="white">
 <p>
 <font color=maroon size=+3><b>
-Model version I (left) vs. Model version II (right)
+Model version I (left) vs. Model version II (right)  CHANGE ALL TEXT and TABEL INPUT BELOW TO FIT YOUR SPECIFIC COMPARISON!
 </b></font>
 <p>
 <font color=black size=+0><b>
 Presenting annual means (from monthly climatological means) from simulations with the following casenames: 
 <p>
-<font color=brown size=+0>ModI = 53OSLO_PD_UNTUNED and 53OSLO_PI_wPDoxi
+<font color=brown size=+0>ModI = F2000ERF and NF2000PIERF
 <br>
-ModII = 53OsloTstNuc and PI53OsloTstNuc <b></font>
+ModII = NF2kNucl and NF2kNuclPI with changes in nucleation treatment <b></font>
 <p>
+<hr noshade size=2 size="100%">
+Both ModI and ModII are from the noresm-dev master version (slightly different vversions...)  
+<br>
+MG2, CLM5, online DMS/POM, with Eul gas deposition scheme, and both using PD oxidants for PI.  <b></font>
+<br>
 
 <hr noshade size=2 size="100%">
-Both ModI and ModII are from the featureCAM5-OsloDevelopment_trunk2.0-6 set up with 
+<font color=brown size=+0>ModI & II both use CMIP6 emissions, but PD reference is different:
 <br>
-MG1.5, CLM4.5, online DMS/POM, with Moz gas deposition scheme, and both using PD oxidants for PI.  
-<p>
-  Only difference in PI53OsloTstNuc: self coagulation of MODE_IDX_SO4SOA_AIT is allowed to
-  <br>
-  contribute to the cogulation sink in the equation for the nucleation rate (coagS), but with
-  <br>
-  that coagulate instead ending up on the already existing coagulation receivers (Mode 5-10).
-<p>
-<font color=brown size=+0>ModI & II (year 2006-2010)<b></font> is from ERA nudged simulations (UVPS), using compset NUDGEPTAEROUPD1.
+  ModI assumes that all bakckground tracers contribute to the coagulation sink for the nucleation rate equation<b></font>
 <p>
 
 <hr noshade size=2 size="100%">
 <p>
-ModI PD: CAM5.3-Oslo, 2000 emissions (PD oxidants), 2 years spin-up, nudged to ERA (2006-2010)
+ModI PD: CAM6-Oslo, 2000 emissions (PD oxidants), 2 years spin-up, showing years 3-30
 <p>
-ModI PI: CAM5.3-Oslo, 1850 emissions (PD oxidants), 2 years spin-up, nudged to ERA (2006-2010)
+ModI PI: CAM6-Oslo, 1850 emissions (PD oxidants), 2 years spin-up, showing years 3-30
 <p>
-ModII PD: CAM5.3-Oslo, 2000 emissions (PD oxidants), 2 years spin-up, nudged to ERA (2006-2010)
+ModII PD: CAM6-Oslo, 2000 emissions (PD oxidants), 2 years spin-up, showing years 3-10
 <p>
-ModII PI: CAM5.3-Oslo, 1850 emissions (PD oxidants), 2 years spin-up, nudged to ERA (2006-2010)
+ModII PI: CAM6-Oslo, 1850 emissions (PD oxidants), 2 years spin-up, showing years 3-10
 <p>
 
 <hr noshade size=2 size="100%">
@@ -137,7 +134,7 @@ ModII PI: CAM5.3-Oslo, 1850 emissions (PD oxidants), 2 years spin-up, nudged to 
 <p>
 <p><br>
 <p>
-<h3 style="color:brown">Pesent-day Mass budget numbers for ModI and ModII</h3> 
+<h3 style="color:brown">Present-day Mass budget numbers for ModI and ModII</h3> 
 <p>
 
 <h4 style="color:black">
@@ -146,67 +143,68 @@ ModII PI: CAM5.3-Oslo, 1850 emissions (PD oxidants), 2 years spin-up, nudged to 
 (0)	Mass budget numbers for model version      I (old), II (new)
 (0)	Note: Values for DMS; SO2 and SO4 are given as Sulfur (S) values
 (0)	-------------------------------------------------------------
-(0)	DMS total emissions   (Tg/yr)             = 34.281, 34.289
-(0)	DMS total sources     (Tg/yr)             = 34.281, 34.289
-(0)	DMS total sink        (Tg/yr)             = 34.535, 34.542
-(0)	DMS burden            (Tg)                = 0.140, 0.140
-(0)	DMS lifetime          (d)                 = 1.477, 1.476
-(0)	DMS chemical loss     (%)                 = 99.975, 99.974
-(0)	DMS pct of chem. loss to MSA (%)          = 8.713, 8.719
+(0)	DMS total emissions   (Tg/yr)             = 31.519, 31.567
+(0)	DMS total sources     (Tg/yr)             = 31.519, 31.567
+(0)	DMS total sink        (Tg/yr)             = 31.781, 31.832
+(0)	DMS burden            (Tg)                = 0.086, 0.086
+(0)	DMS lifetime          (d)                 = 0.988, 0.984
+(0)	DMS chemical loss     (%)                 = 99.974, 99.974
+(0)	DMS pct of chem. loss to MSA (%)          = 7.969, 7.955
 (0)	-------------------------------------------------------------
-(0)	SO2 total emissions   (Tg/yr)             = 65.032, 65.032
-(0)	SO2 total sources     (Tg/yr)             = 96.551, 96.555
-(0)	SO2 total sink        (Tg/yr)             = 96.449, 96.455
-(0)	SO2 burden            (Tg)                = 0.357, 0.357
-(0)	SO2 wet depostion     (% of sinks)        = 19.354, 19.193
-(0)	SO2 lifetime          (d)                 = 1.351, 1.352
-(0)	SO2 chemical loss     (%)                 = 58.186, 58.378
-(0)	SO2 pct of chem loss in clear air (%)     = 25.024, 24.881
+(0)	SO2 total emissions   (Tg/yr)             = 66.749, 66.749
+(0)	SO2 total sources     (Tg/yr)             = 95.989, 96.041
+(0)	SO2 total sink        (Tg/yr)             = 95.864, 95.914
+(0)	SO2 burden            (Tg)                = 0.375, 0.374
+(0)	SO2 wet depostion     (% of sinks)        = 23.036, 22.974
+(0)	SO2 lifetime          (d)                 = 1.429, 1.422
+(0)	SO2 chemical loss     (%)                 = 44.494, 44.555
+(0)	SO2 pct of chem loss in clear air (%)     = 34.464, 34.260
 (0)	-------------------------------------------------------------
-(0)	SO4 total emissions   (Tg/yr)             = 1.667, 1.667
-(0)	SO4 total sources     (Tg/yr)             = 57.825, 58.003
-(0)	SO4 total sink        (Tg/yr)             = 57.578, 57.807
-(0)	SO4 burden            (Tg)                = 0.584, 0.568
-(0)	SO4 wet depostion     (% of sinks)        = 86.820, 86.850
-(0)	SO4 lifetime          (d)                 = 3.702, 3.588
+(0)	SO4 total emissions   (Tg/yr)             = 1.708, 1.708
+(0)	SO4 total sources     (Tg/yr)             = 44.100, 44.180
+(0)	SO4 total sink        (Tg/yr)             = 43.855, 43.806
+(0)	SO4 burden            (Tg)                = 0.501, 0.442
+(0)	SO4 wet depostion     (% of sinks)        = 87.080, 87.823
+(0)	SO4 lifetime          (d)                 = 4.172, 3.679
 (0)	-------------------------------------------------------------
-(0)	BC total emissions   (Tg/yr)              = 7.928, 7.928
-(0)	BC total sources     (Tg/yr)              = 7.928, 7.928
-(0)	BC total sink        (Tg/yr)              = 7.916, 7.917
-(0)	BC burden            (Tg)                 = 0.117, 0.107
-(0)	BC wet depostion     (% of sinks)         = 76.904, 77.465
-(0)	BC lifetime          (d)                  = 5.412, 4.914
+(0)	BC total emissions   (Tg/yr)              = 7.496, 7.496
+(0)	BC total sources     (Tg/yr)              = 7.496, 7.496
+(0)	BC total sink        (Tg/yr)              = 7.496, 7.497
+(0)	BC burden            (Tg)                 = 0.138, 0.105
+(0)	BC wet depostion     (% of sinks)         = 70.707, 73.381
+(0)	BC lifetime          (d)                  = 6.726, 5.112
 (0)	-------------------------------------------------------------
-(0)	POM total emissions   (Tg/yr)             = 86.903, 86.903
-(0)	POM total sources     (Tg/yr)             = 174.190, 172.253
-(0)	POM total sink        (Tg/yr)             = 173.650, 171.751
-(0)	POM burden            (Tg)                = 2.440, 2.323
-(0)	POM wet depostion     (% of sinks)        = 86.438, 86.301
-(0)	POM lifetime          (d)                 = 5.129, 4.936
-(0)	POM chem prod from MSA (Tg/yr)            = 9.022, 9.032
-(0)	POM chem prod (total) (Tg/yr)             = 87.288, 85.352
-(0)	POM chem prod terpenes (Tg /yr)           = 78.266, 76.320
+(0)	POM total emissions   (Tg/yr)             = 62.400, 62.387
+(0)	POM total sources     (Tg/yr)             = 158.497, 157.788
+(0)	POM total sink        (Tg/yr)             = 158.286, 157.596
+(0)	POM burden            (Tg)                = 2.373, 2.138
+(0)	POM wet depostion     (% of sinks)        = 87.778, 88.014
+(0)	POM lifetime          (d)                 = 5.473, 4.951
+(0)	POM chem prod from MSA (Tg/yr)            = 7.594, 7.592
+(0)	POM chem prod (total) (Tg/yr)             = 96.100, 95.403
+(0)	POM chem prod terpenes (Tg /yr)           = 88.505, 87.811
 (0)	-------------------------------------------------------------
-(0)	SS total emissions   (Tg/yr)              = 1936.484, 1937.720
-(0)	SS total sources     (Tg/yr)              = 1936.484, 1937.720
-(0)	SS total sink        (Tg/yr)              = 1935.181, 1936.417
-(0)	SS burden            (Tg)                 = 5.696, 5.696
-(0)	SS wet depostion     (% of sinks)         = 56.351, 56.444
-(0)	SS lifetime          (d)                  = 1.074, 1.074
+(0)	SS total emissions   (Tg/yr)              = 1624.380, 1628.928
+(0)	SS total sources     (Tg/yr)              = 1624.380, 1628.928
+(0)	SS total sink        (Tg/yr)              = 1625.355, 1629.907
+(0)	SS burden            (Tg)                 = 4.041, 4.067
+(0)	SS wet depostion     (% of sinks)         = 61.800, 61.842
+(0)	SS lifetime          (d)                  = 0.908, 0.911
 (0)	-------------------------------------------------------------
-(0)	DU total emissions   (Tg/yr)              = 3105.027, 3103.343
-(0)	DU total sources     (Tg/yr)              = 3105.027, 3103.343
-(0)	DU total sink        (Tg/yr)              = 3104.092, 3102.319
-(0)	DU burden            (Tg)                 = 16.301, 16.266
-(0)	DU wet depostion     (% of sinks)         = 19.263, 19.274
-(0)	DU lifetime          (d)                  = 1.917, 1.914
+(0)	DU total emissions   (Tg/yr)              = 2026.465, 2068.258
+(0)	DU total sources     (Tg/yr)              = 2026.465, 2068.258
+(0)	DU total sink        (Tg/yr)              = 2027.271, 2068.867
+(0)	DU burden            (Tg)                 = 9.380, 9.555
+(0)	DU wet depostion     (% of sinks)         = 18.129, 18.079
+(0)	DU lifetime          (d)                  = 1.689, 1.686
 (0)	-------------------------------------------------------------
+</h4> 
 
 <hr noshade size=2 size="100%">
 <p>
 <p><br>
 <p>
-<h3 style="color:brown">Pre-industrial Mass budget numbers for ModI and ModII</h3> 
+<h3 style="color:brown">Preindustrial Mass budget numbers for ModI and ModII</h3> 
 <p>
 
 <h4 style="color:black">
@@ -215,63 +213,63 @@ ModII PI: CAM5.3-Oslo, 1850 emissions (PD oxidants), 2 years spin-up, nudged to 
 (0)	Mass budget numbers for model version      I (old), II (new)
 (0)	Note: Values for DMS; SO2 and SO4 are given as Sulfur (S) values
 (0)	-------------------------------------------------------------
-(0)	DMS total emissions   (Tg/yr)             = 34.281, 34.287
-(0)	DMS total sources     (Tg/yr)             = 34.281, 34.287
-(0)	DMS total sink        (Tg/yr)             = 34.535, 34.540
-(0)	DMS burden            (Tg)                = 0.140, 0.140
-(0)	DMS lifetime          (d)                 = 1.477, 1.477
-(0)	DMS chemical loss     (%)                 = 99.975, 99.974
-(0)	DMS pct of chem. loss to MSA (%)          = 8.712, 8.718
+(0)	DMS total emissions   (Tg/yr)             = 31.545, 31.575
+(0)	DMS total sources     (Tg/yr)             = 31.545, 31.575
+(0)	DMS total sink        (Tg/yr)             = 31.806, 31.839
+(0)	DMS burden            (Tg)                = 0.086, 0.086
+(0)	DMS lifetime          (d)                 = 0.987, 0.982
+(0)	DMS chemical loss     (%)                 = 99.974, 99.974
+(0)	DMS pct of chem. loss to MSA (%)          = 7.963, 7.951
 (0)	-------------------------------------------------------------
-(0)	SO2 total emissions   (Tg/yr)             = 14.565, 14.564
-(0)	SO2 total sources     (Tg/yr)             = 46.083, 46.085
-(0)	SO2 total sink        (Tg/yr)             = 46.018, 46.020
-(0)	SO2 burden            (Tg)                = 0.158, 0.159
-(0)	SO2 wet depostion     (% of sinks)        = 24.544, 24.643
-(0)	SO2 lifetime          (d)                 = 1.253, 1.261
-(0)	SO2 chemical loss     (%)                 = 57.735, 57.654
-(0)	SO2 pct of chem loss in clear air (%)     = 21.174, 21.258
+(0)	SO2 total emissions   (Tg/yr)             = 14.500, 14.500
+(0)	SO2 total sources     (Tg/yr)             = 43.766, 43.800
+(0)	SO2 total sink        (Tg/yr)             = 43.686, 43.721
+(0)	SO2 burden            (Tg)                = 0.135, 0.135
+(0)	SO2 wet depostion     (% of sinks)        = 23.066, 23.081
+(0)	SO2 lifetime          (d)                 = 1.128, 1.126
+(0)	SO2 chemical loss     (%)                 = 45.093, 45.058
+(0)	SO2 pct of chem loss in clear air (%)     = 25.483, 25.409
 (0)	-------------------------------------------------------------
-(0)	SO4 total emissions   (Tg/yr)             = 0.373, 0.373
-(0)	SO4 total sources     (Tg/yr)             = 26.921, 26.887
-(0)	SO4 total sink        (Tg/yr)             = 26.868, 26.846
-(0)	SO4 burden            (Tg)                = 0.239, 0.237
-(0)	SO4 wet depostion     (% of sinks)        = 86.742, 86.749
-(0)	SO4 lifetime          (d)                 = 3.249, 3.226
+(0)	SO4 total emissions   (Tg/yr)             = 0.372, 0.372
+(0)	SO4 total sources     (Tg/yr)             = 20.002, 20.003
+(0)	SO4 total sink        (Tg/yr)             = 19.765, 19.700
+(0)	SO4 burden            (Tg)                = 0.177, 0.170
+(0)	SO4 wet depostion     (% of sinks)        = 88.521, 88.761
+(0)	SO4 lifetime          (d)                 = 3.271, 3.153
 (0)	-------------------------------------------------------------
-(0)	BC total emissions   (Tg/yr)              = 3.149, 3.149
-(0)	BC total sources     (Tg/yr)              = 3.149, 3.149
-(0)	BC total sink        (Tg/yr)              = 3.142, 3.142
-(0)	BC burden            (Tg)                 = 0.045, 0.045
-(0)	BC wet depostion     (% of sinks)         = 79.043, 79.178
-(0)	BC lifetime          (d)                  = 5.268, 5.179
+(0)	BC total emissions   (Tg/yr)              = 2.595, 2.595
+(0)	BC total sources     (Tg/yr)              = 2.595, 2.595
+(0)	BC total sink        (Tg/yr)              = 2.592, 2.592
+(0)	BC burden            (Tg)                 = 0.040, 0.038
+(0)	BC wet depostion     (% of sinks)         = 75.907, 76.415
+(0)	BC lifetime          (d)                  = 5.617, 5.368
 (0)	-------------------------------------------------------------
-(0)	POM total emissions   (Tg/yr)             = 61.382, 61.383
-(0)	POM total sources     (Tg/yr)             = 150.908, 148.583
-(0)	POM total sink        (Tg/yr)             = 150.527, 148.240
-(0)	POM burden            (Tg)                = 2.009, 1.923
-(0)	POM wet depostion     (% of sinks)        = 86.765, 86.549
-(0)	POM lifetime          (d)                 = 4.873, 4.735
-(0)	POM chem prod from MSA (Tg/yr)            = 9.023, 9.031
-(0)	POM chem prod (total) (Tg/yr)             = 89.527, 87.201
-(0)	POM chem prod terpenes (Tg /yr)           = 80.505, 78.170
+(0)	POM total emissions   (Tg/yr)             = 49.557, 49.531
+(0)	POM total sources     (Tg/yr)             = 145.849, 145.743
+(0)	POM total sink        (Tg/yr)             = 145.660, 145.550
+(0)	POM burden            (Tg)                = 2.070, 1.944
+(0)	POM wet depostion     (% of sinks)        = 88.331, 88.387
+(0)	POM lifetime          (d)                 = 5.188, 4.875
+(0)	POM chem prod from MSA (Tg/yr)            = 7.595, 7.591
+(0)	POM chem prod (total) (Tg/yr)             = 96.294, 96.215
+(0)	POM chem prod terpenes (Tg /yr)           = 88.699, 88.624
 (0)	-------------------------------------------------------------
-(0)	SS total emissions   (Tg/yr)              = 1936.521, 1937.506
-(0)	SS total sources     (Tg/yr)              = 1936.521, 1937.506
-(0)	SS total sink        (Tg/yr)              = 1935.219, 1936.199
-(0)	SS burden            (Tg)                 = 5.674, 5.672
-(0)	SS wet depostion     (% of sinks)         = 56.508, 56.591
-(0)	SS lifetime          (d)                  = 1.070, 1.069
+(0)	SS total emissions   (Tg/yr)              = 1627.006, 1626.318
+(0)	SS total sources     (Tg/yr)              = 1627.006, 1626.318
+(0)	SS total sink        (Tg/yr)              = 1627.962, 1627.337
+(0)	SS burden            (Tg)                 = 4.033, 4.056
+(0)	SS wet depostion     (% of sinks)         = 61.818, 61.872
+(0)	SS lifetime          (d)                  = 0.904, 0.910
 (0)	-------------------------------------------------------------
-(0)	DU total emissions   (Tg/yr)              = 3132.387, 3132.180
-(0)	DU total sources     (Tg/yr)              = 3132.387, 3132.180
-(0)	DU total sink        (Tg/yr)              = 3131.466, 3131.223
-(0)	DU burden            (Tg)                 = 16.423, 16.389
-(0)	DU wet depostion     (% of sinks)         = 19.463, 19.491
-(0)	DU lifetime          (d)                  = 1.914, 1.910
+(0)	DU total emissions   (Tg/yr)              = 2032.477, 2071.750
+(0)	DU total sources     (Tg/yr)              = 2032.477, 2071.750
+(0)	DU total sink        (Tg/yr)              = 2033.121, 2072.041
+(0)	DU burden            (Tg)                 = 9.513, 9.571
+(0)	DU wet depostion     (% of sinks)         = 18.432, 18.524
+(0)	DU lifetime          (d)                  = 1.708, 1.686
 (0)	-------------------------------------------------------------
-</pre>
 </h4> 
+
 
 <hr noshade size=2 size="100%">
 <hr noshade size=2 size="100%">

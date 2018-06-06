@@ -1,15 +1,21 @@
 #!/bin/bash
 
+#Total number of layers minus 1:
+#LL=29
 LL=31
+#MODELNAME=CAM53-Oslo
 MODELNAME=CAM6-Oslo
-AVAILABLEYEARS=(0003 0004 0005 0006 0007)
-#AVAILABLEYEARS=(0015 0016 0017 0018 0019)
+#AVAILABLEYEARS=(2003 2004 2005 2006 2007 2008 2009 2010 2011 2012)
+#AVAILABLEYEARS=(2006 2007 2008 2009 2010 2011 2012 2013 2014)
+#AVAILABLEYEARS=(2010)
+AVAILABLEYEARS=(0003 0004 0005 0006 0007 0008 0009 0010 0011 0012 0013 0014 0015 0016 0017 0018 0019 0020 0021 0022 0023 0024 0025 0026 0027 0028 0029 0030)
 AVAILABLEMONTHS=(01 02 03 04 05 06 07 08 09 10 11 12)
-INPUTDIRECTORY=/projects/NS2345K/noresm/cases
-#EXPERIMENTNAME=PD_MG15MegVadSOA
-EXPERIMENTNAME=PDaug16UVPSndg
-FULLEXPERIMENTNAME=6b76dca_MG15CLM45_22aug2016AK_${EXPERIMENTNAME}
+INPUTDIRECTORY=/projects/NS2345K/noresm/cases/
+EXPERIMENTNAME=F2000ERF
+FULLEXPERIMENTNAME=CAM6-Oslo_F2000ERF_5apr2018AK
+#can chose final directory below, or just cp there elater after checking the results:
 OUTPUTDIRECTORY=/projects/NS2345K/CAM-Oslo/DO_AEROCOM/${MODELNAME}_${FULLEXPERIMENTNAME}/renamed
+#OUTPUTDIRECTORY=/scratch/kirkevag/F2000ERF
 coordinateType="" #Just for initialization , leave this
 PERIOD=9999
 FREQUENCY="monthly"
@@ -74,17 +80,18 @@ ARRAY=("area&GRIDAREA&m2&S"
 	"od550ss&D550_SS&1&C"
 	"od550dust&D550_DU&1&C"
 	"od550lt1dust&DLT_DUST&1&C"
-	"abs440aercs&CDOD550/(CLDFREE+1.e-4f)&1&C"
+	"abs550aercs&CABS550/(CLDFREE+1.e-4f)&1&C"
 	"od550lt1aer&DLT_SS+DLT_DUST+DLT_SO4+DLT_BC+DLT_POM&1&C"
+	"od550gt1aer&DOD550-DLT_SS-DLT_DUST-DLT_SO4-DLT_BC-DLT_POM&1&C"
 	"od550aerh2o&DOD550-OD550DRY&1&C"
-	"emiso2&SFSO2+SO2_CLXF&kg m-2 s-1&S"
+	"emiso2&SFSO2+SO2_XFRC_COL&kg m-2 s-1&S"
 	"emidms&SFDMS&kg m-2 s-1&S"
 	"emidust&SFDST_A2+SFDST_A3&kg m-2 s-1&S"
 	"emiss&SFSS_A1+SFSS_A2+SFSS_A3&kg m-2 s-1&S"
-	"emibc&SFBC_A+SFBC_AX+SFBC_AC+SFBC_N+SFBC_NI+SFBC_AI+BC_N_CLXF+BC_NI_CLXF+BC_AX_CLXF&kg m-2 s-1&S"
-	"emioa&SFOM_AC+SFOM_AI+SFOM_NI+OM_NI_CLXF&kg m-2 s-1&S"
-	"emiso4&$SF1*(SFSO4_A1+${SF2}/${SF1}*SFSO4_A2+SFSO4_AC+SFSO4_NA+SFSO4_PR+SO4_PR_CLXF)&kg m-2 s-1&S"
-	"chepso2&(GS_SO2-SO2_CLXF)-GS_H2SO4&kg m-2 s-1&S"
+	"emibc&SFBC_A+SFBC_AX+SFBC_AC+SFBC_N+SFBC_NI+SFBC_AI+BC_N_XFRC_COL+BC_NI_XFRC_COL+BC_AX_XFRC_COL&kg m-2 s-1&S"
+	"emioa&SFOM_AC+SFOM_AI+SFOM_NI+OM_NI_XFRC_COL&kg m-2 s-1&S"
+	"emiso4&$SF1*(SFSO4_A1+${SF2}/${SF1}*SFSO4_A2+SFSO4_AC+SFSO4_NA+SFSO4_PR+SO4_PR_XFRC_COL)&kg m-2 s-1&S"
+	"chepso2&(GS_SO2-SO2_XFRC_COL)-GS_H2SO4&kg m-2 s-1&S"
 	"chegpso4&$SF1*GS_H2SO4&kg m-2 s-1&S"
 	"cheaqpso4&$SF2*AQ_SO4_A2_OCW&kg m-2 s-1&S"
 	"wetdms&WD_A_DMS&kg m-2 s-1&S"
@@ -100,7 +107,7 @@ ARRAY=("area&GRIDAREA&m2&S"
 	"drydust&-1.0f*(DST_A2DDF+DST_A3DDF+DST_A2_OCWDDF+DST_A3_OCWDDF)&kg m-2 s-1&S"
 	"dryso4&-1.0f*$SF1*(SO4_A1DDF+${SF2}/${SF1}*SO4_A2DDF+SO4_NADDF+SO4_PRDDF+SO4_ACDDF+SO4_A1_OCWDDF+${SF2}/${SF1}*SO4_A2_OCWDDF+SO4_NA_OCWDDF+SO4_PR_OCWDDF+SO4_AC_OCWDDF)&kg m-2 s-1&S"
 	"dryso2&DF_SO2&kg m-2 s-1&S"
-	"drydms&DF_DMS&kg m-2 s-1&S"
+	"drydms&DF_SO2*0.0f&kg m-2 s-1&S"
 	"loadoa&cb_OM+cb_OM_NI_OCW+cb_OM_AI_OCW+cb_OM_AC_OCW+cb_SOA_NA_OCW+cb_SOA_A1_OCW&kg m-2&C"
 	"loadbc&cb_BC+cb_BC_NI_OCW+cb_BC_N_OCW+cb_BC_A_OCW+cb_BC_AI_OCW+cb_BC_AC_OCW&kg m-2&C"
 	"loadss&cb_SALT+cb_SS_A1_OCW+cb_SS_A2_OCW+cb_SS_A3_OCW&kg m-2&C"
@@ -131,8 +138,8 @@ ARRAY=("area&GRIDAREA&m2&S"
 	"cl3D&CLOUD&1&M"
 	"asy3Daer&ASYMMVIS&1&M"
 	"mmraerh2o&MMR_AH2O&kg kg-1&M"
-	"vmrso2&SO2/64.066f*28.97f&kg kg-1&M"
-	"vmrdms&DMS/62.13f*28.97f&kg kg-1&M"
+	"vmrso2&SO2&m3 m-3&M"
+	"vmrdms&DMS&m3 m-3&M"
 	"mmrso4&$SF1*(SO4_A1+${SF2}/${SF1}*SO4_A2+SO4_AC+SO4_NA+SO4_PR+SO4_A1_OCW+${SF2}/${SF1}*SO4_A2_OCW+SO4_AC_OCW+SO4_NA_OCW+SO4_PR_OCW)&kg kg-1&M"
 	"mmroa&OM_AC+OM_AI+OM_NI+SOA_NA+SOA_A1+OM_AC_OCW+OM_AI_OCW+OM_NI_OCW+SOA_NA_OCW+SOA_A1_OCW&kg kg-1&M"
 	"mmrbc&BC_A+BC_AC+BC_AX+BC_N+BC_NI+BC_AI+BC_A_OCW+BC_AC_OCW+BC_N_OCW+BC_NI_OCW+BC_AI_OCW&kg kg-1&M"
@@ -140,8 +147,8 @@ ARRAY=("area&GRIDAREA&m2&S"
 	"mmrdu&DST_A2+DST_A3+DST_A2_OCW+DST_A3_OCW&kg kg-1&M"
 	"pressure[time,lev,lat,lon]&float(P0*hyam+PS*hybm)&Pa&M"
 	"sconcso4[time,lat,lon]&(PS(:,:,:)/287.0f/TS(:,:,:))*$SF1*(SO4_A1(:,$LL,:,:)+${SF2}/${SF1}*SO4_A2(:,$LL,:,:)+SO4_PR(:,$LL,:,:)+SO4_NA(:,$LL,:,:)+SO4_A1_OCW(:,$LL,:,:)+${SF2}/${SF1}*SO4_A2_OCW(:,$LL,:,:)+SO4_PR_OCW(:,$LL,:,:)+SO4_NA_OCW(:,$LL,:,:))*1.e9f&ug m-3&S"
-	"sconcso2[time,lat,lon]&(PS(:,:,:)/287.0f/TS(:,:,:))*SO2(:,$LL,:,:)*1.e9f&ug m-3&S"
-	"sconcdms[time,lat,lon]&(PS(:,:,:)/287.0f/TS(:,:,:))*DMS(:,$LL,:,:)*1.e9f&ug m-3&S"
+	"sconcso2[time,lat,lon]&(PS(:,:,:)/287.0f/TS(:,:,:))*SO2(:,$LL,:,:)*1.e9f*64.066f/28.97f&ug m-3&S"
+	"sconcdms[time,lat,lon]&(PS(:,:,:)/287.0f/TS(:,:,:))*DMS(:,$LL,:,:)*1.e9f*62.13f/28.97f&ug m-3&S"
 	"sconcss[time,lat,lon]&(PS(:,:,:)/287.0f/TS(:,:,:))*(SS_A1(:,$LL,:,:)+SS_A2(:,$LL,:,:)+SS_A3(:,$LL,:,:)+SS_A1_OCW(:,$LL,:,:)+SS_A2_OCW(:,$LL,:,:)+SS_A3_OCW(:,$LL,:,:))*1.e9f&ug m-3&S"
 	"sconcdust[time,lat,lon]&(PS(:,:,:)/287.0f/TS(:,:,:))*(DST_A2(:,$LL,:,:)+DST_A3(:,$LL,:,:)+DST_A2_OCW(:,$LL,:,:)+DST_A3_OCW(:,$LL,:,:))*1.e9f&ug m-3&S"
 	"sconcbc[time,lat,lon]&(PS(:,:,:)/287.0f/TS(:,:,:))*(BC_A(:,$LL,:,:)+BC_AC(:,$LL,:,:)+BC_AX(:,$LL,:,:)+BC_N(:,$LL,:,:)+BC_NI(:,$LL,:,:)+BC_AI(:,$LL,:,:)+BC_A_OCW(:,$LL,:,:)+BC_AC_OCW(:,$LL,:,:)+BC_N_OCW(:,$LL,:,:)+BC_NI_OCW(:,$LL,:,:)+BC_AI_OCW(:,$LL,:,:))*1.e9f&ug m-3&S"
@@ -155,6 +162,7 @@ for aMonth in ${AVAILABLEMONTHS[@]};do
 	for aYear in ${AVAILABLEYEARS[@]}; do
 		echo $aYear $aMonth
 		fileList+="$INPUTDIRECTORY/$EXPERIMENTNAME/atm/hist/$EXPERIMENTNAME.cam.h0.$aYear-$aMonth.nc"
+#		fileList+="$INPUTDIRECTORY/$EXPERIMENTNAME2/$EXPERIMENTNAME.cam.h0.$aYear-$aMonth.nc"
 		fileList+=" "
 		#echo $fileList
 	done
