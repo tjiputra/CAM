@@ -1181,7 +1181,7 @@ subroutine radiation_tend( &
     endif
 
           call pmxsub(lchnk, ncol, 10.0_r8*state%pint, state%pmid,  &
-                      coszrs, state, state%t, qdirind, Nnatk, &
+                      coszrs, state, state%t, cld, qdirind, Nnatk, &
                       per_tau, per_tau_w, per_tau_w_g, per_tau_w_f, &
                       per_lw_abs, &
                       volc_ext_sun, volc_omega_sun, volc_g_sun, & 

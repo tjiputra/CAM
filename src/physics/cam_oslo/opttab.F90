@@ -240,7 +240,7 @@ subroutine initopt
 !ccccccccc1ccccccccc2ccccccccc3ccccccccc4ccccccccc5ccccccccc6ccccccccc7cc
 
 #ifdef COLTST4INTCONS
-      open(101, file='check-kcomp1.out')
+!      open(101, file='check-kcomp1.out')
 #endif
 
       linmax = nbands*10*6*16*6   ! 14*10*6*16*6
@@ -295,9 +295,9 @@ subroutine initopt
 #ifdef COLTST4INTCONS
 !     write to file parameters and dependencies for check against AeroTab and 
 !     general model results wrt. RRTMG optics (for the vis. band 0.442-0.625um)
-      if(iwl.eq.4) then
-        write(101,*) rh(irelh), ke1(iwl,irelh,ifombg,ictot,ifac)
-      endif
+!      if(iwl.eq.4) then
+!        write(101,*) rh(irelh), ke1(iwl,irelh,ifombg,ictot,ifac)
+!      endif
 #endif
 
         end do  ! lin
@@ -322,7 +322,7 @@ subroutine initopt
     enddo
 
 #ifdef COLTST4INTCONS
-      close(101)
+!      close(101)
 #endif
 
         write(iulog,*)'mode 1 ok' 
@@ -332,8 +332,8 @@ subroutine initopt
 !ccccccccc1ccccccccc2ccccccccc3ccccccccc4ccccccccc5ccccccccc6ccccccccc7cc
 
 #ifdef COLTST4INTCONS
-      open(102, file='check-kcomp2.out')
-      open(103, file='check-kcomp3.out')
+!      open(102, file='check-kcomp2.out')
+!      open(103, file='check-kcomp3.out')
 #endif
 
       linmax=nbands*10*16*6
@@ -381,9 +381,9 @@ subroutine initopt
 #ifdef COLTST4INTCONS
 !     write to file parameters and dependencies for check against AeroTab and 
 !     general model results wrt. RRTMG optics (for the vis. band 0.442-0.625um)
-      if(iwl.eq.4) then
-        write(100+ifil,*) rh(irelh), ke2to3(iwl,irelh,ictot,ifac,ifil)
-      endif
+!      if(iwl.eq.4) then
+!        write(100+ifil,*) rh(irelh), ke2to3(iwl,irelh,ictot,ifac,ifil)
+!      endif
 #endif
 
         end do  ! lin
@@ -421,9 +421,9 @@ subroutine initopt
     enddo
 
 #ifdef COLTST4INTCONS
-    do ifil=2,3
-      close(100+ifil)
-    end do
+!    do ifil=2,3
+!      close(100+ifil)
+!    end do
 #endif
 
         write(iulog,*)'modes 2-3 ok' 
@@ -433,7 +433,7 @@ subroutine initopt
 !ccccccccc1ccccccccc2ccccccccc3ccccccccc4ccccccccc5ccccccccc6ccccccccc7cc
 
 #ifdef COLTST4INTCONS
-      open(104, file='check-kcomp4.out')
+!      open(104, file='check-kcomp4.out')
 #endif
 
         ifil = 4
@@ -498,9 +498,9 @@ subroutine initopt
 #ifdef COLTST4INTCONS
 !     write to file parameters and dependencies for check against AeroTab and 
 !     general model results wrt. RRTMG optics (for the vis. band 0.442-0.625um)
-      if(iwl.eq.4) then
-        write(104,*) rh(irelh), ke4(iwl,irelh,ifbcbg,ictot,ifac,ifaq)
-      endif
+!      if(iwl.eq.4) then
+!        write(104,*) rh(irelh), ke4(iwl,irelh,ifbcbg,ictot,ifac,ifaq)
+!      endif
 #endif
         end do
 
@@ -523,7 +523,7 @@ subroutine initopt
     enddo
 
 #ifdef COLTST4INTCONS
-      close(104)
+!      close(104)
 #endif
 
         write(iulog,*)'mode 4 ok' 
@@ -534,12 +534,12 @@ subroutine initopt
 !ccccccccc1ccccccccc2ccccccccc3ccccccccc4ccccccccc5ccccccccc6ccccccccc7cc
 
 #ifdef COLTST4INTCONS
-      open(105, file='check-kcomp5.out')
-      open(106, file='check-kcomp6.out')
-      open(107, file='check-kcomp7.out')
-      open(108, file='check-kcomp8.out')
-      open(109, file='check-kcomp9.out')
-      open(110, file='check-kcomp10.out')
+!      open(105, file='check-kcomp5.out')
+!      open(106, file='check-kcomp6.out')
+!      open(107, file='check-kcomp7.out')
+!      open(108, file='check-kcomp8.out')
+!      open(109, file='check-kcomp9.out')
+!      open(110, file='check-kcomp10.out')
 #endif
 
       linmax = nbands*10*6*6*6*6     ! 14*10*6*6*6*6
@@ -604,9 +604,9 @@ subroutine initopt
 #ifdef COLTST4INTCONS
 !     write to file parameters and dependencies for check against AeroTab and 
 !     general model results wrt. RRTMG optics (for the vis. band 0.442-0.625um)
-      if(iwl.eq.4) then
-        write(100+ifil,*) rh(irelh), ke5to10(iwl,irelh,ictot,ifac,ifbc,ifaq,ifil)
-      endif
+!      if(iwl.eq.4) then
+!        write(100+ifil,*) rh(irelh), ke5to10(iwl,irelh,ictot,ifac,ifbc,ifaq,ifil)
+!      endif
 #endif
 
         end do  ! ifil
@@ -633,9 +633,9 @@ subroutine initopt
     enddo
 
 #ifdef COLTST4INTCONS
-    do ifil=5,10
-      close(100+ifil)
-    end do
+!    do ifil=5,10
+!      close(100+ifil)
+!    end do
 #endif
 
         write(iulog,*)'modes 5-10 ok' 

@@ -20,29 +20,44 @@ module koagsub
    integer, parameter :: numberOfCoagulatingModes = 6
    integer, parameter :: numberOfCoagulationReceivers = 6
 
-
-
    real(r8), dimension(0:nmodes,0:nmodes) :: normalizedCoagulationSink ![m3/#/s]
    real(r8), dimension(0:nmodes)          :: NCloudCoagulationSink    ![m3/#/s]
 
-   !These are the modes which are coagulating!
+!nuctst3+
+   real(r8) normCoagSinkMode1 ![m3/#/s]
+!nuctst3-
+!aktest+
+   integer, parameter :: numberOfAddCoagReceivers = 6
+   real(r8), dimension(numberOfAddCoagReceivers) :: normCoagSinkAdd ![m3/#/s]
+!aktest-
+
+   !These are the modes which are coagulating (belonging to mixtures no. 0, 1, 2, 4, 12, 14)
    integer, dimension(numberOfCoagulatingModes) :: coagulatingMode =    & 
      (/MODE_IDX_BC_EXT_AC                                               &  !inert mode
      , MODE_IDX_SO4SOA_AIT, MODE_IDX_BC_AIT, MODE_IDX_OMBC_INTMIX_COAT_AIT &  !internally mixed small modes
      , MODE_IDX_BC_NUC, MODE_IDX_OMBC_INTMIX_AIT /)      !externally mixed small modes
 
-   !These are the modes which are receiving coagulating material
-   !NOTE: INCONSISTENCY WITH AEROTAB!! IN AEROTAB MODE_IDX_SO4_AC RECEIVES COAGULATE!!
+   !These are the modes which are receiving coagulating material in OsloAero 
+   ! (belonging to mixtures no. 5, 6, 7, 8, 9, 10)
    integer, dimension(numberOfCoagulationReceivers) :: receiverMode = & 
        (/MODE_IDX_SO4_AC,MODE_IDX_DST_A2, MODE_IDX_DST_A3, MODE_IDX_SS_A1, MODE_IDX_SS_A2, MODE_IDX_SS_A3 /)
+
+!aktest+
+   !And these are the additional modes which are allowed to contribute to the
+   ! coagulation sink, defined here and to be used only in the nucleation code in condtend.F90  
+   ! (belonging to mixtures no. 0, 1, 2, 4, 12, 14)
+   integer, dimension(numberOfAddCoagReceivers) :: addReceiverMode = & 
+       (/MODE_IDX_BC_EXT_AC,MODE_IDX_SO4SOA_AIT,MODE_IDX_BC_AIT, &
+         MODE_IDX_OMBC_INTMIX_COAT_AIT,MODE_IDX_BC_NUC,MODE_IDX_OMBC_INTMIX_AIT /) 
+!aktest-
 
    !Coagulation moves aerosol mass to the "coagulate" species, so some
    !lifecycle species will receive mass in this routine!
    integer, dimension(gas_pcnst) :: lifeCycleReceiver
 
-   ! Coagulation with between aerosol and cloud droplets move coagulate into
-   !  the  equivalent value for aerosol concentration in cloud water.
-   ! Exception Sulphate coagulation with cloud droplets is merged with
+   ! Coagulation between aerosol and cloud droplets move coagulate into
+   ! the  equivalent value for aerosol concentration in cloud water.
+   ! Exception: Sulphate coagulation with cloud droplets is merged with
    ! component from aqueous phase chemistry in order to take advantage of the 
    ! more detailed addition onto larger particles.
 
@@ -156,13 +171,20 @@ subroutine initializeCoagulationCoefficients(rhob,rk)
    
       real(r8), dimension(numberOfCoagulationReceivers, numberOfCoagulatingModes, nBinsTab) :: K12 = 0.0_r8  !Coagulation coefficient (m3/s)
 
+!nuctst3+
+!      real(r8), dimension(nBinsTab) :: CoagCoeffMode1 = 0.0_r8  !Coagulation coefficient mode 1 with 1 (m3/s)
+!nuctst3-
+!ak+
+      real(r8), dimension(numberOfAddCoagReceivers,nBinsTab) :: CoagCoeffModeAdd = 0.0_r8  !Coagulation coefficient mode 1 (m3/s)
+!ak-
+
       real(r8), dimension(numberOfCoagulatingModes,nBinsTab) :: K12Cl = 0.0_r8  !Coagulation coefficient (m3/s)
 
       real(r8), dimension(nBinsTab) :: coagulationCoefficient
       integer              :: aMode
       integer              :: modeIndex
-      integer              :: modeIndexCoagulator !Index of coagulating mode
-      integer              :: modeIndexReceiver   !Index of receiving mode
+      integer              :: modeIndexCoagulator  !Index of coagulating mode
+      integer              :: modeIndexReceiver    !Index of receiving mode
       integer              :: iCoagulatingMode     !Counter for coagulating mode
       integer              :: iReceiverMode        !Counter for receiver modes
       integer              :: nsiz                 !counter for look up table sizes
@@ -189,6 +211,37 @@ subroutine initializeCoagulationCoefficients(rhob,rk)
 
          enddo
       end do !receiver modes
+
+!nuctst3+
+!            call calculateCoagulationCoefficient(CoagulationCoefficient    & !O [m3/s] coagulation coefficient 
+!                                 , rk(1)                                   & !I [m] radius of coagulator
+!                                 , rhob(1)                                 & !I [kg/m3] density of coagulator
+!                                 , rhob(1) )                                 !I [kg/m3] density of receiver
+!            CoagCoeffMode1(:) = CoagulationCoefficient(:)
+!nuctst3-
+!ak+
+      do iReceiverMode = 1, numberOfAddCoagReceivers
+            iCoagulatingMode = 1
+
+            !Index of the coagulating mode (0-14), see list above
+            modeIndexCoagulator = coagulatingMode(iCoagulatingMode) 
+
+            !Index of receiver mode (0-14), see list above
+            modeIndexReceiver = addReceiverMode(iReceiverMode) 
+            
+            !Pre-calculate coagulation coefficients for this coagulator..
+            !Note: Not using actual density of coagulator here 
+            !Since this is not known at init-time
+            call calculateCoagulationCoefficient(CoagulationCoefficient    & !O [m3/s] coagulation coefficient 
+                                 , rk(modeIndexCoagulator)                 & !I [m] radius of coagulator
+                                 , rhob(modeIndexCoagulator)               & !I [kg/m3] density of coagulator
+                                 , rhob(modeIndexReceiver) )                 !I [kg/m3] density of receiver
+
+            !Save values
+            CoagCoeffModeAdd(iReceiverMode,:) = CoagulationCoefficient(:)
+
+      end do !receiver modes
+!ak-
 
 ! Onl one receivermode for cloud coagulation (water)
       do iCoagulatingMode = 1,numberOfCoagulatingModes
@@ -235,6 +288,37 @@ subroutine initializeCoagulationCoefficients(rhob,rk)
             end do !Look up table size
          end do    !receiver modes
       end do       !coagulator
+ 
+
+!nuctst3+
+!            !Add simple self coagulation sink for mode 1 (with 1) in such a way that it
+!            !affects coagulationSink but not the lifecycling (directly) otherwise
+!            normCoagSinkMode1 = 0.0_r8
+!            do nsiz=1,nBinsTab  !aerotab bin sizes   
+!                   normCoagSinkMode1 = normCoagSinkMode1 + normnk(1,nsiz) * CoagCoeffMode1(nsiz)
+!            end do !Look up table size
+!nuctst3-
+!ak+
+            !Calculate additional coagulation sink for mode 1 in such a way that it
+            !affects coagulationSink but not the lifecycling (directly) otherwise
+
+         !Sum the loss for all possible receivers
+         normCoagSinkAdd(:) = 0.0_r8
+         iCoagulatingMode = 1
+         do iReceiverMode = 1, numberOfAddCoagReceivers
+
+            modeIndexReceiver = addReceiverMode(iReceiverMode) !Index of additional receiver mode
+            
+            do nsiz=1,nBinsTab  !aerotab bin sizes   
+      
+               !Sum up coagulation sink for this coagulating species (for all receiving modes)
+               normCoagSinkAdd(modeIndexReceiver)      =   &   ![m3/#/s]
+                     normCoagSinkAdd(modeIndexReceiver)    &   ![m3/#/s] Previous value
+                   + normnk(modeIndexReceiver, nsiz)          &   !Normalized size distribution for receiver mode
+                   * CoagCoeffModeAdd(iReceiverMode, nsiz)                  !Koagulation coefficient (m3/#/s)
+            end do !Look up table size
+         end do    !receiver modes
+!ak-
  
       nsiz=1
       do while (rBinMidPoint(nsiz).lt.rcoagdroplet.and.nsiz.lt.nBinsTab)

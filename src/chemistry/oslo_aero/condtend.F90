@@ -260,7 +260,13 @@ contains
 ! Added input for h2so4 and soa nucleation: soa_lv_gasprod, soa_sv_gasprod, pblh,zm,qh20 (cka)
 
    use cam_history,     only: outfld,fieldname_len
-   use koagsub,         only: normalizedCoagulationSink,receiverMode,numberOfCoagulationReceivers ! h2so4 and soa nucleation(cka)
+!nuctst3+   use koagsub,         only: normalizedCoagulationSink,receiverMode,numberOfCoagulationReceivers ! h2so4 and soa nucleation(cka)
+!   use koagsub,         only: normCoagSinkMode1,normalizedCoagulationSink,receiverMode,numberOfCoagulationReceivers ! h2so4 and soa nucleation(cka)
+!nuctst3-
+!ak+ 
+    use koagsub,         only: normalizedCoagulationSink,receiverMode,numberOfCoagulationReceivers, &
+                               numberOfAddCoagReceivers,addReceiverMode,normCoagSinkAdd
+!ak-
    use constituents,    only: pcnst  ! h2so4 and soa nucleation (cka)
 
    implicit none
@@ -310,6 +316,9 @@ contains
    integer  :: modeIndexReceiverCoag             !Index of modes receiving coagulate
    integer  :: iCoagReceiver                     !counter for species receiving coagulate
    real(r8) :: coagulationSink(pcols,pver)       ![1/s] coaglation loss for SO4_n and soa_n   
+!nuctst3+
+!   real(r8) :: normCSmode1(pcols,pver)           !normalized coagulation from self coagulation (simplified)
+!nuctst3-
    real(r8), parameter :: lvocfrac=0.5           !Fraction of organic oxidation products with low enough 
                                                   !volatility to enter nucleation mode particles (1-24 nm)
    real(r8) :: soa_lv_forNucleation(pcols,pver)  ![kg/kg] soa gas available for nucleation
@@ -324,6 +333,9 @@ contains
     coagulationSink(:,:)=0.0_r8             
     condensationSinkFraction(:,:,:,:) = 0.0_r8  !Sink to the coming "receiver" of any vapour
     numberConcentrationExtMix(:,:,:) = 0.0_r8
+!ak+
+!    normCSmode1(:,:)=0.0_r8 
+!ak-
 
     do k=1,pver
       do i=1,ncol
@@ -421,6 +433,25 @@ contains
                               * numberConcentration(modeIndexReceiverCoag)            !numberConcentration (#/m3) 
          end do    !coagulation sink
 
+!nuctst3+
+!         coagulationSink(i,k) = coagulationSink(i,k) + &
+!               normCoagSinkMode1*numberConcentration(1)
+!         if (i.eq.1.and.k.eq.30) write(*,*) 'cSink, dcSink = ', coagulationSink(i,k), normCoagSinkMode1*numberConcentration(1)
+!         if (i.eq.1.and.k.eq.30) write(*,*) 'nConc1 = ', numberConcentration(1)
+!nuctst3-
+!ak+
+         !Sum coagulation sink for nucleated so4 and soa particles over all additional
+         !receivers od coagulate (not directly affecting the life-cycle). 
+         do iCoagReceiver = 1, numberOfAddCoagReceivers
+
+            modeIndexReceiverCoag = addReceiverMode(iCoagReceiver)
+
+            coagulationSink(i,k) =   &                                                ![1/s]
+               coagulationSink(i,k) + &                                               ![1/] previous value
+               normCoagSinkAdd(modeIndexReceiverCoag) & ![m3/#/s] 
+                              * numberConcentration(modeIndexReceiverCoag)            !numberConcentration (#/m3) 
+         end do    !coagulation sink
+!ak-
 
       end do !index i
    end do !index k

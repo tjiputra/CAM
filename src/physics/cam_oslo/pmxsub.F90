@@ -6,7 +6,7 @@ module pmxsub_mod
 contains
 !===============================================================================
 
-subroutine pmxsub(lchnk, ncol, pint, pmid, coszrs, state, t, qm1, Nnatk, &
+subroutine pmxsub(lchnk, ncol, pint, pmid, coszrs, state, t, cld, qm1, Nnatk, &
                   per_tau, per_tau_w, per_tau_w_g, per_tau_w_f, per_lw_abs, & 
                   volc_ext_sun, volc_omega_sun, volc_g_sun, &
                   volc_ext_earth, volc_omega_earth, & 
@@ -56,6 +56,7 @@ subroutine pmxsub(lchnk, ncol, pint, pmid, coszrs, state, t, qm1, Nnatk, &
    real(r8), intent(in) :: pint(pcols,pverp)      ! Model interface pressures (10*Pa)
    real(r8), intent(in) :: pmid(pcols,pver)       ! Model level pressures (Pa)
    real(r8), intent(in) :: t(pcols,pver)          ! Model level temperatures (K)
+   real(r8), intent(in) :: cld(pcols,pver)        ! cloud fraction
    real(r8), intent(in) :: qm1(pcols,pver,pcnst)  ! Specific humidity and tracers (kg/kg)
    real(r8), intent(in) :: volc_ext_sun(pcols,pver,nbands) ! volcanic aerosol extinction for solar bands, CMIP6
    real(r8), intent(in) :: volc_omega_sun(pcols,pver,nbands) ! volcanic aerosol SSA for solar bands, CMIP6
@@ -410,16 +411,18 @@ subroutine pmxsub(lchnk, ncol, pint, pmid, coszrs, state, t, qm1, Nnatk, &
         es(1:ncol,1:pver), qs(1:ncol,1:pver))
    rht(1:ncol,1:pver) = state%q(1:ncol,1:pver,1) / qs(1:ncol,1:pver)
    rh_temp(1:ncol,1:pver) = min(rht(1:ncol,1:pver),1._r8)
-!test
+
 
       do k=1,pver
          do icol=1,ncol
 !         Set upper and lower relative humidity for the aerosol calculations
           rhum(icol,k) = min(0.995_r8, max(rh_temp(icol,k), 0.01_r8))
           rhoda(icol,k) = pmid(icol,k)/(rair*t(icol,k))      ! unit kg/m^3
-!TEST
-!          rhum(icol,k) = 0.01_r8
-!TEST
+!test          rhum(icol,k) = 0.01_r8
+          if (cld(icol,k) .lt. 1.0_r8) then
+             rhum(icol,k) = (rhum(icol,k) - cld(icol,k)) / (1.0_r8 - cld(icol,k))  ! clear portion
+          end if
+          rhum(icol,k) = min(0.995_r8, max(rhum(icol,k), 0.01_r8))
          end do
       end do
 
