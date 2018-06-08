@@ -134,11 +134,11 @@ module aerosoldef
 
    !The process modes need an "efficient size" (Why does A1 have a different size than the others??)
    real(r8), parameter, public, dimension(numberOfProcessModeTracers) :: processModeNumberMedianRadius = &
-                                       (/ 0.04e-6_r8, 0.1e-6_r8, 0.1e-6_r8, 0.1e-6_r8, 0.1e-6_r8, 0.1e-6_r8 /) 
+                                       (/ 0.04e-6_r8, 0.1e-6_r8, 0.1e-6_r8, 0.1e-6_r8, 0.1e-6_r8, 0.04e-6_r8 /) 
 
    !The process modes need an "efficient sigma"   
    real(r8), parameter, public, dimension(numberOfProcessModeTracers) :: processModeSigma =   & 
-                                       (/ 1.8_r8, 1.59_r8, 1.59_r8, 1.59_r8, 1.59_r8, 1.59_r8  /)
+                                       (/ 1.8_r8, 1.59_r8, 1.59_r8, 1.59_r8, 1.59_r8, 1.8_r8  /)
                                                                        
 
    real(r8), parameter, public, dimension(numberOfProcessModeTracers) :: belowCloudScavengingCoefficientProcessModes = &
