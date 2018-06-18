@@ -68,7 +68,7 @@
   'SO4_PR ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20180330/emissions_cmip6_noresm2_SO4_PR_volcCONTEXPL_vertical_2000_0.9x1.25_version20180330.nc'
 </ext_frc_specifier>
 <ext_frc_specifier hgrid="1.9x2.5">
-  'H2O    ->  $INPUTDATA_ROOT/atm/cam/chem/emis/elev/H2O_emission_CH4_oxidationx2_elev_3DmonthlyL70_2000climo_c180511.nc',
+  'H2O    ->  $INPUTDATA_ROOT/atm/cam/chem/emis/elev/H2O_emission_CH4_oxidationx2_elev_3Dmonthly_L70_2000climo_c180511.nc',
   'BC_AX  ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20180330/emissions_cmip6_noresm2_BC_AX_airALL_vertical_2000_1.9x2.5_version20180330.nc',
   'BC_AX  ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20180330/emissions_cmip6_noresm2_BC_AX_anthroprofENEIND_vertical_2000_1.9x2.5_version20180330.nc',
   'BC_N   ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20180330/emissions_cmip6_noresm2_BC_N_airALL_vertical_2000_1.9x2.5_version20180330.nc',
