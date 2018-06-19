@@ -448,7 +448,7 @@ contains
 
             coagulationSink(i,k) =   &                                                ![1/s]
                coagulationSink(i,k) + &                                               ![1/] previous value
-               normCoagSinkAdd(modeIndexReceiverCoag) & ![m3/#/s] 
+               normCoagSinkAdd(iCoagReceiver) & ![m3/#/s] 
                               * numberConcentration(modeIndexReceiverCoag)            !numberConcentration (#/m3) 
          end do    !coagulation sink
 !ak-
