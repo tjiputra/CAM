@@ -312,8 +312,8 @@ subroutine initializeCoagulationCoefficients(rhob,rk)
             do nsiz=1,nBinsTab  !aerotab bin sizes   
       
                !Sum up coagulation sink for this coagulating species (for all receiving modes)
-               normCoagSinkAdd(modeIndexReceiver)      =   &   ![m3/#/s]
-                     normCoagSinkAdd(modeIndexReceiver)    &   ![m3/#/s] Previous value
+               normCoagSinkAdd(iReceiverMode)      =   &   ![m3/#/s]
+                     normCoagSinkAdd(iReceiverMode)    &   ![m3/#/s] Previous value
                    + normnk(modeIndexReceiver, nsiz)          &   !Normalized size distribution for receiver mode
                    * CoagCoeffModeAdd(iReceiverMode, nsiz)                  !Koagulation coefficient (m3/#/s)
             end do !Look up table size

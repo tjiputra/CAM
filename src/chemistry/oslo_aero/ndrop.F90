@@ -2105,6 +2105,7 @@ subroutine dropmixnuc( &
    !fxm: Make this work with the oslo aerosols also!
    call ccncalc(state, pbuf, cs, ccn)
 #else
+   if (history_aerosol) then
    call ccncalc_oslo(state &
                     , pbuf &
                     , cs     &
@@ -2116,11 +2117,13 @@ subroutine dropmixnuc( &
                     , hygroscopicity &
                     , lnSigma        &
                     , ccn           )
+  end if
 #endif
+   if(history_aerosol) then
    do l = 1, psat
       call outfld(ccn_name(l), ccn(1,1,l), pcols, lchnk)
    enddo
-
+   end if
 #ifndef OSLO_AERO
    ! do column tendencies
    if (prog_modal_aero) then
