@@ -396,11 +396,13 @@ contains
        call addfld( wetdep_name_area(m), horiz_only, 'A', 'kg/m2/s ', spc_name//' wet deposition' )
 
        !Needed for budget term of gases! Aerosols have their own budget terms
-       if(.NOT. isAerosol(n))then
-        if(history_chemistry)then
-            call add_default( wetdep_name_area(m), 1, ' ') 
-         end if
-       endif
+       if(n.gt.0) then
+          if(.NOT. isAerosol(n))then
+            if(history_chemistry)then
+              call add_default( wetdep_name_area(m), 1, ' ') 
+            end if
+          endif
+        end if
 #endif
 
        if (spc_name(1:3) == 'num') then
@@ -409,18 +411,17 @@ contains
           unit_basename = 'kg'
        endif
 
-#ifndef OSLO_AERO
+!#ifndef OSLO_AERO
        if ( any( aer_species == m ) ) then
-#else
-       if ( any( aer_species == m ) .or. isAerosol(n) ) then
-#endif
+!#else
+!       if ( any( aer_species == m ) .or. isAerosol(n) ) then
+!#endif
           call addfld( spc_name,   (/ 'lev' /), 'A', unit_basename//'/kg ', trim(attr)//' concentration')
           call addfld( trim(spc_name)//'_SRF', horiz_only, 'A', unit_basename//'/kg', trim(attr)//" in bottom layer")
        else
           call addfld( spc_name, (/ 'lev' /), 'A', 'mol/mol', trim(attr)//' concentration')
           call addfld( trim(spc_name)//'_SRF', horiz_only, 'A', 'mol/mol', trim(attr)//" in bottom layer")
        endif
-
        if ((m /= id_cly) .and. (m /= id_bry)) then
           if (history_aerosol.or.history_chemistry) then
              call add_default( spc_name, 1, ' ' )
@@ -739,6 +740,7 @@ contains
 #ifndef OSLO_AERO
        if ( any( aer_species == m ) ) then
 #else
+       if (n.gt.0) then
        if ( any( aer_species == m ) .or. isAerosol(n) ) then
 #endif
           call outfld( solsym(m), mmr(:ncol,:,m), ncol ,lchnk )
@@ -747,7 +749,12 @@ contains
           call outfld( solsym(m), vmr(:ncol,:,m), ncol ,lchnk )
           call outfld( trim(solsym(m))//'_SRF', vmr(:ncol,pver,m), ncol ,lchnk )
        endif
-
+#ifdef OSLO_AERO
+       else
+          call outfld( solsym(m), vmr(:ncol,:,m), ncol ,lchnk )
+          call outfld( trim(solsym(m))//'_SRF', vmr(:ncol,pver,m), ncol ,lchnk )
+       end if
+#endif
 #if defined OSLO_AERO
        if(n > 0) then
          cloudTracerIndex = getCloudTracerIndexDirect(n)

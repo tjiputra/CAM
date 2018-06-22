@@ -280,26 +280,29 @@ contains
 
     do m = 1,gas_pcnst
 
+
        unit_basename = 'kg'  ! Units 'kg' or '1' 
 
        call addfld( 'GS_'//trim(solsym(m)),horiz_only, 'A', unit_basename//'/m2/s ', &
                     trim(solsym(m))//' gas chemistry/wet removal (for gas species)')
        call addfld( 'AQ_'//trim(solsym(m)),horiz_only, 'A', unit_basename//'/m2/s ', &
                     trim(solsym(m))//' aqueous chemistry (for gas species)')
-
+       if(physicsIndex(m).le.pcnst) then
        if (getCloudTracerIndexDirect(physicsIndex(m)) .gt. 0)then
          call addfld( 'AQ_'//getCloudTracerName(physicsIndex(m)),horiz_only, 'A', unit_basename//'/m2/s ', &
                     trim(solsym(m))//' aqueous chemistry (for cloud species)')
+       end if
        end if
 
        if ( history_aerosol ) then 
           call add_default( 'GS_'//trim(solsym(m)), 1, ' ')
           call add_default( 'AQ_'//trim(solsym(m)), 1, ' ')
+       if(physicsIndex(m).le.pcnst) then
           if(getCloudTracerIndexDirect(physicsIndex(m)).gt.0)then
              call add_default( 'AQ_'//getCloudTracerName(physicsIndex(m)),1,' ')
           end if
+       end if
        endif
-       
     enddo
 
     call addfld ('NUCLRATE',(/'lev'/), 'A','#/cm3/s','Nucleation rate')
@@ -671,6 +674,7 @@ end subroutine aero_model_init
        !In oslo aero also write out the tendencies for the 
        !cloud borne aerosols... 
        n = physicsIndex(m) 
+       if (n.le.pcnst) then
        if(getCloudTracerIndexDirect(n) .gt. 0)then
           name = 'AQ_'//trim(getCloudTracerName(n))
           wrk(:ncol)=0.0_r8
@@ -678,6 +682,7 @@ end subroutine aero_model_init
             wrk(:ncol) = wrk(:ncol) + dvmrcwdt_sv1(:ncol,k,m)*adv_mass(m)/mbar(:ncol,k)*pdel(:ncol,k)/gravit  
           end do
           call outfld( name, wrk(:ncol), ncol, lchnk )
+       end if
        end if
     enddo
 
