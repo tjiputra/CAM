@@ -7,9 +7,9 @@
 <!--do_beljaars>           .true.   </do_beljaars-->  
 
 <!-- Solar constant -->
-  <solar_irrad_data_file     >   'atm/cam/solar/SolarForcingCMIP6piControl_c160921.nc'   </solar_irrad_data_file>
-  <solar_data_ymd      >   18500101                                                </solar_data_ymd>
-  <solar_data_type     >    FIXED                                                  </solar_data_type>
+<solar_irrad_data_file     >   'atm/cam/solar/SolarForcingCMIP6piControl_c160921.nc'   </solar_irrad_data_file>
+<solar_data_ymd      >   18500101                                                </solar_data_ymd>
+<solar_data_type     >    FIXED                                                  </solar_data_type>
 
 <!-- 1850 GHG values Taken from Meinshausen et al., 2017 -->
 <co2vmr>   284.32e-6  </co2vmr>
@@ -25,14 +25,6 @@
 <prescribed_ozone_name    >   'O3'                                                          </prescribed_ozone_name>
 <prescribed_ozone_type    >   'CYCLICAL'                                                    </prescribed_ozone_type>
 
-<!-- Surface emissions for MAMOslo -->
-<srf_emis_type>     CYCLICAL   </srf_emis_type>
-<srf_emis_cycle_yr> 1850       </srf_emis_cycle_yr>
-
-<!-- External forcing for MAMOslo -->
-<ext_frc_type>      CYCLICAL   </ext_frc_type>
-<ext_frc_cycle_yr>  1850       </ext_frc_cycle_yr>
-
 <!-- Prescribed oxidants for aerosol chemistry -->
 <tracer_cnst_cycle_yr >   1850                                                             </tracer_cnst_cycle_yr>
 <tracer_cnst_datapath >   'atm/cam/tracer_cnst'                                            </tracer_cnst_datapath>
@@ -40,6 +32,14 @@
 <tracer_cnst_specifier>   'O3','OH','NO3','HO2'                                            </tracer_cnst_specifier>
 <tracer_cnst_type     >   'CYCLICAL'                                                       </tracer_cnst_type>
 <tracer_cnst_filelist >   ''                                                               </tracer_cnst_filelist>
+
+<!-- Surface emissions for MAMOslo -->
+<srf_emis_type>     CYCLICAL   </srf_emis_type>
+<srf_emis_cycle_yr> 1850       </srf_emis_cycle_yr>
+
+<!-- External forcing for MAMOslo -->
+<ext_frc_type>      CYCLICAL   </ext_frc_type>
+<ext_frc_cycle_yr>  1850       </ext_frc_cycle_yr>
 
 <!-- surface emissions -->
 <srf_emis_specifier hgrid="0.9x1.25">
