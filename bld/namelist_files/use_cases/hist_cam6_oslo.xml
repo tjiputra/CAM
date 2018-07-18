@@ -119,6 +119,9 @@
 <zmconv_c0_lnd> 0.0300D0 </zmconv_c0_lnd>
 <zmconv_c0_ocn> 0.0300D0 </zmconv_c0_ocn>
 
+<zmconv_ke>     8.0E-6 </zmconv_ke>
+<zmconv_ke_lnd> 8.0E-6 </zmconv_ke_lnd>
+
 <!--Options for megan -->
 <megan_specifier>'isoprene = isoprene','monoterp = myrcene + sabinene + limonene+ carene_3 + ocimene_t_b + pinene_b + pinene_a'</megan_specifier>
 
