@@ -303,7 +303,7 @@ subroutine oslo_dms_emis_intr(state, cam_in)
          kwdms(:ncol) = ocnfrc(:ncol) * Xconvxa *u10m(:ncol)**2*(660./scdms(:ncol))**0.5 
          flux (:ncol) = 62.13*kwdms(:ncol)*1e-9*odms(:ncol)
       endif
-      cam_in%cflx(:ncol, pndx_fdms  )  = flux(:ncol) *.67_r8 ! tune to coupled HAMOCC global emission
+      cam_in%cflx(:ncol, pndx_fdms  )  = flux(:ncol) 
 
    ! IF OCEAN FLUX
    elseif(dms_source=='ocean_flux') then 
