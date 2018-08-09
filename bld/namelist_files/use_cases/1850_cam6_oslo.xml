@@ -7,9 +7,9 @@
 <!--do_beljaars>           .true.   </do_beljaars-->  
 
 <!-- Solar constant -->
-  <solar_irrad_data_file     >   'atm/cam/solar/SolarForcingCMIP6piControl_c160921.nc'   </solar_irrad_data_file>
-  <solar_data_ymd      >   18500101                                                </solar_data_ymd>
-  <solar_data_type     >    FIXED                                                  </solar_data_type>
+<solar_irrad_data_file     >   'atm/cam/solar/SolarForcingCMIP6piControl_c160921.nc'   </solar_irrad_data_file>
+<solar_data_ymd      >   18500101                                                </solar_data_ymd>
+<solar_data_type     >    FIXED                                                  </solar_data_type>
 
 <!-- 1850 GHG values Taken from Meinshausen et al., 2017 -->
 <co2vmr>   284.32e-6  </co2vmr>
@@ -25,14 +25,6 @@
 <prescribed_ozone_name    >   'O3'                                                          </prescribed_ozone_name>
 <prescribed_ozone_type    >   'CYCLICAL'                                                    </prescribed_ozone_type>
 
-<!-- Surface emissions for MAMOslo -->
-<srf_emis_type>     CYCLICAL   </srf_emis_type>
-<srf_emis_cycle_yr> 1850       </srf_emis_cycle_yr>
-
-<!-- External forcing for MAMOslo -->
-<ext_frc_type>      CYCLICAL   </ext_frc_type>
-<ext_frc_cycle_yr>  1850       </ext_frc_cycle_yr>
-
 <!-- Prescribed oxidants for aerosol chemistry -->
 <tracer_cnst_cycle_yr >   1850                                                             </tracer_cnst_cycle_yr>
 <tracer_cnst_datapath >   'atm/cam/tracer_cnst'                                            </tracer_cnst_datapath>
@@ -41,60 +33,68 @@
 <tracer_cnst_type     >   'CYCLICAL'                                                       </tracer_cnst_type>
 <tracer_cnst_filelist >   ''                                                               </tracer_cnst_filelist>
 
+<!-- Surface emissions for MAMOslo -->
+<srf_emis_type>     CYCLICAL   </srf_emis_type>
+<srf_emis_cycle_yr> 1850       </srf_emis_cycle_yr>
+
+<!-- External forcing for MAMOslo -->
+<ext_frc_type>      CYCLICAL   </ext_frc_type>
+<ext_frc_cycle_yr>  1850       </ext_frc_cycle_yr>
+
 <!-- surface emissions -->
 <srf_emis_specifier hgrid="0.9x1.25">
-  'BC_AX  ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20180330/emissions_cmip6_noresm2_BC_AX_anthrosurfAGRTRADOMSOLWSTSHP_surface_1850_0.9x1.25_version20180330.nc',
-  'BC_N   ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20180330/emissions_cmip6_noresm2_BC_N_anthrosurfAGRTRADOMSOLWSTSHP_surface_1850_0.9x1.25_version20180330.nc',
-  'OM_NI  ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20180330/emissions_cmip6_noresm2_OM_NI_anthrosurfAGRTRADOMSOLWSTSHP_surface_1850_0.9x1.25_version20180330.nc',
-  'SO2    ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20180330/emissions_cmip6_noresm2_SO2_anthrosurfAGRTRADOMSOLWSTSHP_surface_1850_0.9x1.25_version20180330.nc',
-  'SO4_PR ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20180330/emissions_cmip6_noresm2_SO4_PR_anthrosurfAGRTRADOMSOLWSTSHP_surface_1850_0.9x1.25_version20180330.nc'
+  'BC_AX  ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20180512/emissions_cmip6_noresm2_BC_AX_anthrosurfAGRTRADOMSOLWSTSHP_surface_1850_0.9x1.25_version20180512.nc',
+  'BC_N   ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20180512/emissions_cmip6_noresm2_BC_N_anthrosurfAGRTRADOMSOLWSTSHP_surface_1850_0.9x1.25_version20180512.nc',
+  'OM_NI  ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20180512/emissions_cmip6_noresm2_OM_NI_anthrosurfAGRTRADOMSOLWSTSHP_surface_1850_0.9x1.25_version20180512.nc',
+  'SO2    ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20180512/emissions_cmip6_noresm2_SO2_anthrosurfAGRTRADOMSOLWSTSHP_surface_1850_0.9x1.25_version20180512.nc',
+  'SO4_PR ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20180512/emissions_cmip6_noresm2_SO4_PR_anthrosurfAGRTRADOMSOLWSTSHP_surface_1850_0.9x1.25_version20180512.nc'
 </srf_emis_specifier>
 <srf_emis_specifier hgrid="1.9x2.5">
-  'BC_AX  ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20180330/emissions_cmip6_noresm2_BC_AX_anthrosurfAGRTRADOMSOLWSTSHP_surface_1850_1.9x2.5_version20180330.nc',
-  'BC_N   ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20180330/emissions_cmip6_noresm2_BC_N_anthrosurfAGRTRADOMSOLWSTSHP_surface_1850_1.9x2.5_version20180330.nc',
-  'OM_NI  ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20180330/emissions_cmip6_noresm2_OM_NI_anthrosurfAGRTRADOMSOLWSTSHP_surface_1850_1.9x2.5_version20180330.nc',
-  'SO2    ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20180330/emissions_cmip6_noresm2_SO2_anthrosurfAGRTRADOMSOLWSTSHP_surface_1850_1.9x2.5_version20180330.nc',
-  'SO4_PR ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20180330/emissions_cmip6_noresm2_SO4_PR_anthrosurfAGRTRADOMSOLWSTSHP_surface_1850_1.9x2.5_version20180330.nc'
+  'BC_AX  ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20180512/emissions_cmip6_noresm2_BC_AX_anthrosurfAGRTRADOMSOLWSTSHP_surface_1850_1.9x2.5_version20180512.nc',
+  'BC_N   ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20180512/emissions_cmip6_noresm2_BC_N_anthrosurfAGRTRADOMSOLWSTSHP_surface_1850_1.9x2.5_version20180512.nc',
+  'OM_NI  ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20180512/emissions_cmip6_noresm2_OM_NI_anthrosurfAGRTRADOMSOLWSTSHP_surface_1850_1.9x2.5_version20180512.nc',
+  'SO2    ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20180512/emissions_cmip6_noresm2_SO2_anthrosurfAGRTRADOMSOLWSTSHP_surface_1850_1.9x2.5_version20180512.nc',
+  'SO4_PR ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20180512/emissions_cmip6_noresm2_SO4_PR_anthrosurfAGRTRADOMSOLWSTSHP_surface_1850_1.9x2.5_version20180512.nc'
 </srf_emis_specifier>
 
 <!-- 3D emissions -->
 <ext_frc_specifier hgrid="0.9x1.25">
   'H2O    ->  $INPUTDATA_ROOT/atm/cam/chem/emis/elev/H2O_emission_CH4_oxidationx2_elev_3DmonthlyL70_1850climo295_c180426.nc',
-  'BC_AX  ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20180330/emissions_cmip6_noresm2_BC_AX_airALL_vertical_1850_0.9x1.25_version20180330.nc',
-  'BC_AX  ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20180330/emissions_cmip6_noresm2_BC_AX_anthroprofENEIND_vertical_1850_0.9x1.25_version20180330.nc',
-  'BC_N   ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20180330/emissions_cmip6_noresm2_BC_N_airALL_vertical_1850_0.9x1.25_version20180330.nc',
-  'BC_N   ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20180330/emissions_cmip6_noresm2_BC_N_anthroprofENEIND_vertical_1850_0.9x1.25_version20180330.nc',
-  'BC_NI  ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20180330/emissions_cmip6_noresm2_BC_NI_bbAGRIBORFDEFOPEATSAVATEMF_vertical_1850_0.9x1.25_version20180330.nc',
-  'OM_NI  ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20180330/emissions_cmip6_noresm2_OM_NI_airALL_vertical_1850_0.9x1.25_version20180330.nc',
-  'OM_NI  ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20180330/emissions_cmip6_noresm2_OM_NI_anthroprofENEIND_vertical_1850_0.9x1.25_version20180330.nc',
-  'OM_NI  ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20180330/emissions_cmip6_noresm2_OM_NI_bbAGRIBORFDEFOPEATSAVATEMF_vertical_1850_0.9x1.25_version20180330.nc',
-  'SO2    ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20180330/emissions_cmip6_noresm2_SO2_airALL_vertical_1850_0.9x1.25_version20180330.nc',
-  'SO2    ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20180330/emissions_cmip6_noresm2_SO2_anthroprofENEIND_vertical_1850_0.9x1.25_version20180330.nc',
-  'SO2    ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20180330/emissions_cmip6_noresm2_SO2_bbAGRIBORFDEFOPEATSAVATEMF_vertical_1850_0.9x1.25_version20180330.nc',
-  'SO2    ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20180330/emissions_cmip6_noresm2_SO2_volcCONTEXPL_vertical_1850_0.9x1.25_version20180330.nc',
-  'SO4_PR ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20180330/emissions_cmip6_noresm2_SO4_PR_airALL_vertical_1850_0.9x1.25_version20180330.nc',
-  'SO4_PR ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20180330/emissions_cmip6_noresm2_SO4_PR_anthroprofENEIND_vertical_1850_0.9x1.25_version20180330.nc',
-  'SO4_PR ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20180330/emissions_cmip6_noresm2_SO4_PR_bbAGRIBORFDEFOPEATSAVATEMF_vertical_1850_0.9x1.25_version20180330.nc',
-  'SO4_PR ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20180330/emissions_cmip6_noresm2_SO4_PR_volcCONTEXPL_vertical_1850_0.9x1.25_version20180330.nc'
+  'BC_AX  ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20180512/emissions_cmip6_noresm2_BC_AX_airALL_vertical_1850_0.9x1.25_version20180512.nc',
+  'BC_AX  ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20180512/emissions_cmip6_noresm2_BC_AX_anthroprofENEIND_vertical_1850_0.9x1.25_version20180512.nc',
+  'BC_N   ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20180512/emissions_cmip6_noresm2_BC_N_airALL_vertical_1850_0.9x1.25_version20180512.nc',
+  'BC_N   ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20180512/emissions_cmip6_noresm2_BC_N_anthroprofENEIND_vertical_1850_0.9x1.25_version20180512.nc',
+  'BC_NI  ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20180512/emissions_cmip6_noresm2_BC_NI_bbAGRIBORFDEFOPEATSAVATEMF_vertical_1850_0.9x1.25_version20180512.nc',
+  'OM_NI  ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20180512/emissions_cmip6_noresm2_OM_NI_airALL_vertical_1850_0.9x1.25_version20180512.nc',
+  'OM_NI  ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20180512/emissions_cmip6_noresm2_OM_NI_anthroprofENEIND_vertical_1850_0.9x1.25_version20180512.nc',
+  'OM_NI  ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20180512/emissions_cmip6_noresm2_OM_NI_bbAGRIBORFDEFOPEATSAVATEMF_vertical_1850_0.9x1.25_version20180512.nc',
+  'SO2    ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20180512/emissions_cmip6_noresm2_SO2_airALL_vertical_1850_0.9x1.25_version20180512.nc',
+  'SO2    ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20180512/emissions_cmip6_noresm2_SO2_anthroprofENEIND_vertical_1850_0.9x1.25_version20180512.nc',
+  'SO2    ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20180512/emissions_cmip6_noresm2_SO2_bbAGRIBORFDEFOPEATSAVATEMF_vertical_1850_0.9x1.25_version20180512.nc',
+  'SO2    ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20180512/emissions_cmip6_noresm2_SO2_volcCONTEXPL_vertical_1850_0.9x1.25_version20180512.nc',
+  'SO4_PR ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20180512/emissions_cmip6_noresm2_SO4_PR_airALL_vertical_1850_0.9x1.25_version20180512.nc',
+  'SO4_PR ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20180512/emissions_cmip6_noresm2_SO4_PR_anthroprofENEIND_vertical_1850_0.9x1.25_version20180512.nc',
+  'SO4_PR ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20180512/emissions_cmip6_noresm2_SO4_PR_bbAGRIBORFDEFOPEATSAVATEMF_vertical_1850_0.9x1.25_version20180512.nc',
+  'SO4_PR ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20180512/emissions_cmip6_noresm2_SO4_PR_volcCONTEXPL_vertical_1850_0.9x1.25_version20180512.nc'
 </ext_frc_specifier>
 <ext_frc_specifier hgrid="1.9x2.5">
   'H2O    ->  $INPUTDATA_ROOT/atm/cam/chem/emis/elev/H2O_emission_CH4_oxidationx2_elev_3DmonthlyL70_1850climo295_c180426.nc',
-  'BC_AX  ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20180330/emissions_cmip6_noresm2_BC_AX_airALL_vertical_1850_1.9x2.5_version20180330.nc',
-  'BC_AX  ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20180330/emissions_cmip6_noresm2_BC_AX_anthroprofENEIND_vertical_1850_1.9x2.5_version20180330.nc',
-  'BC_N   ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20180330/emissions_cmip6_noresm2_BC_N_airALL_vertical_1850_1.9x2.5_version20180330.nc',
-  'BC_N   ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20180330/emissions_cmip6_noresm2_BC_N_anthroprofENEIND_vertical_1850_1.9x2.5_version20180330.nc',
-  'BC_NI  ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20180330/emissions_cmip6_noresm2_BC_NI_bbAGRIBORFDEFOPEATSAVATEMF_vertical_1850_1.9x2.5_version20180330.nc',
-  'OM_NI  ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20180330/emissions_cmip6_noresm2_OM_NI_airALL_vertical_1850_1.9x2.5_version20180330.nc',
-  'OM_NI  ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20180330/emissions_cmip6_noresm2_OM_NI_anthroprofENEIND_vertical_1850_1.9x2.5_version20180330.nc',
-  'OM_NI  ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20180330/emissions_cmip6_noresm2_OM_NI_bbAGRIBORFDEFOPEATSAVATEMF_vertical_1850_1.9x2.5_version20180330.nc',
-  'SO2    ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20180330/emissions_cmip6_noresm2_SO2_airALL_vertical_1850_1.9x2.5_version20180330.nc',
-  'SO2    ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20180330/emissions_cmip6_noresm2_SO2_anthroprofENEIND_vertical_1850_1.9x2.5_version20180330.nc',
-  'SO2    ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20180330/emissions_cmip6_noresm2_SO2_bbAGRIBORFDEFOPEATSAVATEMF_vertical_1850_1.9x2.5_version20180330.nc',
-  'SO2    ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20180330/emissions_cmip6_noresm2_SO2_volcCONTEXPL_vertical_1850_1.9x2.5_version20180330.nc',
-  'SO4_PR ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20180330/emissions_cmip6_noresm2_SO4_PR_airALL_vertical_1850_1.9x2.5_version20180330.nc',
-  'SO4_PR ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20180330/emissions_cmip6_noresm2_SO4_PR_anthroprofENEIND_vertical_1850_1.9x2.5_version20180330.nc',
-  'SO4_PR ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20180330/emissions_cmip6_noresm2_SO4_PR_bbAGRIBORFDEFOPEATSAVATEMF_vertical_1850_1.9x2.5_version20180330.nc',
-  'SO4_PR ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20180330/emissions_cmip6_noresm2_SO4_PR_volcCONTEXPL_vertical_1850_1.9x2.5_version20180330.nc'
+  'BC_AX  ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20180512/emissions_cmip6_noresm2_BC_AX_airALL_vertical_1850_1.9x2.5_version20180512.nc',
+  'BC_AX  ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20180512/emissions_cmip6_noresm2_BC_AX_anthroprofENEIND_vertical_1850_1.9x2.5_version20180512.nc',
+  'BC_N   ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20180512/emissions_cmip6_noresm2_BC_N_airALL_vertical_1850_1.9x2.5_version20180512.nc',
+  'BC_N   ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20180512/emissions_cmip6_noresm2_BC_N_anthroprofENEIND_vertical_1850_1.9x2.5_version20180512.nc',
+  'BC_NI  ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20180512/emissions_cmip6_noresm2_BC_NI_bbAGRIBORFDEFOPEATSAVATEMF_vertical_1850_1.9x2.5_version20180512.nc',
+  'OM_NI  ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20180512/emissions_cmip6_noresm2_OM_NI_airALL_vertical_1850_1.9x2.5_version20180512.nc',
+  'OM_NI  ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20180512/emissions_cmip6_noresm2_OM_NI_anthroprofENEIND_vertical_1850_1.9x2.5_version20180512.nc',
+  'OM_NI  ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20180512/emissions_cmip6_noresm2_OM_NI_bbAGRIBORFDEFOPEATSAVATEMF_vertical_1850_1.9x2.5_version20180512.nc',
+  'SO2    ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20180512/emissions_cmip6_noresm2_SO2_airALL_vertical_1850_1.9x2.5_version20180512.nc',
+  'SO2    ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20180512/emissions_cmip6_noresm2_SO2_anthroprofENEIND_vertical_1850_1.9x2.5_version20180512.nc',
+  'SO2    ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20180512/emissions_cmip6_noresm2_SO2_bbAGRIBORFDEFOPEATSAVATEMF_vertical_1850_1.9x2.5_version20180512.nc',
+  'SO2    ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20180512/emissions_cmip6_noresm2_SO2_volcCONTEXPL_vertical_1850_1.9x2.5_version20180512.nc',
+  'SO4_PR ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20180512/emissions_cmip6_noresm2_SO4_PR_airALL_vertical_1850_1.9x2.5_version20180512.nc',
+  'SO4_PR ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20180512/emissions_cmip6_noresm2_SO4_PR_anthroprofENEIND_vertical_1850_1.9x2.5_version20180512.nc',
+  'SO4_PR ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20180512/emissions_cmip6_noresm2_SO4_PR_bbAGRIBORFDEFOPEATSAVATEMF_vertical_1850_1.9x2.5_version20180512.nc',
+  'SO4_PR ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20180512/emissions_cmip6_noresm2_SO4_PR_volcCONTEXPL_vertical_1850_1.9x2.5_version20180512.nc'
 </ext_frc_specifier>
 
 
@@ -128,6 +128,9 @@
 <!--zmconv_nl-->
 <zmconv_c0_lnd> 0.0300D0 </zmconv_c0_lnd>
 <zmconv_c0_ocn> 0.0300D0 </zmconv_c0_ocn>
+
+<zmconv_ke>     8.0E-6 </zmconv_ke>
+<zmconv_ke_lnd> 8.0E-6 </zmconv_ke_lnd>
 
 <!--Options for megan -->
 <megan_specifier>'isoprene = isoprene','monoterp = myrcene + sabinene + limonene+ carene_3 + ocimene_t_b + pinene_b + pinene_a'</megan_specifier>
