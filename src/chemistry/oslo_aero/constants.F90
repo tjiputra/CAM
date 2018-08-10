@@ -26,6 +26,9 @@ subroutine constants
    real(r8)                      :: logDeltaBin
    real(r8)                      :: logNextEdge
 
+   rhob(:)=-1.0_r8
+   volumeToNumber(:)=-1.0_r8
+   numberToSurface(:)=-1.0_r8
    !Prepare modal properties
    do i=0, nmodes
          

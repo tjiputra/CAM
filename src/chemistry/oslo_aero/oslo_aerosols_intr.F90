@@ -324,7 +324,8 @@ contains
 
     lchnk = state%lchnk
     ncol  = state%ncol
-
+    aerdepdryis(:,:)=0._r8
+    aerdepdrycw(:,:)=0._r8
     ! calc ram and fv over ocean and sea ice ...
     call calcram( ncol,landfrac,icefrac,ocnfrac,obklen,&
                   ustar,ram1in,ram1,state%t(:,pver),state%pmid(:,pver),&
