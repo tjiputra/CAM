@@ -464,7 +464,11 @@ subroutine pmxsub(lchnk, ncol, pint, pmid, coszrs, state, t, cld, qm1, Nnatk, &
           n_aer(icol,k)     = 0.0_r8
         end do
       end do
-
+      kalw(:,:,:,:)=0._r8
+        be(:,:,:,:)=0._r8
+        ke(:,:,:,:)=0._r8
+      asym(:,:,:,:)=0._r8
+       ssa(:,:,:,:)=0._r8
 !      Find process tagged bulk aerosol properies (from the life cycle module): 
 
           call calculateBulkProperties(ncol, qm1, rhoda, Nnatk, Ca, f_c, f_bc, &
