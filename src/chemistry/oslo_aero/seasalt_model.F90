@@ -156,7 +156,9 @@ subroutine oslo_salt_emis_intr(state, cam_in)
     ! New whitecap area fraction / air entrainment flux from eqn. 6 in Salter et al. (2015)
     ! JCA & MS Using Hanson & Phillips 99 air entrainment vs. wind speed 
     ! (Note the uncertainty in the factor 2, written as 2 pluss/minus 1 in Eq. 6 -> possible tuning factor)
-    whitecapAreaFraction(:ncol) = (2.0_r8*10.0_r8**(-8.0_r8))*(u10m(:ncol)**3.41_r8)
+!aktst+    whitecapAreaFraction(:ncol) = (2.0_r8*10.0_r8**(-8.0_r8))*(u10m(:ncol)**3.41_r8)
+    whitecapAreaFraction(:ncol) = (2.0_r8*10.0_r8**(-8.0_r8))*(u10m(:ncol)**3.74_r8)
+!aktst-
 
     whitecapAreaFraction(:ncol) = ocnfrc(:ncol) * (1._r8-icefrc(:ncol)) * whitecapAreaFraction(:ncol)
     open_ocean(:ncol) = ocnfrc(:ncol) * (1._r8-icefrc(:ncol))
