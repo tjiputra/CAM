@@ -62,11 +62,18 @@ real(r8) :: third, twothird, sixth, zero
 real(r8) :: sq2, sqpi
 
 ! CCN diagnostic fields
-integer,  parameter :: psat=6    ! number of supersaturations to calc ccn concentration
+!integer,  parameter :: psat=6    ! number of supersaturations to calc ccn concentration
+!real(r8), parameter :: supersat(psat)= & ! supersaturation (%) to determine ccn concentration
+!                       (/ 0.02_r8, 0.05_r8, 0.1_r8, 0.2_r8, 0.5_r8, 1.0_r8 /)
+!character(len=8) :: ccn_name(psat)= &
+!                    (/'CCN1','CCN2','CCN3','CCN4','CCN5','CCN6'/)
+!akc6+
+integer,  parameter :: psat=7    ! number of supersaturations to calc ccn concentration
 real(r8), parameter :: supersat(psat)= & ! supersaturation (%) to determine ccn concentration
-                       (/ 0.02_r8, 0.05_r8, 0.1_r8, 0.2_r8, 0.5_r8, 1.0_r8 /)
+                       (/ 0.02_r8, 0.05_r8, 0.1_r8, 0.15_r8, 0.2_r8, 0.5_r8, 1.0_r8 /)
 character(len=8) :: ccn_name(psat)= &
-                    (/'CCN1','CCN2','CCN3','CCN4','CCN5','CCN6'/)
+                    (/'CCN1','CCN2','CCN3','CCN4','CCN5','CCN6','CCN7'/)
+!akc6-
 
 ! indices in state and pbuf structures
 integer :: numliq_idx = -1
@@ -345,12 +352,21 @@ subroutine ndrop_init
 
 #endif
 
+!   call addfld('CCN1',(/ 'lev' /), 'A','#/cm3','CCN concentration at S=0.02%')
+!   call addfld('CCN2',(/ 'lev' /), 'A','#/cm3','CCN concentration at S=0.05%')
+!   call addfld('CCN3',(/ 'lev' /), 'A','#/cm3','CCN concentration at S=0.1%')
+!   call addfld('CCN4',(/ 'lev' /), 'A','#/cm3','CCN concentration at S=0.2%')
+!   call addfld('CCN5',(/ 'lev' /), 'A','#/cm3','CCN concentration at S=0.5%')
+!   call addfld('CCN6',(/ 'lev' /), 'A','#/cm3','CCN concentration at S=1.0%')
+!akc6+
    call addfld('CCN1',(/ 'lev' /), 'A','#/cm3','CCN concentration at S=0.02%')
    call addfld('CCN2',(/ 'lev' /), 'A','#/cm3','CCN concentration at S=0.05%')
    call addfld('CCN3',(/ 'lev' /), 'A','#/cm3','CCN concentration at S=0.1%')
-   call addfld('CCN4',(/ 'lev' /), 'A','#/cm3','CCN concentration at S=0.2%')
-   call addfld('CCN5',(/ 'lev' /), 'A','#/cm3','CCN concentration at S=0.5%')
-   call addfld('CCN6',(/ 'lev' /), 'A','#/cm3','CCN concentration at S=1.0%')
+   call addfld('CCN4',(/ 'lev' /), 'A','#/cm3','CCN concentration at S=0.15%')
+   call addfld('CCN5',(/ 'lev' /), 'A','#/cm3','CCN concentration at S=0.2%')
+   call addfld('CCN6',(/ 'lev' /), 'A','#/cm3','CCN concentration at S=0.5%')
+   call addfld('CCN7',(/ 'lev' /), 'A','#/cm3','CCN concentration at S=1.0%')
+!akc6-
 
 #ifdef OSLO_AERO
    if(history_aerosol)then
@@ -2905,7 +2921,9 @@ subroutine ccncalc_oslo(state &
 !+tht
    logical, intent(in)  :: hasAerosol(pcols, pver, nmodes)
 !-tht
-   real(r8), intent(in) ::  numberConcentration(pcols,pver, nmodes) ! interstit+activated aerosol number conc (/m3)
+!akc6   real(r8), intent(in) ::  numberConcentration(pcols,pver, nmodes) ! interstit+activated aerosol number conc (/m3)
+   real(r8), intent(in) ::  numberConcentration(pcols,pver,0:nmodes) !   interstit+activated aerosol number conc (/m3)
+!akc6-
    real(r8), intent(in) ::  volumeConcentration(pcols,pver,nmodes)  ! interstit+activated aerosol volume conc (m3/m3)
    real(r8), intent(in) ::  hygroscopicity(pcols,pver,nmodes)
    real(r8), intent(in) ::  lnSigma(pcols,pver,nmodes)

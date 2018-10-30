@@ -411,17 +411,30 @@ contains
           unit_basename = 'kg'
        endif
 
-!#ifndef OSLO_AERO
+!akc6       if ( any( aer_species == m ) ) then
+!akc6!       if ( any( aer_species == m ) .or. isAerosol(n) ) then
+!akc6+
+#ifndef OSLO_AERO
        if ( any( aer_species == m ) ) then
-!#else
-!       if ( any( aer_species == m ) .or. isAerosol(n) ) then
-!#endif
+#else
+       if (n.gt.0) then
+       if ( any( aer_species == m ) .or. isAerosol(n) ) then
+!akc6-
+#endif
           call addfld( spc_name,   (/ 'lev' /), 'A', unit_basename//'/kg ', trim(attr)//' concentration')
           call addfld( trim(spc_name)//'_SRF', horiz_only, 'A', unit_basename//'/kg', trim(attr)//" in bottom layer")
        else
           call addfld( spc_name, (/ 'lev' /), 'A', 'mol/mol', trim(attr)//' concentration')
           call addfld( trim(spc_name)//'_SRF', horiz_only, 'A', 'mol/mol', trim(attr)//" in bottom layer")
        endif
+!akc6+
+#ifdef OSLO_AERO
+       else
+          call addfld( spc_name, (/ 'lev' /), 'A', 'mol/mol', trim(attr)//' concentration')
+          call addfld( trim(spc_name)//'_SRF', horiz_only, 'A', 'mol/mol', trim(attr)//" in bottom layer")
+       endif
+#endif
+!akc6-
        if ((m /= id_cly) .and. (m /= id_bry)) then
           if (history_aerosol.or.history_chemistry) then
              call add_default( spc_name, 1, ' ' )

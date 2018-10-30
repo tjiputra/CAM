@@ -888,8 +888,12 @@ subroutine micro_mg_cam_init(pbuf2d)
    call addfld ('FCTI',        horiz_only,   'A', 'fraction', 'Fractional occurrence of cloud top ice'                            )
    !++IH
    !For comparing to Bernartz CDNC concentrations
-   call addfld ('ACTNL_B    ', horiz_only, 'A', 'Micron  ', 'Average Cloud Top droplet number (Bennartz)'                         )
-   call addfld ('FCTL_B     ', horiz_only, 'A', 'fraction',  'Fractional occurrence of cloud top liquid (Bennartz)'                      )
+!akc6   call addfld ('ACTNL_B    ', horiz_only, 'A', 'Micron  ', 'Average Cloud Top droplet number (Bennartz)'                         )
+   call addfld ('ACTNL_B    ', horiz_only, 'A', 'm-3',  'Average Cloud Top   droplet number (Bennartz)'                       )
+   call addfld ('FCTL_B     ', horiz_only, 'A', 'fraction',  'Fractional occurrence of cloud top liquid (Bennartz)'           )
+!ak6+
+   call addfld ('CCN_B      ', horiz_only, 'A', 'm-3',  'Average Cloud Top liquid CCN (Bennartz)'                             )
+!ak6-
    !--IH
 
    ! New frequency arrays for mixed phase and supercooled liquid (only and mixed) for (a) Cloud Top and (b) everywhere..
@@ -999,6 +1003,9 @@ subroutine micro_mg_cam_init(pbuf2d)
       call add_default ('FCTL_B    ', 1, ' ')
       call add_default ('ACTNL_B     ', 1, ' ')
       !--IH
+!akc6+
+      call add_default ('CCN_B       ', 1, ' ')
+!akc6-
       do m = 1, ncnst
          call cnst_get_ind(cnst_names(m), mm)
          call add_default(cnst_name(mm), 1, ' ')
@@ -1675,6 +1682,9 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
    !++IH: 
    real(r8) :: fctl_b(pcols) !frequency of occurrence for Bennartz 
    real(r8) :: ctnl_b(pcols) !cdnc [/m3] for Bennartz
+!akc6+
+   real(r8) :: ccn_b(pcols)  !ccm [/m3] defined as for cdnc for Bennartz
+!akc6-
    !--IH
 
    ! Variables for precip efficiency calculation
@@ -3048,6 +3058,9 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
    !++IH for comparign to Bennartz CDNC concentrations 
    fctl_b  = 0._r8
    ctnl_b  = 0._r8
+!akc6+
+   ccn_b   = 0._r8
+!akc6-
 
    do i = 1, ngrdcol
       do k = top_lev, pver
@@ -3106,6 +3119,9 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
             !Save cloud fraction and in-cloud number conc
             ctnl_b(i)  = icwnc(i,k) * liqcldf(i,k)
             fctl_b(i)  = liqcldf(i,k)
+!akc6+
+            ccn_b(i)   = ncal(i,k) * liqcldf(i,k)
+!akc6-
             exit !==> Go out to i=1,ncol-loop
          end if
          !--IH
@@ -3121,6 +3137,9 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
    !++IH 
    call outfld( 'FCTL_B'       , fctl_b,      pcols, lchnk )
    call outfld( 'ACTNL_B'      , ctnl_b,      pcols, lchnk )
+!akc6+
+   call outfld( 'CCN_B'      , ccn_b,          pcols, lchnk )
+!akc6-
    !--IH
 
    ! --------------------------------------------- !

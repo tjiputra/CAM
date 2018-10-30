@@ -328,6 +328,9 @@ contains
     call addfld ('ASYMMVIS',(/'lev'/),  'A','unitless','Aerosol assymetry factor in visible wavelength band')    
     call addfld ('EXTVIS  ',(/'lev'/),  'A','1/km    ','Aerosol extinction')     
     call addfld ('RELH    ',(/'lev'/),  'A', 'unitless','Fictive relative humidity')
+!akc6+
+   call addfld ('BVISVOLC ',(/'lev'/),   'A','1/km    ','CMIP6 volcanic aerosol extinction at 0.442-0.625um')
+!akc6-
 #ifdef COLTST4INTCONS 
 ! optical depth for each mode/mixture:
     call addfld ('TAUKC0 ',horiz_only, 'A','unitless','Aerosol optical depth at 0.442-0.625um for kcomp 0')
@@ -393,6 +396,10 @@ contains
       call addfld ('AKCXS   ',horiz_only, 'A','mg/m2   ','Scheme excess aerosol mass burden')     
       call addfld ('PMTOT   ',horiz_only, 'A','ug/m3   ','Aerosol PM, all sizes')
       call addfld ('PM25    ',horiz_only, 'A','ug/m3   ','Aerosol PM2.5')
+!akc6+
+      call addfld ('PM2P5   ',(/'lev'/), 'A','ug/m3   ','3D aerosol PM2.5')
+      call addfld ('MMRPM2P5',(/'lev'/), 'A','kg/kg   ','3D aerosol PM2.5 mass mixing ratio')
+!akc6-
       call addfld ('GRIDAREA',horiz_only, 'A','m2      ','Grid area for 1.9x2.5 horizontal resolution')
       call addfld ('DAERH2O ',horiz_only, 'A', 'mg/m2   ','Aerosol water load')
       call addfld ('MMR_AH2O',(/'lev'/), 'A', 'kg/kg   ','Aerosol water mmr')
@@ -513,6 +520,7 @@ contains
       call addfld ('DGT_SO4 ',horiz_only, 'A','unitless','SO4 aerosol optical depth 550nm gt05')     
       call addfld ('DGT_POM ',horiz_only, 'A','unitless','OC aerosol optical depth 550nm gt05')     
       call addfld ('DGT_BC  ',horiz_only, 'A','unitless','BC aerosol optical depth 550nm gt05')     
+      call addfld ('AIRMASS ',horiz_only, 'A','kg/m2   ','Vertically integrated airmass')     !akc6
       call addfld ('NNAT_0  ',(/'lev'/),'A','1/cm3   ','Aerosol mode 0 number concentration')     
       call addfld ('NNAT_1  ',(/'lev'/),'A','1/cm3   ','Aerosol mode 1 number concentration')     
       call addfld ('NNAT_2  ',(/'lev'/),'A','1/cm3   ','Aerosol mode 2 number concentration')     
@@ -525,12 +533,13 @@ contains
       call addfld ('NNAT_10 ',(/'lev'/),'A','1/cm3   ','Aerosol mode 10 number concentration')     
       call addfld ('NNAT_12 ',(/'lev'/),'A','1/cm3   ','Aerosol mode 12 number concentration')     
       call addfld ('NNAT_14 ',(/'lev'/),'A','1/cm3   ','Aerosol mode 14 number concentration')     
-      call addfld ('AIRMASS ',(/'lev'/),'A','kg/m3   ','Layer airmass')     
-      call addfld ('BETOTVIS',(/'lev'/),'A','unitless','Aerosol 3d optical depth at 0.442-0.625')  ! CAM4-Oslo: 0.35-0.64um
-      call addfld ('BATOTVIS',(/'lev'/),'A','unitless','Aerosol 3d absorptive optical depth at 0.442-0.625') ! CAM4-Oslo: 0.35-0.64um
-      call addfld ('BATSW13 ',(/'lev'/),'A','unitless','Aerosol 3d SW absorptive optical depth at 3.077-3.846um')
-      call addfld ('BATLW01 ',(/'lev'/),'A','unitless','Aerosol 3d LW absorptive optical depth at 3.077-3.846um')
-      call addfld ('AERLWA01',(/'lev'/),'A','unitless','CAM5 3d LW absorptive optical depth at 3.077-3.846um')
+!ak      call addfld ('AIRMASS ',(/'lev'/),'A','kg/m3   ','Layer airmass')     
+      call addfld ('AIRMASSL',(/'lev'/),'A','kg/m2   ','Layer airmass')     
+      call addfld ('BETOTVIS',(/'lev'/),'A','1/km','Aerosol 3d extinction at 0.442-0.625')  ! CAM4-Oslo: 0.35-0.64um
+      call addfld ('BATOTVIS',(/'lev'/),'A','1/km','Aerosol 3d absorption at 0.442-0.625') ! CAM4-Oslo: 0.35-0.64um
+      call addfld ('BATSW13 ',(/'lev'/),'A','1/km','Aerosol 3d SW absorption at 3.077-3.846um')
+      call addfld ('BATLW01 ',(/'lev'/),'A','1/km','Aerosol 3d LW absorption depth at 3.077-3.846um')
+!akc6      call addfld ('AERLWA01',(/'lev'/),'A','unitless','CAM5 3d LW absorptive optical depth at 3.077-3.846um')
 !+
       do i=1,nbmodes
          modeString="  "
@@ -715,6 +724,9 @@ contains
    call add_default ('ASYMMVIS', 1, ' ')
    call add_default ('EXTVIS  ', 1, ' ')
    call add_default ('RELH    ', 1, ' ')
+!akc6+
+   call add_default ('BVISVOLC', 1, ' ')
+!akc6-
 #ifdef AEROFFL
      call add_default ('FSNT_DRF', 1, ' ')
      call add_default ('FSNTCDRF', 1, ' ')
@@ -737,6 +749,10 @@ contains
       call add_default ('AKCXS   ', 1, ' ')
       call add_default ('PMTOT   ', 1, ' ')
       call add_default ('PM25    ', 1, ' ')
+!akc6+
+      call add_default ('PM2P5   ', 1, ' ')
+      call add_default ('MMRPM2P5', 1, ' ')
+!akc6-
       call add_default ('GRIDAREA', 1, ' ')
       call add_default ('DAERH2O ', 1, ' ')
       call add_default ('MMR_AH2O', 1, ' ')
@@ -865,12 +881,13 @@ contains
       call add_default ('NNAT_10 ', 1, ' ')
       call add_default ('NNAT_12 ', 1, ' ')
       call add_default ('NNAT_14 ', 1, ' ')
-      call add_default ('AIRMASS ', 1, ' ')
+      call add_default ('AIRMASSL', 1, ' ')  !akc6
+      call add_default ('AIRMASS ', 1, ' ')  !akc6
       call add_default ('BETOTVIS', 1, ' ')
       call add_default ('BATOTVIS', 1, ' ')
       call add_default ('BATSW13 ', 1, ' ')
       call add_default ('BATLW01 ', 1, ' ')
-      call add_default ('AERLWA01', 1, ' ')
+!akc6      call add_default ('AERLWA01', 1, ' ')
 !+
       do i=1,nbmodes
          modeString="  "

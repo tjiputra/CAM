@@ -90,9 +90,13 @@ subroutine pmxsub(lchnk, ncol, pint, pmid, coszrs, state, t, cld, qm1, Nnatk, &
 
    real(r8) aodvisvolc(pcols)      ! AOD vis for CMIP6 volcanic aerosol
    real(r8) absvisvolc(pcols)      ! AAOD vis for CMIP6 volcanic aerosol
+!akc6+
+   real(r8) bevisvolc(pcols,pver)  ! Extinction in vis wavelength band for CMIP6 volcanic aerosol
+!akc6-
    real(r8) rhum(pcols,pver)       ! (trimmed) relative humidity for the aerosol calculations
    real(r8) deltah_km(pcols,pver)  ! Layer thickness, unit km
-   real(r8) deltah, airmass(pcols,pver) 
+!akc6   real(r8) deltah, airmass(pcols,pver) 
+   real(r8) deltah, airmassl(pcols,pver), airmass(pcols) !akc6
    real(r8) Ca(pcols,pver), f_c(pcols,pver), f_bc(pcols,pver), f_aq(pcols,pver)
    real(r8) fnbc(pcols,pver), faitbc(pcols,pver), f_so4_cond(pcols,pver), &
             f_soa(pcols,pver),f_soana(pcols,pver), vnbc, vaitbc
@@ -206,6 +210,10 @@ subroutine pmxsub(lchnk, ncol, pint, pmid, coszrs, state, t, cld, qm1, Nnatk, &
             c_bc_2(pcols,pver), c_bc_4(pcols,pver), c_bc_12(pcols,pver), c_bc_14(pcols,pver), &  
             c_oc_4(pcols,pver), c_oc_14(pcols,pver)   
    real(r8) c_tots(pcols), c_tot125s(pcols), c_pm25s(pcols) ! = PM all sizes, PM>2.5um and PM<2.5um (PM2.5)
+!akc6+
+   real(r8) c_tot(pcols,pver), c_tot125(pcols,pver), c_pm25(pcols,pver), &
+            mmr_pm25(pcols,pver) 
+!akc6-
    real(r8) aaeros_tot(pcols,pver), aaerol_tot(pcols,pver), vaeros_tot(pcols,pver), &
             vaerol_tot(pcols,pver), aaercols(pcols), aaercoll(pcols), vaercols(pcols), & 
             vaercoll(pcols), derlt05(pcols), dergt05(pcols), der(pcols), &
@@ -864,7 +872,7 @@ enddo ! iloop
             betot(icol,k,ib)=0.0_r8
             ssatot(icol,k,ib)=0.0_r8
             asymtot(icol,k,ib)=0.0_r8
-          end do
+         end do
         enddo  
       enddo
       do ib=1,nbands
@@ -901,6 +909,9 @@ enddo ! iloop
              + volc_ext_sun(1:ncol,1:pver,ib)*volc_omega_sun(1:ncol,1:pver,ib) &
               *volc_g_sun(1:ncol,1:pver,ib)
       enddo
+!akc6+
+      bevisvolc(1:ncol,1:pver) = volc_ext_sun(1:ncol,1:pver,4)        
+!akc6-
 !     and then calculate the total bulk optical parameters
       do ib=1,nbands
        do k=1,pver
@@ -1104,7 +1115,7 @@ enddo ! iloop
           ssavis(icol,k) = 0.0_r8
           asymmvis(icol,k) = 0.0_r8
           extvis(icol,k) = 0.0_r8
-          dayfoc(icol,k) = 0.0_r8    
+          dayfoc(icol,k) = 0.0_r8 
         enddo
       end do
 
@@ -1136,6 +1147,7 @@ enddo ! iloop
           absvis(icol)=0.0_r8
           aodvisvolc(icol)=0.0_r8
           absvisvolc(icol)=0.0_r8
+          airmass(icol)=0.0_r8  !akc6
 #ifdef COLTST4INTCONS 
           taukc0(icol)=0.0_r8
           taukc1(icol)=0.0_r8
@@ -1160,7 +1172,9 @@ enddo ! iloop
          do k=1,pver
 !         Layer thickness, unit km, and layer airmass, unit kg/m2
           deltah=deltah_km(icol,k)
-          airmass(icol,k)=1.e3_r8*deltah*rhoda(icol,k)
+!akc6          airmass(icol,k)=1.e3_r8*deltah*rhoda(icol,k)
+          airmassl(icol,k)=1.e3_r8*deltah*rhoda(icol,k)
+          airmass(icol)=airmass(icol)+airmassl(icol,k)  !akc6
 !          Optical depths at ca. 550 nm (0.442-0.625um) all aerosols
           aodvis(icol)=aodvis(icol)+betotvis(icol,k)*deltah
           absvis(icol)=absvis(icol)+batotvis(icol,k)*deltah
@@ -1169,7 +1183,7 @@ enddo ! iloop
           absvisvolc(icol)=absvisvolc(icol)+volc_ext_sun(icol,k,4) &
                                 *(1.0_r8-volc_omega_sun(icol,k,4))*deltah
 #ifdef COLTST4INTCONS 
-!         To check internal consistency of these AOD calculations,make
+!         To check internal consistency of these AOD calculations, make
 !         sure that sum_i(taukc_i)=aodvis (tested to be ok on 7/1-2016).
 !         Note that this will not be the case when CMIP6 volcanic forcing
 !         as optical properties are included, since this comes "on top of"
@@ -1201,6 +1215,9 @@ enddo ! iloop
         call outfld('ABSVIS  ',absvis ,pcols,lchnk)
         call outfld('AODVVOLC',aodvisvolc ,pcols,lchnk)
         call outfld('ABSVVOLC',absvisvolc ,pcols,lchnk)
+!akc6+
+        call outfld('BVISVOLC',bevisvolc ,pcols,lchnk)
+!akc6-
 #ifdef COLTST4INTCONS 
         call outfld('TAUKC0  ',taukc0 ,pcols,lchnk)
         call outfld('TAUKC1  ',taukc1 ,pcols,lchnk)
@@ -2066,6 +2083,13 @@ enddo ! iloop
             c_bc_14(icol,k)=0.0_r8
             c_oc_4(icol,k)=0.0_r8
             c_oc_14(icol,k)=0.0_r8
+!akc6+
+            c_tot(icol,k)=0.0_r8
+            c_tot125(icol,k)=0.0_r8
+            c_pm25(icol,k)=0.0_r8
+            mmr_pm25(icol,k)=0.0_r8
+!akc6-
+
             do i=0,nbmodes
         if(i.ne.3) then
              c_bc(icol,k)    = c_bc(icol,k) &
@@ -2154,7 +2178,7 @@ enddo ! iloop
                             +Nnatk(icol,k,0)*cintbg125(icol,k,0)                &
                             +Nnatk(icol,k,12)*ckngt125(icol,k,12)               &
                             +Nnatk(icol,k,14)*ckngt125(icol,k,14)*fnbc(icol,k)
-             c_oc_ac(icol,k)= c_oc(icol,k)  ! Note: now including so4_a1, so not only coagulated oc! (should be renamed) 
+             c_oc_ac(icol,k)= c_oc(icol,k)
              c_oc_4(icol,k)  = Nnatk(icol,k,4)*cintbg(icol,k,4)*(1.0_r8-faitbc(icol,k))
              c_oc_14(icol,k) = Nnatk(icol,k,14)*cknorm(icol,k,14)*(1.0_r8-fnbc(icol,k))
              c_oc(icol,k)    = c_oc(icol,k)                                           &
@@ -2182,6 +2206,16 @@ enddo ! iloop
                             +Nnatk(icol,k,1)*cintbg125(icol,k,1)*(1.0_r8-f_soana(icol,k)) &
                             +Nnatk(icol,k,5)*cintbg125(icol,k,5)  
 
+!akc6+
+             c_tot(icol,k)    = c_s4(icol,k) + c_oc(icol,k) + c_bc(icol,k) &
+                            + c_mi(icol,k) + c_ss(icol,k)
+             c_tot125(icol,k) = c_s4125(icol,k) + c_oc125(icol,k) + c_bc125(icol,k) &
+                            + c_mi125(icol,k) + c_ss125(icol,k)
+             c_pm25(icol,k)   = c_tot(icol,k) - c_tot125(icol,k)
+!            mass mixing ratio:
+             mmr_pm25(icol,k) = 1.e-9*c_pm25(icol,k)/rhoda(icol,k)   
+!akc6-
+
 !            converting from S to SO4 concentrations is no longer necessary, since 
 !             sc=H2SO4 and sa=(NH4)2SO4 now, not SO4 as in CAM4-Oslo     
 !             c_s4(icol,k)=c_s4(icol,k)/3._r8
@@ -2197,13 +2231,16 @@ enddo ! iloop
 
 !       Total PM and PM2.5 (dry r>1.25um), surface values (ug/m3)
         do icol=1,ncol
-          c_tots(icol) = c_s4(icol,pver) + c_oc(icol,pver) + c_bc(icol,pver) &
-                          + c_mi(icol,pver) + c_ss(icol,pver)
-          c_tot125s(icol) = c_s4125(icol,pver) + c_oc125(icol,pver) + c_bc125(icol,pver) &
-                          + c_mi125(icol,pver) + c_ss125(icol,pver)
-          c_pm25s(icol) = c_tots(icol) - c_tot125s(icol)
-!          write(*,*) 'icol, c_pm25s =', icol, c_pm25s(icol)
-!          write(*,*) 'icol, d550 =', icol, dod550(icol)
+!          c_tots(icol) = c_s4(icol,pver) + c_oc(icol,pver) + c_bc(icol,pver) &
+!                          + c_mi(icol,pver) + c_ss(icol,pver)
+!          c_tot125s(icol) = c_s4125(icol,pver) + c_oc125(icol,pver) + c_bc125(icol,pver) &
+!                          + c_mi125(icol,pver) + c_ss125(icol,pver)
+!          c_pm25s(icol) = c_tots(icol) - c_tot125s(icol)
+!akc6+
+          c_tots(icol) = c_tot(icol,pver)
+          c_tot125s(icol) = c_tot125(icol,pver)
+          c_pm25s(icol) = c_pm25(icol,pver)
+!akc6-
         enddo
 
 !       Effective, column integrated, radii for particles
@@ -2329,6 +2366,10 @@ enddo ! iloop
 !        call outfld('C_SS125 ',c_ss125,pcols,lchnk)
         call outfld('PMTOT  ',c_tots   ,pcols,lchnk)
         call outfld('PM25    ',c_pm25s ,pcols,lchnk)
+!akc6+
+        call outfld('PM2P5   ',c_pm25  ,pcols,lchnk)
+        call outfld('MMRPM2P5',mmr_pm25,pcols,lchnk)
+!akc6-
 !       total (all r) dry concentrations (ug/m3) and loadings (mg/m2)
         call outfld('DLOAD_MI',dload_mi,pcols,lchnk)
         call outfld('DLOAD_SS',dload_ss,pcols,lchnk)
@@ -2365,7 +2406,9 @@ enddo ! iloop
         call outfld('NNAT_12 ',nnat_12,pcols,lchnk)
 !=0        call outfld('NNAT_13 ',nnat_13,pcols,lchnk)
         call outfld('NNAT_14 ',nnat_14,pcols,lchnk)
-        call outfld('AIRMASS ',airmass,pcols,lchnk)
+!akc6        call outfld('AIRMASSL',airmassl,pcols,lchnk)
+        call outfld('AIRMASSL',airmassl,pcols,lchnk)
+        call outfld('AIRMASS ',airmass,pcols,lchnk)  !akc6
 !c_er3d 
 !       effective dry radii (um) in each layer
 !        call outfld('ERLT053D',erlt053d,pcols,lchnk)
