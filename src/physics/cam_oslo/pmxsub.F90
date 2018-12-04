@@ -212,7 +212,7 @@ subroutine pmxsub(lchnk, ncol, pint, pmid, coszrs, state, t, cld, qm1, Nnatk, &
    real(r8) c_tots(pcols), c_tot125s(pcols), c_pm25s(pcols) ! = PM all sizes, PM>2.5um and PM<2.5um (PM2.5)
 !akc6+
    real(r8) c_tot(pcols,pver), c_tot125(pcols,pver), c_pm25(pcols,pver), &
-            mmr_pm25(pcols,pver) 
+            mmr_pm25(pcols,pver), c_tot05(pcols,pver), c_pm1(pcols,pver), mmr_pm1(pcols,pver)  
 !akc6-
    real(r8) aaeros_tot(pcols,pver), aaerol_tot(pcols,pver), vaeros_tot(pcols,pver), &
             vaerol_tot(pcols,pver), aaercols(pcols), aaercoll(pcols), vaercols(pcols), & 
@@ -2086,8 +2086,11 @@ enddo ! iloop
 !akc6+
             c_tot(icol,k)=0.0_r8
             c_tot125(icol,k)=0.0_r8
+            c_tot05(icol,k)=0.0_r8
             c_pm25(icol,k)=0.0_r8
+            c_pm1(icol,k)=0.0_r8
             mmr_pm25(icol,k)=0.0_r8
+            mmr_pm1(icol,k)=0.0_r8
 !akc6-
 
             do i=0,nbmodes
@@ -2211,9 +2214,13 @@ enddo ! iloop
                             + c_mi(icol,k) + c_ss(icol,k)
              c_tot125(icol,k) = c_s4125(icol,k) + c_oc125(icol,k) + c_bc125(icol,k) &
                             + c_mi125(icol,k) + c_ss125(icol,k)
+             c_tot05(icol,k) = c_s405(icol,k) + c_oc05(icol,k) + c_bc05(icol,k) &
+                            + c_mi05(icol,k) + c_ss05(icol,k)
              c_pm25(icol,k)   = c_tot(icol,k) - c_tot125(icol,k)
+             c_pm1(icol,k)    = c_tot05(icol,k)
 !            mass mixing ratio:
              mmr_pm25(icol,k) = 1.e-9*c_pm25(icol,k)/rhoda(icol,k)   
+             mmr_pm1(icol,k)  = 1.e-9*c_pm1(icol,k)/rhoda(icol,k)   
 !akc6-
 
 !            converting from S to SO4 concentrations is no longer necessary, since 
@@ -2369,6 +2376,7 @@ enddo ! iloop
 !akc6+
         call outfld('PM2P5   ',c_pm25  ,pcols,lchnk)
         call outfld('MMRPM2P5',mmr_pm25,pcols,lchnk)
+        call outfld('MMRPM1  ',mmr_pm1 ,pcols,lchnk)
 !akc6-
 !       total (all r) dry concentrations (ug/m3) and loadings (mg/m2)
         call outfld('DLOAD_MI',dload_mi,pcols,lchnk)

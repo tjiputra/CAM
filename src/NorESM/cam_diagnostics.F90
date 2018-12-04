@@ -309,6 +309,9 @@ contains
 
     call addfld ('ATMEINT',    horiz_only,  'A', 'J/m2','Vertically integrated total atmospheric energy ')
 
+!akc6+  CNVCLD is zero... 
+!    call addfld ('CNVCLD',     horiz_only,  'A', 'fraction', 'Vertically integrated convective cloud cover')
+!akc6-
 
 
 #ifdef OSLO_AERO
@@ -399,6 +402,7 @@ contains
 !akc6+
       call addfld ('PM2P5   ',(/'lev'/), 'A','ug/m3   ','3D aerosol PM2.5')
       call addfld ('MMRPM2P5',(/'lev'/), 'A','kg/kg   ','3D aerosol PM2.5 mass mixing ratio')
+      call addfld ('MMRPM1  ',(/'lev'/), 'A','kg/kg   ','3D aerosol PM1.0 mass mixing ratio')
 !akc6-
       call addfld ('GRIDAREA',horiz_only, 'A','m2      ','Grid area for 1.9x2.5 horizontal resolution')
       call addfld ('DAERH2O ',horiz_only, 'A', 'mg/m2   ','Aerosol water load')
@@ -663,6 +667,10 @@ contains
       call add_default ('PTTEND'          , history_budget_histfile_num, ' ')
     end if
 
+!akc6+ CNVCLD is zero
+!   call add_default ('CNVCLD  ', 1, ' ')
+!akc6-
+
     ! create history variables for fourier coefficients of the diurnal
     ! and semidiurnal tide in T, U, V, and Z3
     call tidal_diag_init()
@@ -752,6 +760,7 @@ contains
 !akc6+
       call add_default ('PM2P5   ', 1, ' ')
       call add_default ('MMRPM2P5', 1, ' ')
+      call add_default ('MMRPM1  ', 1, ' ')
 !akc6-
       call add_default ('GRIDAREA', 1, ' ')
       call add_default ('DAERH2O ', 1, ' ')
