@@ -30,19 +30,21 @@ save
 ! Public interfaces
 
 public :: &
-   diag_readnl,        &! read namelist options
-   diag_register,      &! register pbuf space
-   diag_init,          &! initialization
-   diag_allocate,      &! allocate memory for module variables
-   diag_deallocate,    &! deallocate memory for module variables
-   diag_conv_tend_ini, &! initialize convective tendency calcs
-   diag_phys_writeout, &! output diagnostics of the dynamics
-   diag_phys_tend_writeout, & ! output physics tendencies
-   diag_state_b4_phys_write,& ! output state before physics execution
-   diag_conv,          &! output diagnostics of convective processes
-   diag_surf,          &! output diagnostics of the surface
-   diag_export,        &! output export state
-   diag_physvar_ic
+   diag_readnl,              &! read namelist options
+   diag_register,            &! register pbuf space
+   diag_init,                &! initialization
+   diag_allocate,            &! allocate memory for module variables
+   diag_deallocate,          &! deallocate memory for module variables
+   diag_conv_tend_ini,       &! initialize convective tendency calcs
+   diag_phys_writeout,       &! output diagnostics of the dynamics
+   diag_phys_tend_writeout,  &! output physics tendencies
+   diag_state_b4_phys_write, &! output state before physics execution
+   diag_conv,                &! output diagnostics of convective processes
+   diag_surf,                &! output diagnostics of the surface
+   diag_export,              &! output export state
+   diag_physvar_ic,          &
+   diag_phys_writeout_dry,   &! output diagnostics of the dynamics
+   nsurf
 
 
 ! Private data
@@ -74,7 +76,10 @@ logical          :: history_budget                 ! output tendencies and state
 integer          :: history_budget_histfile_num    ! output history file number for budget fields
 logical          :: history_waccm                  ! outputs typically used for WACCM
 
-!Physics buffer indices
+! Physics buffer indices
+
+integer  ::      psl_idx    = 0 
+integer  ::      relhum_idx = 0 
 integer  ::      qcwat_idx  = 0 
 integer  ::      tcwat_idx  = 0 
 integer  ::      lcwat_idx  = 0 
@@ -140,6 +145,9 @@ contains
 !==============================================================================
 
   subroutine diag_register_dry()
+
+    call pbuf_add_field('PSL', 'physpkg', dtype_r8, (/pcols/), psl_idx)
+
     ! Request physics buffer space for fields that persist across timesteps.
     call pbuf_add_field('T_TTEND', 'global', dtype_r8, (/pcols,pver,dyn_time_lvls/), t_ttend_idx)
   end subroutine diag_register_dry
@@ -362,6 +370,59 @@ contains
     ! and semidiurnal tide in T, U, V, and Z3
     call tidal_diag_init()
 
+    !
+    ! energy diagnostics
+    !
+    call addfld ('SE_pBF',   horiz_only, 'A', 'J/m2','Dry Static Energy before energy fixer')
+    call addfld ('SE_pBP',   horiz_only, 'A', 'J/m2','Dry Static Energy before parameterizations')
+    call addfld ('SE_pAP',   horiz_only, 'A', 'J/m2','Dry Static Energy after parameterizations')
+    call addfld ('SE_pAM',   horiz_only, 'A', 'J/m2','Dry Static Energy after dry mass correction')
+
+    call addfld ('KE_pBF',   horiz_only, 'A', 'J/m2','Kinetic Energy before energy fixer')
+    call addfld ('KE_pBP',   horiz_only, 'A', 'J/m2','Kinetic Energy before parameterizations')
+    call addfld ('KE_pAP',   horiz_only, 'A', 'J/m2','Kinetic Energy after parameterizations')
+    call addfld ('KE_pAM',   horiz_only, 'A', 'J/m2','Kinetic Energy after dry mass correction')
+
+    call addfld ('TT_pBF',   horiz_only, 'A', 'kg/m2','Total column test tracer before energy fixer')
+    call addfld ('TT_pBP',   horiz_only, 'A', 'kg/m2','Total column test tracer before parameterizations')
+    call addfld ('TT_pAP',   horiz_only, 'A', 'kg/m2','Total column test tracer after parameterizations')
+    call addfld ('TT_pAM',   horiz_only, 'A', 'kg/m2','Total column test tracer after dry mass correction')
+
+    call addfld ('WV_pBF',   horiz_only, 'A', 'kg/m2','Total column water vapor before energy fixer')
+    call addfld ('WV_pBP',   horiz_only, 'A', 'kg/m2','Total column water vapor before parameterizations')
+    call addfld ('WV_pAP',   horiz_only, 'A', 'kg/m2','Total column water vapor after parameterizations')
+    call addfld ('WV_pAM',   horiz_only, 'A', 'kg/m2','Total column water vapor after dry mass correction')
+
+    call addfld ('WL_pBF',   horiz_only, 'A', 'kg/m2','Total column cloud water before energy fixer')
+    call addfld ('WL_pBP',   horiz_only, 'A', 'kg/m2','Total column cloud water before parameterizations')
+    call addfld ('WL_pAP',   horiz_only, 'A', 'kg/m2','Total column cloud water after parameterizations')
+    call addfld ('WL_pAM',   horiz_only, 'A', 'kg/m2','Total column cloud water after dry mass correction')
+
+    call addfld ('WI_pBF',   horiz_only, 'A', 'kg/m2','Total column cloud ice before energy fixer')
+    call addfld ('WI_pBP',   horiz_only, 'A', 'kg/m2','Total column cloud ice before parameterizations')
+    call addfld ('WI_pAP',   horiz_only, 'A', 'kg/m2','Total column cloud ice after parameterizations')
+    call addfld ('WI_pAM',   horiz_only, 'A', 'kg/m2','Total column cloud ice after dry mass correction')
+    !
+    ! Axial Angular Momentum diagnostics
+    !
+    call addfld ('MR_pBF',   horiz_only, 'A', 'kg*m2/s*rad2',&
+    'Total column wind axial angular momentum before energy fixer')
+    call addfld ('MR_pBP',   horiz_only, 'A', 'kg*m2/s*rad2',&
+    'Total column wind axial angular momentum before parameterizations')
+    call addfld ('MR_pAP',   horiz_only, 'A', 'kg*m2/s*rad2',&
+         'Total column wind axial angular momentum after parameterizations')
+    call addfld ('MR_pAM',   horiz_only, 'A', 'kg*m2/s*rad2',&
+         'Total column wind axial angular momentum after dry mass correction')
+
+    call addfld ('MO_pBF',   horiz_only, 'A', 'kg*m2/s*rad2',&
+    'Total column mass axial angular momentum before energy fixer')
+    call addfld ('MO_pBP',   horiz_only, 'A', 'kg*m2/s*rad2',&
+    'Total column mass axial angular momentum before parameterizations')
+    call addfld ('MO_pAP',   horiz_only, 'A', 'kg*m2/s*rad2',&
+         'Total column mass axial angular momentum after parameterizations')
+    call addfld ('MO_pAM',   horiz_only, 'A', 'kg*m2/s*rad2',&
+         'Total column mass axial angular momentum after dry mass correction')
+
   end subroutine diag_init_dry
 
   subroutine diag_init_moist(pbuf2d)
@@ -407,7 +468,7 @@ contains
 
     call addfld ('PSDRY',      horiz_only,  'A', 'Pa', 'Dry surface pressure')
     call addfld ('PMID',       (/ 'lev' /), 'A', 'Pa', 'Pressure at layer midpoints')
-    call addfld ('PDELDRY',    (/ 'lev' /), 'A','Pa','Dry pressure difference between levels')
+    call addfld ('PDELDRY',    (/ 'lev' /), 'A', 'Pa', 'Dry pressure difference between levels')
 
     ! outfld calls in diag_conv
 
@@ -464,71 +525,25 @@ contains
     call addfld ('ALDIR',    horiz_only, 'A', '1','albedo: longwave, direct')
     call addfld ('ALDIF',    horiz_only, 'A', '1','albedo: longwave, diffuse')
     call addfld ('SST',      horiz_only, 'A', 'K','sea surface temperature')
-    !
-    ! energy diagnostics
-    !
-    call addfld ('SE_pBF',   horiz_only, 'A', 'J/m2','Dry Static Energy before energy fixer')
-    call addfld ('SE_pBP',   horiz_only, 'A', 'J/m2','Dry Static Energy before parameterizations')
-    call addfld ('SE_pAP',   horiz_only, 'A', 'J/m2','Dry Static Energy after parameterizations')
-    call addfld ('SE_pAM',   horiz_only, 'A', 'J/m2','Dry Static Energy after dry mass correction')
 
-    call addfld ('KE_pBF',   horiz_only, 'A', 'J/m2','Kinetic Energy before energy fixer')
-    call addfld ('KE_pBP',   horiz_only, 'A', 'J/m2','Kinetic Energy before parameterizations')
-    call addfld ('KE_pAP',   horiz_only, 'A', 'J/m2','Kinetic Energy after parameterizations')
-    call addfld ('KE_pAM',   horiz_only, 'A', 'J/m2','Kinetic Energy after dry mass correction')
-
-    call addfld ('TT_pBF',   horiz_only, 'A', 'kg/m2','Total column test tracer before energy fixer')
-    call addfld ('TT_pBP',   horiz_only, 'A', 'kg/m2','Total column test tracer before parameterizations')
-    call addfld ('TT_pAP',   horiz_only, 'A', 'kg/m2','Total column test tracer after parameterizations')
-    call addfld ('TT_pAM',   horiz_only, 'A', 'kg/m2','Total column test tracer after dry mass correction')
-
-    call addfld ('WV_pBF',   horiz_only, 'A', 'kg/m2','Total column water vapor before energy fixer')
-    call addfld ('WV_pBP',   horiz_only, 'A', 'kg/m2','Total column water vapor before parameterizations')
-    call addfld ('WV_pAP',   horiz_only, 'A', 'kg/m2','Total column water vapor after parameterizations')
-    call addfld ('WV_pAM',   horiz_only, 'A', 'kg/m2','Total column water vapor after dry mass correction')
-
-    call addfld ('WL_pBF',   horiz_only, 'A', 'kg/m2','Total column cloud water before energy fixer')
-    call addfld ('WL_pBP',   horiz_only, 'A', 'kg/m2','Total column cloud water before parameterizations')
-    call addfld ('WL_pAP',   horiz_only, 'A', 'kg/m2','Total column cloud water after parameterizations')
-    call addfld ('WL_pAM',   horiz_only, 'A', 'kg/m2','Total column cloud water after dry mass correction')
-
-    call addfld ('WI_pBF',   horiz_only, 'A', 'kg/m2','Total column cloud ice before energy fixer')
-    call addfld ('WI_pBP',   horiz_only, 'A', 'kg/m2','Total column cloud ice before parameterizations')
-    call addfld ('WI_pAP',   horiz_only, 'A', 'kg/m2','Total column cloud ice after parameterizations')
-    call addfld ('WI_pAM',   horiz_only, 'A', 'kg/m2','Total column cloud ice after dry mass correction')
-    !
-    ! Axial Angular Momentum diagnostics
-    !
-    call addfld ('MR_pBF',   horiz_only, 'A', 'kg*m2/s*rad2',&
-    'Total column wind axial angular momentum before energy fixer')
-    call addfld ('MR_pBP',   horiz_only, 'A', 'kg*m2/s*rad2',&
-    'Total column wind axial angular momentum before parameterizations')
-    call addfld ('MR_pAP',   horiz_only, 'A', 'kg*m2/s*rad2',&
-         'Total column wind axial angular momentum after parameterizations')
-    call addfld ('MR_pAM',   horiz_only, 'A', 'kg*m2/s*rad2',&
-         'Total column wind axial angular momentum after dry mass correction')
-
-    call addfld ('MO_pBF',   horiz_only, 'A', 'kg*m2/s*rad2',&
-    'Total column mass axial angular momentum before energy fixer')
-    call addfld ('MO_pBP',   horiz_only, 'A', 'kg*m2/s*rad2',&
-    'Total column mass axial angular momentum before parameterizations')
-    call addfld ('MO_pAP',   horiz_only, 'A', 'kg*m2/s*rad2',&
-         'Total column mass axial angular momentum after parameterizations')
-    call addfld ('MO_pAM',   horiz_only, 'A', 'kg*m2/s*rad2',&
-         'Total column mass axial angular momentum after dry mass correction')
 
     ! outfld calls in diag_phys_tend_writeout
 
     call addfld (ptendnam(       1),(/ 'lev' /), 'A', 'kg/kg/s',trim(cnst_name(       1))//' total physics tendency '      )
-    call addfld (ptendnam(ixcldliq),(/ 'lev' /), 'A', 'kg/kg/s',trim(cnst_name(ixcldliq))//' total physics tendency '      )
+
+    if (ixcldliq > 0) then
+       call addfld (ptendnam(ixcldliq),(/ 'lev' /), 'A', 'kg/kg/s',trim(cnst_name(ixcldliq))//' total physics tendency '      )
+    end if
     if (ixcldice > 0) then
       call addfld (ptendnam(ixcldice),(/ 'lev' /), 'A', 'kg/kg/s',trim(cnst_name(ixcldice))//' total physics tendency ')
     end if
     if ( dycore_is('LR') )then
       call addfld (dmetendnam(       1),(/ 'lev' /), 'A','kg/kg/s', &
            trim(cnst_name(       1))//' dme adjustment tendency (FV) ')
-      call addfld (dmetendnam(ixcldliq),(/ 'lev' /), 'A','kg/kg/s', &
-           trim(cnst_name(ixcldliq))//' dme adjustment tendency (FV) ')
+      if (ixcldliq > 0) then
+         call addfld (dmetendnam(ixcldliq),(/ 'lev' /), 'A','kg/kg/s', &
+            trim(cnst_name(ixcldliq))//' dme adjustment tendency (FV) ')
+      end if
       if (ixcldice > 0) then
         call addfld (dmetendnam(ixcldice),(/ 'lev' /), 'A','kg/kg/s', &
              trim(cnst_name(ixcldice))//' dme adjustment tendency (FV) ')
@@ -598,9 +613,9 @@ contains
     end if
 
     if (dycore_is('SE')) then
-       call add_default ('PSDRY', 1, ' ')
-       call add_default ('PMID',  1, ' ')
-    end if
+      call add_default ('PSDRY', 1, ' ')
+      call add_default ('PMID',  1, ' ')
+   end if
 
     if (history_eddy) then
       call add_default ('VQ      ', 1, ' ')
@@ -610,13 +625,17 @@ contains
       call add_default (cnst_name(1), history_budget_histfile_num, ' ')
       call add_default ('PTTEND'          , history_budget_histfile_num, ' ')
       call add_default (ptendnam(       1), history_budget_histfile_num, ' ')
-      call add_default (ptendnam(ixcldliq), history_budget_histfile_num, ' ')
+      if (ixcldliq > 0) then
+         call add_default (ptendnam(ixcldliq), history_budget_histfile_num, ' ')
+      end if
       if (ixcldice > 0) then
         call add_default (ptendnam(ixcldice), history_budget_histfile_num, ' ')
       end if
       if ( dycore_is('LR') )then
         call add_default(dmetendnam(1)       , history_budget_histfile_num, ' ')
-        call add_default(dmetendnam(ixcldliq), history_budget_histfile_num, ' ')
+        if (ixcldliq > 0) then
+           call add_default(dmetendnam(ixcldliq), history_budget_histfile_num, ' ')
+        end if
         if (ixcldice > 0) then
           call add_default(dmetendnam(ixcldice), history_budget_histfile_num, ' ')
         end if
@@ -683,6 +702,7 @@ contains
     end if
 
     ! Pbuf field indices for collecting output data
+    relhum_idx = pbuf_get_index('RELHUM',  errcode=ierr)
     qcwat_idx  = pbuf_get_index('QCWAT',  errcode=ierr)
     tcwat_idx  = pbuf_get_index('TCWAT',  errcode=ierr)
     lcwat_idx  = pbuf_get_index('LCWAT',  errcode=ierr)
@@ -883,7 +903,7 @@ contains
 
 !===============================================================================
 
-  subroutine diag_phys_writeout_dry(state, p_surf_t, psl)
+  subroutine diag_phys_writeout_dry(state, pbuf, p_surf_t)
 
     !-----------------------------------------------------------------------
     !
@@ -894,7 +914,6 @@ contains
     use time_manager,       only: get_nstep
     use interpolate_data,   only: vertinterp
     use constituent_burden, only: constituent_burden_comp
-    use cam_control_mod,    only: moist_physics
     use co2_cycle,          only: c_i, co2_transport
 
     use tidal_diag,         only: tidal_diag_write
@@ -903,15 +922,14 @@ contains
     ! Arguments
     !
     type(physics_state), intent(inout) :: state
+    type(physics_buffer_desc), pointer :: pbuf(:)
     real(r8),            intent(out)   :: p_surf_t(pcols, nsurf)  ! data interpolated to a pressure surface
-    real(r8), optional , intent(out)   :: psl(pcols)
     !
     !---------------------------Local workspace-----------------------------
     !
     real(r8) :: ftem(pcols,pver)  ! temporary workspace
     real(r8) :: ftem1(pcols,pver) ! another temporary workspace
     real(r8) :: ftem2(pcols,pver) ! another temporary workspace
-    real(r8) :: psl_tmp(pcols)    ! Sea Level Pressure
     real(r8) :: z3(pcols,pver)    ! geo-potential height
     real(r8) :: p_surf(pcols)     ! data interpolated to a pressure surface
     real(r8) :: tem2(pcols,pver)  ! temporary workspace
@@ -919,7 +937,8 @@ contains
     real(r8) :: esl(pcols,pver)   ! saturation vapor pressures
     real(r8) :: esi(pcols,pver)   !
     real(r8) :: dlon(pcols)       ! width of grid cell (meters)
-    integer  :: plon              ! number of longitudes
+
+    real(r8), pointer :: psl(:)   ! Sea Level Pressure
 
     integer  :: i, k, m, lchnk, ncol, nstep
     !
@@ -1053,17 +1072,12 @@ contains
       call vertinterp(ncol, pcols, pver, state%pmid, 50000._r8, state%omega, p_surf)
       call outfld('OMEGA500', p_surf, pcols, lchnk)
     end if
-    !
+
     ! Sea level pressure
-    !
-    if (present(psl) .or. hist_fld_active('PSL')) then
-      call cpslec (ncol, state%pmid, state%phis, state%ps, state%t,psl_tmp, gravit, rair)
-      call outfld ('PSL     ',psl_tmp  ,pcols, lchnk     )
-      if (present(psl)) then	
-        psl(:ncol) = psl_tmp(:ncol)
-      end if
-    end if
-    !
+    call pbuf_get_field(pbuf, psl_idx, psl)
+    call cpslec(ncol, state%pmid, state%phis, state%ps, state%t, psl, gravit, rair)
+    call outfld('PSL', psl, pcols, lchnk)
+
     ! Output T,u,v fields on pressure surfaces
     !
     if (hist_fld_active('T850')) then
@@ -1226,23 +1240,24 @@ contains
 
 !===============================================================================
 
-  subroutine diag_phys_writeout_moist(state, p_surf_t)
+  subroutine diag_phys_writeout_moist(state, pbuf, p_surf_t)
 
     !-----------------------------------------------------------------------
     !
     ! Purpose: record dynamics variables on physics grid
     !
     !-----------------------------------------------------------------------
-    use physconst,          only: gravit, rga, rair, cpair, latvap, rearth, pi, cappa
+    use physconst,          only: gravit, rga, rair, cpair, latvap, rearth, pi, cappa, &
+                                  epsilo, rh2o
     use interpolate_data,   only: vertinterp
     use constituent_burden, only: constituent_burden_comp
-    use cam_control_mod,    only: moist_physics
     use co2_cycle,          only: c_i, co2_transport
     !-----------------------------------------------------------------------
     !
     ! Arguments
     !
     type(physics_state), intent(inout) :: state
+    type(physics_buffer_desc), pointer :: pbuf(:)
     real(r8),            intent(inout) :: p_surf_t(pcols, nsurf)  ! data interpolated to a pressure surface
     !
     !---------------------------Local workspace-----------------------------
@@ -1257,8 +1272,8 @@ contains
     real(r8) :: tem2(pcols,pver) ! temporary workspace
     real(r8) :: esl(pcols,pver)   ! saturation vapor pressures
     real(r8) :: esi(pcols,pver)   !
-    real(r8) :: dlon(pcols)      ! width of grid cell (meters)
-    integer ::  plon             ! number of longitudes
+
+    real(r8), pointer :: ftem_ptr(:,:)
 
     integer :: i, k, m, lchnk, ncol
     !
@@ -1278,7 +1293,7 @@ contains
 
     call outfld('PSDRY',   state%psdry,   pcols, lchnk)
     call outfld('PMID',    state%pmid,    pcols, lchnk)
-    call outfld('PDELDRY ',state%pdeldry, pcols, lchnk)
+    call outfld('PDELDRY', state%pdeldry, pcols, lchnk)
 
     !
     ! Meridional advection fields
@@ -1305,10 +1320,15 @@ contains
 
     ! Relative humidity
     if (hist_fld_active('RELHUM')) then
-      call qsat(state%t(:ncol,:), state%pmid(:ncol,:), &
-           tem2(:ncol,:), ftem(:ncol,:))
-      ftem(:ncol,:) = state%q(:ncol,:,1)/ftem(:ncol,:)*100._r8
-      call outfld ('RELHUM  ',ftem    ,pcols   ,lchnk     )
+       if (relhum_idx > 0) then
+          call pbuf_get_field(pbuf, relhum_idx, ftem_ptr)
+          ftem(:ncol,:) = ftem_ptr(:ncol,:)
+       else
+          call qsat(state%t(:ncol,:), state%pmid(:ncol,:), &
+                    tem2(:ncol,:), ftem(:ncol,:))
+          ftem(:ncol,:) = state%q(:ncol,:,1)/ftem(:ncol,:)*100._r8
+       end if
+       call outfld ('RELHUM  ',ftem    ,pcols   ,lchnk     )
     end if
 
     if (hist_fld_active('RHW') .or. hist_fld_active('RHI') .or. hist_fld_active('RHCFMIP') ) then
@@ -1457,24 +1477,26 @@ contains
 
 !===============================================================================
 
-  subroutine diag_phys_writeout(state, psl)
+  subroutine diag_phys_writeout(state, pbuf)
 
     !-----------------------------------------------------------------------
     !
     ! Arguments
     !
     type(physics_state), intent(inout) :: state
-    real(r8), optional , intent(out)   :: psl(pcols)
+    type(physics_buffer_desc), pointer :: pbuf(:)
 
     !
     ! Local variable
     !
     real(r8) :: p_surf_t(pcols, nsurf)  ! data interpolated to a pressure surface
 
-    call diag_phys_writeout_dry(state, p_surf_t, psl)
+    call diag_phys_writeout_dry(state, pbuf, p_surf_t)
+
     if (moist_physics) then
-      call diag_phys_writeout_moist(state, p_surf_t)
+      call diag_phys_writeout_moist(state, pbuf, p_surf_t)
     end if
+
   end subroutine diag_phys_writeout
 
 !===============================================================================
@@ -1964,7 +1986,7 @@ contains
     integer  :: ncol              ! number of columns in chunk
     real(r8) :: ftem2(pcols)      ! Temporary workspace for outfld variables
     real(r8) :: ftem3(pcols,pver) ! Temporary workspace for outfld variables
-    real(r8) :: heat_glob         ! T-tend from fixer (FV only)
+    real(r8) :: heat_glob         ! tht: T-tend from fixer (FV only)
     real(r8) :: tedif_glob        !+tht energy flux from fixer (FV only)
     ! CAM pointers to get variables from the physics buffer
     real(r8), pointer, dimension(:,:) :: t_ttend

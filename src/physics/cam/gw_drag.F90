@@ -29,7 +29,7 @@ module gw_drag
   use cam_logfile,    only: iulog
   use cam_abortutils, only: endrun
 
-  use ref_pres,       only: do_molec_diff, nbot_molec
+  use ref_pres,       only: do_molec_diff, nbot_molec, press_lim_idx
   use physconst,      only: cpair
 
   ! These are the actual switches for different gravity wave sources.
@@ -189,6 +189,9 @@ module gw_drag
   real(r8) :: gw_prndl = 0.25_r8
   real(r8) :: gw_qbo_hdepth_scaling = 1._r8 ! heating depth scaling factor
 
+  logical :: gw_top_taper=.false.
+  real(r8), pointer :: vramp(:)=>null()
+
 !==========================================================================
 contains
 !==========================================================================
@@ -228,7 +231,8 @@ subroutine gw_drag_readnl(nlfile)
        use_gw_rdg_gamma, n_rdg_gamma, effgw_rdg_gamma, effgw_rdg_gamma_max, &
        rdg_gamma_cd_llb, trpd_leewv_rdg_gamma, bnd_rdggm, &
        gw_oro_south_fac, gw_limit_tau_without_eff, &
-       gw_lndscl_sgh, gw_prndl, gw_apply_tndmax, gw_qbo_hdepth_scaling
+       gw_lndscl_sgh, gw_prndl, gw_apply_tndmax, gw_qbo_hdepth_scaling, &
+       gw_top_taper
   !----------------------------------------------------------------------
 
   if (use_simple_phys) return
@@ -313,6 +317,10 @@ subroutine gw_drag_readnl(nlfile)
   if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: gw_limit_tau_without_eff")
   call mpi_bcast(gw_apply_tndmax, 1, mpi_logical, mstrid, mpicom, ierr)
   if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: gw_apply_tndmax")
+
+  call mpi_bcast(gw_top_taper, 1, mpi_logical, mstrid, mpicom, ierr)
+  if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: gw_top_taper")
+
   call mpi_bcast(gw_lndscl_sgh, 1, mpi_logical, mstrid, mpicom, ierr)
   if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: gw_lndscl_sgh")
   call mpi_bcast(gw_prndl, 1, mpi_real8, mstrid, mpicom, ierr)
@@ -379,7 +387,7 @@ subroutine gw_init()
   use ncdio_atm,        only: infld
   use ioFileMod,        only: getfil
 
-  use ref_pres,   only: pref_edge
+  use ref_pres,   only: pref_edge, pref_mid
   use physconst,  only: gravit, rair, rearth
 
   use gw_common,  only: gw_common_init
@@ -466,6 +474,9 @@ subroutine gw_init()
 
   ! temporary workaround for restart w/ ridge scheme
   character(len=256) :: bnd_topo_loc   ! filepath of topo file on local disk
+
+  integer :: botndx,topndx
+
   !-----------------------------------------------------------------------
 
   if (do_molec_diff) then
@@ -978,6 +989,24 @@ subroutine gw_init()
   call cnst_get_ind("CLDLIQ", ixcldliq)
   call cnst_get_ind("CLDICE", ixcldice)
 
+  if (gw_top_taper) then
+     allocate(vramp(pver))
+     vramp(:) = 1._r8
+     topndx = 1
+     botndx = press_lim_idx( 0.6E-02_r8, top=.true. )
+     if (botndx>1) then
+        do k=botndx,topndx,-1
+           vramp(k) = vramp(k+1)/(pref_edge(k+1)/pref_edge(k))
+        end do
+        if (masterproc) then
+           write(iulog,'(A)') 'GW taper coef (vramp):'
+           do k=1,pver
+              write(iulog,"('k: ',I4,' taper coef,press(Pa): ',F12.8,E12.4)") k, vramp(k), pref_mid(k)
+           enddo
+        endif
+     endif
+  end if
+
 end subroutine gw_init
 
 !==========================================================================
@@ -1383,7 +1412,7 @@ subroutine gw_tend(state, pbuf, dt, ptend, cam_in, flx_heat)
 
      ! Solve for the drag profile with Beres source spectrum.
      call gw_drag_prof(ncol, band_mid, p, src_level, tend_level, dt, &
-          t,    &
+          t, vramp,    &
           piln, rhoi,       nm,   ni, ubm,  ubi,  xv,    yv,   &
           effgw,   c,       kvtt, q,  dse,  tau,  utgw,  vtgw, &
           ttgw, qtgw, egwdffi,  gwut, dttdf, dttke,            &
@@ -1468,7 +1497,7 @@ subroutine gw_tend(state, pbuf, dt, ptend, cam_in, flx_heat)
 
      ! Solve for the drag profile with Beres source spectrum.
      call gw_drag_prof(ncol, band_mid, p, src_level, tend_level,  dt, &
-          t,    &
+          t, vramp,    &
           piln, rhoi,       nm,   ni, ubm,  ubi,  xv,    yv,   &
           effgw,   c,       kvtt, q,  dse,  tau,  utgw,  vtgw, &
           ttgw, qtgw, egwdffi,  gwut, dttdf, dttke,            &
@@ -1553,7 +1582,7 @@ subroutine gw_tend(state, pbuf, dt, ptend, cam_in, flx_heat)
 
      ! Solve for the drag profile with C&M source spectrum.
      call gw_drag_prof(ncol, band_mid, p, src_level, tend_level,  dt, &
-          t,    &
+          t, vramp,   &
           piln, rhoi,       nm,   ni, ubm,  ubi,  xv,    yv,   &
           effgw,   c,       kvtt, q,  dse,  tau,  utgw,  vtgw, &
           ttgw, qtgw, egwdffi,  gwut, dttdf, dttke,            &
@@ -1640,7 +1669,7 @@ subroutine gw_tend(state, pbuf, dt, ptend, cam_in, flx_heat)
 
      ! Solve for the drag profile with C&M source spectrum.
      call gw_drag_prof(ncol, band_long, p, src_level, tend_level,  dt, &
-          t,    &
+          t, vramp,    &
           piln, rhoi,       nm,   ni, ubm,  ubi,  xv,    yv,   &
           effgw,   c,       kvtt, q,  dse,  tau,  utgw,  vtgw, &
           ttgw, qtgw, egwdffi,  gwut, dttdf, dttke, ro_adjust=ro_adjust, &
@@ -1735,7 +1764,7 @@ subroutine gw_tend(state, pbuf, dt, ptend, cam_in, flx_heat)
 
      ! Solve for the drag profile with orographic sources.
      call gw_drag_prof(ncol, band_oro, p, src_level, tend_level,   dt,   &
-          t,    &
+          t, vramp,   &
           piln, rhoi,       nm,   ni, ubm,  ubi,  xv,    yv,   &
           effgw,c,          kvtt, q,  dse,  tau,  utgw,  vtgw, &
           ttgw, qtgw, egwdffi,  gwut, dttdf, dttke,            &
@@ -2014,6 +2043,7 @@ subroutine gw_rdg_calc( &
    ! U,V tendency accumulators
    real(r8) :: utrdg(ncol,pver)
    real(r8) :: vtrdg(ncol,pver)
+   real(r8) :: ttrdg(ncol,pver)
 
    ! Energy change used by fixer.
    real(r8) :: de(ncol)
@@ -2030,6 +2060,7 @@ subroutine gw_rdg_calc( &
    ! initialize accumulated momentum fluxes and tendencies
    taurx = 0._r8
    taury = 0._r8 
+   ttrdg = 0._r8
    utrdg = 0._r8
    vtrdg = 0._r8
 
@@ -2059,7 +2090,7 @@ subroutine gw_rdg_calc( &
          ldo_trapped_waves=trpd_leewv)
      
       call gw_drag_prof(ncol, band_oro, p, src_level, tend_level, dt, &
-         t,    &
+         t, vramp,    &
          piln, rhoi, nm, ni, ubm, ubi, xv, yv,   &
          effgw, c, kvtt, q, dse, tau, utgw, vtgw, &
          ttgw, qtgw, egwdffi,   gwut, dttdf, dttke, &
@@ -2071,6 +2102,7 @@ subroutine gw_rdg_calc( &
          ! diagnostics
          utrdg(:,k) = utrdg(:,k) + utgw(:,k)
          vtrdg(:,k) = vtrdg(:,k) + vtgw(:,k)
+         ttrdg(:,k) = ttrdg(:,k) + ttgw(:,k)
          ! physics tendencies
          ptend%u(:ncol,k) = ptend%u(:ncol,k) + utgw(:,k)
          ptend%v(:ncol,k) = ptend%v(:ncol,k) + vtgw(:,k)
@@ -2133,6 +2165,7 @@ subroutine gw_rdg_calc( &
    call outfld(fname(2), taury(:,pver+1), ncol, lchnk)
    call outfld(fname(3), utrdg,  ncol, lchnk)
    call outfld(fname(4), vtrdg,  ncol, lchnk)
+   call outfld('TTGWORO', ttrdg / cpair,  ncol, lchnk)
 
    deallocate(tau, gwut, c)
 
