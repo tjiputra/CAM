@@ -388,8 +388,7 @@ contains
 
           call addfld( wetdep_name(m), horiz_only,  'A', 'kg/s', spc_name//' wet deposition' )
           call addfld( wtrate_name(m), (/ 'lev' /), 'A',   '/s', spc_name//' wet deposition rate' )
-          
-       endif 
+       endif
 
 #if defined OSLO_AERO
        wetdep_name_area(m)='WD_A_'//trim(spc_name)
@@ -1005,7 +1004,6 @@ contains
     use phys_grid,    only : get_wght_all_p
 #else
     use phys_grid,    only : get_wght_all_p, get_area_all_p
-    use mo_neu_wetdep, only: do_neu_wetdep
 #endif
     implicit none
 

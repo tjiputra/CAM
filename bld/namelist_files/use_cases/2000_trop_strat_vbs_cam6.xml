@@ -38,8 +38,9 @@
   'num_a4 -> $INPUTDATA_ROOT/atm/cam/chem/emis/CMIP6_emissions_2000climo/emissions-cmip6_num_bc_a4_aircraft_vertical_2000climo_0.9x1.25_c20170322.nc',
   'NO2    -> $INPUTDATA_ROOT/atm/cam/chem/emis/CMIP6_emissions_2000climo/emissions-cmip6_NO2_aircraft_vertical_2000climo_0.9x1.25_c20170322.nc',
   'SVOC   -> $INPUTDATA_ROOT/atm/cam/chem/emis/CMIP6_emissions_2000climo/emissions-cmip6_SVOC_bb_vertical_2000climo_0.9x1.25_c20170322.nc',
-  'SO2    -> $INPUTDATA_ROOT/atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_SO2_contvolcano_vertical_850-5000_0.9x1.25_c20170724.nc'
+  'SO2    -> $INPUTDATA_ROOT/atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_SO2_contvolcano_vertical_850-5000_0.9x1.25_c20170724.nc',
   'SO2    -> $INPUTDATA_ROOT/atm/cam/chem/emis/CMIP6_emissions_2000climo/emissions-cmip6_SO2_aircraft_vertical_2000climo_0.9x1.25_c20170322.nc',
+  'SO2    -> $INPUTDATA_ROOT/atm/cam/chem/stratvolc/VolcanEESMv3.10_SO2_1995-2005average_1deg_ZeroTrop_c180912.nc'
 </ext_frc_specifier>
 
 <srf_emis_type>CYCLICAL</srf_emis_type>
@@ -127,6 +128,8 @@
   'so4_a1 -> $INPUTDATA_ROOT/atm/cam/chem/emis/CMIP6_emissions_2000climo/emissions-cmip6_so4_a1_bb_surface_2000climo_0.9x1.25_c20170322.nc',
   'so4_a2 -> $INPUTDATA_ROOT/atm/cam/chem/emis/CMIP6_emissions_2000climo/emissions-cmip6_so4_a2_anthro-res_surface_2000climo_0.9x1.25_c20170616.nc'
 </srf_emis_specifier>
+
+<ndep_list>'noy', 'nhx'</ndep_list>
 
 <!-- History Files -->
 
@@ -241,7 +244,7 @@
          'soa3_a1_CHMP', 'soa4_a1_CHMP', 'soa5_a1_CHMP', 'soa1_a2_CHMP', 'soa2_a2_CHMP', 'soa3_a2_CHMP', 'soa4_a2_CHMP', 'soa5_a2_CHMP', 'r_jsoa1_a1',
          'r_jsoa2_a1', 'r_jsoa3_a1', 'r_jsoa4_a1', 'r_jsoa5_a1', 'r_jsoa1_a2', 'r_jsoa2_a2', 'r_jsoa3_a2', 'r_jsoa4_a2', 'r_jsoa5_a2',
          'r_GLYOXAL_aer', 'H2SO4_sfnnuc1', 'num_a2_sfnnuc1', 'TMOCS', 'TMSO2', 'TMDMS', 'TMso4_a1', 'TMso4_a2', 'TMso4_a3',
-         'BURDENDUSTdn', 'BURDENPOMdn', 'BURDENSO4dn', 'BURDENSOAdn', 'BURDENSEASALTdn','BURDENBCdn'
+         'BURDENDUSTdn', 'BURDENPOMdn', 'BURDENSO4dn', 'BURDENSOAdn', 'BURDENSEASALTdn','BURDENBCdn', 'PM25'
 </fincl1>
 
 <rxn_rate_sums>

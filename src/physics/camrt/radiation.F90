@@ -856,13 +856,13 @@ subroutine radiation_tend( &
 
    character(*), parameter :: name = 'radiation_tend'
 
-   logical, parameter :: cosz_rad_call=.true. !+tht
-
    ! tropopause diagnostic
    integer :: troplev(pcols)
    real(r8):: p_trop(pcols)
 
    logical :: write_output ! switch for outfld calls
+
+   logical, parameter :: cosz_rad_call=.true. !+tht
    !----------------------------------------------------------------------
 
    lchnk = state%lchnk
@@ -904,7 +904,7 @@ subroutine radiation_tend( &
    ! Cosine solar zenith angle for current time step
    call get_rlat_all_p(lchnk, ncol, clat)
    call get_rlon_all_p(lchnk, ncol, clon)
-   call zenith (calday, clat, clon, coszrs, ncol, dt_avg, cosz_rad_call)
+   call zenith (calday, clat, clon, coszrs, ncol, dt_avg, cosz_rad_call) !+tht
 
    ! Gather night/day column indices.
    Nday = 0

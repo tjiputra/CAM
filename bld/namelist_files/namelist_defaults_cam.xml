@@ -85,13 +85,6 @@
 <ncdata dyn="fv" hgrid="4x5"     nlev="30" chem="trop_strat_mam4_vbs" ic_ymd="101" >atm/cam/inic/fv/trop_strat_mam3_chem_2000-01-01_4x5_L30_c121015.nc</ncdata>
 <ncdata dyn="fv" hgrid="1.9x2.5" nlev="30" chem="trop_strat_mam4_vbs" ic_ymd="101" >atm/cam/inic/fv/trop_strat_mam3_chem_2000-01-01_1.9x2.5_L30_c121015.nc</ncdata>
 
-<ncdata dyn="fv" hgrid="10x15"   nlev="26" chem="super_fast_llnl" ic_ymd="101" >atm/cam/inic/fv/camchemi_0012-01-01_10x15_L26_c081104.nc</ncdata>
-<ncdata dyn="fv" hgrid="10x15"   nlev="30" chem="super_fast_llnl" ic_ymd="101" >atm/cam/inic/fv/camchemi_0012-01-01_10x15_L30_c081104.nc</ncdata>
-<ncdata dyn="fv" hgrid="4x5"     nlev="26" chem="super_fast_llnl" ic_ymd="101" >atm/cam/inic/fv/camchemi_0012-01-01_4x5_L26_c081104.nc</ncdata>
-<ncdata dyn="fv" hgrid="4x5"     nlev="30" chem="super_fast_llnl" ic_ymd="101" >atm/cam/inic/fv/camchemi_0012-01-01_4x5_L30_c081104.nc</ncdata>
-<ncdata dyn="fv" hgrid="1.9x2.5" nlev="26" chem="super_fast_llnl" ic_ymd="101" >atm/cam/inic/fv/camchemi_0012-01-01_1.9x2.5_L26_c081104.nc</ncdata>
-<ncdata dyn="fv" hgrid="1.9x2.5" nlev="30" chem="super_fast_llnl" ic_ymd="101" >atm/cam/inic/fv/camchemi_0012-01-01_1.9x2.5_L30_c081104.nc</ncdata>
-
 <ncdata dyn="fv"  hgrid="4x5"       nlev="26"  chem="trop_mozart" ic_ymd="901" >atm/cam/chem/trop_mozart/ic/cami_0000-09-01_4x5_L26_c060217.nc</ncdata>
 <ncdata dyn="fv"  hgrid="10x15"     nlev="26"  chem="trop_mozart" ic_ymd="901" >atm/cam/chem/trop_mozart/ic/cami_0000-09-01_10x15_L26_c060216.nc</ncdata>
 
@@ -109,12 +102,11 @@
 <ncdata dyn="fv"  hgrid="10x15"     nlev="66"   ic_ymd="20000101" >atm/waccm/ic/cami_2000-01-01_10x15_L66_c041121.nc</ncdata>
 <ncdata dyn="fv"  hgrid="4x5"       nlev="66"  chem="waccm_ma_sulfur" ic_ymd="20000101">atm/waccm/ic/f40.2000.4deg.wcm.carma.sulf.004.cam2.i.0008-01-01-00000.nc</ncdata>
 <ncdata dyn="fv"  hgrid="1.9x2.5"   nlev="66"  chem="waccm_ma_sulfur" ic_ymd="20100101">atm/waccm/ic/f40.2deg.wcm.carma.sulf.L66.cam2.i.2010-01-01.nc</ncdata>
-<ncdata dyn="fv"  hgrid="10x15"     nlev="66"  chem="waccm_tsmlt_sulfur"  ic_ymd="20000101">atm/waccm/ic/f40.2000.10deg.wcm.carma.sulf.004.cam2.i.0008-01-01-00000.nc</ncdata>
-<ncdata dyn="fv"  hgrid="4x5"       nlev="66"  chem="waccm_tsmlt_sulfur"  ic_ymd="20000101">atm/waccm/ic/f40.2000.4deg.wcm.carma.sulf.004.cam2.i.0008-01-01-00000.nc</ncdata>
 <ncdata dyn="fv"  hgrid="1.9x2.5"   nlev="81"  waccmx="1"  ic_ymd="20000101" >atm/waccm/ic/WAX3548T08CO_2003top_f2000.waccm_0017bottom_L81_c110906.nc</ncdata>
 <ncdata dyn="fv"  hgrid="4x5"       nlev="81"  waccmx="1"  ic_ymd="20000101" >atm/waccm/ic/WAX3548T08CO_2003top_f2000.waccm_0017bottom_4x5_L81_c160630.nc</ncdata>
 <ncdata dyn="fv"  hgrid="10x15"     nlev="81"  waccmx="1"  ic_ymd="20000101" >atm/waccm/ic/WAX3548T08CO_2003top_f2000.waccm_0017bottom_10x15_L81_c141027.nc</ncdata>
 <ncdata dyn="fv"  hgrid="4x5"       nlev="126" waccmx="1"  ic_ymd="101" aquaplanet="1">atm/waccm/ic/waccmx_aqua_4x5_L126_c170705.nc</ncdata>
+<ncdata dyn="fv"  hgrid="0.9x1.25"  nlev="126" waccmx="1">atm/waccm/ic/fx2000_1deg.cam.i.0001-01-02-00000_c180712.nc</ncdata>
 
 <ncdata dyn="eul" hgrid="512x1024"  nlev="26"              ic_ymd="101" >atm/cam/inic/gaus/T341clim01.cam2.i.0024-01-01-00000.nc</ncdata>
 <ncdata dyn="eul" hgrid="256x512"   nlev="26"              ic_ymd="101" >atm/cam/inic/gaus/cami_0000-01-01_256x512_L26_c030918.nc</ncdata>
@@ -190,7 +182,8 @@
 <analytic_ic_type                   > none </analytic_ic_type>
 <analytic_ic_type phys="adiabatic"  > held_suarez_1994 </analytic_ic_type>
 <analytic_ic_type phys="held_suarez"> held_suarez_1994 </analytic_ic_type>
-<analytic_ic_type phys="kessler"    > baroclinic_wave </analytic_ic_type>
+<analytic_ic_type phys="kessler"    > moist_baroclinic_wave_dcmip2016 </analytic_ic_type>
+<analytic_ic_type phys="tj2016"     > moist_baroclinic_wave_dcmip2016 </analytic_ic_type>
 
 <!-- Bulk aerosol physical properties (includes optics) -->
 
@@ -276,7 +269,6 @@
 <!-- Eruptive volcanic aerosols  -->
 <VOLC_MMR                        rad="camrt">atm/cam/physprops/volc_camRT_byradius_sigma1.6_c130724.nc</VOLC_MMR>
 <VOLC_MMR chem="none"            rad="camrt">atm/cam/physprops/sulfuricacid_cam3_c080918.nc</VOLC_MMR>
-<VOLC_MMR chem="super_fast_llnl" rad="camrt">atm/cam/physprops/sulfuricacid_cam3_c080918.nc</VOLC_MMR>
 <VOLC_MMR rad="rrtmg">atm/cam/physprops/volc_camRRTMG_byradius_sigma1.6_c130724.nc</VOLC_MMR>
 <VOLC_MMR1 rad="rrtmg">atm/cam/physprops/volc_camRRTMG_byradius_sigma1.6_mode1_c170214.nc</VOLC_MMR1>
 <VOLC_MMR2 rad="rrtmg">atm/cam/physprops/volc_camRRTMG_byradius_sigma1.6_mode2_c170214.nc</VOLC_MMR2>
@@ -415,7 +407,16 @@
 <flbc_file>atm/waccm/lb/LBC_1765-2100_1.9x2.5_CCMI_RCP60_za_RNOCStrend_c141002.nc</flbc_file>
 
 <!-- Time-variant CO2 fossil fuel emissions -->
-<co2flux_fuel_file hgrid="0.9x1.25" sim_year="1850-2000">atm/cam/ggas/co2flux_fossil_1751-2006-monthly_0.9x1.25_c20100204.nc</co2flux_fuel_file>
+<co2flux_fuel_file hgrid="0.9x1.25" sim_year="1850-2000">atm/cam/ggas/emissions-cmip6_CO2_anthro_surface_175001-201512_fv_0.9x1.25_c20181011.nc</co2flux_fuel_file>
+<co2flux_fuel_file hgrid="1.9x2.5"  sim_year="1850-2000">atm/cam/ggas/emissions-cmip6_CO2_anthro_surface_175001-201512_fv_1.9x2.5_c20181011.nc</co2flux_fuel_file>
+
+<ac_CO2_emis hgrid="0.9x1.25">ac_CO2_filelist_175001-201512_fv_0.9x1.25_c20181011.txt</ac_CO2_emis>
+<ac_CO2_emis hgrid="1.9x2.5" >ac_CO2_filelist_175001-201512_fv_1.9x2.5_c20181011.txt</ac_CO2_emis>
+<aircraft_datapath >atm/cam/ggas</aircraft_datapath>
+<aircraft_type     >SERIAL</aircraft_type>
+<!-- These CO2 aircraft emission files are the same as in the aircraft_specifier file above (for cam.input_data_list) -->
+<aircraft_co2_file  hgrid="0.9x1.25">atm/cam/ggas/emissions-cmip6_CO2_anthro_ac_175001-201512_fv_0.9x1.25_c20181011.nc</aircraft_co2_file>
+<aircraft_co2_file  hgrid="1.9x2.5" >atm/cam/ggas/emissions-cmip6_CO2_anthro_ac_175001-201512_fv_1.9x2.5_c20181011.nc</aircraft_co2_file>
 
 <!-- DMS surface emissions -->
 <bndtvdms          hgrid="128x256"  >atm/cam/scyc/DMS_emissions_128x256_clim_c040122.nc</bndtvdms>
@@ -468,7 +469,7 @@
 <solar_parms_data_file phys="cam5" waccm_phys="1">atm/waccm/solar/wasolar_c140408.nc</solar_parms_data_file>
 <solar_parms_data_file             waccm_phys="1">atm/cam/solar/SolarForcing1995-2005avg_c160929.nc</solar_parms_data_file>
 
-<solar_wind_data_file>atm/waccm/solar/solar_wind_imf_OMNI_WACCMX_2000001-2016366_c170907.nc</solar_wind_data_file>
+<solar_wind_data_file>atm/waccm/solar/solar_wind_imf_OMNI_WACCMX_2000001-2017365_c180731.nc</solar_wind_data_file>
 
 <!-- nudged QBO  -->
 <qbo_forcing_file>atm/waccm/qbo/qbocyclic28months.nc</qbo_forcing_file>
@@ -493,12 +494,18 @@
 <gw_polar_taper>.false.</gw_polar_taper>
 <gw_polar_taper dyn="fv">.true.</gw_polar_taper>
 
+<gw_top_taper>.false.</gw_top_taper>
+<gw_top_taper waccmx="1">.true.</gw_top_taper>
+<pgwv>32</pgwv>
+<pgwv waccmx="1">18</pgwv>
+
 <!-- gravity wave settings -->
 <effgw_beres_dp>0.1D0</effgw_beres_dp>
 <effgw_beres_dp hgrid="0.9x1.25">0.4D0</effgw_beres_dp>
 <effgw_beres_dp waccm_phys="0">0.55D0</effgw_beres_dp>
 <effgw_beres_dp waccm_phys="1" hgrid="0.9x1.25">0.5D0</effgw_beres_dp>
 <effgw_beres_dp chem="trop_strat_mam4_vbs" hgrid="0.9x1.25">0.5D0</effgw_beres_dp>
+<effgw_beres_dp chem="trop_strat_mam4_vbsext" hgrid="0.9x1.25">0.5D0</effgw_beres_dp>
 <effgw_oro      nlev="60"     >0.0625D0</effgw_oro>
 
 <!-- setting for gravity waves from shallow convection. -->
@@ -510,18 +517,23 @@
 <gw_prndl                               >0.25d0 </gw_prndl>
 <gw_prndl                 waccm_phys="1">0.5d0  </gw_prndl>
 <gw_prndl     chem="trop_strat_mam4_vbs">0.5d0  </gw_prndl>
+<gw_prndl     chem="trop_strat_mam4_vbsext">0.5d0  </gw_prndl>
 <gw_oro_south_fac                       >1.d0   </gw_oro_south_fac>
 <gw_oro_south_fac         waccm_phys="1">2.d0   </gw_oro_south_fac>
 <gw_oro_south_fac chem="trop_strat_mam4_vbs">2.d0   </gw_oro_south_fac>
+<gw_oro_south_fac chem="trop_strat_mam4_vbsext">2.d0   </gw_oro_south_fac>
 <gw_lndscl_sgh                          >.true. </gw_lndscl_sgh>
 <gw_lndscl_sgh            waccm_phys="1">.false.</gw_lndscl_sgh>
 <gw_lndscl_sgh chem="trop_strat_mam4_vbs">.false.</gw_lndscl_sgh>
+<gw_lndscl_sgh chem="trop_strat_mam4_vbsext">.false.</gw_lndscl_sgh>
 <gw_limit_tau_without_eff               >.false.</gw_limit_tau_without_eff>
 <gw_limit_tau_without_eff waccm_phys="1">.true. </gw_limit_tau_without_eff>
 <gw_limit_tau_without_eff chem="trop_strat_mam4_vbs">.true. </gw_limit_tau_without_eff>
+<gw_limit_tau_without_eff chem="trop_strat_mam4_vbsext">.true. </gw_limit_tau_without_eff>
 <gw_apply_tndmax                        >.true. </gw_apply_tndmax>
 <gw_apply_tndmax          waccm_phys="1">.false.</gw_apply_tndmax>
 <gw_apply_tndmax chem="trop_strat_mam4_vbs">.false.</gw_apply_tndmax>
+<gw_apply_tndmax chem="trop_strat_mam4_vbsext">.false.</gw_apply_tndmax>
 
 <!-- gravity wave drag options -->
 <gw_rdg_do_divstream                    >.true.  </gw_rdg_do_divstream>
@@ -546,6 +558,8 @@
 <waccmx_opt waccmx="1" ionosphere="none">neutral</waccmx_opt>
 <ionos_epotential_model>heelis</ionos_epotential_model>
 <wei05_coefs_file>atm/waccm/efld/wei05sc_c080415.nc</wei05_coefs_file>
+<ionos_xport_nsplit waccmx="1">5</ionos_xport_nsplit>
+<ionos_xport_nsplit hgrid="0.9x1.25" waccmx="1">20</ionos_xport_nsplit>
 
 <!-- For scaling lightning sources of NOx -->
 <lght_no_prd_factor                                              >1.00D0</lght_no_prd_factor>
@@ -615,14 +629,6 @@
 <co_emis_file   chem="waccm_ma_sulfur">atm/cam/chem/1850-2000_emis/IPCC_emissions_houw_CO_1850-2000_1.9x2.5.c090728.nc</co_emis_file>
 <ch2o_emis_file chem="waccm_ma_sulfur">atm/cam/chem/1850-2000_emis/IPCC_emissions_houw_CH2O_1850-2000_1.9x2.5.c090728.nc</ch2o_emis_file>
 <so2_emis_file  chem="waccm_ma_sulfur">atm/cam/chem/1850-2000_emis/IPCC_emissions_houw_SO2_1850-2000_1.9x2.5.c090522.nc</so2_emis_file>
-
-<!-- super_fast Chemistry emissions -->
-<ch2o_emis_file	   chem="super_fast_llnl">atm/cam/chem/trop_mozart/emis/emissions.CH2O.surface.T42LR.nc</ch2o_emis_file>
-<co_emis_file      chem="super_fast_llnl">atm/cam/chem/trop_mozart/emis/emissions.CO.surface.T42LR.nc</co_emis_file>
-<dms_emis_file     chem="super_fast_llnl">atm/cam/chem/trop_mozart/emis/emissions.DMS.surface.T42LR.nc</dms_emis_file>
-<nox_emis_file     chem="super_fast_llnl">atm/cam/chem/trop_mozart/emis/emissions.NO.surface.T42LR.nc</nox_emis_file>
-<so2_emis_file     chem="super_fast_llnl">atm/cam/chem/trop_mozart/emis/emissions.SO2.surface.T42LR.nc</so2_emis_file>
-<isop_emis_file    chem="super_fast_llnl">atm/cam/chem/trop_mozart/emis/emissions.ISOP.surface.T42LR.nc</isop_emis_file>
 
 <!-- BAM and MAM aerosol emissions -->
 <dms_emis_bam      >atm/cam/chem/trop_mozart_aero/emis/aerocom_DMS_2000.c080417.nc</dms_emis_bam>
@@ -710,9 +716,9 @@
 <BENZENE_an_srf_file  ver="cam6">atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_BENZENE_anthro_surface_1750-2015_0.9x1.25_c20170608.nc</BENZENE_an_srf_file>
 <BENZENE_bb_srf_file  ver="cam6">atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_BENZENE_bb_surface_1750-2015_0.9x1.25_c20170322.nc</BENZENE_bb_srf_file>
 <BIGALK_an_srf_file   ver="cam6">atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_BIGALK_anthro_surface_1750-2015_0.9x1.25_c20170608.nc</BIGALK_an_srf_file>
-<BIGALK_bb_srf_file   ver="cam6">atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_BIGALK_bb_surface_1750-2015_0.9x1.25_c20170322.nc</BIGALK_bb_srf_file>
+<BIGALK_bb_srf_file   ver="cam6">atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_BIGALK_bb_surface_1750-2015_0.9x1.25_c20180611.nc</BIGALK_bb_srf_file>
 <BIGENE_an_srf_file   ver="cam6">atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_BIGENE_anthro_surface_1750-2015_0.9x1.25_c20170608.nc</BIGENE_an_srf_file>
-<BIGENE_bb_srf_file   ver="cam6">atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_BIGENE_bb_surface_1750-2015_0.9x1.25_c20170322.nc</BIGENE_bb_srf_file>
+<BIGENE_bb_srf_file   ver="cam6">atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_BIGENE_bb_surface_1750-2015_0.9x1.25_c20180611.nc</BIGENE_bb_srf_file>
 <C2H2_an_srf_file     ver="cam6">atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_C2H2_anthro_surface_1750-2015_0.9x1.25_c20170608.nc</C2H2_an_srf_file>
 <C2H2_bb_srf_file     ver="cam6">atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_C2H2_bb_surface_1750-2015_0.9x1.25_c20170322.nc</C2H2_bb_srf_file>
 <C2H4_an_srf_file     ver="cam6">atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_C2H4_anthro_surface_1750-2015_0.9x1.25_c20170608.nc</C2H4_an_srf_file>
@@ -760,7 +766,7 @@
 <NH3_bb_srf_file      ver="cam6">atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_NH3_bb_surface_1750-2015_0.9x1.25_c20170322.nc</NH3_bb_srf_file>
 <NH3_ot_srf_file      ver="cam6">atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_NH3_other_surface_1750-2015_0.9x1.25_c20170322.nc</NH3_ot_srf_file>
 <NO_an_srf_file       ver="cam6">atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_NO_anthro_surface_1750-2015_0.9x1.25_c20170608.nc</NO_an_srf_file>
-<NO_bb_srf_file       ver="cam6">atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_NO_bb_surface_1750-2015_0.9x1.25_c20170322.nc</NO_bb_srf_file>
+<NO_bb_srf_file       ver="cam6">atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_NO_bb_surface_1750-2015_0.9x1.25_c20180611.nc</NO_bb_srf_file>
 <NO_ot_srf_file       ver="cam6">atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_NO_other_surface_1750-2015_0.9x1.25_c20170322.nc</NO_ot_srf_file>
 <SVOC_an_srf_file     ver="cam6">atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_SVOC_anthro_surface_1750-2015_0.9x1.25_c20170608.nc</SVOC_an_srf_file>
 <SVOC_bb_srf_file     ver="cam6">atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_SVOC_bb_surface_1750-2015_0.9x1.25_c20170322.nc</SVOC_bb_srf_file>
@@ -771,7 +777,7 @@
 
 <E90_srf_file         ver="cam6">atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions_E90global_surface_1750-2100_0.9x1.25_c20170322.nc</E90_srf_file>
 
-<h2o_ch4ox_ext_file    ver="cam6">atm/cam/chem/emis/elev/H2O_emission_CH4_oxidationx2_elev_1850-2100_CCMI_RCP6_0_c160219.nc</h2o_ch4ox_ext_file>
+<h2o_ch4ox_ext_file    ver="cam6">atm/cam/chem/emis/elev/H2OemissionCH4oxidationx2_3D_L70_1849-2015_CMIP6ensAvg_c180927.nc</h2o_ch4ox_ext_file>
 <so2_cv_ext_file       ver="cam6">atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_SO2_contvolcano_vertical_850-5000_0.9x1.25_c20170724.nc</so2_cv_ext_file>
 <so4_a1_cv_ext_file    ver="cam6">atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_so4_a1_contvolcano_vertical_850-5000_0.9x1.25_c20170724.nc</so4_a1_cv_ext_file>
 <num_a1_cv_ext_file    ver="cam6">atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_num_a1_so4_contvolcano_vertical_850-5000_0.9x1.25_c20170724.nc</num_a1_cv_ext_file>
@@ -784,8 +790,8 @@
 <no2_ar_ext_file       ver="cam6">atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_NO2_aircraft_vertical_1750-2015_0.9x1.25_c20170608.nc</no2_ar_ext_file>
 <num_a4_ar_ext_file    ver="cam6">atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_num_bc_a4_aircraft_vertical_1750-2015_0.9x1.25_c20170608.nc</num_a4_ar_ext_file>
 <so2_ar_ext_file       ver="cam6">atm/cam/chem/emis/CMIP6_emissions_1750_2015/emissions-cmip6_SO2_aircraft_vertical_1750-2015_0.9x1.25_c20170608.nc</so2_ar_ext_file>
-<so2_volc_1deg_ext_file ver="cam6">atm/cam/chem/stratvolc/VolcanEESMv3.10_SO2_850-2016_Mscale_Zreduc_1deg_c180416.nc</so2_volc_1deg_ext_file>
-<so2_volc_2deg_ext_file ver="cam6">atm/cam/chem/stratvolc/VolcanEESMv3.10_SO2_850-2016_Mscale_Zreduc_2deg_c180416.nc</so2_volc_2deg_ext_file>
+<so2_volc_1deg_ext_file ver="cam6">atm/cam/chem/stratvolc/VolcanEESMv3.11_SO2_850-2016_Mscale_Zreduc_1deg_c180812.nc</so2_volc_1deg_ext_file>
+<so2_volc_2deg_ext_file ver="cam6">atm/cam/chem/stratvolc/VolcanEESMv3.11_SO2_850-2016_Mscale_Zreduc_2deg_c180812.nc</so2_volc_2deg_ext_file>
 <so2_volc_pi_ext_file   ver="cam6">atm/cam/chem/stratvolc/VolcanEESMv3.10_piControl_SO2_1850-2014average_1deg_ZeroTrop_c180416.nc</so2_volc_pi_ext_file>
 
 
@@ -1019,7 +1025,7 @@
 
 <!-- prescribed oxidants for prognostic aerosol chemistry -->
 <tracer_cnst_file     ver="fixed_ox">oxid_1.9x2.5_L26_1850-2005_c091123.nc</tracer_cnst_file>
-
+                                              
 <!-- prescribed oxidants for prognostic aerosol chemistry -lightweight set for running SCAM and producing SCAM IOP boundary data -->
 <tracer_cnst_file     phys="cam6"  ver="fixed_ox" scam="1">oxid_1.9x2.5_L26_1850clim_c091123.nc</tracer_cnst_file>
 <tracer_cnst_cycle_yr phys="cam6"  ver="fixed_ox" scam="1">1850</tracer_cnst_cycle_yr>
@@ -1723,6 +1729,7 @@
 <history_chemistry>            .true.   </history_chemistry>
 <history_chemspecies_srf>      .true.   </history_chemspecies_srf>
 <history_clubb>                .true.   </history_clubb>
+<history_dust>                 .false.  </history_dust>
 
 <!-- ================================================================== -->
 <!-- Defaults for SE                                                    -->
@@ -1731,8 +1738,7 @@
 <se_fine_ne                            >   0 </se_fine_ne>
 <se_fine_ne hgrid="ne0np4CONUS.ne30x8" > 120 </se_fine_ne>
 
-<se_ftype           > 0 </se_ftype>
-<se_ftype cslam="1" > 2 </se_ftype>
+<se_ftype> 2 </se_ftype>
 
 <se_hypervis_on_plevs> .true.  </se_hypervis_on_plevs>
 
@@ -1790,6 +1796,7 @@
 <se_qsize_condensate_loading phys="held_suarez" > 1 </se_qsize_condensate_loading>
 <se_qsize_condensate_loading phys="adiabatic"   > 1 </se_qsize_condensate_loading>
 <se_qsize_condensate_loading phys="kessler"     > 1 </se_qsize_condensate_loading>
+<se_qsize_condensate_loading phys="tj2016"      > 1 </se_qsize_condensate_loading>
 
 <se_qsplit > 1 </se_qsplit>
 
@@ -1913,7 +1920,7 @@
 
 <!-- Ocean domain files -->
 <focndomain hgrid="128x256" >atm/cam/ocnfrac/domain.camocn.128x256_USGS_070807.nc</focndomain>
-<focndomain hgrid="64x128"  >share/domains/domain.ocn.T42_gx1v7.170629.nc</focndomain>
+<focndomain hgrid="64x128"  >share/domains/domain.ocn.T42_gx1v7.180727.nc</focndomain>
 <focndomain hgrid="48x96"   >share/domains/domain.ocn.48x96_gx3v7_100114.nc</focndomain>
 <focndomain hgrid="32x64"   >atm/cam/ocnfrac/domain.camocn.32x64_USGS_070807.nc</focndomain>
 <focndomain hgrid="8x16"    >atm/cam/ocnfrac/domain.camocn.8x16_USGS_070807.nc</focndomain>
@@ -1945,4 +1952,5 @@
 <opom_cycle_year>2000</opom_cycle_year>
 <ocean_filename>Lana_ocean_1849_2006.nc</ocean_filename>
 <ocean_filepath>noresm-only/atm/cam/camoslo</ocean_filepath>
+
 </namelist_defaults>

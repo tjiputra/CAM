@@ -532,6 +532,10 @@ subroutine radiation_init(pbuf2d)
                                                                            sampling_seq='rad_lwsw')
          call addfld('FLNTC'//diag(icall),   horiz_only,  'A', 'W/m2', 'Clearsky net longwave flux at top of model',       &
                                                                            sampling_seq='rad_lwsw')
+         call addfld('FLNTCLR'//diag(icall), horiz_only,  'A', 'W/m2', 'Clearsky ONLY points net longwave flux at top of model',&
+                                                                           sampling_seq='rad_lwsw')
+         call addfld('FREQCLR'//diag(icall), horiz_only,  'A', 'Frac', 'Frequency of Occurrence of Clearsky',       &
+                                                                           sampling_seq='rad_lwsw')
          call addfld('FLUT'//diag(icall),    horiz_only,  'A', 'W/m2', 'Upwelling longwave flux at top of model',          &
                                                                            sampling_seq='rad_lwsw')
          call addfld('FLUTC'//diag(icall),   horiz_only,  'A', 'W/m2', 'Clearsky upwelling longwave flux at top of model', &
@@ -562,6 +566,8 @@ subroutine radiation_init(pbuf2d)
             call add_default('QRL'//diag(icall),   1, ' ')
             call add_default('FLNT'//diag(icall),  1, ' ')
             call add_default('FLNTC'//diag(icall), 1, ' ')
+            call add_default('FLNTCLR'//diag(icall), 1, ' ')
+            call add_default('FREQCLR'//diag(icall), 1, ' ')
             call add_default('FLUT'//diag(icall),  1, ' ')
             call add_default('FLUTC'//diag(icall), 1, ' ')
             call add_default('LWCF'//diag(icall),  1, ' ')
@@ -723,6 +729,7 @@ subroutine radiation_tend( &
     character(len=3) :: c3
 #endif
 
+   ! Arguments
    type(physics_state), intent(in), target :: state
    type(physics_ptend), intent(out)        :: ptend
     
@@ -882,9 +889,12 @@ subroutine radiation_tend( &
 
    real(r8) :: ftem(pcols,pver)        ! Temporary workspace for outfld variables
 
-   logical, parameter :: cosz_rad_call=.true. !+tht
+   real(r8) :: freqclr(pcols)          ! Frequency of occurrence of clear sky columns
+   real(r8) :: flntclr(pcols)          ! Clearsky only columns (zero if cloudy)
 
    character(*), parameter :: name = 'radiation_tend'
+
+   logical, parameter :: cosz_rad_call=.true. !+tht
    !--------------------------------------------------------------------------------------
 
    lchnk = state%lchnk
@@ -1023,7 +1033,7 @@ subroutine radiation_tend( &
             do i = 1, ncol
                do k = 1, pver
 
-                  if (cldfprime(i,k) > 0.) then
+                  if (cldfprime(i,k) > 0._r8) then
 
                      c_cld_tau(:,i,k)     = ( cldfsnow(i,k)*snow_tau(:,i,k) &
                                              + cld(i,k)*cld_tau(:,i,k) )/cldfprime(i,k)
@@ -1403,7 +1413,16 @@ subroutine radiation_tend( &
                   end do
                end if
 
-               if (write_output) call radiation_output_lw(lchnk, ncol, icall, rd, pbuf, cam_out)
+               flntclr(:) = 0._r8
+               freqclr(:) = 0._r8
+               do i = 1, ncol
+                  if (maxval(cldfprime(i,:)) <= 0.1_r8) then
+                     freqclr(i) = 1._r8
+                     flntclr(i) = rd%flntc(i)
+                  end if
+               end do
+
+               if (write_output) call radiation_output_lw(lchnk, ncol, icall, rd, pbuf, cam_out, freqclr, flntclr)
 
             end if
          end do
@@ -1426,7 +1445,7 @@ subroutine radiation_tend( &
          if (cldfsnow_idx > 0) then
             do i = 1, ncol
                do k = 1, pver
-                  if (cldfsnow(i,k) > 0.) then
+                  if (cldfsnow(i,k) > 0._r8) then
                      gb_snow_tau(i,k) = snow_tau(rrtmg_sw_cloudsim_band,i,k)*cldfsnow(i,k)
                      gb_snow_lw(i,k)  = snow_lw_abs(rrtmg_lw_cloudsim_band,i,k)*cldfsnow(i,k)
                   end if
@@ -1582,7 +1601,7 @@ end subroutine radiation_output_cld
 
 !===============================================================================
 
-subroutine radiation_output_lw(lchnk, ncol, icall, rd, pbuf, cam_out)
+subroutine radiation_output_lw(lchnk, ncol, icall, rd, pbuf, cam_out, freqclr, flntclr)
 
    ! Dump longwave radiation information to history buffer
 
@@ -1592,6 +1611,8 @@ subroutine radiation_output_lw(lchnk, ncol, icall, rd, pbuf, cam_out)
    type(rad_out_t),        intent(in) :: rd
    type(physics_buffer_desc), pointer :: pbuf(:)
    type(cam_out_t),        intent(in) :: cam_out
+   real(r8),               intent(in) :: freqclr(pcols)
+   real(r8),               intent(in) :: flntclr(pcols)
 
    ! local variables
    real(r8), pointer :: qrl(:,:)
@@ -1610,6 +1631,9 @@ subroutine radiation_output_lw(lchnk, ncol, icall, rd, pbuf, cam_out)
 
    call outfld('FLNT'//diag(icall),    flnt,          pcols, lchnk)
    call outfld('FLNTC'//diag(icall),   rd%flntc,      pcols, lchnk)
+
+   call outfld('FREQCLR'//diag(icall), freqclr,       pcols, lchnk)
+   call outfld('FLNTCLR'//diag(icall), flntclr,       pcols, lchnk)
 
    call outfld('FLUT'//diag(icall),    rd%flut,       pcols, lchnk)
    call outfld('FLUTC'//diag(icall),   rd%flutc,      pcols, lchnk)

@@ -25,7 +25,6 @@ module mo_neu_wetdep
   private
   public :: neu_wetdep_init
   public :: neu_wetdep_tend
-  public :: do_neu_wetdep
 !
   save
 !

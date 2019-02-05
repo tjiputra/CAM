@@ -6,6 +6,12 @@
 # Check physics
 ruby $ADDREALKIND_EXE -r r8 -l 1 -d $CAM_ROOT/components/cam/src/physics/cam
 rc=$?
+ruby $ADDREALKIND_EXE -r r8 -l 1 -d $CAM_ROOT/components/cam/src/physics/camrt
+rc=`expr $? + $rc`
+ruby $ADDREALKIND_EXE -r r8 -l 1 -d $CAM_ROOT/components/cam/src/physics/rrtmg -s aer_src
+rc=`expr $? + $rc`
+ruby $ADDREALKIND_EXE -r r8 -l 1 -d $CAM_ROOT/components/cam/src/physics/simple
+rc=`expr $? + $rc`
 ruby $ADDREALKIND_EXE -r r8 -l 1 -d $CAM_ROOT/components/cam/src/physics/waccm
 rc=`expr $? + $rc`
 ruby $ADDREALKIND_EXE -r r8 -l 1 -d $CAM_ROOT/components/cam/src/physics/waccmx
@@ -20,7 +26,7 @@ ruby $ADDREALKIND_EXE -r r8 -l 1 -d $CAM_ROOT/components/cam/src/chemistry
 rc=`expr $? + $rc`
 
 #Check Dynamics
-ruby $ADDREALKIND_EXE -r r8 -l 1 -d $CAM_ROOT/components/cam/src/dynamics/se -s share
+ruby $ADDREALKIND_EXE -r r8 -l 1 -d $CAM_ROOT/components/cam/src/dynamics/se
 rc=`expr $? + $rc`
 ruby $ADDREALKIND_EXE -r r8 -l 1 -d $CAM_ROOT/components/cam/src/dynamics/fv
 rc=`expr $? + $rc`
