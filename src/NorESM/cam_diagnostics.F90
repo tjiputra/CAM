@@ -386,19 +386,19 @@ contains
 #endif !aerocom
 #endif !extra tests
 #ifdef AEROFFL
-    call addfld ('FSNT_DRF',horiz_only, 'A','W/m^2','Total column absorbed solar flux (DIRind)')
-    call addfld ('FSNTCDRF',horiz_only, 'A','W/m^2','Clear sky total column absorbed solar flux (DIRind)' )
-    call addfld ('FSNS_DRF',horiz_only, 'A','W/m^2   ','Surface absorbed solar flux (DIRind)' )
-    call addfld ('FSNSCDRF',horiz_only, 'A','W/m^2   ','Clear sky surface absorbed solar flux (DIRind)' )
-    call addfld ('QRS_DRF ',(/'lev'/), 'A','K/s     ','Solar heating rate (DIRind)')
-    call addfld ('QRSC_DRF',(/'lev'/), 'A','K/s     ','Clearsky solar heating rate (DIRind)' )
-    call addfld ('FLNT_DRF',horiz_only, 'A','W/m^2   ','Total column longwave flux (DIRind)' )
-    call addfld ('FLNTCDRF',horiz_only, 'A','W/m^2   ','Clear sky total column longwave flux (DIRind)' )
+    call addfld ('FSNT_DRF',horiz_only, 'A','W/m^2','Clean sky (aer_tau=0) net solar flux at top of model')
+    call addfld ('FSNTCDRF',horiz_only, 'A','W/m^2',' Clean (aer_tau=0) and Clear sky net solar flux at top of model' )
+    call addfld ('FSNS_DRF',horiz_only, 'A','W/m^2   ','Clean sky (aer_tau=0) net solar flux at surface' )
+    call addfld ('FSNSCDRF',horiz_only, 'A','W/m^2   ','Clean (aer_tau=0) and Clear sky net solar flux at surface ' )
+    call addfld ('QRS_DRF ',(/'lev'/), 'A','K/s     ','Clean sky (aer_tau=0) Solar heating rate')
+    call addfld ('QRSC_DRF',(/'lev'/), 'A','K/s     ','Clean (aer_tau=0) and Clear sky solar heating rate' )
+    call addfld ('FLNT_DRF',horiz_only, 'A','W/m^2   ','Clean sky (aer_tau=0) net longwave flux at top of model' )
+    call addfld ('FLNTCDRF',horiz_only, 'A','W/m^2   ','Clean (aer_tau=0) and Clear sky net longwave flux at top of model' )
 #ifdef AEROCOM 
-    call addfld ('FSUTADRF',horiz_only, 'A','W/m^2   ','SW upwelling flux at TOA')
-    call addfld ('FSDS_DRF',horiz_only, 'A','W/m^2   ','SW downelling flux at surface')
-    call addfld ('FSUS_DRF',horiz_only, 'A','W/m^2   ','SW upwelling flux at surface')
-    call addfld ('FSDSCDRF',horiz_only, 'A','W/m^2   ','SW downwelling clear sky flux at surface')
+    call addfld ('FSUTADRF',horiz_only, 'A','W/m^2   ','Clean sky (aer_tau=0) upwelling solar flux at TOA')
+    call addfld ('FSDS_DRF',horiz_only, 'A','W/m^2   ','Clean sky (aer_tau=0) downwelling solar flux at surface')
+    call addfld ('FSUS_DRF',horiz_only, 'A','W/m^2   ','Clean sky (aer_tau=0) upwelling solar flux at surface')
+    call addfld ('FSDSCDRF',horiz_only, 'A','W/m^2   ','Clean (aer_tau=0) and Clear sky downwelling solar flux at surface')
     call addfld ('FLUS    ',horiz_only, 'A','W/m^2   ','LW surface upwelling flux')
     call addfld ('FLNT_ORG',horiz_only, 'A','W/m^2   ','Total column longwave flux (CAM5)' )
 #endif  ! aerocom
