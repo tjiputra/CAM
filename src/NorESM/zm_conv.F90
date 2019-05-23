@@ -17,7 +17,7 @@ module zm_conv
   use ppgrid,          only: pcols, pver, pverp
   use cloud_fraction,  only: cldfrc_fice
   use physconst,       only: cpair, epsilo, gravit, latice, latvap, tmelt, rair, &
-                             cpwv, cpliq, rh2o
+                             cpwv, cpliq, rh2o, cpvir, zvir
   use cam_abortutils,  only: endrun
   use cam_logfile,     only: iulog
   use zm_microphysics, only: zm_mphy, zm_aero_t, zm_conv_t
@@ -94,6 +94,11 @@ module zm_conv
 !                        ,tentrm     = 1e-3_r8 &      !+tht (initial) entrainment rate for test parcel
                          ,cin_threshd= 0.33_r8        !+tht CIN threshold (large-->no cin; ignored if use_cin=F)
 
+!tht moist thermo, additional parameter (must be evaluated in runtime) 
+  !real(r8), parameter :: dcol=(cpliq-cpwv)/latvap
+   real(r8) dcol
+!-tht
+
 contains
 
 
@@ -125,6 +130,9 @@ subroutine zm_convi(limcnv_in, zmconv_c0_lnd, zmconv_c0_ocn, zmconv_ke, zmconv_k
    rgas   = rair
    grav   = gravit
    cp     = cpres
+!+tht moist thermo
+   dcol=(cpliq-cpwv)/latvap
+!-tht
 
    c0_lnd  = zmconv_c0_lnd 
    c0_ocn  = zmconv_c0_ocn
@@ -810,7 +818,10 @@ subroutine zm_convr(lchnk   ,ncol    , &
    do k = 1,pver
       do i = 1,ncol
          q(i,k) = qh(i,k)
-         s(i,k) = t(i,k) + (grav/cpres)*z(i,k)
+!+tht moist thermo
+        !s(i,k) = t(i,k) + (grav/cpres)*z(i,k)
+         s(i,k) = t(i,k) + (grav/((1._r8+zvir*q(i,k))*cpres))*z(i,k)
+!-tht
          tp(i,k)=0.0_r8
          shat(i,k) = s(i,k)
          qhat(i,k) = q(i,k)
@@ -3084,6 +3095,10 @@ subroutine cldprp(lchnk   , &
 !tht For tiedke_msk
    real(r8) tiedke_msk(pcols)
 
+!tht moist thermo vars 
+   real(r8), dimension(pcols,pver) :: mcp,mrd,mrl,tu,td
+!-tht
+
    real(r8) hmin(pcols)
    real(r8) expdif(pcols)
    real(r8) expnum(pcols)
@@ -3099,7 +3114,7 @@ subroutine cldprp(lchnk   , &
    real(r8) totevp(pcols)
    real(r8) alfa(pcols)
    real(r8) ql1
-   real(r8) tu
+  !real(r8) tu
    real(r8) estu
    real(r8) qstu
 
@@ -3218,11 +3233,18 @@ subroutine cldprp(lchnk   , &
          if ( p(i,k)-est(i) <= 0._r8 ) then
             qst(i,k) = 1.0_r8
          end if
-
-         gamma(i,k) = qst(i,k)*(1._r8 + qst(i,k)/eps1)*eps1*rl/(rd*t(i,k)**2)*rl/cp
-!tht: mixing ratios; note that q dependence of Cp and T dependence of L are ignored 
-         hmn(i,k) = cp*t(i,k) + grav*z(i,k) + rl*q(i,k)
-         hsat(i,k) = cp*t(i,k) + grav*z(i,k) + rl*qst(i,k)
+!tht moist thermo 
+         mrd(i,k) = (1._r8+zvir*q(i,k))*rd
+         mcp(i,k) = (1._r8+cpvir*q(i,k))*cp
+         mrl(i,k) = (1._r8-dcol*(t(i,k)-tmelt))*rl
+!         gamma(i,k) = qst(i,k)*(1._r8 + qst(i,k)/eps1)*eps1*rl/(rd*t(i,k)**2)*rl/cp
+!!tht: mixing ratios; note that q dependence of Cp and T dependence of L are ignored 
+!         hmn(i,k) = cp*t(i,k) + grav*z(i,k) + rl*q(i,k)
+!         hsat(i,k) = cp*t(i,k) + grav*z(i,k) + rl*qst(i,k)
+         gamma(i,k) = qst(i,k)*(1._r8 + qst(i,k)/eps1)*eps1*mrl(i,k)/(mrd(i,k)*t(i,k)**2)*mrl(i,k)/mcp(i,k)
+         hmn(i,k) = mcp(i,k)*t(i,k) + grav*z(i,k) + mrl(i,k)*q(i,k)
+         hsat(i,k) = mcp(i,k)*t(i,k) + grav*z(i,k) + mrl(i,k)*qst(i,k)
+!-tht
          hu(i,k) = hmn(i,k)
          hd(i,k) = hmn(i,k)
          rprd(i,k) = 0._r8
@@ -3230,7 +3252,10 @@ subroutine cldprp(lchnk   , &
          fice(i,k) = 0._r8
          tug(i,k)  = 0._r8
          qcde(i,k)   = 0._r8
-         tvuo(i,k) = (shat(i,k) - grav/cp*zf(i,k))*(1._r8 + 0.608_r8*qhat(i,k))
+!+tht moist thermo
+        !tvuo(i,k) = (shat(i,k) - grav/cp*zf(i,k))*(1._r8 + 0.608_r8*qhat(i,k))
+         tvuo(i,k) = (shat(i,k) - grav/mcp(i,k)*zf(i,k))*(1._r8+zvir*qhat(i,k))
+!-tht
          tvu(i,k) = tvuo(i,k)
          frz(i,k)  = 0._r8
 
@@ -3288,7 +3313,10 @@ subroutine cldprp(lchnk   , &
          else
             qsthat(i,k) = qst(i,k)
          end if
-         hsthat(i,k) = cp*shat(i,k) + rl*qsthat(i,k)
+!+tht moist thermo
+        !hsthat(i,k) = cp*shat(i,k) + rl*qsthat(i,k)
+         hsthat(i,k) =mcp(i,k)*shat(i,k) +mrl(i,k)*qsthat(i,k)
+!-tht
          if (abs(gamma(i,k-1)-gamma(i,k)) > 1.E-6_r8) then
             gamhat(i,k) = log(gamma(i,k-1)/gamma(i,k))*gamma(i,k-1)*gamma(i,k)/ &
                                 (gamma(i,k-1)-gamma(i,k))
@@ -3335,8 +3363,11 @@ subroutine cldprp(lchnk   , &
    do k = msg + 1,pver
       do i = 1,il2g
          if (k >= jt(i) .and. k <= jb(i)) then
+!+tht moist thermo - uniform perturbation either in h or in s
             hu(i,k) = hmn(i,mx(i)) + cp*tiedke_msk(i)
-            su(i,k) = s(i,mx(i)) + tiedke_msk(i)
+           !su(i,k) = s(i,mx(i)) + tiedke_msk(i)
+            su(i,k) = s(i,mx(i)) + tiedke_msk(i)/(1._r8+cpvir*qu(i,k))
+!-tht
          end if
       end do
    end do
@@ -3571,15 +3602,25 @@ subroutine cldprp(lchnk   , &
          do i = 1,il2g
             if (k == jb(i) .and. eps0(i) > 0._r8) then
                qu(i,k) = q(i,mx(i))
-               su(i,k) = (hu(i,k)-rl*qu(i,k))/cp
+!+tht moist thermo
+              !su(i,k) = (hu(i,k)-rl*qu(i,k))/cp
+               tu(i,k) = (hu(i,k)-grav*zf(i,k)-(1._r8+dcol*tmelt)*rl*qu(i,k)) &
+                                /(cp*( 1._r8 + (cpvir-dcol*(rl/cp))*qu(i,k) ))
+               su(i,k) = (hu(i,k)-(1._r8-dcol*(tu(i,k)-tmelt))*rl*qu(i,k)) &
+                        /((1._r8+cpvir*qu(i,k))*cp)
+!-tht
             end if
             if (( .not. done(i) .and. k > jt(i) .and. k < jb(i)) .and. eps0(i) > 0._r8) then
                su(i,k) = mu(i,k+1)/mu(i,k)*su(i,k+1) + &
                          dz(i,k)/mu(i,k)* (eu(i,k)-du(i,k))*s(i,k)
                qu(i,k) = mu(i,k+1)/mu(i,k)*qu(i,k+1) + dz(i,k)/mu(i,k)* (eu(i,k)*q(i,k)- &
                                du(i,k)*qst(i,k))
-               tu = su(i,k) - grav/cp*zf(i,k)
-               call qsat_hPa(tu, (p(i,k)+p(i,k-1))/2._r8, estu, qstu)
+!+tht moist thermo
+              !tu = su(i,k) - grav/cp*zf(i,k)
+              !call qsat_hPa(tu, (p(i,k)+p(i,k-1))/2._r8, estu, qstu)
+               tu(i,k) = su(i,k) - grav/((1._r8+0.85*qu(i,k))*cp)*zf(i,k)
+               call qsat_hPa(tu(i,k), (p(i,k)+p(i,k-1))/2._r8, estu, qstu)
+!-tht
                if (qu(i,k) >= qstu) then
                   jlcl(i) = k
                   kount = kount + 1
@@ -3593,9 +3634,15 @@ subroutine cldprp(lchnk   , &
       do k = msg + 2,pver
          do i = 1,il2g
             if ((k > jt(i) .and. k <= jlcl(i)) .and. eps0(i) > 0._r8) then
-               su(i,k) = shat(i,k) + (hu(i,k)-hsthat(i,k))/(cp* (1._r8+gamhat(i,k)))
+!+tht moist thermo
+              !su(i,k) = shat(i,k) + (hu(i,k)-hsthat(i,k))/(cp* (1._r8+gamhat(i,k)))
+              !qu(i,k) = qsthat(i,k) + gamhat(i,k)*(hu(i,k)-hsthat(i,k))/ &
+              !         (rl* (1._r8+gamhat(i,k)))
                qu(i,k) = qsthat(i,k) + gamhat(i,k)*(hu(i,k)-hsthat(i,k))/ &
-                        (rl* (1._r8+gamhat(i,k)))
+                        ((1._r8-dcol*(tu(i,k)-tmelt))*rl* (1._r8+gamhat(i,k)))
+               su(i,k) = shat(i,k) + (hu(i,k)-hsthat(i,k))/((1._r8+cpvir*qu(i,k))*cp* (1._r8+gamhat(i,k)))
+               tu(i,k) = su(i,k) - grav/((1._r8+cpvir*qu(i,k))*cp)*zf(i,k)
+!-tht 
             end if
          end do
       end do
@@ -3613,11 +3660,18 @@ subroutine cldprp(lchnk   , &
                if (zmconv_microp) then
                   cu(i,k) = ((mu(i,k)*su(i,k)-mu(i,k+1)*su(i,k+1))/ &
                          dz(i,k)- eu(i,k)*s(i,k)+du(i,k)*su(i,k))/(rl/cp)  &
+!+tht moist thermo
+                                 *((1._r8+cpvir*qu(i,k))/(1._r8-dcol*(tu(i,k)-tmelt))) &
+!-tht
                           - latice*frz(i,k)/rl
                else
 
                   cu(i,k) = ((mu(i,k)*su(i,k)-mu(i,k+1)*su(i,k+1))/ &
-                         dz(i,k)- (eu(i,k)-du(i,k))*s(i,k))/(rl/cp)
+!+tht moist thermo
+                        !dz(i,k)- (eu(i,k)-du(i,k))*s(i,k))/(rl/cp)
+                         dz(i,k)- (eu(i,k)-du(i,k))*s(i,k))/(rl/cp) &
+                                 *((1._r8+cpvir*qu(i,k))/(1._r8-dcol*(tu(i,k)-tmelt)))
+!-tht
                end if
                if (k == jt(i)) cu(i,k) = 0._r8
                cu(i,k) = max(0._r8,cu(i,k))
@@ -3633,7 +3687,10 @@ subroutine cldprp(lchnk   , &
 
          do k = pver, msg+2, -1
             do i = 1, il2g
-               tug(i,k) = su(i,k) - grav/cp*zf(i,k)
+!+tht moist thermo
+              !tug(i,k) = su(i,k) - grav/cp*zf(i,k)
+               tug(i,k) = su(i,k) - grav/cp*zf(i,k)/(1._r8+cpvir*qu(i,k))
+!-tht
             end do
          end do
 
@@ -3707,7 +3764,10 @@ subroutine cldprp(lchnk   , &
             if ((k > jt(i) .and. k <= jlcl(i)) .and. eps0(i) > 0._r8) then
                if (iter == 1) tvuo(i,k)= (su(i,k) - grav/cp*zf(i,k))*(1._r8+0.608_r8*qu(i,k))
                if (iter == 2 .and. k > max(jt(i),jto(i)) ) then
-                  tvu(i,k) = (su(i,k) - grav/cp*zf(i,k))*(1._r8 +0.608_r8*qu(i,k))
+!+tht moist thermo
+                 !tvu(i,k) = (su(i,k) - grav/cp*zf(i,k))*(1._r8 +0.608_r8*qu(i,k))
+                  tvu(i,k) = (su(i,k) - grav/(cp*(1._r8+cpvir*qu(i,k)))*zf(i,k))*(1._r8 +0.608_r8*qu(i,k))
+!-tht
                   loc_conv%dcape(i) = loc_conv%dcape(i)+ rd*(tvu(i,k)-tvuo(i,k))*log(p(i,k)/p(i,k-1))
                end if
             end if
@@ -3811,13 +3871,23 @@ subroutine cldprp(lchnk   , &
          if ((k >= jd(i) .and. k <= jb(i)) .and. eps0(i) > 0._r8 .and. jd(i) < jb(i)) then
             qds(i,k) = qsthat(i,k) + gamhat(i,k)*(hd(i,k)-hsthat(i,k))/ &
                (rl*(1._r8 + gamhat(i,k)))
+!+tht moist thermo
+            td(i,k)  = (hd(i,k)-grav*zf(i,k)-(1._r8+dcol*tmelt)*rl*qds(i,k)) &
+                              /(cp*( 1._r8 + (cpvir-dcol*(rl/cp))*qds(i,k) ))
+            qds(i,k) = qsthat(i,k) + gamhat(i,k)*(hd(i,k)-hsthat(i,k))/ &
+               ((1._r8-dcol*(td(i,k)-tmelt))*rl*(1._r8 + gamhat(i,k)))
+!-tht
          end if
       end do
    end do
 
    do i = 1,il2g
       qd(i,jd(i)) = qds(i,jd(i))
-      sd(i,jd(i)) = (hd(i,jd(i)) - rl*qd(i,jd(i)))/cp
+!+tht moist thermo
+     !sd(i,jd(i)) = (hd(i,jd(i)) - rl*qd(i,jd(i)))/cp
+      sd(i,jd(i)) = (hd(i,jd(i)) - (1._r8-dcol*(td(i,k)-tmelt))*rl*qd(i,jd(i)))/((1._r8+cpvir*qd(i,k))*cp)
+      td(i,k) = sd(i,k) - grav/((1._r8+cpvir*qd(i,k))*cp)*zf(i,k)
+!-tht
    end do
 !
    do k = msg + 2,pver
@@ -3830,7 +3900,11 @@ subroutine cldprp(lchnk   , &
             if (zmconv_microp) then
               evp(i,k) = min(evp(i,k),rprd(i,k))
             end if
-            sd(i,k+1) = ((rl/cp*evp(i,k)-ed(i,k)*s(i,k))*dz(i,k) + md(i,k)*sd(i,k))/mdt
+!+tht moist thermo
+           !sd(i,k+1) = ((rl/cp*evp(i,k)-ed(i,k)*s(i,k))*dz(i,k) + md(i,k)*sd(i,k))/mdt
+            sd(i,k+1) = (((1._r8-dcol*(td(i,k)-tmelt))*rl/((1._r8+cpvir*qd(i,k))*cp)*evp(i,k) &
+                          -ed(i,k)*s(i,k))*dz(i,k) + md(i,k)*sd(i,k))/mdt
+!-tht
             totevp(i) = totevp(i) - dz(i,k)*ed(i,k)*q(i,k)
          end if
       end do
@@ -3984,6 +4058,10 @@ subroutine closure(lchnk   , &
 
    real(r8) rd
    real(r8) rl
+!+tht moist thermo
+   real(r8) rltp
+!-tht moist thermo
+
 ! change of subcloud layer properties due to convection is
 ! related to cumulus updrafts and downdrafts.
 ! mc(z)=f(z)*mb, mub=betau*mb, mdb=betad*mb are used
@@ -4016,10 +4094,16 @@ subroutine closure(lchnk   , &
    do k = msg + 1,pver - 1
       do i = il1g,il2g
          if (k == jt(i)) then
-            dtmdt(i,k) = (1._r8/dp(i,k))*(mu(i,k+1)* (su(i,k+1)-shat(i,k+1)- &
-                          rl/cp*ql(i,k+1))+md(i,k+1)* (sd(i,k+1)-shat(i,k+1)))
-            dqmdt(i,k) = (1._r8/dp(i,k))*(mu(i,k+1)* (qu(i,k+1)- &
-                         qhat(i,k+1)+ql(i,k+1))+md(i,k+1)*(qd(i,k+1)-qhat(i,k+1)))
+!+tht moist thermo -- changes in this most parts of routine do not seem essential
+           !dtmdt(i,k) = (1._r8/dp(i,k))*(mu(i,k+1)* (su(i,k+1)-shat(i,k+1)- &
+           !              rl/cp*ql(i,k+1))+md(i,k+1)* (sd(i,k+1)-shat(i,k+1)))
+           !dqmdt(i,k) = (1._r8/dp(i,k))*(mu(i,k+1)* (qu(i,k+1)- &
+           !             qhat(i,k+1)+ql(i,k+1))+md(i,k+1)*(qd(i,k+1)-qhat(i,k+1)))
+            dqmdt(i,k) = (1._r8/dp(i,k))*(mu(i,k+1)*(qu(i,k+1)-qhat(i,k+1)      +ql(i,k+1)) &
+                                         +md(i,k+1)*(qd(i,k+1)-qhat(i,k+1)                ))
+            dtmdt(i,k) = (1._r8/dp(i,k))*(mu(i,k+1)*(su(i,k+1)-shat(i,k+1)-rl/cp*ql(i,k+1)) &
+                                         +md(i,k+1)*(sd(i,k+1)-shat(i,k+1)                ))
+!-tht
          end if
       end do
    end do
@@ -4028,17 +4112,17 @@ subroutine closure(lchnk   , &
    do k = msg + 1,pver - 1
       do i = il1g,il2g
          if (k > jt(i) .and. k < mx(i)) then
-            dtmdt(i,k) = (mc(i,k)* (shat(i,k)-s(i,k))+mc(i,k+1)* (s(i,k)-shat(i,k+1)))/ &
-                         dp(i,k) - rl/cp*du(i,k)*(beta*ql(i,k)+ (1-beta)*ql(i,k+1))
+            dtmdt(i,k) = (mc(i,k)*(shat(i,k)-s(i,k)) - mc(i,k+1)*(shat(i,k+1)-s(i,k)))/dp(i,k) &
+                        - rl/cp*du(i,k)*(beta*ql(i,k)+ (1-beta)*ql(i,k+1))
 !          dqmdt(i,k)=(mc(i,k)*(qhat(i,k)-q(i,k))
 !     1                +mc(i,k+1)*(q(i,k)-qhat(i,k+1)))/dp(i,k)
 !     2                +du(i,k)*(qs(i,k)-q(i,k))
 !     3                +du(i,k)*(beta*ql(i,k)+(1-beta)*ql(i,k+1))
 
-            dqmdt(i,k) = (mu(i,k+1)* (qu(i,k+1)-qhat(i,k+1)+cp/rl* (su(i,k+1)-s(i,k)))- &
-                          mu(i,k)* (qu(i,k)-qhat(i,k)+cp/rl*(su(i,k)-s(i,k)))+md(i,k+1)* &
-                         (qd(i,k+1)-qhat(i,k+1)+cp/rl*(sd(i,k+1)-s(i,k)))-md(i,k)* &
-                         (qd(i,k)-qhat(i,k)+cp/rl*(sd(i,k)-s(i,k))))/dp(i,k) + &
+            dqmdt(i,k) = (mu(i,k+1)*(qu(i,k+1)-qhat(i,k+1)+cp/rl*(su(i,k+1)-s(i,k))) &
+                         -mu(i,k  )*(qu(i,k  )-qhat(i,k  )+cp/rl*(su(i,k  )-s(i,k))) &
+                         +md(i,k+1)*(qd(i,k+1)-qhat(i,k+1)+cp/rl*(sd(i,k+1)-s(i,k))) &
+                         -md(i,k  )*(qd(i,k  )-qhat(i,k  )+cp/rl*(sd(i,k  )-s(i,k))))/dp(i,k) + &
                           du(i,k)* (beta*ql(i,k)+(1-beta)*ql(i,k+1))
          end if
       end do
@@ -4047,22 +4131,32 @@ subroutine closure(lchnk   , &
    do k = msg + 1,pver
       do i = il1g,il2g
          if (k >= lel(i) .and. k <= lcl(i)) then
-            thetavp(i,k) = tp(i,k)* (1000._r8/p(i,k))** (rd/cp)*(1._r8+1.608_r8*qstp(i,k)-q(i,mx(i)))
-            thetavm(i,k) = t(i,k)* (1000._r8/p(i,k))** (rd/cp)*(1._r8+0.608_r8*q(i,k))
+            thetavp(i,k) = tp(i,k)* (1000._r8/p(i,k))**(rd/cp) *(1._r8+1.608_r8*qstp(i,k)-q(i,mx(i)))
+            thetavm(i,k) = t (i,k)* (1000._r8/p(i,k))**(rd/cp) *(1._r8+0.608_r8*q(i,k)              )
+!!+tht moist thermo ...but probably important for parcel heating
             dqsdtp(i,k) = qstp(i,k)* (1._r8+qstp(i,k)/eps1)*eps1*rl/(rd*tp(i,k)**2)
+           !rltp=rl*(1.-dcol*(tp(i,k)-tmelt))
+           !dqsdtp(i,k) = qstp(i,k)* (1._r8+qstp(i,k)/eps1)*eps1*rltp/(rd*tp(i,k)**2)
 !
 ! dtpdt is the parcel temperature change due to change of
 ! subcloud layer properties during convection.
 !
-            dtpdt(i,k) = tp(i,k)/ (1._r8+rl/cp* (dqsdtp(i,k)-qstp(i,k)/tp(i,k)))* &
-                        (dtbdt(i)/t(i,mx(i))+rl/cp* (dqbdt(i)/tl(i)-q(i,mx(i))/ &
-                         tl(i)**2*dtldt(i)))
+            dtpdt(i,k) = tp(i,k)/ (1._r8 + rl/cp*(dqsdtp(i,k)-qstp(i,k)/tp(i,k))) &
+                        *(dtbdt(i)/t(i,mx(i)) + rl/cp*(dqbdt(i)/tl(i)-q(i,mx(i))/tl(i)**2*dtldt(i)))
+           !rltp=rltp/(cp*(1.+cpvir*qstp(i,k)))
+           !dtpdt(i,k) = tp(i,k)/ (1._r8 + rltp*(dqsdtp(i,k)-qstp(i,k)/tp(i,k))) &
+           !            *(dtbdt(i)/t(i,mx(i)) + rltp*(dqbdt(i)/tl(i)-q(i,mx(i))/tl(i)**2*dtldt(i)))
+!!-tht
 !
 ! dboydt is the integrand of cape change.
 !
-            dboydt(i,k) = ((dtpdt(i,k)/tp(i,k)+1._r8/(1._r8+1.608_r8*qstp(i,k)-q(i,mx(i)))* &
-                          (1.608_r8 * dqsdtp(i,k) * dtpdt(i,k) -dqbdt(i))) - (dtmdt(i,k)/t(i,k)+0.608_r8/ &
-                          (1._r8+0.608_r8*q(i,k))*dqmdt(i,k)))*grav*thetavp(i,k)/thetavm(i,k)
+            dboydt(i,k) = ((dtpdt(i,k)/tp(i,k) &
+                           +1._r8   /(1._r8+1.608_r8*qstp(i,k)-q(i,mx(i)))  &
+                            *(1.608_r8*dqsdtp(i,k)*dtpdt(i,k)-dqbdt(i))) &
+                          -(dtmdt(i,k)/t (i,k) &
+                           +0.608_r8/(1._r8+0.608_r8*q(i,k)              )  &
+                            *dqmdt(i,k))  &
+                          )*grav*thetavp(i,k)/thetavm(i,k)
          end if
       end do
    end do
@@ -4070,14 +4164,16 @@ subroutine closure(lchnk   , &
    do k = msg + 1,pver
       do i = il1g,il2g
          if (k > lcl(i) .and. k < mx(i)) then
-            thetavp(i,k) = tp(i,k)* (1000._r8/p(i,k))** (rd/cp)*(1._r8+0.608_r8*q(i,mx(i)))
-            thetavm(i,k) = t(i,k)* (1000._r8/p(i,k))** (rd/cp)*(1._r8+0.608_r8*q(i,k))
+            thetavp(i,k) = tp(i,k)* (1000._r8/p(i,k))**(rd/cp) *(1._r8+0.608_r8*q(i,mx(i)))
+            thetavm(i,k) = t (i,k)* (1000._r8/p(i,k))**(rd/cp) *(1._r8+0.608_r8*q(i,k    ))
 !
 ! dboydt is the integrand of cape change.
 !
-            dboydt(i,k) = (dtbdt(i)/t(i,mx(i))+0.608_r8/ (1._r8+0.608_r8*q(i,mx(i)))*dqbdt(i)- &
-                          dtmdt(i,k)/t(i,k)-0.608_r8/ (1._r8+0.608_r8*q(i,k))*dqmdt(i,k))* &
-                          grav*thetavp(i,k)/thetavm(i,k)
+            dboydt(i,k) = (dtbdt(i  )/t(i,mx(i)) &
+                          +0.608_r8/(1._r8+0.608_r8*q(i,mx(i)))*dqbdt(i  ) &
+                          -dtmdt(i,k)/t(i,k    ) &
+                          -0.608_r8/(1._r8+0.608_r8*q(i,k    ))*dqmdt(i,k) &
+                          )*grav*thetavp(i,k)/thetavm(i,k)
          end if
       end do
    end do
@@ -4198,25 +4294,37 @@ subroutine q1q2_pjr(lchnk   , &
       kbm = min(kbm,mx(i))
    end do
 
+  !do k =ktm,pver-1
+  !  do i=il1g,il2g
+  !    tu(i,k)=su(i,k)-grav*zf(i,k)/(cp*(1._r8+cpvir*qu(i,k)))
+  !    td(i,k)=sd(i,k)-grav*zf(i,k)/(cp*(1._r8+cpvir*qd(i,k)))
+  !  enddo
+  !enddo
+
    do k = ktm,pver-1
       do i = il1g,il2g
          emc = -cu (i,k)               &         ! condensation in updraft
                +evp(i,k)                         ! evaporating rain in downdraft
 
+        !rlcu0=(1.-dcol*(tu(i,k  )-tmelt))/(1._r8+cpvir*qu(i,k  ))
+        !rlcu1=(1.-dcol*(tu(i,k+1)-tmelt))/(1._r8+cpvir*qu(i,k+1))
+        !rlcd0=(1.-dcol*(td(i,k  )-tmelt))/(1._r8+cpvir*qd(i,k  ))
+        !rlcd1=(1.-dcol*(td(i,k+1)-tmelt))/(1._r8+cpvir*qd(i,k+1))
+
          dsdt(i,k) = -rl/cp*emc &
-                     + (+mu(i,k+1)* (su(i,k+1)-shat(i,k+1)) &
-                        -mu(i,k)*   (su(i,k)-shat(i,k)) &
+                     + ( mu(i,k+1)* (su(i,k+1)-shat(i,k+1)) &
+                        -mu(i,k  )* (su(i,k  )-shat(i,k  )) &
                         +md(i,k+1)* (sd(i,k+1)-shat(i,k+1)) &
-                        -md(i,k)*   (sd(i,k)-shat(i,k)) &
+                        -md(i,k  )* (sd(i,k  )-shat(i,k  )) &
                        )/dp(i,k)
 
          if (zmconv_microp) dsdt(i,k) = dsdt(i,k) + latice/cp*loc_conv%frz(i,k)
 
          dqdt(i,k) = emc + &
-                    (+mu(i,k+1)* (qu(i,k+1)-qhat(i,k+1)) &
-                     -mu(i,k)*   (qu(i,k)-qhat(i,k)) &
+                    ( mu(i,k+1)* (qu(i,k+1)-qhat(i,k+1)) &
+                     -mu(i,k  )* (qu(i,k  )-qhat(i,k  )) &
                      +md(i,k+1)* (qd(i,k+1)-qhat(i,k+1)) &
-                     -md(i,k)*   (qd(i,k)-qhat(i,k)) &
+                     -md(i,k  )* (qd(i,k  )-qhat(i,k  )) &
                     )/dp(i,k)
 
          dl(i,k) = du(i,k)*ql(i,k+1)
@@ -4409,10 +4517,10 @@ subroutine buoyan_dilute(lchnk   ,ncol    , &
 #ifdef PERGRO
    do k = pver,msg + 1,-1
       do i = 1,ncol
-!+tht: use correct total mse
-         hmn(i) = cp*t(i,k) + grav*z(i,k) + rl*q(i,k)
-        !hmn(i) =(cp+q(i,k)*cpliq)*t(i,k)/(1._r8+q(i,k)) + (1._r8+q(i,k)/eps1)/(1._r8+q(i,k))*grav*z(i,k) &
-        !       +(rl-(cpliq-cpwv)*(t(i,k)-tfreez))*q(i,k)
+!+tht: use correct total mse -- moist thermo
+        !hmn(i) = cp*t(i,k) + grav*z(i,k) + rl*q(i,k)
+         hmn(i) =(cp+q(i,k)*cpliq)*t(i,k)/(1._r8+q(i,k)) + (1._r8+q(i,k)/eps1)/(1._r8+q(i,k))*grav*z(i,k) &
+                +(rl-(cpliq-cpwv)*(t(i,k)-tfreez))*q(i,k)
 !-tht
 
 !
@@ -4428,10 +4536,10 @@ subroutine buoyan_dilute(lchnk   ,ncol    , &
 #else
    do k = pver,msg + 1,-1
       do i = 1,ncol
-!+tht: use total mse
-         hmn(i) = cp*t(i,k) + grav*z(i,k) + rl*q(i,k)
-        !hmn(i) =(cp+q(i,k)*cpliq)*t(i,k)/(1._r8+q(i,k)) + (1._r8+q(i,k)/eps1)/(1._r8+q(i,k))*grav*z(i,k) &
-        !       +(rl-(cpliq-cpwv)*(t(i,k)-tfreez))*q(i,k)
+!+tht: use total mse -- moist thermo
+        !hmn(i) = cp*t(i,k) + grav*z(i,k) + rl*q(i,k)
+         hmn(i) =(cp+q(i,k)*cpliq)*t(i,k)/(1._r8+q(i,k)) + (1._r8+q(i,k)/eps1)/(1._r8+q(i,k))*grav*z(i,k) &
+                +(rl-(cpliq-cpwv)*(t(i,k)-tfreez))*q(i,k)
 !-tht
          if (k >= nint(pblt(i)) .and. k <= lon(i) .and. hmn(i) > hmax(i)) then
             hmax(i) = hmn(i)

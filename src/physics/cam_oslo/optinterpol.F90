@@ -85,15 +85,19 @@ subroutine interpol0 (lchnk, ncol, daylight, Nnatk, omega, gass, bex, ske, lw_on
           do icol=1,ncol
 
 !           if(Nnatk(icol,k,kcomp)>0.0_r8) then
-           if(daylight(icol)) then
-           do i=1,nbands   ! i = wavelength index
-              omega(icol,k,kcomp,i)=om0(i)
-              gass(icol,k,kcomp,i)=g0(i) 
-              bex(icol,k,kcomp,i)=be0(i)
-              ske(icol,k,kcomp,i)=ke0(i)
-           end do          ! i
-           endif  ! daylight        
-
+             if(daylight(icol)) then
+               do i=1,nbands   ! i = wavelength index
+                omega(icol,k,kcomp,i)=om0(i)
+                gass(icol,k,kcomp,i)=g0(i) 
+                bex(icol,k,kcomp,i)=be0(i)
+                ske(icol,k,kcomp,i)=ke0(i)
+              end do          ! i
+           
+           else  ! daylight 
+! Need be and ke in   nband=4 for lw calculation    
+              bex(icol,k,kcomp,4)=be0(4)
+              ske(icol,k,kcomp,4)=ke0(4)
+           end if ! daylight
           end do ! icol
         end do ! k
 
@@ -358,6 +362,49 @@ subroutine interpol1 (lchnk, ncol, daylight, xrh, irh1, mplus10, Nnatk, xfombg, 
 !      if(bex(icol,k,kc10,8)<1.e-20_r8) then
 !        write(*,995) 'bex(8)=', kc10, t_xrh, t_xct, t_xfac, t_xfombg, bex(icol,k,kc10,8)
 !      endif
+       else  ! daylight
+
+
+!ccccccccc1ccccccccc2ccccccccc3ccccccccc4ccccccccc5ccccccccc6ccccccccc7cc
+!  aerosol extinction used for size information in LW  
+
+      i=4
+
+!     end points as basis for multidimentional linear interpolation  
+      opt4d(1,1,1,1)=be1(i,t_irh1,t_ifo1,t_ict1,t_ifc1)
+      opt4d(1,1,1,2)=be1(i,t_irh1,t_ifo1,t_ict1,t_ifc2)
+      opt4d(1,1,2,1)=be1(i,t_irh1,t_ifo1,t_ict2,t_ifc1)
+      opt4d(1,1,2,2)=be1(i,t_irh1,t_ifo1,t_ict2,t_ifc2)
+      opt4d(1,2,1,1)=be1(i,t_irh1,t_ifo2,t_ict1,t_ifc1)
+      opt4d(1,2,1,2)=be1(i,t_irh1,t_ifo2,t_ict1,t_ifc2)
+      opt4d(1,2,2,1)=be1(i,t_irh1,t_ifo2,t_ict2,t_ifc1)
+      opt4d(1,2,2,2)=be1(i,t_irh1,t_ifo2,t_ict2,t_ifc2)
+      opt4d(2,1,1,1)=be1(i,t_irh2,t_ifo1,t_ict1,t_ifc1)
+      opt4d(2,1,1,2)=be1(i,t_irh2,t_ifo1,t_ict1,t_ifc2)
+      opt4d(2,1,2,1)=be1(i,t_irh2,t_ifo1,t_ict2,t_ifc1)
+      opt4d(2,1,2,2)=be1(i,t_irh2,t_ifo1,t_ict2,t_ifc2)
+      opt4d(2,2,1,1)=be1(i,t_irh2,t_ifo2,t_ict1,t_ifc1)
+      opt4d(2,2,1,2)=be1(i,t_irh2,t_ifo2,t_ict1,t_ifc2)
+      opt4d(2,2,2,1)=be1(i,t_irh2,t_ifo2,t_ict2,t_ifc1)
+      opt4d(2,2,2,2)=be1(i,t_irh2,t_ifo2,t_ict2,t_ifc2)
+
+!     interpolation in the fac, cat and fombg dimensions
+      call lininterpol4dim (d2mx, dxm1, invd, opt4d, bex1, bex2)
+
+      bex1=max(bex1,1.e-30_r8)
+      bex2=max(bex2,1.e-30_r8)
+
+!     finally, interpolation in the rh dimension
+      if(t_xrh <= 0.37_r8) then
+        bex(icol,k,kc10,i)=((t_rh2-t_xrh)*bex1+(t_xrh-t_rh1)*bex2) &
+            /(t_rh2-t_rh1)    
+      else
+        a=(log(bex2)-log(bex1))/(t_rh2-t_rh1)
+        b=(t_rh2*log(bex1)-t_rh1*log(bex2))/(t_rh2-t_rh1)
+        bex(icol,k,kc10,i)=e**(a*t_xrh+b)
+      endif
+
+       endif  ! daylight
 
 
       do i=4,4            ! i = wavelength index
@@ -406,7 +453,7 @@ subroutine interpol1 (lchnk, ncol, daylight, xrh, irh1, mplus10, Nnatk, xfombg, 
 
       end do ! i
 
-       endif  ! daylight
+
 
       if (lw_on) then
  
@@ -674,6 +721,43 @@ subroutine interpol2to3 (lchnk, ncol, daylight, xrh, irh1, mplus10, Nnatk, &
       endif
 
       end do ! i
+       else  ! daylight
+
+
+
+!ccccccccc1ccccccccc2ccccccccc3ccccccccc4ccccccccc5ccccccccc6ccccccccc7cc
+!  aerosol extinction used for LW size information
+
+      i=4
+!     end points as basis for multidimentional linear interpolation  
+      opt3d(1,1,1)=be2to3(i,t_irh1,t_ict1,t_ifc1,kcomp)
+      opt3d(1,1,2)=be2to3(i,t_irh1,t_ict1,t_ifc2,kcomp)
+      opt3d(1,2,1)=be2to3(i,t_irh1,t_ict2,t_ifc1,kcomp)
+      opt3d(1,2,2)=be2to3(i,t_irh1,t_ict2,t_ifc2,kcomp)
+      opt3d(2,1,1)=be2to3(i,t_irh2,t_ict1,t_ifc1,kcomp)
+      opt3d(2,1,2)=be2to3(i,t_irh2,t_ict1,t_ifc2,kcomp)
+      opt3d(2,2,1)=be2to3(i,t_irh2,t_ict2,t_ifc1,kcomp)
+      opt3d(2,2,2)=be2to3(i,t_irh2,t_ict2,t_ifc2,kcomp)
+
+!     interpolation in the (fac and) cat dimension
+      call lininterpol3dim (d2mx, dxm1, invd, opt3d, bex1, bex2)
+
+      bex1=max(bex1,1.e-30)
+      bex2=max(bex2,1.e-30)
+
+!     finally, interpolation in the rh dimension
+!      write(*,*) 'Before bex'
+      if(t_xrh <= 0.37) then
+       bex(icol,k,kc10,i)=((t_rh2-t_xrh)*bex1+(t_xrh-t_rh1)*bex2) &
+            /(t_rh2-t_rh1)    
+      else
+        a=(log(bex2)-log(bex1))/(t_rh2-t_rh1)
+        b=(t_rh2*log(bex1)-t_rh1*log(bex2))/(t_rh2-t_rh1)
+        bex(icol,k,kc10,i)=e**(a*t_xrh+b)
+      endif
+
+       endif  ! daylight
+
 
 
       do i=4,4            ! i = wavelength index
@@ -710,7 +794,7 @@ subroutine interpol2to3 (lchnk, ncol, daylight, xrh, irh1, mplus10, Nnatk, &
 
       end do ! i
 
-       endif  ! daylight
+
 
       if (lw_on) then
 
@@ -1051,6 +1135,68 @@ subroutine interpol4 (lchnk, ncol, daylight, xrh, irh1, mplus10, Nnatk, xfbcbg, 
       endif
 
       end do ! i
+       else  ! daylight
+
+
+
+!ccccccccc1ccccccccc2ccccccccc3ccccccccc4ccccccccc5ccccccccc6ccccccccc7cc
+!  aerosol extinction called for use in size estimate for use in LW   
+      i=4
+
+      opt5d(1,1,1,1,1)=be4(i,t_irh1,t_ifb1,t_ict1,t_ifc1,t_ifa1)
+      opt5d(1,1,1,1,2)=be4(i,t_irh1,t_ifb1,t_ict1,t_ifc1,t_ifa2)
+      opt5d(1,1,1,2,1)=be4(i,t_irh1,t_ifb1,t_ict1,t_ifc2,t_ifa1)
+      opt5d(1,1,1,2,2)=be4(i,t_irh1,t_ifb1,t_ict1,t_ifc2,t_ifa2)
+      opt5d(1,1,2,1,1)=be4(i,t_irh1,t_ifb1,t_ict2,t_ifc1,t_ifa1)
+      opt5d(1,1,2,1,2)=be4(i,t_irh1,t_ifb1,t_ict2,t_ifc1,t_ifa2)
+      opt5d(1,1,2,2,1)=be4(i,t_irh1,t_ifb1,t_ict2,t_ifc2,t_ifa1)
+      opt5d(1,1,2,2,2)=be4(i,t_irh1,t_ifb1,t_ict2,t_ifc2,t_ifa2)
+      opt5d(1,2,1,1,1)=be4(i,t_irh1,t_ifb2,t_ict1,t_ifc1,t_ifa1)
+      opt5d(1,2,1,1,2)=be4(i,t_irh1,t_ifb2,t_ict1,t_ifc1,t_ifa2)
+      opt5d(1,2,1,2,1)=be4(i,t_irh1,t_ifb2,t_ict1,t_ifc2,t_ifa1)
+      opt5d(1,2,1,2,2)=be4(i,t_irh1,t_ifb2,t_ict1,t_ifc2,t_ifa2)
+      opt5d(1,2,2,1,1)=be4(i,t_irh1,t_ifb2,t_ict2,t_ifc1,t_ifa1)
+      opt5d(1,2,2,1,2)=be4(i,t_irh1,t_ifb2,t_ict2,t_ifc1,t_ifa2)
+      opt5d(1,2,2,2,1)=be4(i,t_irh1,t_ifb2,t_ict2,t_ifc2,t_ifa1)
+      opt5d(1,2,2,2,2)=be4(i,t_irh1,t_ifb2,t_ict2,t_ifc2,t_ifa2)
+      opt5d(2,1,1,1,1)=be4(i,t_irh2,t_ifb1,t_ict1,t_ifc1,t_ifa1)
+      opt5d(2,1,1,1,2)=be4(i,t_irh2,t_ifb1,t_ict1,t_ifc1,t_ifa2)
+      opt5d(2,1,1,2,1)=be4(i,t_irh2,t_ifb1,t_ict1,t_ifc2,t_ifa1)
+      opt5d(2,1,1,2,2)=be4(i,t_irh2,t_ifb1,t_ict1,t_ifc2,t_ifa2)
+      opt5d(2,1,2,1,1)=be4(i,t_irh2,t_ifb1,t_ict2,t_ifc1,t_ifa1)
+      opt5d(2,1,2,1,2)=be4(i,t_irh2,t_ifb1,t_ict2,t_ifc1,t_ifa2)
+      opt5d(2,1,2,2,1)=be4(i,t_irh2,t_ifb1,t_ict2,t_ifc2,t_ifa1)
+      opt5d(2,1,2,2,2)=be4(i,t_irh2,t_ifb1,t_ict2,t_ifc2,t_ifa2)
+      opt5d(2,2,1,1,1)=be4(i,t_irh2,t_ifb2,t_ict1,t_ifc1,t_ifa1)
+      opt5d(2,2,1,1,2)=be4(i,t_irh2,t_ifb2,t_ict1,t_ifc1,t_ifa2)
+      opt5d(2,2,1,2,1)=be4(i,t_irh2,t_ifb2,t_ict1,t_ifc2,t_ifa1)
+      opt5d(2,2,1,2,2)=be4(i,t_irh2,t_ifb2,t_ict1,t_ifc2,t_ifa2)
+      opt5d(2,2,2,1,1)=be4(i,t_irh2,t_ifb2,t_ict2,t_ifc1,t_ifa1)
+      opt5d(2,2,2,1,2)=be4(i,t_irh2,t_ifb2,t_ict2,t_ifc1,t_ifa2)
+      opt5d(2,2,2,2,1)=be4(i,t_irh2,t_ifb2,t_ict2,t_ifc2,t_ifa1)
+      opt5d(2,2,2,2,2)=be4(i,t_irh2,t_ifb2,t_ict2,t_ifc2,t_ifa2)
+
+!     interpolation in the faq, fac, cat and fbcbg dimensions
+      call lininterpol5dim (d2mx, dxm1, invd, opt5d, bex1, bex2)
+
+      bex1=max(bex1,1.e-30_r8)
+      bex2=max(bex2,1.e-30_r8)
+
+!     finally, interpolation in the rh dimension 
+!      write(*,*) 'Before bex'
+      if(t_xrh <= 0.37_r8) then
+       bex(icol,k,kc10,i)=((t_rh2-t_xrh)*bex1+(t_xrh-t_rh1)*bex2) &
+            /(t_rh2-t_rh1)    
+      else
+        a=(log(bex2)-log(bex1))/(t_rh2-t_rh1)
+        b=(t_rh2*log(bex1)-t_rh1*log(bex2))/(t_rh2-t_rh1)
+        bex(icol,k,kc10,i)=e**(a*t_xrh+b)
+      endif
+
+       endif  ! daylight
+
+
+
 
 
       do i=4,4            ! i = wavelength index
@@ -1110,7 +1256,7 @@ subroutine interpol4 (lchnk, ncol, daylight, xrh, irh1, mplus10, Nnatk, xfbcbg, 
 
       end do ! i
 
-       endif  ! lw
+
 
       if (lw_on) then
 
@@ -1471,6 +1617,64 @@ subroutine interpol5to10 (lchnk, ncol, daylight, xrh, irh1, Nnatk, xct, ict1, &
       endif
 
       end do ! i
+       else  ! daylight
+
+
+!ccccccccc1ccccccccc2ccccccccc3ccccccccc4ccccccccc5ccccccccc6ccccccccc7cc
+!  aerosol extinction  used for aerosol size estimate needed for LW calculations
+      i=4
+      opt5d(1,1,1,1,1)=be5to10(i,t_irh1,t_ict1,t_ifc1,t_ifb1,t_ifa1,kcomp)
+      opt5d(1,1,1,1,2)=be5to10(i,t_irh1,t_ict1,t_ifc1,t_ifb1,t_ifa2,kcomp)
+      opt5d(1,1,1,2,1)=be5to10(i,t_irh1,t_ict1,t_ifc1,t_ifb2,t_ifa1,kcomp)
+      opt5d(1,1,1,2,2)=be5to10(i,t_irh1,t_ict1,t_ifc1,t_ifb2,t_ifa2,kcomp)
+      opt5d(1,1,2,1,1)=be5to10(i,t_irh1,t_ict1,t_ifc2,t_ifb1,t_ifa1,kcomp)
+      opt5d(1,1,2,1,2)=be5to10(i,t_irh1,t_ict1,t_ifc2,t_ifb1,t_ifa2,kcomp)
+      opt5d(1,1,2,2,1)=be5to10(i,t_irh1,t_ict1,t_ifc2,t_ifb2,t_ifa1,kcomp)
+      opt5d(1,1,2,2,2)=be5to10(i,t_irh1,t_ict1,t_ifc2,t_ifb2,t_ifa2,kcomp)
+      opt5d(1,2,1,1,1)=be5to10(i,t_irh1,t_ict2,t_ifc1,t_ifb1,t_ifa1,kcomp)
+      opt5d(1,2,1,1,2)=be5to10(i,t_irh1,t_ict2,t_ifc1,t_ifb1,t_ifa2,kcomp)
+      opt5d(1,2,1,2,1)=be5to10(i,t_irh1,t_ict2,t_ifc1,t_ifb2,t_ifa1,kcomp)
+      opt5d(1,2,1,2,2)=be5to10(i,t_irh1,t_ict2,t_ifc1,t_ifb2,t_ifa2,kcomp)
+      opt5d(1,2,2,1,1)=be5to10(i,t_irh1,t_ict2,t_ifc2,t_ifb1,t_ifa1,kcomp)
+      opt5d(1,2,2,1,2)=be5to10(i,t_irh1,t_ict2,t_ifc2,t_ifb1,t_ifa2,kcomp)
+      opt5d(1,2,2,2,1)=be5to10(i,t_irh1,t_ict2,t_ifc2,t_ifb2,t_ifa1,kcomp)
+      opt5d(1,2,2,2,2)=be5to10(i,t_irh1,t_ict2,t_ifc2,t_ifb2,t_ifa2,kcomp)
+      opt5d(2,1,1,1,1)=be5to10(i,t_irh2,t_ict1,t_ifc1,t_ifb1,t_ifa1,kcomp)
+      opt5d(2,1,1,1,2)=be5to10(i,t_irh2,t_ict1,t_ifc1,t_ifb1,t_ifa2,kcomp)
+      opt5d(2,1,1,2,1)=be5to10(i,t_irh2,t_ict1,t_ifc1,t_ifb2,t_ifa1,kcomp)
+      opt5d(2,1,1,2,2)=be5to10(i,t_irh2,t_ict1,t_ifc1,t_ifb2,t_ifa2,kcomp)
+      opt5d(2,1,2,1,1)=be5to10(i,t_irh2,t_ict1,t_ifc2,t_ifb1,t_ifa1,kcomp)
+      opt5d(2,1,2,1,2)=be5to10(i,t_irh2,t_ict1,t_ifc2,t_ifb1,t_ifa2,kcomp)
+      opt5d(2,1,2,2,1)=be5to10(i,t_irh2,t_ict1,t_ifc2,t_ifb2,t_ifa1,kcomp)
+      opt5d(2,1,2,2,2)=be5to10(i,t_irh2,t_ict1,t_ifc2,t_ifb2,t_ifa2,kcomp)
+      opt5d(2,2,1,1,1)=be5to10(i,t_irh2,t_ict2,t_ifc1,t_ifb1,t_ifa1,kcomp)
+      opt5d(2,2,1,1,2)=be5to10(i,t_irh2,t_ict2,t_ifc1,t_ifb1,t_ifa2,kcomp)
+      opt5d(2,2,1,2,1)=be5to10(i,t_irh2,t_ict2,t_ifc1,t_ifb2,t_ifa1,kcomp)
+      opt5d(2,2,1,2,2)=be5to10(i,t_irh2,t_ict2,t_ifc1,t_ifb2,t_ifa2,kcomp)
+      opt5d(2,2,2,1,1)=be5to10(i,t_irh2,t_ict2,t_ifc2,t_ifb1,t_ifa1,kcomp)
+      opt5d(2,2,2,1,2)=be5to10(i,t_irh2,t_ict2,t_ifc2,t_ifb1,t_ifa2,kcomp)
+      opt5d(2,2,2,2,1)=be5to10(i,t_irh2,t_ict2,t_ifc2,t_ifb2,t_ifa1,kcomp)
+      opt5d(2,2,2,2,2)=be5to10(i,t_irh2,t_ict2,t_ifc2,t_ifb2,t_ifa2,kcomp)
+
+!     interpolation in the faq, fbc, fac and cat dimensions
+      call lininterpol5dim (d2mx, dxm1, invd, opt5d, bex1, bex2)
+
+      bex1=max(bex1,1.e-30_r8)
+      bex2=max(bex2,1.e-30_r8)
+
+!     finally, interpolation in the rh dimension 
+!      write(*,*) 'Before bex'
+      if(t_xrh <= 0.37_r8) then
+       bex(icol,k,kcomp,i)=((t_rh2-t_xrh)*bex1+(t_xrh-t_rh1)*bex2) &
+            /(t_rh2-t_rh1)    
+      else
+        a=(log(bex2)-log(bex1))/(t_rh2-t_rh1)
+        b=(t_rh2*log(bex1)-t_rh1*log(bex2))/(t_rh2-t_rh1)
+        bex(icol,k,kcomp,i)=e**(a*t_xrh+b)
+      endif
+
+       endif  ! daylight
+
 
 
       do i=4,4            ! i = wavelength index
@@ -1530,7 +1734,7 @@ subroutine interpol5to10 (lchnk, ncol, daylight, xrh, irh1, Nnatk, xct, ict1, &
 
       end do ! i
 
-       endif  ! daylight
+
       
       if (lw_on) then
 
