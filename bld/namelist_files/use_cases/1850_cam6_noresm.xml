@@ -107,7 +107,7 @@
 
 <!--prescribed_strataero_cycle_yr>  1850          </prescribed_strataero_cycle_yr-->
 
-<clubb_gamma_coef hgrid="1.9x2.5">      0.258     </clubb_gamma_coef>
+<clubb_gamma_coef hgrid="1.9x2.5">      0.264     </clubb_gamma_coef>
 
 <!-- dyn_fv-->
 <fv_am_correction> .true. </fv_am_correction>
