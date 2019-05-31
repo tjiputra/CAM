@@ -3593,7 +3593,15 @@ subroutine cldprp(lchnk   , &
             end if
          end do
       end do
- 
+
+! initialise tu (moist thermo)
+       do k = pver,msg + 2,-1
+         do i = 1,il2g
+               tu(i,k) = (hu(i,k)-grav*zf(i,k)-(1._r8+dcol*tmelt)*rl*qu(i,k)) &
+                                /(cp*( 1._r8 + (cpvir-dcol*(rl/cp))*qu(i,k) ))
+         end do
+      end do
+
       do i = 1,il2g
          done(i) = .false.
       end do
@@ -3885,6 +3893,7 @@ subroutine cldprp(lchnk   , &
       qd(i,jd(i)) = qds(i,jd(i))
 !+tht moist thermo
      !sd(i,jd(i)) = (hd(i,jd(i)) - rl*qd(i,jd(i)))/cp
+ k=jd(i) ! BUG FIX 2019 05 24
       sd(i,jd(i)) = (hd(i,jd(i)) - (1._r8-dcol*(td(i,k)-tmelt))*rl*qd(i,jd(i)))/((1._r8+cpvir*qd(i,k))*cp)
       td(i,k) = sd(i,k) - grav/((1._r8+cpvir*qd(i,k))*cp)*zf(i,k)
 !-tht
