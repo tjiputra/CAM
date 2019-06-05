@@ -110,6 +110,8 @@
 <clubb_gamma_coef hgrid="1.9x2.5">      0.264     </clubb_gamma_coef>
 
 <!-- dyn_fv-->
+<fv_high_order_top> .false. </fv_high_order_top>
+<fv_am_geom_crrct> .true. </fv_am_geom_crrct>
 <fv_am_correction> .true. </fv_am_correction>
 <fv_am_fixer>      .true. </fv_am_fixer>
 <fv_am_fix_lbl>    .true. </fv_am_fix_lbl>

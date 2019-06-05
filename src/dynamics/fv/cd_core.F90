@@ -12,7 +12,7 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
                    mlt, ncx, ncy, nmfx, nmfy, iremote,            &
                    cxtag, cytag, mfxtag, mfytag,                  &
                    cxreqs, cyreqs, mfxreqs, mfyreqs,              &
-                   kmtp, am_correction, am_fixer, dod, don ,high_order_top)
+                   kmtp, am_correction, am_geom_crrct, am_fixer, dod, don ,high_order_top)
 
    ! Dynamical core for both C- and D-grid Lagrangian dynamics
    !
@@ -82,6 +82,7 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
    real(r8), intent(in) :: del2coef
    integer,  intent(in) :: kmtp           ! range of levels (1:kmtp) where order is reduced
    logical,  intent(in) :: am_correction  ! logical switch for correction (applied here)
+   logical,  intent(in) :: am_geom_crrct  ! logical switch for correction (applied here)
    logical,  intent(in) :: am_fixer       ! logical switch for fixer (generate out args)
    logical,  intent(in) :: high_order_top ! use uniform 4th order everywhere (incl. model top)
 
@@ -295,9 +296,11 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
    real(r8) :: ptr(grid%im,grid%jfirst-1:grid%jlast+1,grid%kfirst:grid%klast+1)
 
    logical :: sw_am_corr
+   logical :: am_press_crrct !+tht 11.05.2019
+   real(r8):: wg_hiord       !+tht 11.05.2019
 
 !+tht 12.10.2017
-   real(r8) tpr
+   real(r8) tpr, acap
 !-tht 12.10.2017
 
    !******************************************************************
@@ -380,6 +383,15 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
    endif
 #endif
 
+!+tht 11.05.2019
+   am_press_crrct = am_geom_crrct.and.am_correction
+   if (am_press_crrct) then
+     wg_hiord       =-D1_0
+   else
+     wg_hiord       = D0_0
+   endif
+!-tht 11.05.2019
+
    npes_yz  = grid%npes_yz
 
    im       = grid%im
@@ -408,14 +420,21 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
          kelp(grid%im,grid%jfirst-1:grid%jlast ,grid%kfirst:grid%klast  ), &
          dpn(grid%im,grid%jfirst  :grid%jlast  ,grid%kfirst:grid%klast  ), &
          dpo(grid%im,grid%jfirst  :grid%jlast  ,grid%kfirst:grid%klast  ) )
+!+tht 12/04/2019
+!    define polar cap contributions correctly
+      acap=1._r8/4._r8               ! effective AM/MoI contribution from polar caps
+!-tht 12/04/2019
+   endif
+   if (am_press_crrct) then 
+      allocate( &
+         dpr(grid%im,grid%jfirst-1:grid%jlast+1,grid%kfirst:grid%klast  )  )
+      xakap      = 1._r8/cap3vc(1,jfirst,kfirst)
    endif
    if (am_correction) then 
       allocate( &
-         dpr(grid%im,grid%jfirst-1:grid%jlast+1,grid%kfirst:grid%klast  ), &
          ddpu(grid%im,grid%jfirst  :grid%jlast ,grid%kfirst:grid%klast  ), &
          dpns(grid%jfirst:grid%jlast,grid%kfirst:grid%klast), &
          ddus(grid%jfirst:grid%jlast,grid%kfirst:grid%klast) )
-      xakap      = 1._r8/cap3vc(1,jfirst,kfirst)
 !+tht 04.07.2017
       ddus = 0._r8
       ucc  = 0._r8
@@ -746,7 +765,7 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
                                 ua(1,jfirst-ng_d,k),       va(1,jfirst-ng_s,k),     &
                                 uc(1,jfirst-ng_d,k),       vc(1,jfirst-2,k),        &
                                 u_cen(1,jfirst-ng_d,k), v_cen(1,jfirst-ng_s,k),     &
-                                reset_winds, met_rlx(k), am_correction)
+                                reset_winds, met_rlx(k), am_geom_crrct)
 
          ! Optionally filter advecting C-grid winds
          if (filtcw .gt. 0) then
@@ -794,7 +813,7 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
                     ua(1,jfirst-ng_d,k),  va(1,jfirst-ng_s,k),        &
                     uc(1,jfirst-ng_d,k),  vc(1,jfirst-2,k),           &
                     ptc(1,jfirst,k),      delpf(1,jfirst-ng_d,k),     &
-                    ptk(1,jfirst,k), tiny, iord, jord, am_correction)
+                    ptk(1,jfirst,k), tiny, iord, jord, am_geom_crrct)
       end do
 
       call FVstopclock(grid,'---C_CORE')
@@ -1058,7 +1077,7 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
       do k = kfirst, klast
          do j = js2g0, jn2g0
 
-            if (am_correction) then
+            if (am_press_crrct) then
 
                do i = 1, im
                   ! AM fix: ensure interior pressure torque vanishes 
@@ -1139,7 +1158,7 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
 
       call FVstartclock(grid,'---C_V_PGRAD')
 
-      if (am_correction) then
+      if (am_press_crrct) then
 !$omp parallel do private(i, j, k)
          ! AM correction (pressure, advective winds): pxc -> ptr
          do k = kfirst, klast+1
@@ -1322,6 +1341,18 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
                   dpo(i,j,k)=(kelp(i,j,k)*cosp(j)+kelp(i,j-1,k)*cosp(j-1))/(cosp(j)+cosp(j-1)) ! A->D
                end do
             end do
+            if (jfirst.eq.1) then
+               do i = 1, im
+                  dpn(i, 2,k)=(help(i,  2 ,k)*cosp(  2 )+acap*help(i, 1,k)*cose( 2))/cosp(  2 )
+                  dpo(i, 2,k)=(kelp(i,  2 ,k)*cosp(  2 )+acap*kelp(i, 1,k)*cose( 2))/cosp(  2 )
+               end do
+            endif
+            if (jlast.eq.jm) then
+               do i = 1, im
+                  dpn(i,jm,k)=(help(i,jm-1,k)*cosp(jm-1)+acap*help(i,jm,k)*cose(jm))/cosp(jm-1)
+                  dpo(i,jm,k)=(kelp(i,jm-1,k)*cosp(jm-1)+acap*kelp(i,jm,k)*cose(jm))/cosp(jm-1)
+               end do
+            endif
          end do
 
          if (am_correction) then 
@@ -1338,7 +1369,7 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
             do k = kfirst, klast
                do j = js2g0, jlast
                   do i = 1, im
-                     ddu(i,j,k)=ddu(i,j,k)* D0_5*(dpo(i,j,k)+dpn(i,j,k)      ) 
+                     ddu(i,j,k)=ddu(i,j,k)* D0_5*(dpo(i,j,k)+dpn(i,j,k)      )      ! new 05/03/2019
                   end do
                end do
             end do
@@ -1347,14 +1378,14 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
             do k = kfirst, klast
                do j = js2g0, jlast
                   ddus(j,k) = ddu(1,j,k) &
-                             + (u(1,j,k) + uc(1,j,k)*D0_5)*ddpu(1,j,k) & 
-                             - vf(1,j,k)*(dpn(1,j,k) - dpo(1,j,k))*D0_5
+                             + (u(1,j,k) + uc(1,j,k)*D0_5)*ddpu(1,j,k) & ! new 05/03/2019
+                             + wg_hiord*vf(1,j,k)*(dpn(1,j,k) - dpo(1,j,k))*D0_5
                   dpns(j,k) = dpn(1,j,k)
                   do i = 2, im
                      ddus(j,k) = ddus(j,k) &
                                 + ddu(i,j,k) &
-                                + (u(i,j,k)+uc(i,j,k)*D0_5)*ddpu(i,j,k) & 
-                                - vf(i,j,k)*(dpn(i,j,k)-dpo(i,j,k))*D0_5
+                                + (u(i,j,k)+uc(i,j,k)*D0_5)*ddpu(i,j,k) & ! new 05/03/2019
+                                + wg_hiord*vf(i,j,k)*(dpn(i,j,k)-dpo(i,j,k))*D0_5
                      dpns(j,k) = dpns(j,k) + dpn(i,j,k)
                   end do
                   ddus(j,k) = ddus(j,k)/dpns(j,k)  
@@ -1381,26 +1412,40 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
          end if ! (am_correction)
  
          if (am_fixer) then
-
+            if (.not.am_geom_crrct) then 
+!$omp parallel do private(i, j, k) 
+             do k = kfirst, klast
+               do j = js2g0, jlast
+                 do i = 1, im
+                  dpn(i,j,k)=(help(i,j,k)        +help(i,j-1,k)          )/(       2._r8     )
+                  dpo(i,j,k)=(kelp(i,j,k)        +kelp(i,j-1,k)          )/(       2._r8     )
+                end do
+               end do
+               if (jfirst.eq.1) then
+                do i = 1, im
+                  dpn(i, 2,k)=(help(i,  2 ,k)    +     help(i, 1,k)         )/(  2._r8 )
+                  dpo(i, 2,k)=(kelp(i,  2 ,k)    +     kelp(i, 1,k)         )/(  2._r8 )
+                end do
+               endif
+               if (jlast.eq.jm) then
+                do i = 1, im
+                  dpn(i,jm,k)=(help(i,jm-1,k)    +     help(i,jm,k)         )/(  2._r8 )
+                  dpo(i,jm,k)=(kelp(i,jm-1,k)    +     kelp(i,jm,k)         )/(  2._r8 )
+                end do
+               endif
+             end do
+            endif
 !$omp parallel do private(i, j, k) 
             do k = kfirst, klast
                do j = js2g0, jlast
                   do i = 1, im
                      don(j,k) = don(j,k) + (cosp(j) + cosp(j-1))*cose(j) &
                                 *(uc(i,j,k)*dpn(i,j,k)                   &
-                                + (u(i,j,k) + cose(j)*oma)*(dpn(i,j,k) - dpo(i,j,k)))
+                                 +(u(i,j,k) + cose(j)*oma)*(dpn(i,j,k)-dpo(i,j,k)))
                      dod(j,k) = dod(j,k) + (cosp(j) + cosp(j-1))*cose(j)**2*dpn(i,j,k)
                   end do
                end do
-
-               ! north pole
-               if (jfirst == 1) then 
-                  do i = 1, im
-                     dod(1,k) = dod(1,k) + grid%acap/(D0_5*im)*cose(1)**2*help(i,1,k)
-                  end do
-               end if
             end do
- 
          end if  ! (am_fixer)
  
          call FVstopclock(grid,'---dp4corr_COMM_2')
@@ -1708,8 +1753,8 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
       end if
       call FVstopclock(grid,'---PRE_D_PGRAD_COMM_1')
 #endif
-
-      if (am_correction) then
+ 
+      if (am_press_crrct) then
          ! AM correction (pressure, prognostic winds): pkc -> ptr
 !$omp parallel do private(i, j, k)
          do k = kfirst, klast+1
@@ -1730,7 +1775,7 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
          end do
       endif
 
-      if (am_correction) then
+      if (am_press_crrct) then
 !$omp parallel do private(i, j, k)
          ! Beware k+1 references directly below (AAM)
          do k = kfirst, klast
@@ -1783,7 +1828,7 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
             cycle
          end if
 
-         if (am_correction) then
+         if (am_press_crrct) then
             do j=js2g1,jn2g0                             ! wk3 needed S
                wk3(1,j) = (wz(1,j,k)+wz(im,j,k)) *       &
                        (ptr(1,j,k) - ptr(im,j,k))
@@ -1833,7 +1878,7 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
 ! N-S walls
 
          do j=js2g0,jn1g1                     ! wk1 needed N
-            if (am_correction) then
+            if (am_press_crrct) then
                do i=1,im
                   wk1(i,j) = (wz(i,j,k) + wz(i,j-1,k))*(ptr(i,j,k) - ptr(i,j-1,k))
                enddo
@@ -1871,7 +1916,7 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
             enddo
          enddo
 
-         if (am_correction) then
+         if (am_press_crrct) then
 
             ! use true pressure for wk1, then update it
             do j = js1g1, jn1g1
@@ -1898,7 +1943,7 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
 !$omp parallel do private(i, j, k, wk, wk1, wk2, wk3)
       do k = kfirst, klast
 
-         if (am_correction) then
+         if (am_press_crrct) then
             do j = js1g1, jn1g1
                wk1(1,j) = dpr(1,j,k) + dpr(im,j,k)
                do i = 2, im
@@ -1947,7 +1992,7 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
         !end do
 !-tht
 
-         if (am_correction) then
+         if (am_geom_crrct) then
             ! apply cos-weighted avg'ing
             do j = js2g0, jn2g0                  ! Assumes wk2 ghosted on N
                do i = 1, im
