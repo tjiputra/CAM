@@ -69,6 +69,7 @@ integer,public, allocatable :: cosp_cnt(:)       ! counter for cosp
 integer,public              :: cosp_cnt_init = 0 !initial value for cosp counter
 
 type rad_out_t
+
    real(r8) :: solin(pcols)         ! Solar incident flux
 
    real(r8) :: qrsc(pcols,pver)
@@ -128,7 +129,12 @@ integer :: irad_always = 0 ! Specifies length of time in timesteps (positive)
                            ! run continuously from the start of an
                            ! initial or restart run
 logical :: use_rad_dt_cosz  = .false. ! if true, use radiation dt for all cosz calculations
-logical :: spectralflux     = .false. ! calculate fluxes (up and down) per band.
+!logical :: spectralflux     = .false. ! calculate fluxes (up and down) per band.
+!#ifdef RFMIPIRF
+!   logical :: spectralflux = .true.  ! calculate fluxes (up and down) per band.
+!#else
+   logical :: spectralflux = .false. ! calculate fluxes (up and down) per band.
+!#endif
 
 ! Physics buffer indices
 integer :: qrs_idx      = 0 
@@ -177,6 +183,11 @@ subroutine radiation_readnl(nlfile)
 
    namelist /radiation_nl/ iradsw, iradlw, irad_always, &
                            use_rad_dt_cosz, spectralflux
+
+!#ifdef RFMIPIRF
+!   spectralflux = .true. ! calculate fluxes (up and down) per band.
+!#endif
+
    !-----------------------------------------------------------------------------
 
    if (masterproc) then
@@ -249,6 +260,7 @@ subroutine radiation_register
 
    ! If the namelist has been configured for preserving the spectral fluxes, then create
    ! physics buffer variables to store the results.
+! legg til #ifndef RFMIPIRF her ogsaa?!
    if (spectralflux) then
       call pbuf_add_field('SU'  , 'global',dtype_r8,(/pcols,pverp,nswbands/), su_idx) ! shortwave upward flux (per band)
       call pbuf_add_field('SD'  , 'global',dtype_r8,(/pcols,pverp,nswbands/), sd_idx) ! shortwave downward flux (per band)
@@ -381,6 +393,7 @@ subroutine radiation_init(pbuf2d)
       call pbuf_set_field(pbuf2d, qrl_idx, 0._r8)
    end if
 
+
    ! Set the radiation timestep for cosz calculations if requested using the adjusted iradsw value from radiation
    if (use_rad_dt_cosz)  then
       dtime  = get_step_size()
@@ -493,6 +506,10 @@ subroutine radiation_init(pbuf2d)
          call addfld('FDS'//diag(icall),      (/ 'ilev' /), 'I', 'W/m2', 'Shortwave downward flux')
          call addfld('FUSC'//diag(icall),     (/ 'ilev' /), 'I', 'W/m2', 'Shortwave clear-sky upward flux')
          call addfld('FDSC'//diag(icall),     (/ 'ilev' /), 'I', 'W/m2', 'Shortwave clear-sky downward flux')
+!#ifdef AEROFFL
+!         call addfld('FDSCDRF', (/ 'ilev' /), 'A', 'W/m2', 'Shortwave clear-sky downward flux')   
+!         call addfld('FUSCDRF', (/ 'ilev' /), 'A', 'W/m2', 'Shortwave clear-sky upward flux')
+!#endif
 
          if (history_amwg) then
             call add_default('SOLIN'//diag(icall),   1, ' ')
@@ -511,6 +528,11 @@ subroutine radiation_init(pbuf2d)
 
       end if
    end do
+
+#ifdef AEROFFL
+      call addfld('FDSCDRF', (/ 'ilev' /), 'A', 'W/m2', 'Shortwave clear-sky downward flux')   
+      call addfld('FUSCDRF', (/ 'ilev' /), 'A', 'W/m2', 'Shortwave clear-sky upward flux')
+#endif
 
    if (scm_crm_mode) then
       call add_default('FUS     ', 1, ' ')
@@ -676,7 +698,11 @@ end subroutine radiation_read_restart
 !===============================================================================
   
 subroutine radiation_tend( &
+!#ifdef SPAERO
+!   state, ptend, pbuf, cam_out, cam_in, net_flx, xcdnc, rd_out)
+!#else
    state, ptend, pbuf, cam_out, cam_in, net_flx, rd_out)
+!#endif
 
    !----------------------------------------------------------------------- 
    ! 
@@ -685,6 +711,10 @@ subroutine radiation_tend( &
    ! Revision history:
    ! 2007-11-05  M. Iacono        Install rrtmg_lw and sw as radiation model.
    ! 2007-12-27  M. Iacono        Modify to use CAM cloud optical properties with rrtmg.
+   !
+   !
+   ! 2019-05-06  A. Kirkevåg: Changes for testing the 
+   !   "simple plumes" aerosols, based on NorESM1 code P. Räisänen.
    !-----------------------------------------------------------------------
     
    use phys_grid,          only: get_rlat_all_p, get_rlon_all_p
@@ -720,6 +750,10 @@ subroutine radiation_tend( &
     use constituents,     only: pcnst
     use oslo_control,     only: oslo_getopts
     use physics_buffer,   only: pbuf_get_index
+!#ifdef SPAERO
+!    use time_manager,     only: get_curr_date
+!    use physconst,        only: rair
+!#endif
 #endif
 
 #ifdef DIRIND
@@ -727,6 +761,9 @@ subroutine radiation_tend( &
     real(r8) volc_fraction_coarse               ! Fraction of volcanic aerosols going to coarse mode
     integer :: band
     character(len=3) :: c3
+#ifdef AEROFFL
+    logical idrf
+#endif
 #endif
 
    ! Arguments
@@ -812,6 +849,19 @@ subroutine radiation_tend( &
    real(r8) :: cld_tau_w_f(nswbands,pcols,pver) ! cloud forward scattered fraction * w * tau
    real(r8) :: cld_lw_abs (nlwbands,pcols,pver) ! cloud absorption optics depth (LW)
 
+!#ifdef SPAERO
+   ! cloud radiative parameters are "in cloud" not "in cell" with SP aerosols
+!   real(r8) :: sp_liq_tau    (nswbands,pcols,pver) ! liquid extinction optical depth
+!   real(r8) :: sp_liq_tau_w  (nswbands,pcols,pver) ! liquid single scattering albedo * tau
+!   real(r8) :: sp_liq_tau_w_g(nswbands,pcols,pver) ! liquid assymetry parameter * tau * w
+!   real(r8) :: sp_liq_tau_w_f(nswbands,pcols,pver) ! liquid forward scattered fraction * tau * w
+!   real(r8) :: sp_cld_tau    (nswbands,pcols,pver) ! liquid extinction optical depth
+!   real(r8) :: sp_cld_tau_w  (nswbands,pcols,pver) ! cloud single scattering albedo * tau
+!   real(r8) :: sp_cld_tau_w_g(nswbands,pcols,pver) ! cloud assymetry parameter * w * tau
+!   real(r8) :: sp_cld_tau_w_f(nswbands,pcols,pver) ! cloud forward scattered fraction * w * tau
+!   real(r8) :: sp_cld_lw_abs (nlwbands,pcols,pver) ! cloud absorption optics depth (LW)
+!#endif
+
    ! cloud radiative parameters are "in cloud" not "in cell"
    real(r8) :: snow_tau    (nswbands,pcols,pver) ! snow extinction optical depth
    real(r8) :: snow_tau_w  (nswbands,pcols,pver) ! snow single scattering albedo * tau
@@ -826,6 +876,12 @@ subroutine radiation_tend( &
    real(r8) :: c_cld_tau_w_g(nswbands,pcols,pver) ! combined cloud assymetry parameter * w * tau
    real(r8) :: c_cld_tau_w_f(nswbands,pcols,pver) ! combined cloud forward scattered fraction * w * tau
    real(r8) :: c_cld_lw_abs (nlwbands,pcols,pver) ! combined cloud absorption optics depth (LW)
+!#ifdef SPAERO   ! and for SP aerosols (only for SW)
+!   real(r8) :: sp_c_cld_tau    (nswbands,pcols,pver) ! combined cloud extinction optical depth
+!   real(r8) :: sp_c_cld_tau_w  (nswbands,pcols,pver) ! combined cloud single scattering albedo * tau
+!   real(r8) :: sp_c_cld_tau_w_g(nswbands,pcols,pver) ! combined cloud assymetry parameter * w * tau
+!   real(r8) :: sp_c_cld_tau_w_f(nswbands,pcols,pver) ! combined cloud forward scattered fraction * w * tau
+!#endif
 
    real(r8) :: sfac(1:nswbands)     ! time varying scaling factors due to Solar Spectral Irrad at 1 A.U. per band
 
@@ -840,6 +896,36 @@ subroutine radiation_tend( &
    real(r8) :: aer_lw_abs (pcols,pver,nlwbands)   ! aerosol absorption optics depth (LW)
 
 #ifdef DIRIND  
+
+!#ifdef SPAERO
+! Aerosol optical properties, simple plume aerosols
+!    real(r8) :: sp_tau (pcols,pver,nswbands) ! aerosol extinction optical depth, simple plumes
+!    real(r8) :: sp_ssa (pcols,pver,nswbands) ! aerosol single scattering albedo, simple plumes
+!    real(r8) :: sp_asy (pcols,pver,nswbands) ! aerosol assymetry parameter, simple plumes 
+!
+! Aerosol optical properties, sum of NorESM + simple plume aerosols
+!    real(r8) :: sp_per_tau    (pcols,0:pver,nswbands) ! aerosol extinction optical depth
+!    real(r8) :: sp_per_tau_w  (pcols,0:pver,nswbands) ! aerosol single scattering albedo * tau
+!    real(r8) :: sp_per_tau_w_g(pcols,0:pver,nswbands) ! aerosol assymetry parameter * w * tau
+!    real(r8) :: sp_per_tau_w_f(pcols,0:pver,nswbands) ! aerosol forward scattered fraction * w * tau
+!
+!    real(r8), intent(out) :: xcdnc(pcols)  ! CDNC modification factor
+!    real(r8) :: re_mult(pcols,pver) ! Multiplication factor of liquid cloud effective radius, simple plumes
+!    real(r8) :: re_multeq1(pcols,pver) ! Dummy multiplication factor (=1.0) of liquid cloud effective radius, simple plumes
+!    real(r8) :: xcdnceq1(pcols) ! Dummy xcdnc 
+!    
+!!ak    real(r8) :: sp_relca(pcols,pver) ! Modified liquid cloud effective radius, simple plumes
+!
+!    real(r8) :: year_fr ! Fractional year (1903.0 is the 0Z on the first of January 1903, Gregorian)
+!
+!    integer  :: yr, mon, day, tod ! date components    
+!#endif
+!#ifdef RFMIPIRF
+!    real(r8) :: per_aod (pcols,pver,nswbands) ! aerosol single scattering albedo 
+!    real(r8) :: per_ssa (pcols,pver,nswbands) ! aerosol single scattering albedo 
+!    real(r8) :: per_asy (pcols,pver,nswbands) ! aerosol assymetry parameter 
+!#endif
+
 ! Local variables used for calculating aerosol optics and direct and indirect forcings.
 ! aodvis and absvis are AOD and absorptive AOD for visible wavelength close to 0.55 um (0.35-0.64)
 ! Note that aodvis and absvis output should be devided by dayfoc to give physical (A)AOD values  
@@ -850,14 +936,11 @@ subroutine radiation_tend( &
 #ifdef AEROCOM
    real(r8) dod440(pcols),dod550(pcols),dod870(pcols),abs550(pcols),abs550alt(pcols)
    real(r8) clearod440(pcols),clearod550(pcols),clearod870(pcols),clearabs550(pcols),clearabs550alt(pcols)
+!#ifdef RFMIPIRF
+!      character(len=2) :: c2
+!#endif  
 #endif  ! AEROCOM
     real(r8) ftem_1d(pcols)             ! work-array to avoid NAN and pcols/ncol confusion
-    real(r8) fsnk(pcols,pverp)          ! generalized fsnt or fsns
-    real(r8) fsnknoa(pcols,pverp)       ! fsnk with virtually no background aerosol included
-    real(r8) fsnknat(pcols,pverp)       ! fsnk with a pure background aerosol is included
-    real(r8) fsnktot(pcols,pverp)       ! fsnk with all aerosols included
-    real(r8) faerobg(pcols,pverp)       ! level background aerosol forcing
-    real(r8) faero(pcols,pverp)         ! level anthropogenic aerosol forcing
     real(r8) Nnatk(pcols,pver,0:nmodes) ! Modal aerosol number concentration
     real(r8) batotlw(pcols,pver,nlwbands)  ! spectral aerosol absportion extinction in LW
     real(r8) rhoda(pcols,pver)          ! air mass density, unit kg/m^3
@@ -875,6 +958,9 @@ subroutine radiation_tend( &
     real(r8) :: volc_g_sun(pcols,pver,nswbands) ! volcanic aerosol g for solar bands, CMIP6
     real(r8) :: volc_ext_earth(pcols,pver,nlwbands) ! volcanic aerosol extinction for terrestrial bands, CMIP6
     real(r8) :: volc_omega_earth(pcols,pver,nlwbands) ! volcanic aerosol SSA for terrestrial bands, CMIP6
+!#ifdef SPAERO
+!   real(r8) deltah_km(pcols,pver)      ! Layer thickness, unit km    
+!#endif
 #endif
 
    real(r8) :: fns(pcols,pverp)     ! net shortwave flux
@@ -999,6 +1085,48 @@ subroutine radiation_tend( &
       
       if (dosw) then
 
+!#ifdef SPAERO
+!*********************************** SPAERO + *********************************************
+! Define anthrop. aerosol optical properties and "cdnc" for the "simple plumes" climatology
+
+!       CALL get_curr_date(yr, mon, day, tod)
+
+! Petri used a hard-coded year for BACCHUS: either 1850, 1975 or 2005
+
+!       yr=2005 
+
+!       year_fr = yr + (calday-1.0_r8) / 365.0_r8
+
+!ak+  Need deltah_km before pmxsub is called, due to cloud optics (-> input to pmxsub later)
+!      do k=1,pver
+!!      NB have to multiply with 10 to get the same values as in pmxsub, due to different p units!
+!          rhoda(1:ncol,k) = state%pmid(1:ncol,k)/(rair*state%t(1:ncol,k))      ! unit kg/m^3
+!          deltah_km(1:ncol,k)=10._r8*1.e-4_r8*(state%pint(1:ncol,k+1)-state%pint(1:ncol,k))/(rhoda(1:ncol,k)*9.8_r8) 
+!      end do
+
+!     initialization
+!      re_mult(1:ncol,1:pver) = 1._r8  
+!      xcdnc(1:ncol) = 1._r8  
+!     for use in calls without the effect of SP aerosols
+!      re_multeq1(1:ncol,1:pver) = 1._r8  
+!      xcdnceq1(1:ncol) = 1._r8  
+!ak-
+
+!       CALL simple_plumes_interface(lchnk, ncol, nswbands,state%phis, &
+!                                    deltah_km, clon, clat, year_fr, & 
+!                                    sp_tau, sp_ssa, sp_asy, re_mult, xcdnc)
+
+! When using year 1850 for the MACv2-SP aerosols, switch them off entirely
+!       IF (yr==1850) THEN 
+!         sp_tau(1:ncol,1:pver,1:nswbands)=0._r8  
+!         sp_ssa(1:ncol,1:pver,1:nswbands)=0._r8  
+!         sp_asy(1:ncol,1:pver,1:nswbands)=0._r8  
+!         re_mult(1:ncol,1:pver) = 1._r8  
+!         xcdnc(1:ncol) = 1._r8  
+!       END IF
+!*********************************** SPAERO - *********************************************
+!#endif
+
          if (oldcldoptics) then
             call ec_ice_optics_sw(state, pbuf, ice_tau, ice_tau_w, ice_tau_w_g, ice_tau_w_f, oldicewp=.false.)
             call slingo_liq_optics_sw(state, pbuf, liq_tau, liq_tau_w, liq_tau_w_g, liq_tau_w_f, oldliqwp=.false.)
@@ -1016,7 +1144,14 @@ subroutine radiation_tend( &
             case ('slingo')
                call slingo_liq_optics_sw(state, pbuf, liq_tau, liq_tau_w, liq_tau_w_g, liq_tau_w_f, oldliqwp=.true.)
             case ('gammadist')
+
+!#ifdef SPAERO
+!              The order of the two calls below has been tested not to make any difference 
+!               call get_liquid_optics_sw(state, pbuf, xcdnceq1, liq_tau, liq_tau_w, liq_tau_w_g, liq_tau_w_f)
+!               call get_liquid_optics_sw(state, pbuf, xcdnc, sp_liq_tau, sp_liq_tau_w, sp_liq_tau_w_g, sp_liq_tau_w_f)
+!#else
                call get_liquid_optics_sw(state, pbuf, liq_tau, liq_tau_w, liq_tau_w_g, liq_tau_w_f)
+!#endif
             case default
                call endrun('liqcldoptics must be either slingo or gammadist')
             end select
@@ -1026,7 +1161,13 @@ subroutine radiation_tend( &
          cld_tau_w(:,:ncol,:)   =  liq_tau_w(:,:ncol,:)   + ice_tau_w(:,:ncol,:)
          cld_tau_w_g(:,:ncol,:) =  liq_tau_w_g(:,:ncol,:) + ice_tau_w_g(:,:ncol,:)
          cld_tau_w_f(:,:ncol,:) =  liq_tau_w_f(:,:ncol,:) + ice_tau_w_f(:,:ncol,:)
- 
+!#ifdef SPAERO
+!         sp_cld_tau(:,:ncol,:)     =  sp_liq_tau(:,:ncol,:)     + ice_tau(:,:ncol,:)
+!         sp_cld_tau_w(:,:ncol,:)   =  sp_liq_tau_w(:,:ncol,:)   + ice_tau_w(:,:ncol,:)
+!         sp_cld_tau_w_g(:,:ncol,:) =  sp_liq_tau_w_g(:,:ncol,:) + ice_tau_w_g(:,:ncol,:)
+!         sp_cld_tau_w_f(:,:ncol,:) =  sp_liq_tau_w_f(:,:ncol,:) + ice_tau_w_f(:,:ncol,:)
+!#endif
+
          if (cldfsnow_idx > 0) then
             ! add in snow
             call get_snow_optics_sw(state, pbuf, snow_tau, snow_tau_w, snow_tau_w_g, snow_tau_w_f)
@@ -1054,11 +1195,38 @@ subroutine radiation_tend( &
                   end if
                end do
             end do
+!#ifdef SPAERO
+!            do i = 1, ncol
+!               do k = 1, pver
+!                  if (cldfprime(i,k) > 0._r8) then
+!                     sp_c_cld_tau(:,i,k)     = ( cldfsnow(i,k)*snow_tau(:,i,k) &
+!                                             + cld(i,k)*sp_cld_tau(:,i,k) )/cldfprime(i,k)
+!                     sp_c_cld_tau_w(:,i,k)   = ( cldfsnow(i,k)*snow_tau_w(:,i,k)  &
+!                                             + cld(i,k)*sp_cld_tau_w(:,i,k) )/cldfprime(i,k)
+!                     sp_c_cld_tau_w_g(:,i,k) = ( cldfsnow(i,k)*snow_tau_w_g(:,i,k) &
+!                                             + cld(i,k)*sp_cld_tau_w_g(:,i,k) )/cldfprime(i,k)
+!                     sp_c_cld_tau_w_f(:,i,k) = ( cldfsnow(i,k)*snow_tau_w_f(:,i,k) &
+!                                             + cld(i,k)*sp_cld_tau_w_f(:,i,k) )/cldfprime(i,k)
+!                  else
+!                     sp_c_cld_tau(:,i,k)     = 0._r8
+!                     sp_c_cld_tau_w(:,i,k)   = 0._r8
+!                     sp_c_cld_tau_w_g(:,i,k) = 0._r8
+!                     sp_c_cld_tau_w_f(:,i,k) = 0._r8
+!                  end if
+!               end do
+!            end do
+!#endif
          else
             c_cld_tau(:,:ncol,:)     = cld_tau(:,:ncol,:)
             c_cld_tau_w(:,:ncol,:)   = cld_tau_w(:,:ncol,:)
             c_cld_tau_w_g(:,:ncol,:) = cld_tau_w_g(:,:ncol,:)
             c_cld_tau_w_f(:,:ncol,:) = cld_tau_w_f(:,:ncol,:)
+!#ifdef SPAERO
+!            sp_c_cld_tau(:,:ncol,:)     = sp_cld_tau(:,:ncol,:)
+!            sp_c_cld_tau_w(:,:ncol,:)   = sp_cld_tau_w(:,:ncol,:)
+!            sp_c_cld_tau_w_g(:,:ncol,:) = sp_cld_tau_w_g(:,:ncol,:)
+!            sp_c_cld_tau_w_f(:,:ncol,:) = sp_cld_tau_w_f(:,:ncol,:)
+!#endif
          end if
 
          ! Output cloud optical depth fields for the visible band
@@ -1201,6 +1369,56 @@ subroutine radiation_tend( &
 #else
                       aodvis, absvis)
 #endif
+
+!#ifdef RFMIPIRF
+!!      Extra RFMIP-IRF diagnostics for each SW wave-length/number band
+!       per_aod(:,:,:)=0._r8
+!       per_ssa(:,:,:)=0._r8
+!       per_asy(:,:,:)=0._r8 
+!       DO i=1,ncol
+!!         DO k=0,pver
+!         DO k=1,pver
+!           DO ns=1,nswbands
+!             per_aod(i,k,ns)=per_tau(i,k,ns)
+!             per_ssa(i,k,ns)=min(per_tau_w(i,k,ns)/(per_tau(i,k,ns)+eps),1._r8)
+!             per_asy(i,k,ns)=min(per_tau_w_g(i,k,ns)/(per_tau_w(i,k,ns)+eps),1._r8)
+!           ENDDO
+!         ENDDO  
+!       ENDDO
+!       do ns=1,nswbands
+!          write(c2,'(I2)') ns
+!             call outfld('AERTAUBND'//trim(adjustl(c2)),per_aod(:,:,ns),pcols,lchnk)
+!             call outfld('AERSSABND'//trim(adjustl(c2)),per_ssa(:,:,ns),pcols,lchnk)
+!             call outfld('AERASYBND'//trim(adjustl(c2)),per_asy(:,:,ns),pcols,lchnk)
+!       enddo 
+!#endif
+
+!#ifdef SPAERO
+!*********************************** SPAERO + *********************************************
+! Use the anthropogenic aerosol optical properties for the "simple plumes" climatology
+
+! Add "simple plumes" to NorESM2 aerosols (which should be defined using year 1850 emissions)
+
+! Set aerosol optical properties zero for the top layer (0)
+!       sp_per_tau(1:ncol,0,1:nswbands) = 0._r8
+!       sp_per_tau_w(1:ncol,0,1:nswbands) = 0._r8
+!       sp_per_tau_w_g(1:ncol,0,1:nswbands) = 0._r8
+!       sp_per_tau_w_f(1:ncol,0,1:nswbands) = 0._r8
+
+! Other layers
+!       DO i=1,ncol
+!         DO k=1,pver
+!           DO ns=1,nswbands
+!             sp_per_tau(i,k,ns)=per_tau(i,k,ns) + sp_tau(i,k,ns)
+!             sp_per_tau_w(i,k,ns)=per_tau_w(i,k,ns) + sp_tau(i,k,ns)*sp_ssa(i,k,ns)
+!             sp_per_tau_w_g(i,k,ns)=per_tau_w_g(i,k,ns) + sp_tau(i,k,ns)*sp_ssa(i,k,ns)*sp_asy(i,k,ns)
+!             sp_per_tau_w_f(i,k,ns)=per_tau_w_f(i,k,ns) + sp_tau(i,k,ns)*sp_ssa(i,k,ns)*sp_asy(i,k,ns)**2
+!           ENDDO
+!         ENDDO  
+!       ENDDO
+!*********************************** SPAERO - *********************************************
+!#endif
+
 #endif  ! DIRIND
 
           call get_variability(sfac)
@@ -1219,9 +1437,15 @@ subroutine radiation_tend( &
                   !call aer_rad_props_sw(icall, state, pbuf, nnite, idxnite, &
                   !                   aer_tau, aer_tau_w, aer_tau_w_g, aer_tau_w_f)
 #ifdef DIRIND
+! A first call with Oslo aerosols set to zero for radiative forcing diagnostics
+! follwoing the Ghan (2013) method:
+
 #ifdef AEROFFL   ! for calculation of direct radiative forcing, not necessarily "offline" as such anymore 
                  ! (just nudged), but with an extra call with 0 aerosol extiction.  
 !
+!akc6+
+               idrf = .true.
+!akc6-
                call rad_rrtmg_sw( &
                   lchnk, ncol, num_rrtmg_levs, r_state, state%pmid,          &
                   cldfprime, &
@@ -1232,7 +1456,14 @@ subroutine radiation_tend( &
                   fsnt, rd%fsntc, rd%fsntoa, rd%fsutoa, rd%fsntoac,          &
                   rd%fsnirt, rd%fsnrtc, rd%fsnirtsq, fsns, rd%fsnsc,         &
                   rd%fsdsc, fsds, cam_out%sols, cam_out%soll, cam_out%solsd, &
-                  cam_out%solld, fns, fcns, Nday, Nnite,                     &
+!akc6+
+!#ifdef AEROFFL
+!                  cam_out%solld, fns, fcns, fds, fdsc, Nday, Nnite,          &
+                  cam_out%solld, fns, fcns, idrf, Nday, Nnite,          &
+!#else
+!                  cam_out%solld, fns, fcns, Nday, Nnite,                     &
+!#endif
+!akc6-
                   IdxDay, IdxNite, su, sd, E_cld_tau=c_cld_tau,              &
                   E_cld_tau_w=c_cld_tau_w, E_cld_tau_w_g=c_cld_tau_w_g,      &
                   E_cld_tau_w_f=c_cld_tau_w_f, old_convert=.false.)
@@ -1250,30 +1481,30 @@ subroutine radiation_tend( &
                   call outfld('FSNS_DRF',fsns(:)  ,pcols,lchnk)
                   call outfld('FSNTCDRF',rd%fsntc(:) ,pcols,lchnk)
                   call outfld('FSNSCDRF',rd%fsnsc(:) ,pcols,lchnk)
-#ifdef AEROCOM
+!#ifdef AEROCOM
                   call outfld('FSUTADRF',rd%fsutoa(:),pcols,lchnk)
                   call outfld('FSDS_DRF',fsds(:)  ,pcols,lchnk)
                   ftem_1d(1:ncol) = fsds(1:ncol)-fsns(1:ncol)
                   call outfld('FSUS_DRF',ftem_1d,pcols,lchnk)
                   call outfld('FSDSCDRF',rd%fsdsc(:) ,pcols,lchnk)
-#endif
+!#endif
+    idrf = .false.         
 #endif ! AEROFFL
 #endif ! DIRIND
-
                
                rd%cld_tau_cloudsim(:ncol,:) = cld_tau(rrtmg_sw_cloudsim_band,:ncol,:)
                rd%aer_tau550(:ncol,:)       = aer_tau(:ncol,:,idx_sw_diag)
                rd%aer_tau400(:ncol,:)       = aer_tau(:ncol,:,idx_sw_diag+1)
                rd%aer_tau700(:ncol,:)       = aer_tau(:ncol,:,idx_sw_diag-1)
 
+! Then the usual call with Oslo aerosols for radiative forcing diagnostics
+
                call rad_rrtmg_sw( &
                   lchnk, ncol, num_rrtmg_levs, r_state, state%pmid,          &
                   cldfprime, &
 #ifdef DIRIND
-
                   per_tau,      per_tau_w,    per_tau_w_g,  per_tau_w_f,            &
 #else
-
                   aer_tau, aer_tau_w, aer_tau_w_g,  aer_tau_w_f,  &
 #endif
                   eccf, coszrs, rd%solin, sfac, cam_in%asdir,                &
@@ -1281,11 +1512,117 @@ subroutine radiation_tend( &
                   fsnt, rd%fsntc, rd%fsntoa, rd%fsutoa, rd%fsntoac,          &
                   rd%fsnirt, rd%fsnrtc, rd%fsnirtsq, fsns, rd%fsnsc,         &
                   rd%fsdsc, fsds, cam_out%sols, cam_out%soll, cam_out%solsd, &
+!akc6+
+#ifdef AEROFFL
+!                  cam_out%solld, fns, fcns, fds, fdsc, Nday, Nnite,          &
+                  cam_out%solld, fns, fcns, idrf, Nday, Nnite,          &
+#else
                   cam_out%solld, fns, fcns, Nday, Nnite,                     &
+#endif
+!akc6-
                   IdxDay, IdxNite, su, sd, E_cld_tau=c_cld_tau,              &
                   E_cld_tau_w=c_cld_tau_w, E_cld_tau_w_g=c_cld_tau_w_g,      &
                   E_cld_tau_w_f=c_cld_tau_w_f, old_convert=.false.)
 
+
+!#ifdef SPAERO
+             !
+             ! Dump shortwave radiation information to history tape buffer (diagnostics)
+             !
+! Added, as for BACCHUS by P. Räisänen
+!             call outfld('FSNT_SP ',fsnt       ,pcols,lchnk)
+!             call outfld('FSNS_SP ',fsns       ,pcols,lchnk)
+!             call outfld('FSNTC_SP',rd%fsntc   ,pcols,lchnk)
+!             call outfld('FSNSC_SP',rd%fsnsc   ,pcols,lchnk)
+!#endif
+
+
+!#ifdef SPAERO
+!*********************************** SPAERO + *********************************************
+! THIRD CALL INCLUDING SIMPLE PLUME AEROSOLS FOR ONLY THE DIRECT EFFECT (SW ERF ari)  
+
+!               call rad_rrtmg_sw( &
+!                  lchnk, ncol, num_rrtmg_levs, r_state, state%pmid,          &
+!                  cldfprime, &
+!ak+                  per_tau,      per_tau_w,    per_tau_w_g,  per_tau_w_f,  &
+!                  sp_per_tau,      sp_per_tau_w,    sp_per_tau_w_g,  sp_per_tau_w_f, &
+!ak-
+!                  eccf, coszrs, rd%solin, sfac, cam_in%asdir,                &
+!                  cam_in%asdif, cam_in%aldir, cam_in%aldif, qrs, rd%qrsc,    &
+!                  fsnt, rd%fsntc, rd%fsntoa, rd%fsutoa, rd%fsntoac,          &
+!                  rd%fsnirt, rd%fsnrtc, rd%fsnirtsq, fsns, rd%fsnsc,         &
+!                  rd%fsdsc, fsds, cam_out%sols, cam_out%soll, cam_out%solsd, &
+!akc6+
+!#ifdef AEROFFL
+!                  cam_out%solld, fns, fcns, idrf, Nday, Nnite,          &
+!#else
+!                  cam_out%solld, fns, fcns, Nday, Nnite,                     &
+!#endif
+!akc6-
+!                  IdxDay, IdxNite, su, sd, E_cld_tau=c_cld_tau,              &
+!                  E_cld_tau_w=c_cld_tau_w, E_cld_tau_w_g=c_cld_tau_w_g,      &
+!                  E_cld_tau_w_f=c_cld_tau_w_f, old_convert=.false.)
+
+
+             !
+             ! Dump shortwave radiation information to history tape buffer (diagnostics)
+             !
+! Added, as for BACCHUS by P. Räisänen
+!             call outfld('FSNT_SP2',fsnt       ,pcols,lchnk)
+!             call outfld('FSNS_SP2',fsns       ,pcols,lchnk)
+!             call outfld('FSNTCSP2',rd%fsntc   ,pcols,lchnk)
+!             call outfld('FSNSCSP2',rd%fsnsc   ,pcols,lchnk)
+
+! FOURTH CALL INCLUDING SIMPLE PLUME AEROSOLS FOR BOTH THE DIRECT AND THE 1. INDIRECT EFFECT
+
+!               call rad_rrtmg_sw( &
+!                  lchnk, ncol, num_rrtmg_levs, r_state, state%pmid,          &
+!                  cldfprime, &
+!ak+                  per_tau,      per_tau_w,    per_tau_w_g,  per_tau_w_f,   &
+!                  sp_per_tau,      sp_per_tau_w,    sp_per_tau_w_g,  sp_per_tau_w_f, &
+!ak-
+!                  eccf, coszrs, rd%solin, sfac, cam_in%asdir,                &
+!                  cam_in%asdif, cam_in%aldir, cam_in%aldif, qrs, rd%qrsc,    &
+!                  fsnt, rd%fsntc, rd%fsntoa, rd%fsutoa, rd%fsntoac,          &
+!                  rd%fsnirt, rd%fsnrtc, rd%fsnirtsq, fsns, rd%fsnsc,         &
+!                  rd%fsdsc, fsds, cam_out%sols, cam_out%soll, cam_out%solsd, &
+!akc6+
+!#ifdef AEROFFL
+!                  cam_out%solld, fns, fcns, idrf, Nday, Nnite,          &
+!#else
+!                  cam_out%solld, fns, fcns, Nday, Nnite,                     &
+!#endif
+!akc6-
+!ak+                  IdxDay, IdxNite, su, sd, E_cld_tau=c_cld_tau,              &
+!ak+                  E_cld_tau_w=c_cld_tau_w, E_cld_tau_w_g=c_cld_tau_w_g,      &
+!ak+                  E_cld_tau_w_f=c_cld_tau_w_f, old_convert=.false.)
+!                  IdxDay, IdxNite, su, sd, E_cld_tau=sp_c_cld_tau,           &
+!                  E_cld_tau_w=sp_c_cld_tau_w, E_cld_tau_w_g=sp_c_cld_tau_w_g,&
+!                  E_cld_tau_w_f=sp_c_cld_tau_w_f, old_convert=.false.)
+!ak-
+
+             !
+             ! Dump shortwave radiation information to history tape buffer (diagnostics)
+             !
+! Added, as for BACCHUS by P. Räisänen
+!             call outfld('FSNT_SP3',fsnt       ,pcols,lchnk)
+!             call outfld('FSNS_SP3',fsns       ,pcols,lchnk)
+!             call outfld('FSNTCSP3',rd%fsntc   ,pcols,lchnk)
+!             call outfld('FSNSCSP3',rd%fsnsc   ,pcols,lchnk)
+
+!*********************************** SPAERO + *********************************************
+!#endif
+
+!#ifdef RFMIPIRF
+!      Extra RFMIP-IRF diagnostics for each SW wave-length/number band
+!               do ns=1,nswbands
+!                 write(c2,'(I2)') ns
+!                 call outfld('SDBND'//trim(adjustl(c2)),sd(:,:,ns),pcols,lchnk)
+!                 call outfld('SUBND'//trim(adjustl(c2)),su(:,:,ns),pcols,lchnk)
+!               enddo 
+!#endif
+
+!ak+           Has been moved from above to after the last rad_rrtmg_sw call...
                ! Output net fluxes at 200 mb
                call vertinterp(ncol, pcols, pverp, state%pint, 20000._r8, fcns, rd%fsn200c)
                call vertinterp(ncol, pcols, pverp, state%pint, 20000._r8, fns,  rd%fsn200)
@@ -1294,13 +1631,13 @@ subroutine radiation_tend( &
                      call vertinterp(1, 1, pverp, state%pint(i,:), p_trop(i), fns(i,:), rd%fsnr(i))
                   end do
                end if
-
                if (write_output) call radiation_output_sw(lchnk, ncol, icall, rd, pbuf, cam_out)
-
+!ak-
             end if
          end do
 
       end if
+
 #ifdef DIRIND
 	  !Calculate cloud-free fraction assuming random overlap 
 	  !(kind of duplicated from cloud_cover_diags::cldsav)
@@ -1388,11 +1725,11 @@ subroutine radiation_tend( &
 
 #ifdef DIRIND
 #ifdef AEROFFL   ! FLNT_ORG is just for temporary testing vs. FLNT
-#ifdef AEROCOM
-                  call outfld('FLNT_ORG',flnt(:)  ,pcols,lchnk)
+!#ifdef AEROCOM
+!                  call outfld('FLNT_ORG',flnt(:)  ,pcols,lchnk)
                   ftem_1d(1:ncol) = cam_out%flwds(1:ncol) - flns(1:ncol)
                   call outfld('FLUS    ',ftem_1d ,pcols,lchnk)
-#endif  ! AEROCOM
+!#endif  ! AEROCOM
 #endif  ! AEROFFL
 !#ifdef AEROCOM
 !                  do i=1,ncol
@@ -1402,6 +1739,16 @@ subroutine radiation_tend( &
 !                  end do
 !                  call outfld('AERLWA01',aerlwabs01,pcols,lchnk)
 !#endif
+
+!#ifdef RFMIPIRF
+!      Extra RFMIP-IRF diagnostics for each LW wave-length/number band
+!               do ns=1,nlwbands
+!                 write(c2,'(I2)') ns
+!                 call outfld('LDBND'//trim(adjustl(c2)),ld(:,:,ns),pcols,lchnk)
+!                 call outfld('LUBND'//trim(adjustl(c2)),lu(:,:,ns),pcols,lchnk)
+!               enddo 
+!#endif
+
 #endif  ! DIRIND
 
                !  Output fluxes at 200 mb

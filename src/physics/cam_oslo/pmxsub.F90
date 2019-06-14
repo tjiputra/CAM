@@ -94,7 +94,12 @@ subroutine pmxsub(lchnk, ncol, pint, pmid, coszrs, state, t, cld, qm1, Nnatk, &
    real(r8) bevisvolc(pcols,pver)  ! Extinction in vis wavelength band for CMIP6 volcanic aerosol
 !akc6-
    real(r8) rhum(pcols,pver)       ! (trimmed) relative humidity for the aerosol calculations
+!tst
+!   real(r8) aodvis3d(pcols,pver)  ! 3D AOD in VIS
+!tst
+
    real(r8) deltah_km(pcols,pver)  ! Layer thickness, unit km
+
 !akc6   real(r8) deltah, airmass(pcols,pver) 
    real(r8) deltah, airmassl(pcols,pver), airmass(pcols) !akc6
    real(r8) Ca(pcols,pver), f_c(pcols,pver), f_bc(pcols,pver), f_aq(pcols,pver)
@@ -966,11 +971,13 @@ enddo ! iloop
             per_tau_w(i,k,ib)=per_tau(i,k,ib)*max(min(ssatot(i,k,14-ib),0.999999_r8),1.e-6_r8)
             per_tau_w_g(i,k,ib)=per_tau_w(i,k,ib)*asymtot(i,k,14-ib)
             per_tau_w_f(i,k,ib)=per_tau_w_g(i,k,ib)*asymtot(i,k,14-ib)
+!tst
 !       if(ib.eq.4.and.k.eq.pver.and.i.eq.1) then
 !         write(*,*) 'per_tau =', per_tau(i,k,ib)
 !         write(*,*) 'per_tau_w =', per_tau_w(i,k,ib)
 !         write(*,*) 'per_tau_w_g =', per_tau_w_g(i,k,ib)
 !       endif
+!tst
           end do
         end do
           ib=14
@@ -1176,6 +1183,9 @@ enddo ! iloop
           airmassl(icol,k)=1.e3_r8*deltah*rhoda(icol,k)
           airmass(icol)=airmass(icol)+airmassl(icol,k)  !akc6
 !          Optical depths at ca. 550 nm (0.442-0.625um) all aerosols
+!tst
+!          aodvis3d(icol,k)=betotvis(icol,k)*deltah
+!tst
           aodvis(icol)=aodvis(icol)+betotvis(icol,k)*deltah
           absvis(icol)=absvis(icol)+batotvis(icol,k)*deltah
 !          Optical depths at ca. 550 nm (0.442-0.625um) CMIP6 volcanic aerosol
@@ -1218,6 +1228,9 @@ enddo ! iloop
 !akc6+
         call outfld('BVISVOLC',bevisvolc ,pcols,lchnk)
 !akc6-
+!tst
+!        call outfld('AODVIS3D',aodvis3d,pcols,lchnk)
+!tst
 #ifdef COLTST4INTCONS 
         call outfld('TAUKC0  ',taukc0 ,pcols,lchnk)
         call outfld('TAUKC1  ',taukc1 ,pcols,lchnk)
@@ -1960,7 +1973,9 @@ enddo ! iloop
         call outfld('DGT_BC  ',dod550gt1_bc,pcols,lchnk)
         call outfld('DLT_POM ',dod550lt1_pom,pcols,lchnk)
         call outfld('DGT_POM ',dod550gt1_pom,pcols,lchnk)
-!-        call outfld('DOD5503D',dod5503d,pcols,lchnk)
+!tst
+!        call outfld('DOD5503D',dod5503d,pcols,lchnk)
+!tst
 !-        call outfld('ABS5503D',abs5503d,pcols,lchnk)
 !-        call outfld('D443_SS ',dod4403d_ss  ,pcols,lchnk)
 !-        call outfld('D443_DU ',dod4403d_dust,pcols,lchnk)
@@ -2417,6 +2432,7 @@ enddo ! iloop
 !akc6        call outfld('AIRMASSL',airmassl,pcols,lchnk)
         call outfld('AIRMASSL',airmassl,pcols,lchnk)
         call outfld('AIRMASS ',airmass,pcols,lchnk)  !akc6
+
 !c_er3d 
 !       effective dry radii (um) in each layer
 !        call outfld('ERLT053D',erlt053d,pcols,lchnk)
@@ -2431,7 +2447,7 @@ enddo ! iloop
 
 !000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 
-!     Extra AeroCom diagnostics requiring table look-ups with RH = constant. 
+!     Extra AeroCom diagnostics requiring table look-ups with RH = constant 
 
 #ifdef AEROCOM_INSITU
       irfmax=6
