@@ -2392,6 +2392,7 @@ enddo ! iloop
         call outfld('PM2P5   ',c_pm25  ,pcols,lchnk)
         call outfld('MMRPM2P5',mmr_pm25,pcols,lchnk)
         call outfld('MMRPM1  ',mmr_pm1 ,pcols,lchnk)
+        call outfld('MMRPM2P5_SRF',mmr_pm25(:pcols,pver),pcols,lchnk) 
 !akc6-
 !       total (all r) dry concentrations (ug/m3) and loadings (mg/m2)
         call outfld('DLOAD_MI',dload_mi,pcols,lchnk)

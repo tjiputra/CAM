@@ -221,6 +221,7 @@ contains
     call addfld ('PS',         horiz_only,  'A', 'Pa',       'Surface pressure')
     call addfld ('T',          (/ 'lev' /), 'A', 'K',        'Temperature')
     call addfld ('U',          (/ 'lev' /), 'A', 'm/s',      'Zonal wind')
+    call addfld ('UA010',      horiz_only,  'A', 'm/s',      'Zonal wind U at 10 mbar pressure surface')
     call addfld ('V',          (/ 'lev' /), 'A', 'm/s',      'Meridional wind')
 
     call register_vector_field('U','V')
@@ -258,10 +259,12 @@ contains
     call addfld ('Z200',       horiz_only,  'A', 'm',         'Geopotential Z at 200 mbar pressure surface')
     call addfld ('Z100',       horiz_only,  'A', 'm',         'Geopotential Z at 100 mbar pressure surface')
     call addfld ('Z050',       horiz_only,  'A', 'm',         'Geopotential Z at 50 mbar pressure surface')
+    call addfld ('Z010',       horiz_only,  'A', 'm',         'Geopotential Z at 10 mbar pressure surface')
 
     call addfld ('ZZ',         (/ 'lev' /), 'A', 'm2',        'Eddy height variance' )
     call addfld ('VZ',         (/ 'lev' /), 'A', 'm2/s',      'Meridional transport of geopotential height')
     call addfld ('VT',         (/ 'lev' /), 'A', 'K m/s   ',  'Meridional heat transport')
+    call addfld ('VT100',      horiz_only,  'A', 'K m/s   ',  'Meridional heat transport at 100 mbar pressure level')
     call addfld ('VU',         (/ 'lev' /), 'A', 'm2/s2',     'Meridional flux of zonal momentum' )
     call addfld ('VV',         (/ 'lev' /), 'A', 'm2/s2',     'Meridional velocity squared' )
     call addfld ('OMEGAV',     (/ 'lev' /), 'A', 'm Pa/s2 ',  'Vertical flux of meridional momentum' )
@@ -423,6 +426,7 @@ contains
       call addfld ('PM2P5   ',(/'lev'/), 'A','ug/m3   ','3D aerosol PM2.5')
       call addfld ('MMRPM2P5',(/'lev'/), 'A','kg/kg   ','3D aerosol PM2.5 mass mixing ratio')
       call addfld ('MMRPM1  ',(/'lev'/), 'A','kg/kg   ','3D aerosol PM1.0 mass mixing ratio')
+      call addfld ('MMRPM2P5_SRF',horiz_only, 'A','kg/kg   ','Aerosol PM2.5 mass mixing ratio in bottom layer')   
 !akc6-
       call addfld ('GRIDAREA',horiz_only, 'A','m2      ','Grid area for 1.9x2.5 horizontal resolution')
       call addfld ('DAERH2O ',horiz_only, 'A', 'mg/m2   ','Aerosol water load')
@@ -1710,6 +1714,14 @@ contains
       call vertinterp(ncol, pcols, pver, state%pmid,  5000._r8, z3, p_surf, ln_interp=.true.)
       call outfld('Z050    ', p_surf, pcols, lchnk)
     end if
+    if (hist_fld_active('Z010')) then
+      call vertinterp(ncol, pcols, pver, state%pmid,  1000._r8, z3, p_surf, ln_interp=.true.)
+      call outfld('Z010    ', p_surf, pcols, lchnk)
+    end if
+    if (hist_fld_active('UA010')) then
+      call vertinterp(ncol, pcols, pver, state%pmid,  1000._r8, state%u, p_surf, ln_interp=.true.)
+      call outfld('UA010   ', p_surf, pcols, lchnk)
+    end if
     !
     ! Quadratic height fiels Z3*Z3
     !
@@ -1723,6 +1735,11 @@ contains
     !
     ftem(:ncol,:) = state%v(:ncol,:)*state%t(:ncol,:)
     call outfld ('VT      ',ftem    ,pcols   ,lchnk     )
+
+    if (hist_fld_active('VT100')) then
+      call vertinterp(ncol, pcols, pver, state%pmid, 10000._r8, ftem, p_surf, ln_interp=.true.)
+      call outfld('VT100  ', p_surf, pcols, lchnk)
+    end if
 
     ftem(:ncol,:) = state%v(:ncol,:)**2
     call outfld ('VV      ',ftem    ,pcols   ,lchnk     )
