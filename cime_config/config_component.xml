@@ -8,7 +8,7 @@
       CAM
     ===============
    -->
-    <desc atm="CAM60[%1PCT][%4xCO2][%CCTS][%CFIRE][%CVBSX][%PORT][%RCO2][%SCAM][%SDYN][%WCCM][%WCMD][%WCSC][%WCTS][%NORESM]">CAM cam6 physics:</desc>
+    <desc atm="CAM60[%1PCT][%4xCO2][%CCTS][%CFIRE][%CVBSX][%PORT][%RCO2][%SCAM][%SDYN][%WCCM][%WCMD][%WCSC][%WCTS][%NORESM][%GHGONLY]">CAM cam6 physics:</desc>
     <desc atm="CAM50[%CCTS][%CLB][%PORT][%RCO2][%SCAM][%SDYN][%WCSC][%WCTS]"              >CAM cam5 physics:</desc>
     <desc atm="CAM40[%PORT][%RCO2][%SCAM][%SDYN][%TMOZ][%WXIE][%WXIED][%WCMD]"                   >CAM cam4 physics:</desc>
     <desc atm="CAM[%ADIAB][%DABIP04][%TJ16][%HS94][%KESSLER][%RCO2][%SPCAMS][%SPCAMCLBS][%SPCAMM][%SPCAMCLBM]">CAM simplified and non-versioned physics :</desc>
@@ -279,6 +279,7 @@
       <value compset="2000_CAM60%PTAERO"  >2000_cam6_oslo</value>
       <value compset="1850_CAM60%PTAERO"  >1850_cam6_oslo</value>
       <value compset="1850_CAM60%NORESM"    >1850_cam6_noresm</value>
+      <value compset="1850_CAM60%NORESM%GHGONLY" >1850_cam6_noresm_ghgonly</value>
       <value compset="HIST_CAM60%PTAERO"  >hist_cam6_oslo</value>
       <value compset="HIST_CAM60%NORESM"  >hist_cam6_noresm</value>
       <value compset="_CAM50%NUDGEPTAERO" >2000_cam5_oslonudge</value>
