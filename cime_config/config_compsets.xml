@@ -77,6 +77,11 @@
     <!--science_support grid="f09_f09_mg17"/-->
   </compset>
 
+  <compset>
+    <alias>NF1850norbc</alias>
+    <lname>1850_CAM60%NORESM%NORBC_CLM50%BGC-CROP_CICE%PRES_DOCN%DOM_MOSART_SGLC_SWAV</lname>
+  </compset>
+
   <!-- CAM simpler model compsets -->
 
   <compset>
@@ -501,6 +506,8 @@
         <value compset="1850_"         grid="a%0.9x1.25.*_oi%0.9x1.25"       >$DIN_LOC_ROOT/atm/cam/sst/sst_HadOIBl_bc_0.9x1.25_clim_pi_c101028.nc</value>
         <value compset="1850_"         grid="a%0.47x0.63.*_oi%0.47x0.63"     >$DIN_LOC_ROOT/atm/cam/sst/sst_HadOIBl_bc_0.47x0.63_clim_pi_c101028.nc</value>
         <value compset="1850_"         grid="a%0.23x0.31.*_oi%0.23x0.31"     >$DIN_LOC_ROOT/atm/cam/sst/sst_HadOIBl_bc_0.23x0.31_clim_pi_c101028.nc</value>
+       
+        <value compset="1850_CAM60%NORESM%NORBC"      grid=".+"                 >$DIN_LOC_ROOT/noresm-only/atm/cam/sst/fice-micom-divocn_sst-micom-dow_N1850_f19_tn14_20190621_1751-1780_series_version20190719_clim.nc</value>
 
         <value compset="2000"          grid=".+"                             >$DIN_LOC_ROOT/atm/cam/sst/sst_HadOIBl_bc_1x1_2000climo_c180511.nc</value>
         <value compset="2000"          grid="a%T31.*_oi%T31"                 >$DIN_LOC_ROOT/atm/cam/sst/sst_HadOIBl_bc_48x96_2000climo_c180511.nc</value>
