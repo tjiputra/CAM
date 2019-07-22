@@ -337,6 +337,7 @@
       <value compset="1850_CAM60%NORESM%NORBC"> opom_cycle_year=1850 </value>
       <value compset="1850_CAM60%NORESM%NORBC"> dms_source_type='CYCLICAL' </value>
       <value compset="1850_CAM60%NORESM%NORBC"> opom_source_type='CYCLICAL' </value>
+      <value compset="1850_CAM60%NORESM%NORBC%4xCO2"> co2vmr=1138.8e-6 </value>
     </values>
     <group>run_component_cam</group>
     <file>env_run.xml</file>

@@ -82,6 +82,11 @@
     <lname>1850_CAM60%NORESM%NORBC_CLM50%BGC-CROP_CICE%PRES_DOCN%DOM_MOSART_SGLC_SWAV</lname>
   </compset>
 
+  <compset>
+    <alias>NF1850norbc_4xco2</alias>
+    <lname>1850_CAM60%NORESM%NORBC%4xCO2_CLM50%BGC-CROP_CICE%PRES_DOCN%DOM_MOSART_SGLC_SWAV</lname>
+  </compset>
+
   <!-- CAM simpler model compsets -->
 
   <compset>
