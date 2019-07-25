@@ -92,6 +92,26 @@
     <lname>1850_CAM60%NORESM%NORBC%GHG2014_CLM50%BGC-CROP_CICE%PRES_DOCN%DOM_MOSART_SGLC_SWAV</lname>
   </compset>
 
+  <compset>
+    <alias>NF1850norbc_bc2014</alias>
+    <lname>1850_CAM60%NORESM%NORBC%BC2014_CLM50%BGC-CROP_CICE%PRES_DOCN%DOM_MOSART_SGLC_SWAV</lname>
+  </compset>
+
+  <compset>
+    <alias>NF1850norbc_oc2014</alias>
+    <lname>1850_CAM60%NORESM%NORBC%OC2014_CLM50%BGC-CROP_CICE%PRES_DOCN%DOM_MOSART_SGLC_SWAV</lname>
+  </compset>
+
+  <compset>
+    <alias>NF1850norbc_so22014</alias>
+    <lname>1850_CAM60%NORESM%NORBC%SO22014_CLM50%BGC-CROP_CICE%PRES_DOCN%DOM_MOSART_SGLC_SWAV</lname>
+  </compset>
+
+  <compset>
+    <alias>NF1850norbc_aer2014</alias>
+    <lname>1850_CAM60%NORESM%NORBC%AER2014_CLM50%BGC-CROP_CICE%PRES_DOCN%DOM_MOSART_SGLC_SWAV</lname>
+  </compset>
+
 
   <!-- CAM simpler model compsets -->
 
