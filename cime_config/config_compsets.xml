@@ -470,6 +470,36 @@
 
   <entries>
 
+    <entry id="ATM_DOMAIN_FILE">
+      <values match="last">
+        <value  compset="%NORESM%NORBC" grid="1.9x2.5">domain.lnd.fv1.9x2.5_tnx1v4.170609.nc</value>
+      </values>
+    </entry>    
+
+    <entry id="LND_DOMAIN_FILE">
+      <values match="last">
+        <value  compset="%NORESM%NORBC" grid="1.9x2.5">domain.lnd.fv1.9x2.5_tnx1v4.170609.nc</value>
+      </values>
+    </entry>    
+
+    <entry id="ICE_DOMAIN_FILE">
+      <values match="last">
+        <value  compset="%NORESM%NORBC" grid="1.9x2.5">domain.ocn.fv1.9x2.5_tnx1v4.170609_djlo.nc</value>
+      </values>
+    </entry>    
+
+    <entry id="OCN_DOMAIN_FILE">
+      <values match="last">
+        <value  compset="%NORESM%NORBC" grid="1.9x2.5">domain.ocn.fv1.9x2.5_tnx1v4.170609_djlo.nc</value>
+      </values>
+    </entry>    
+
+    <entry id="SSTICE_GRID_FILENAME">
+      <values match="last">
+        <value  compset="%NORESM%NORBC" grid="1.9x2.5">$DIN_LOC_ROOT/atm/cam/ocnfrac/domain.ocn.fv1.9x2.5_tnx1v4.170609_djlo.nc</value>
+      </values>
+    </entry>    
+
     <entry id="RUN_STARTDATE">
       <values match="last">
 	<value  compset="CAM[456]0%SCAM">1997-06-18</value>
@@ -538,7 +568,7 @@
         <value compset="1850_"         grid="a%0.47x0.63.*_oi%0.47x0.63"     >$DIN_LOC_ROOT/atm/cam/sst/sst_HadOIBl_bc_0.47x0.63_clim_pi_c101028.nc</value>
         <value compset="1850_"         grid="a%0.23x0.31.*_oi%0.23x0.31"     >$DIN_LOC_ROOT/atm/cam/sst/sst_HadOIBl_bc_0.23x0.31_clim_pi_c101028.nc</value>
        
-        <value compset="1850_CAM60%NORESM%NORBC"      grid=".+"                 >$DIN_LOC_ROOT/noresm-only/atm/cam/sst/fice-micom-divocn_sst-micom-dow_N1850_f19_tn14_20190621_1751-1780_series_version20190719_clim.nc</value>
+        <value compset="1850_CAM60%NORESM%NORBC"      grid=".+"                 >$DIN_LOC_ROOT/noresm-only/atm/cam/sst/fice-micom-divocn_sst-micom-dow_N1850_f19_tn14_20190621_1751-1780_series_version20190726_clim.nc</value>
 
         <value compset="2000"          grid=".+"                             >$DIN_LOC_ROOT/atm/cam/sst/sst_HadOIBl_bc_1x1_2000climo_c180511.nc</value>
         <value compset="2000"          grid="a%T31.*_oi%T31"                 >$DIN_LOC_ROOT/atm/cam/sst/sst_HadOIBl_bc_48x96_2000climo_c180511.nc</value>
