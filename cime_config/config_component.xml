@@ -290,6 +290,8 @@
       <value compset="HIST_CAM60%NORESM"  >hist_cam6_noresm</value>
       <value compset="HIST_CAM60%NORESM%PINTCF"  >hist_cam6_noresm_pintcf</value>
       <value compset="HIST_CAM60%NORESM%PIAER"   >hist_cam6_noresm_piaer</value>
+      <value compset="HIST_CAM60%NORESM%NORBC%PINTCF"  >hist_cam6_noresm_pintcf</value>
+      <value compset="HIST_CAM60%NORESM%NORBC%PIAER"   >hist_cam6_noresm_piaer</value>
       <value compset="_CAM50%NUDGEPTAERO" >2000_cam5_oslonudge</value>
       <value compset="_CAM50%NUDGEPTAEROUPD1">cam5_nudge_ptaero_up1</value>
       <value compset="_CAM54%NUDGEPTAERO" >2000_cam6_noclb_oslonudge</value>

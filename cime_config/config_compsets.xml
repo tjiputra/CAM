@@ -78,6 +78,18 @@
   </compset>
 
   <compset>
+    <alias>NFHISTnorbc_pintcf</alias>
+    <lname>HIST_CAM60%NORESM%NORBC%PINTCF_CLM50%BGC-CROP_CICE%PRES_DOCN%DOM_MOSART_SGLC_SWAV</lname>
+    <science_support grid="f09_f09_mg17"/>
+  </compset>
+
+  <compset>
+    <alias>NFHISTnorbc_piaer</alias>
+    <lname>HIST_CAM60%NORESM%NORBC%PIAER_CLM50%BGC-CROP_CICE%PRES_DOCN%DOM_MOSART_SGLC_SWAV</lname>
+    <science_support grid="f09_f09_mg17"/>
+  </compset>
+
+  <compset>
     <alias>NF2000climo</alias>
     <lname>2000_CAM60%PTAERO_CLM50%SP_CICE%PRES_DOCN%DOM_MOSART_SGLC_SWAV</lname>
     <!--science_support grid="f09_f09_mg17"/-->
