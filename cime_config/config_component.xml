@@ -343,6 +343,9 @@
       <value compset="1850_CAM60%NORESM%NORBC"> opom_cycle_year=1850 </value>
       <value compset="1850_CAM60%NORESM%NORBC"> dms_source_type='CYCLICAL' </value>
       <value compset="1850_CAM60%NORESM%NORBC"> opom_source_type='CYCLICAL' </value>
+      <value compset="HIST_CAM60%NORESM%NORBC"> ocean_filename='dms-hamocc-dow-taylor_chlor_a-lanaclim_NHIST_f19_tn14_20190625_1849-2015_series_version20190726.nc' </value>
+      <value compset="HIST_CAM60%NORESM%NORBC"> dms_source_type='INTERP_MISSING_MONTHS' </value>
+      <value compset="HIST_CAM60%NORESM%NORBC"> opom_source_type='INTERP_MISSING_MONTHS' </value>
       <value compset="1850_CAM60%NORESM%NORBC%4xCO2"> co2vmr=1138.8e-6 </value>
     </values>
     <group>run_component_cam</group>
