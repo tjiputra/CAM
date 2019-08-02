@@ -8,7 +8,7 @@
       CAM
     ===============
    -->
-    <desc atm="CAM60[%1PCT][%4xCO2][%CCTS][%CFIRE][%CVBSX][%PORT][%RCO2][%SCAM][%SDYN][%WCCM][%WCMD][%WCSC][%WCTS][%NORESM][%GHGONLY][%NATONLY][%PINTCF][%PIAER][%NORBC][%GHG2014][%BC2014][%OC2014][%SO22014][%AER2014]">CAM cam6 physics:</desc>
+    <desc atm="CAM60[%1PCT][%4xCO2][%CCTS][%CFIRE][%CVBSX][%PORT][%RCO2][%SCAM][%SDYN][%WCCM][%WCMD][%WCSC][%WCTS][%NORESM][%GHGONLY][%NATONLY][%PINTCF][%PIAER][%NORBC][%GHG2014][%BC2014][%OC2014][%SO22014][%AER2014][%FSST]">CAM cam6 physics:</desc>
     <desc atm="CAM50[%CCTS][%CLB][%PORT][%RCO2][%SCAM][%SDYN][%WCSC][%WCTS]"              >CAM cam5 physics:</desc>
     <desc atm="CAM40[%PORT][%RCO2][%SCAM][%SDYN][%TMOZ][%WXIE][%WXIED][%WCMD]"                   >CAM cam4 physics:</desc>
     <desc atm="CAM[%ADIAB][%DABIP04][%TJ16][%HS94][%KESSLER][%RCO2][%SPCAMS][%SPCAMCLBS][%SPCAMM][%SPCAMCLBM]">CAM simplified and non-versioned physics :</desc>
@@ -175,6 +175,7 @@
       <value compset="_CAM60%PTAERO" >-chem trop_mam_oslo</value>               
       <value compset="_CAM60%NORESM" >-chem trop_mam_oslo</value>               
       <value compset="_CAM60%NORESM%NORBC" >-chem trop_mam_oslo -cosp</value>               
+      <value compset="_CAM60%NORESM%FSST" >-chem trop_mam_oslo -cosp</value>               
       <value compset="_CAM54%PTAERO" >-chem trop_mam_oslo</value>               
   
       <value compset="_CAM50%NUDGEPTAERO"   >-phys cam5 -chem trop_mam_oslo -offline_dyn</value>             
@@ -370,6 +371,7 @@
     <value compset="_CAM40%WX.*_CLM40" grid="a%1.9x2.5_l%1.9x2.5">$SRCROOT/components/cam/cime_config/usermods_dirs/waccmx</value>
     <value compset="CAM[456]0%SCAM" >$SRCROOT/components/cam/cime_config/usermods_dirs/scam_mandatory</value>
     <value compset="CAM60%NORESM%NORBC">$SRCROOT/components/cam/cime_config/usermods_dirs/cmip6_noresm_norbc</value>
+    <value compset="CAM60%NORESM%FSST">$SRCROOT/components/cam/cime_config/usermods_dirs/cmip6_noresm_norbc</value>
     </values>
     <group>run_component_cam</group>
     <file>env_case.xml</file>
