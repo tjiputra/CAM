@@ -8,7 +8,7 @@
       CAM
     ===============
    -->
-    <desc atm="CAM60[%1PCT][%4xCO2][%CCTS][%CFIRE][%CVBSX][%PORT][%RCO2][%SCAM][%SDYN][%WCCM][%WCMD][%WCSC][%WCTS][%NORESM][%GHGONLY][%NATONLY][%PINTCF][%PIAER][%NORBC][%GHG2014][%BC2014][%OC2014][%SO22014][%AER2014][%FSST]">CAM cam6 physics:</desc>
+    <desc atm="CAM60[%1PCT][%4xCO2][%CCTS][%CFIRE][%CVBSX][%PORT][%RCO2][%SCAM][%SDYN][%WCCM][%WCMD][%WCSC][%WCTS][%NORESM][%GHGONLY][%NATONLY][%AEROXIDONLY][%PINTCF][%PIAER][%NORBC][%GHG2014][%BC2014][%OC2014][%SO22014][%AER2014][%FSST]">CAM cam6 physics:</desc>
     <desc atm="CAM50[%CCTS][%CLB][%PORT][%RCO2][%SCAM][%SDYN][%WCSC][%WCTS]"              >CAM cam5 physics:</desc>
     <desc atm="CAM40[%PORT][%RCO2][%SCAM][%SDYN][%TMOZ][%WXIE][%WXIED][%WCMD]"                   >CAM cam4 physics:</desc>
     <desc atm="CAM[%ADIAB][%DABIP04][%TJ16][%HS94][%KESSLER][%RCO2][%SPCAMS][%SPCAMCLBS][%SPCAMM][%SPCAMCLBM]">CAM simplified and non-versioned physics :</desc>
@@ -283,6 +283,7 @@
       <value compset="1850_CAM60%NORESM"    >1850_cam6_noresm</value>
       <value compset="1850_CAM60%NORESM%GHGONLY" >1850_cam6_noresm_ghgonly</value>
       <value compset="1850_CAM60%NORESM%NATONLY" >1850_cam6_noresm_natonly</value>
+      <value compset="1850_CAM60%NORESM%AEROXIDONLY" >1850_cam6_noresm_aeroxidonly</value>
       <value compset="1850_CAM60%NORESM%NORBC%GHG2014" >1850_cam6_noresm_ghg2014</value>
       <value compset="1850_CAM60%NORESM%NORBC%BC2014" >1850_cam6_noresm_bc2014</value>
       <value compset="1850_CAM60%NORESM%NORBC%OC2014" >1850_cam6_noresm_oc2014</value>
