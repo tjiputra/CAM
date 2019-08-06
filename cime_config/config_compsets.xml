@@ -78,6 +78,12 @@
   </compset>
 
   <compset>
+    <alias>NFHISTnorpddmsbc</alias>
+    <lname>HIST_CAM60%NORESM%NORPDDMSBC_CLM50%BGC-CROP_CICE%PRES_DOCN%DOM_MOSART_SGLC_SWAV</lname>
+    <science_support grid="f09_f09_mg17"/>
+  </compset>
+
+  <compset>
     <alias>NFHISTnorbc</alias>
     <lname>HIST_CAM60%NORESM%NORBC_CLM50%BGC-CROP_CICE%PRES_DOCN%DOM_MOSART_SGLC_SWAV</lname>
     <science_support grid="f09_f09_mg17"/>
