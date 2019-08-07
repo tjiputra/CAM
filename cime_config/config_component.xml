@@ -344,19 +344,23 @@
       <value compset="_CAM60%NORESM%1PCT"> flbc_type='SERIAL'</value>
       <value compset="_CAM60%NORESM%1PCT"> flbc_file='$DIN_LOC_ROOT/atm/waccm/lb/LBC_CMIP6_1pctCO2_y1-165_GlobAnnAvg_0p5degLat_c180929.nc'</value>
       <value compset="_CAM60%NORESM%1PCT"> flbc_list='CO2','CH4','N2O','CFC11eq','CFC12' </value>
+      <!-- fSST 30-year pre-industrial-->
       <value compset="1850_CAM60%NORESM%NORBC"> ocean_filename='dms-hamocc-dow-taylor_chlor_a-lanaclim_N1850_f19_tn14_20190621_1751-1780_cycle_version20190726.nc' </value>
       <value compset="1850_CAM60%NORESM%NORBC"> dms_cycle_year=1850 </value>
       <value compset="1850_CAM60%NORESM%NORBC"> opom_cycle_year=1850 </value>
       <value compset="1850_CAM60%NORESM%NORBC"> dms_source_type='CYCLICAL' </value>
       <value compset="1850_CAM60%NORESM%NORBC"> opom_source_type='CYCLICAL' </value>
+      <!-- fSST historical -->
       <value compset="HIST_CAM60%NORESM%NORBC"> ocean_filename='dms-hamocc-dow-taylor_chlor_a-lanaclim_NHIST_f19_tn14_20190625_1849-2015_series_version20190726.nc' </value>
       <value compset="HIST_CAM60%NORESM%NORBC"> dms_source_type='INTERP_MISSING_MONTHS' </value>
       <value compset="HIST_CAM60%NORESM%NORBC"> opom_source_type='INTERP_MISSING_MONTHS' </value>
-      <value compset="1850_CAM60%NORESM%NORPDDMSBC"> ocean_filename='dms-hamocc-dow-taylor_chlor_a-lanaclim_NHIST_f19_tn14_20190625_1985-2014_cycle_version20190726.nc' </value>
-      <value compset="1850_CAM60%NORESM%NORPDDMSBC"> dms_cycle_year=2000 </value>
-      <value compset="1850_CAM60%NORESM%NORPDDMSBC"> opom_cycle_year=2000 </value>
-      <value compset="1850_CAM60%NORESM%NORPDDMSBC"> dms_source_type='CYCLICAL' </value>
-      <value compset="1850_CAM60%NORESM%NORPDDMSBC"> opom_source_type='CYCLICAL' </value>
+      <!-- fSST AMIP type 1979-2014-->
+      <value compset="HIST_CAM60%NORESM%NORPDDMSBC"> ocean_filename='dms-hamocc-dow-taylor_chlor_a-lanaclim_NHIST_f19_tn14_20190625_1985-2014_cycle_version20190726.nc' </value>
+      <value compset="HIST_CAM60%NORESM%NORPDDMSBC"> dms_cycle_year=2000 </value>
+      <value compset="HIST_CAM60%NORESM%NORPDDMSBC"> opom_cycle_year=2000 </value>
+      <value compset="HIST_CAM60%NORESM%NORPDDMSBC"> dms_source_type='CYCLICAL' </value>
+      <value compset="HIST_CAM60%NORESM%NORPDDMSBC"> opom_source_type='CYCLICAL' </value>
+      <!-- fSST 4xCO2-->
       <value compset="1850_CAM60%NORESM%NORBC%4xCO2"> co2vmr=1138.8e-6 </value>
     </values>
     <group>run_component_cam</group>
