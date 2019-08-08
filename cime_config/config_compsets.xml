@@ -77,12 +77,14 @@
     <science_support grid="f09_f09_mg17"/>
   </compset>
 
+  <!-- fSST : evolving from observations ; upper-ocean DMS : present-day constant NorESM derived -->
   <compset>
     <alias>NFHISTnorpddmsbc</alias>
     <lname>HIST_CAM60%NORESM%NORPDDMSBC_CLM50%BGC-CROP_CICE%PRES_DOCN%DOM_MOSART_SGLC_SWAV</lname>
     <science_support grid="f09_f09_mg17"/>
   </compset>
 
+  <!-- fSST : evolving NorESM derived ; DMS: evolving NorESM derived -->
   <compset>
     <alias>NFHISTnorbc</alias>
     <lname>HIST_CAM60%NORESM%NORBC_CLM50%BGC-CROP_CICE%PRES_DOCN%DOM_MOSART_SGLC_SWAV</lname>
@@ -101,12 +103,38 @@
     <science_support grid="f09_f09_mg17"/>
   </compset>
 
+  <!-- constant pre-industrial NorESM derived ; DMS : constant pre-industrial NorESM derived -->
+  <compset>
+    <alias>NFHISTnorpibc</alias>
+    <lname>HIST_CAM60%NORESM%NORPIBC_CLM50%BGC-CROP_CICE%PRES_DOCN%DOM_MOSART_SGLC_SWAV</lname>
+    <science_support grid="f09_f09_mg17"/>
+  </compset>
+
+  <compset>
+    <alias>NFHISTnorpibc_ghgonly</alias>
+    <lname>1850_CAM60%NORESM%NORPIBC%GHGONLY_CLM50%BGC-CROP_CICE%PRES_DOCN%DOM_MOSART_SGLC_SWAV</lname>
+    <science_support grid="f09_f09_mg17"/>
+  </compset>
+
+  <compset>
+    <alias>NFHISTnorpibc_natonly</alias>
+    <lname>1850_CAM60%NORESM%NORPIBC%NATONLY_CLM50%BGC-CROP_CICE%PRES_DOCN%DOM_MOSART_SGLC_SWAV</lname>
+    <science_support grid="f09_f09_mg17"/>
+  </compset>
+
+  <compset>
+    <alias>NFHISTnorpibc_aeroxidonly</alias>
+    <lname>1850_CAM60%NORESM%NORPIBC%AEROXIDONLY_CLM50%BGC-CROP_CICE%PRES_DOCN%DOM_MOSART_SGLC_SWAV</lname>
+    <science_support grid="f09_f09_mg17"/>
+  </compset>
+
   <compset>
     <alias>NF2000climo</alias>
     <lname>2000_CAM60%PTAERO_CLM50%SP_CICE%PRES_DOCN%DOM_MOSART_SGLC_SWAV</lname>
     <!--science_support grid="f09_f09_mg17"/-->
   </compset>
 
+  <!-- fSST : constant pre-industrial NorESM derived ; DMS : constant pre-industrial NorESM derived --> 
   <compset>
     <alias>NF1850norbc</alias>
     <lname>1850_CAM60%NORESM%NORBC_CLM50%BGC-CROP_CICE%PRES_DOCN%DOM_MOSART_SGLC_SWAV</lname>
@@ -141,6 +169,9 @@
     <alias>NF1850norbc_aer2014</alias>
     <lname>1850_CAM60%NORESM%NORBC%AER2014_CLM50%BGC-CROP_CICE%PRES_DOCN%DOM_MOSART_SGLC_SWAV</lname>
   </compset>
+
+
+
 
 
   <!-- CAM simpler model compsets -->
@@ -503,30 +534,35 @@
     <entry id="ATM_DOMAIN_FILE">
       <values match="last">
         <value  compset="%NORESM%NORBC" grid="1.9x2.5">domain.lnd.fv1.9x2.5_tnx1v4.170609.nc</value>
+        <value  compset="%NORESM%NORPIBC" grid="1.9x2.5">domain.lnd.fv1.9x2.5_tnx1v4.170609.nc</value>
       </values>
     </entry>    
 
     <entry id="LND_DOMAIN_FILE">
       <values match="last">
         <value  compset="%NORESM%NORBC" grid="1.9x2.5">domain.lnd.fv1.9x2.5_tnx1v4.170609.nc</value>
+        <value  compset="%NORESM%NORPIBC" grid="1.9x2.5">domain.lnd.fv1.9x2.5_tnx1v4.170609.nc</value>
       </values>
     </entry>    
 
     <entry id="ICE_DOMAIN_FILE">
       <values match="last">
         <value  compset="%NORESM%NORBC" grid="1.9x2.5">domain.ocn.fv1.9x2.5_tnx1v4.170609_djlo.nc</value>
+        <value  compset="%NORESM%NORPIBC" grid="1.9x2.5">domain.ocn.fv1.9x2.5_tnx1v4.170609_djlo.nc</value>
       </values>
     </entry>    
 
     <entry id="OCN_DOMAIN_FILE">
       <values match="last">
         <value  compset="%NORESM%NORBC" grid="1.9x2.5">domain.ocn.fv1.9x2.5_tnx1v4.170609_djlo.nc</value>
+        <value  compset="%NORESM%NORPIBC" grid="1.9x2.5">domain.ocn.fv1.9x2.5_tnx1v4.170609_djlo.nc</value>
       </values>
     </entry>    
 
     <entry id="SSTICE_GRID_FILENAME">
       <values match="last">
         <value  compset="%NORESM%NORBC" grid="1.9x2.5">$DIN_LOC_ROOT/atm/cam/ocnfrac/domain.ocn.fv1.9x2.5_tnx1v4.170609_djlo.nc</value>
+        <value  compset="%NORESM%NORPIBC" grid="1.9x2.5">$DIN_LOC_ROOT/atm/cam/ocnfrac/domain.ocn.fv1.9x2.5_tnx1v4.170609_djlo.nc</value>
       </values>
     </entry>    
 
@@ -591,7 +627,8 @@
         <value compset="(HIST_|20TR_|5505_|TSCH)" grid="a%0.47x0.63.*_oi%0.47x0.63"     >$DIN_LOC_ROOT/atm/cam/sst/sst_HadOIBl_bc_0.47x0.63_1850_2017_c180507.nc</value>
         <value compset="(HIST_|20TR_|5505_|TSCH)" grid="a%0.23x0.31.*_oi%0.23x0.31"     >$DIN_LOC_ROOT/atm/cam/sst/sst_HadOIBl_bc_0.23x0.31_1850_2017_c180507.nc</value>
 
-       <value compset="HIST_CAM60%NORESM%NORBC"     grid=".+"                  >$DIN_LOC_ROOT/noresm-only/atm/cam/sst/fice-micom-divocn_sst-micom-dow_NHIST_f19_tn14_20190625_1849-2015_series_version20190726_ts.nc</value>
+       <!-- fSST : evolving NorESM derived -->
+       <value compset="HIST_CAM60%NORESM%NORBC"     grid=".+"                >$DIN_LOC_ROOT/noresm-only/atm/cam/sst/fice-micom-divocn_sst-micom-dow_NHIST_f19_tn14_20190625_1849-2015_series_version20190726_ts.nc</value>
 
         <value compset="1850_" grid=".+"                                     >$DIN_LOC_ROOT/atm/cam/sst/sst_HadOIBl_bc_1x1_clim_pi_c101029.nc</value>
         <value compset="1850_"         grid="a%T31.*_oi%T31"                 >$DIN_LOC_ROOT/atm/cam/sst/sst_HadOIBl_bc_48x96_clim_pi_c101028.nc</value>
@@ -600,7 +637,9 @@
         <value compset="1850_"         grid="a%0.47x0.63.*_oi%0.47x0.63"     >$DIN_LOC_ROOT/atm/cam/sst/sst_HadOIBl_bc_0.47x0.63_clim_pi_c101028.nc</value>
         <value compset="1850_"         grid="a%0.23x0.31.*_oi%0.23x0.31"     >$DIN_LOC_ROOT/atm/cam/sst/sst_HadOIBl_bc_0.23x0.31_clim_pi_c101028.nc</value>
        
-        <value compset="1850_CAM60%NORESM%NORBC"      grid=".+"                 >$DIN_LOC_ROOT/noresm-only/atm/cam/sst/fice-micom-divocn_sst-micom-dow_N1850_f19_tn14_20190621_1751-1780_series_version20190726_clim.nc</value>
+        <!-- fSST : constant preindustrial NorESM derived -->
+        <value compset="1850_CAM60%NORESM%NORBC"   grid=".+"                 >$DIN_LOC_ROOT/noresm-only/atm/cam/sst/fice-micom-divocn_sst-micom-dow_N1850_f19_tn14_20190621_1751-1780_series_version20190726_clim.nc</value>
+        <value compset="CAM60%NORESM%NORPIBC"      grid=".+"                 >$DIN_LOC_ROOT/noresm-only/atm/cam/sst/fice-micom-divocn_sst-micom-dow_N1850_f19_tn14_20190621_1751-1780_series_version20190726_clim.nc</value>
 
         <value compset="2000"          grid=".+"                             >$DIN_LOC_ROOT/atm/cam/sst/sst_HadOIBl_bc_1x1_2000climo_c180511.nc</value>
         <value compset="2000"          grid="a%T31.*_oi%T31"                 >$DIN_LOC_ROOT/atm/cam/sst/sst_HadOIBl_bc_48x96_2000climo_c180511.nc</value>
