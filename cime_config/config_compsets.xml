@@ -686,7 +686,8 @@
     </entry>
     <entry id="SSTICE_YEAR_END">
       <values match="first">
-        <value compset="HIST_">2016</value>
+        <value compset="CAM60%NORESM%NORPIBC">0</value>
+        <value compset="HIST_">2016</value>        
       </values>
     </entry>
 
