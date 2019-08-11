@@ -170,9 +170,15 @@
     <lname>1850_CAM60%NORESM%NORBC%AER2014_CLM50%BGC-CROP_CICE%PRES_DOCN%DOM_MOSART_SGLC_SWAV</lname>
   </compset>
 
+  <compset>
+    <alias>NF1850norbc_aeroxid2014</alias>
+    <lname>1850_CAM60%NORESM%NORBC%AEROXID2014_CLM50%BGC-CROP_CICE%PRES_DOCN%DOM_MOSART_SGLC_SWAV</lname>
+  </compset>
 
-
-
+  <compset>
+    <alias>NF1850norbc_ntcf2014</alias>
+    <lname>1850_CAM60%NORESM%NORBC%NTCF2014_CLM50%BGC-CROP_CICE%PRES_DOCN%DOM_MOSART_SGLC_SWAV</lname>
+  </compset>
 
   <!-- CAM simpler model compsets -->
 
