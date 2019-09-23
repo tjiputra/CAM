@@ -8,7 +8,7 @@
       CAM
     ===============
    -->
-    <desc atm="CAM60[%1PCT][%4xCO2][%CCTS][%CFIRE][%CVBSX][%PORT][%RCO2][%SCAM][%SDYN][%WCCM][%WCMD][%WCSC][%WCTS][%NORESM][%FRC2][%GHGONLY][%NATONLY][%AEROXIDONLY][%PINTCF][%PIAER][%NORBC][%GHG2014][%BC2014][%OC2014][%SO22014][%AER2014][%AEROXID2014][%SO2OXID2014][%NTCF2014][%ANTHRO2014][%OZONE2014][%H2O2014][%OXID2014][%FSST][%NORPDDMSBC][%NORPIBC]">CAM cam6 physics:</desc>
+    <desc atm="CAM60[%1PCT][%4xCO2][%CCTS][%CFIRE][%CVBSX][%PORT][%RCO2][%SCAM][%SDYN][%WCCM][%WCMD][%WCSC][%WCTS][%NORESM][%FRC2][%GHGONLY][%NATONLY][%AEROXIDONLY][%PINTCF][%PIAER][%PIAEROXID][%NORBC][%GHG2014][%BC2014][%OC2014][%SO22014][%AER2014][%AEROXID2014][%SO2OXID2014][%NTCF2014][%ANTHRO2014][%OZONE2014][%H2O2014][%OXID2014][%FSST][%NORPDDMSBC][%NORPIBC]">CAM cam6 physics:</desc>
     <desc atm="CAM50[%CCTS][%CLB][%PORT][%RCO2][%SCAM][%SDYN][%WCSC][%WCTS]"              >CAM cam5 physics:</desc>
     <desc atm="CAM40[%PORT][%RCO2][%SCAM][%SDYN][%TMOZ][%WXIE][%WXIED][%WCMD]"                   >CAM cam4 physics:</desc>
     <desc atm="CAM[%ADIAB][%DABIP04][%TJ16][%HS94][%KESSLER][%RCO2][%SPCAMS][%SPCAMCLBS][%SPCAMM][%SPCAMCLBM]">CAM simplified and non-versioned physics :</desc>
@@ -310,8 +310,9 @@
       <value compset="HIST_CAM60%NORESM"  >hist_cam6_noresm</value>
       <value compset="HIST_CAM60%NORESM%FRC2"  >hist_cam6_noresm_frc2</value>
       <!-- AerChemMIP transient coupled -->
-      <value compset="HIST_CAM60%NORESM%PINTCF"  >hist_cam6_noresm_pintcf</value>
-      <value compset="HIST_CAM60%NORESM%PIAER"   >hist_cam6_noresm_piaer</value>
+      <value compset="HIST_CAM60%NORESM%PINTCF"    >hist_cam6_noresm_pintcf</value>
+      <value compset="HIST_CAM60%NORESM%PIAER"     >hist_cam6_noresm_piaer</value>
+      <value compset="HIST_CAM60%NORESM%PIAEROXID" >hist_cam6_noresm_piaeroxid</value>
       <!-- AerChemMIP transient, with varying NorESM derived fSST -->
       <value compset="HIST_CAM60%NORESM%NORBC%PINTCF"  >hist_cam6_noresm_pintcf</value>
       <value compset="HIST_CAM60%NORESM%NORBC%PIAER"   >hist_cam6_noresm_piaer</value>
