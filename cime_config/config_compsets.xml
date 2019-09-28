@@ -162,6 +162,21 @@
   </compset>
 
   <compset>
+    <alias>NF1850norbc_n2o2014</alias>
+    <lname>1850_CAM60%NORESM%NORBC%N2O2014_CLM50%BGC-CROP_CICE%PRES_DOCN%DOM_MOSART_SGLC_SWAV</lname>
+  </compset>
+
+  <compset>
+    <alias>NF1850norbc_ch42014</alias>
+    <lname>1850_CAM60%NORESM%NORBC%CH42014_CLM50%BGC-CROP_CICE%PRES_DOCN%DOM_MOSART_SGLC_SWAV</lname>
+  </compset>
+
+  <compset>
+    <alias>NF1850norbc_ch4noh2o2014</alias>
+    <lname>1850_CAM60%NORESM%NORBC%CH4NOH2O2014_CLM50%BGC-CROP_CICE%PRES_DOCN%DOM_MOSART_SGLC_SWAV</lname>
+  </compset>
+
+  <compset>
     <alias>NF1850norbc_bc2014</alias>
     <lname>1850_CAM60%NORESM%NORBC%BC2014_CLM50%BGC-CROP_CICE%PRES_DOCN%DOM_MOSART_SGLC_SWAV</lname>
   </compset>
