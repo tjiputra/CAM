@@ -152,6 +152,11 @@
   </compset>
 
   <compset>
+    <alias>NF1850norbc_2xco2</alias>
+    <lname>1850_CAM60%NORESM%NORBC%2xCO2_CLM50%BGC-CROP_CICE%PRES_DOCN%DOM_MOSART_SGLC_SWAV</lname>
+  </compset>
+
+  <compset>
     <alias>NF1850norbc_ghg2014</alias>
     <lname>1850_CAM60%NORESM%NORBC%GHG2014_CLM50%BGC-CROP_CICE%PRES_DOCN%DOM_MOSART_SGLC_SWAV</lname>
   </compset>
