@@ -217,6 +217,11 @@
   </compset>
 
   <compset>
+    <alias>NF1850norbc_ghgozonelu2014</alias>
+    <lname>1850_CAM60%NORESM%NORBC%GHGOZONELU2014_CLM50%BGC-CROP_CICE%PRES_DOCN%DOM_MOSART_SGLC_SWAV</lname>
+  </compset>
+
+  <compset>
     <alias>NF1850norbc_so2oxid2014</alias>
     <lname>1850_CAM60%NORESM%NORBC%SO2OXID2014_CLM50%BGC-CROP_CICE%PRES_DOCN%DOM_MOSART_SGLC_SWAV</lname>
   </compset>
