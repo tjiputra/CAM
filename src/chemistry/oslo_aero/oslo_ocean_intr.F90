@@ -145,6 +145,7 @@ subroutine oslo_ocean_init()
 
    use tracer_data,      only : trcdata_init
    use constituents,     only : cnst_get_ind
+   use cam_history,      only : addfld, add_default, horiz_only
 
    implicit none
 
@@ -213,6 +214,9 @@ subroutine oslo_ocean_init()
    enddo
 !   write(iulog,*) 'oslo_ocean_init: read file '
 
+   call addfld( 'odms', horiz_only,  'A',  'nmol/L', 'DMS upper ocean concentration' )
+
+   call add_default('odms', 1, ' ')
 
 endsubroutine oslo_ocean_init
 !------------------------------------------------------------------------------------------
@@ -249,6 +253,7 @@ subroutine oslo_dms_emis_intr(state, cam_in)
 
    use physics_types, only: physics_state
    use constituents,  only: cnst_mw   !molecular weight for physics constituents
+   use cam_history,   only: outfld
 
    type(physics_state),    intent(in)    :: state   ! Physics state variables
    type(cam_in_t), target, intent(inout) :: cam_in  ! import state
@@ -299,11 +304,14 @@ subroutine oslo_dms_emis_intr(state, cam_in)
          flux (:ncol) = 2.778e-15*cnst_mw(pndx_fdms)*rk600(:ncol)*open_ocn(:ncol)*odms(:ncol) ! [kg m-2 s-1]
       else if (method_hamocc) then  
          t(:ncol)=cam_in%sst(:ncol)-273.15_r8
+         u10m (:ncol) = u10m(:ncol)*log(10._r8/z0)/log(state%zm(:ncol,pver)/z0)
          scdms(:ncol) = 2855.7+  (-177.63 + (6.0438 + (-0.11645 + 0.00094743*t(:ncol))*t(:ncol))*t(:ncol))*t(:ncol)
-         kwdms(:ncol) = ocnfrc(:ncol) * Xconvxa *u10m(:ncol)**2*(660./scdms(:ncol))**0.5 
+         kwdms(:ncol) = open_ocn(:ncol) * Xconvxa *u10m(:ncol)**2*(660./scdms(:ncol))**0.5 
          flux (:ncol) = 62.13*kwdms(:ncol)*1e-9*odms(:ncol)
       endif
       cam_in%cflx(:ncol, pndx_fdms  )  = flux(:ncol) 
+
+      call outfld('odms', odms(:ncol), ncol, lchnk)
 
    ! IF OCEAN FLUX
    elseif(dms_source=='ocean_flux') then 
