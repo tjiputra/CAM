@@ -84,6 +84,12 @@
     <science_support grid="f09_f09_mg17"/>
   </compset>
 
+  <compset>
+    <alias>NFHISTfrc2norpddmsbc</alias>
+    <lname>HIST_CAM60%NORESM%NORPDDMSBC%FRC2_CLM50%BGC-CROP_CICE%PRES_DOCN%DOM_MOSART_SGLC_SWAV</lname>
+    <science_support grid="f09_f09_mg17"/>
+  </compset>
+
   <!-- fSST : evolving NorESM derived ; DMS: evolving NorESM derived -->
   <compset>
     <alias>NFHISTnorbc</alias>
