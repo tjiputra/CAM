@@ -250,6 +250,15 @@
 
       <value compset="PIPD_CAM50"        >1850-PD_cam5</value>
 
+      <value compset="SSP126_CAM60"      >ssp126_cam6</value>
+      <value compset="SSP245_CAM60"      >ssp245_cam6</value>
+      <value compset="SSP370_CAM60"      >ssp370_cam6</value>
+      <value compset="SSP585_CAM60"      >ssp585_cam6</value>
+      <value compset="SSP126_CAM60%WCTS" >waccm_tsmlt_ssp126_cam6</value>
+      <value compset="SSP245_CAM60%WCTS" >waccm_tsmlt_ssp245_cam6</value>
+      <value compset="SSP370_CAM60%WCTS" >waccm_tsmlt_ssp370_cam6</value>
+      <value compset="SSP534_CAM60%WCTS" >waccm_tsmlt_ssp534_cam6</value>
+      <value compset="SSP585_CAM60%WCTS" >waccm_tsmlt_ssp585_cam6</value>
       <value compset="RCP2_CAM40"        >2005-2100_cam4_rcp26</value>
       <value compset="RCP4_CAM40"        >2005-2100_cam4_rcp45</value>
       <value compset="RCP4_CAM40.*_BGC%B">2005-2100_cam4_rcp45_bgc</value>
@@ -324,6 +333,11 @@
       <!-- AerChemMIP transient, with varying NorESM derived fSST -->
       <value compset="HIST_CAM60%NORESM%NORBC%PINTCF"  >hist_cam6_noresm_pintcf</value>
       <value compset="HIST_CAM60%NORESM%NORBC%PIAER"   >hist_cam6_noresm_piaer</value>
+
+      <value compset="SSP126_CAM60%NORESM%FRC2"  >ssp126_cam6_noresm_frc2</value>
+      <value compset="SSP245_CAM60%NORESM%FRC2"  >ssp245_cam6_noresm_frc2</value>
+      <value compset="SSP370_CAM60%NORESM%FRC2"  >ssp370_cam6_noresm_frc2</value>
+      <value compset="SSP585_CAM60%NORESM%FRC2"  >ssp585_cam6_noresm_frc2</value>
 
       <value compset="_CAM50%NUDGEPTAERO" >2000_cam5_oslonudge</value>
       <value compset="_CAM50%NUDGEPTAEROUPD1">cam5_nudge_ptaero_up1</value>
