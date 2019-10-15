@@ -25,11 +25,11 @@
 <tracer_cnst_type         >   'INTERP_MISSING_MONTHS'                                      </tracer_cnst_type>
 <tracer_cnst_filelist     >   ''                                                           </tracer_cnst_filelist>
 
-<!-- Surface emissions for  MAMOslo -->
-<srf_emis_type            >    INTERP_MISSING_MONTHS  </srf_emis_type>
+<!-- Surface emissions for MAMOslo -->
+<srf_emis_type> INTERP_MISSING_MONTHS </srf_emis_type>
 
 <!-- External forcing for MAMOslo -->
-<ext_frc_type             >    INTERP_MISSING_MONTHS  </ext_frc_type>
+<ext_frc_type>  INTERP_MISSING_MONTHS </ext_frc_type>
 
 <!-- surface emissions -->
 <srf_emis_specifier hgrid="0.9x1.25">
@@ -55,7 +55,7 @@
   'BC_NI  ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20190808/emissions_cmip6_noresm2_ScenarioMIP_IAMC-IMAGE-ssp126-1-1_BC_NI_all_vertical_2014-2301_0.9x1.25_version20190808.nc',
   'OM_NI  ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20190808/emissions_cmip6_noresm2_ScenarioMIP_IAMC-IMAGE-ssp126-1-1_OM_NI_all_vertical_2014-2301_0.9x1.25_version20190808.nc',
   'SO2    ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20190808/emissions_cmip6_noresm2_ScenarioMIP_IAMC-IMAGE-ssp126-1-1_SO2_all_vertical_2014-2301_0.9x1.25_version20190808.nc',
-  'SO4_PR ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20190808/emissions_cmip6_noresm2_ScenarioMIP_IAMC-IMAGE-ssp126-1-1_SO4_PR_all_vertical_2014-2301_0.9x1.25_version20190808.nc',
+  'SO4_PR ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20190808/emissions_cmip6_noresm2_ScenarioMIP_IAMC-IMAGE-ssp126-1-1_SO4_PR_all_vertical_2014-2301_0.9x1.25_version20190808.nc'
 </ext_frc_specifier>
 <ext_frc_specifier hgrid="1.9x2.5">
   'H2O ->  $INPUTDATA_ROOT/atm/cam/chem/emis/elev/H2OemissionCH4oxidationx2_3D_L70_2014-2101_CMIP6-SSP1-2.6_c190307.nc',
@@ -64,13 +64,12 @@
   'BC_NI  ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20190808/emissions_cmip6_noresm2_ScenarioMIP_IAMC-IMAGE-ssp126-1-1_BC_NI_all_vertical_2014-2301_1.9x2.5_version20190808.nc',
   'OM_NI  ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20190808/emissions_cmip6_noresm2_ScenarioMIP_IAMC-IMAGE-ssp126-1-1_OM_NI_all_vertical_2014-2301_1.9x2.5_version20190808.nc',
   'SO2    ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20190808/emissions_cmip6_noresm2_ScenarioMIP_IAMC-IMAGE-ssp126-1-1_SO2_all_vertical_2014-2301_1.9x2.5_version20190808.nc',
-  'SO4_PR ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20190808/emissions_cmip6_noresm2_ScenarioMIP_IAMC-IMAGE-ssp126-1-1_SO4_PR_all_vertical_2014-2301_1.9x2.5_version20190808.nc',
+  'SO4_PR ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20190808/emissions_cmip6_noresm2_ScenarioMIP_IAMC-IMAGE-ssp126-1-1_SO4_PR_all_vertical_2014-2301_1.9x2.5_version20190808.nc'
 </ext_frc_specifier>
 
-<srf_emis_type            >    INTERP_MISSING_MONTHS  </srf_emis_type>
-<ext_frc_type             >    INTERP_MISSING_MONTHS  </ext_frc_type>
 
-<clubb_gamma_coef hgrid="1.9x2.5">      0.264     </clubb_gamma_coef>
+<clubb_gamma_coef hgrid="0.9x1.25">0.286</clubb_gamma_coef>
+<clubb_gamma_coef hgrid="1.9x2.5" >0.264</clubb_gamma_coef>
 
 <!-- dyn_fv-->
 <fv_high_order_top> .false. </fv_high_order_top>
@@ -95,7 +94,8 @@
 
 
 <!--micro_mg_nl-->
-<micro_mg_dcs hgrid="1.9x2.5"> 5.0e-4  </micro_mg_dcs>
+<micro_mg_dcs hgrid="0.9x1.25">5.5e-4</micro_mg_dcs>
+<micro_mg_dcs hgrid="1.9x2.5" >5.0e-4</micro_mg_dcs>
 
 <!--gw_drag_nl-->
 <tau_0_ubc>  .true.   </tau_0_ubc>
@@ -103,7 +103,8 @@
 <!--cldfrc_nl-->
 <cldfrc_iceopt hgrid="1.9x2.5"> 4 </cldfrc_iceopt>
 
-
+<!--cldfrc2m_nl-->
+<cldfrc2m_rhmini hgrid="0.9x1.25">0.90D0</cldfrc2m_rhmini>
 
 <!--Options for megan -->
 <megan_specifier>'isoprene = isoprene','monoterp = myrcene + sabinene + limonene+ carene_3 + ocimene_t_b + pinene_b + pinene_a'</megan_specifier>
