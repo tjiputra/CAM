@@ -329,7 +329,8 @@
      
       <value compset="HIST_CAM60%PTAERO"  >hist_cam6_oslo</value>
       <value compset="HIST_CAM60%NORESM"  >hist_cam6_noresm</value>
-      <value compset="HIST_CAM60%NORESM%FRC2"  >hist_cam6_noresm_frc2</value>
+      <value compset="HIST_CAM60%NORESM%FRC2"            >hist_cam6_noresm_frc2</value>
+      <value compset="HIST_CAM60%NORESM%FSST%FRC2"       >hist_cam6_noresm_frc2</value>
       <value compset="HIST_CAM60%NORESM%NORPDDMSBC%FRC2" >hist_cam6_noresm_frc2</value>
       <!-- nudging -->
       <value compset="HIST_CAM60%NORESM%NORPDDMSBC%SDYN" >sd_hist_cam6_noresm</value>

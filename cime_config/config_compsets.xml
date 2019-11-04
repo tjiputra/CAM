@@ -77,6 +77,12 @@
     <science_support grid="f09_f09_mg17"/>
   </compset>
 
+  <compset>
+    <alias>NFHISTfsstfrc2</alias>
+    <lname>HIST_CAM60%NORESM%FSST%FRC2_CLM50%BGC-CROP_CICE%PRES_DOCN%DOM_MOSART_SGLC_SWAV</lname>
+    <science_support grid="f09_f09_mg17"/>
+  </compset>
+
   <!-- fSST : evolving from observations ; upper-ocean DMS : present-day constant NorESM derived -->
   <compset>
     <alias>NFHISTnorpddmsbc</alias>
