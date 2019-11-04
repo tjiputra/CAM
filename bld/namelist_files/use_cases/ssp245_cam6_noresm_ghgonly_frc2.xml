@@ -58,7 +58,7 @@
 
 <!-- 3D emissions -->
 <ext_frc_specifier hgrid="0.9x1.25">
-  'H2O    ->  $INPUTDATA_ROOT/atm/cam/chem/emis/elev/H2OemissionCH4oxidationx2_3D_L70_1849-2015_CMIP6ensAvg_c180927.nc',
+  'H2O    ->  $INPUTDATA_ROOT/atm/cam/chem/emis/elev/H2OemissionCH4oxidationx2_3D_L70_1849-2101_CMIP6ensAvg_SSP2-4.5_c190403.nc',
   'BC_AX  ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20190808/perturbations/emissions_cmip6_noresm2_BC_AX_all_vertical_1850_date_0000_5000_0.9x1.25_version20190808.nc',
   'BC_N   ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20190808/perturbations/emissions_cmip6_noresm2_BC_N_all_vertical_1850_date_0000_5000_0.9x1.25_version20190808.nc',
   'BC_NI  ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20190808/perturbations/emissions_cmip6_noresm2_BC_NI_all_vertical_1850_date_0000_5000_0.9x1.25_version20190808.nc',
@@ -67,7 +67,7 @@
   'SO4_PR ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20190808/perturbations/emissions_cmip6_noresm2_SO4_PR_all_vertical_1850_date_0000_5000_0.9x1.25_version20190808.nc'
 </ext_frc_specifier>
 <ext_frc_specifier hgrid="1.9x2.5">
-  'H2O    ->  $INPUTDATA_ROOT/atm/cam/chem/emis/elev/H2OemissionCH4oxidationx2_3D_L70_1849-2015_CMIP6ensAvg_c180927.nc',
+  'H2O    ->  $INPUTDATA_ROOT/atm/cam/chem/emis/elev/H2OemissionCH4oxidationx2_3D_L70_1849-2101_CMIP6ensAvg_SSP2-4.5_c190403.nc',
   'BC_AX  ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20190808/perturbations/emissions_cmip6_noresm2_BC_AX_all_vertical_1850_date_0000_5000_1.9x2.5_version20190808.nc',
   'BC_N   ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20190808/perturbations/emissions_cmip6_noresm2_BC_N_all_vertical_1850_date_0000_5000_1.9x2.5_version20190808.nc',
   'BC_NI  ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20190808/perturbations/emissions_cmip6_noresm2_BC_NI_all_vertical_1850_date_0000_5000_1.9x2.5_version20190808.nc',
