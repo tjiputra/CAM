@@ -447,10 +447,6 @@
     <value compset="DOCN%SOMAQP">$SRCROOT/components/cam/cime_config/usermods_dirs/aquap</value>
     <value compset="_CAM40%WX.*_CLM40" grid="a%1.9x2.5_l%1.9x2.5">$SRCROOT/components/cam/cime_config/usermods_dirs/waccmx</value>
     <value compset="CAM[456]0%SCAM" >$SRCROOT/components/cam/cime_config/usermods_dirs/scam_mandatory</value>
-    <value compset="CAM60%NORESM%NORBC"     >$SRCROOT/components/cam/cime_config/usermods_dirs/cmip6_noresm_norbc</value>
-    <value compset="CAM60%NORESM%FSST"      >$SRCROOT/components/cam/cime_config/usermods_dirs/cmip6_noresm_norbc</value>
-    <value compset="CAM60%NORESM%NORPDDMSBC">$SRCROOT/components/cam/cime_config/usermods_dirs/cmip6_noresm_norbc</value>
-    <value compset="CAM60%NORESM%NORPIBC"   >$SRCROOT/components/cam/cime_config/usermods_dirs/cmip6_noresm_norbc</value>
     </values>
     <group>run_component_cam</group>
     <file>env_case.xml</file>
