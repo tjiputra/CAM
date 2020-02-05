@@ -549,24 +549,16 @@ fi
 ##establish script dir and cam_root
 if [ -f \${initdir}/test_driver.sh ]; then
     export CAM_SCRIPTDIR=\`cd \${initdir}; pwd \`
-    if [ -d "\${CAM_SCRIPTDIR}/../../components" ]; then
-        export CAM_ROOT=\`cd \${CAM_SCRIPTDIR}/../.. ; pwd \`
-    else
-        export CAM_ROOT=\`cd \${CAM_SCRIPTDIR}/../../../.. ; pwd \`
-    fi
+    export CAM_ROOT=\`cd \${CAM_SCRIPTDIR}/../../../.. ; pwd \`
 else
     if [ -n "\${CAM_ROOT}" ] && [ -f \${CAM_ROOT}/components/cam/test/system/test_driver.sh ]; then
 	export CAM_SCRIPTDIR=\`cd \${CAM_ROOT}/components/cam/test/system; pwd \`
     else
-	if [ -n "\${CAM_ROOT}"  -a  -f "\${CAM_ROOT}/test/system/test_driver.sh" ]; then
-            export CAM_SCRIPTDIR=\`cd \${CAM_ROOT}/test/system; pwd \`
-        else
-            echo "ERROR: unable to determine script directory "
-	    echo "       if initiating batch job from directory other than the one containing test_driver.sh, "
-	    echo "       you must set the environment variable CAM_ROOT to the full path of directory containing "
-            echo "       <components>. "
-	    exit 3
-        fi
+	echo "ERROR: unable to determine script directory "
+	echo "       if initiating batch job from directory other than the one containing test_driver.sh, "
+	echo "       you must set the environment variable CAM_ROOT to the full path of directory containing "
+        echo "       <components>. "
+	exit 3
     fi
 fi
 
@@ -864,13 +856,7 @@ if [ "${cesm_test_suite}" != "none" -a -n "${cesm_test_mach}" ]; then
     currdir="`pwd -P`"
     logfile="${currdir}/${test_id}.log"
     tdir="$( cd $( dirname $0 ); pwd -P )"
-    trial_dir="$( dirname $( dirname $( dirname $( dirname ${tdir} ) ) ) )"
-    if [ -d "${trial_dir}/cime/scripts" ]; then
-      root_dir=$trial_dir
-    else
-      root_dir="$( dirname $( dirname ${tdir} ) )"
-    fi
-
+    root_dir="$( dirname $( dirname $( dirname $( dirname ${tdir} ) ) ) )"
     script_dir="${root_dir}/cime/scripts"
     if [ ! -d "${script_dir}" ]; then
       echo "ERROR: CIME scripts dir not found at ${script_dir}"

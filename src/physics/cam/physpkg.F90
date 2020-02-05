@@ -1303,6 +1303,7 @@ contains
     real(r8) :: tmp_cldice(pcols,pver) ! tmp space
     real(r8) :: tmp_trac  (pcols,pver,pcnst) ! tmp space
     real(r8) :: tmp_pdel  (pcols,pver) ! tmp space
+    real(r8) :: tmp_t     (pcols,pver) !+tht tmp space
     real(r8) :: tmp_ps    (pcols)      ! tmp space
 
     ! physics buffer fields for total energy and mass adjustment
@@ -1314,6 +1315,10 @@ contains
     real(r8), pointer, dimension(:,:) :: cldiceini
     real(r8), pointer, dimension(:,:) :: dtcore
     real(r8), pointer, dimension(:,:) :: ast     ! relative humidity cloud fraction
+
+    !tht: variables for dme_energy_adjust 
+    real(r8):: eflx(pcols), dsema(pcols)
+    logical, parameter:: ohf_adjust =.true.  ! condensates have surface specific enthalpy
 
     !-----------------------------------------------------------------------
     lchnk = state%lchnk
@@ -1565,6 +1570,7 @@ contains
     ! Scale dry mass and energy (does nothing if dycore is EUL or SLD)
     call cnst_get_ind('CLDLIQ', ixcldliq)
     call cnst_get_ind('CLDICE', ixcldice)
+    tmp_t     (:ncol,:pver) = state%t(:ncol,:pver) !+tht
     tmp_q     (:ncol,:pver) = state%q(:ncol,:pver,1)
     tmp_cldliq(:ncol,:pver) = state%q(:ncol,:pver,ixcldliq)
     tmp_cldice(:ncol,:pver) = state%q(:ncol,:pver,ixcldice)
@@ -1589,7 +1595,11 @@ contains
     end if
 
     if (dycore_is('LR')) then
-      call physics_dme_adjust(state, tend, qini, ztodt)
+!+tht
+     !call physics_dme_adjust(state, tend, qini, ztodt)
+      call physics_dme_adjust(state, tend, qini, ztodt, eflx, dsema, &
+                             ohf_adjust, cam_in%ocnfrac, cam_in%sst, cam_in%ts)
+!-tht
       call calc_te_and_aam_budgets(state, 'pAM')
     endif
 
@@ -1609,12 +1619,16 @@ contains
           if (cam_in%ocnfrac(i) /= 1._r8) labort = .true.
        end do
        if (labort) then
-          call endrun ('TPHYSAC error:  grid contains non-ocean point')
+          call endrun ('TPHYSAC error: in aquaplanet mode, but grid contains non-ocean point')
        endif
     endif
 
-    call diag_phys_tend_writeout (state, pbuf,  tend, ztodt, tmp_q, tmp_cldliq, tmp_cldice, &
-         qini, cldliqini, cldiceini)
+!+tht
+   !call diag_phys_tend_writeout (state, pbuf,  tend, ztodt, tmp_q, tmp_cldliq, tmp_cldice, &
+   !     qini, cldliqini, cldiceini)
+    call diag_phys_tend_writeout (state, pbuf,  tend, ztodt, tmp_q, tmp_t, tmp_cldliq, tmp_cldice, &
+         qini, cldliqini, cldiceini, eflx, dsema) 
+!-tht
 
     call clybry_fam_set( ncol, lchnk, map2chm, state%q, pbuf )
 

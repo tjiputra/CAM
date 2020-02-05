@@ -39,11 +39,7 @@ def _build_cam():
         #-------------------------------------------------------
         # Call cam's buildcpp
         #-------------------------------------------------------
-        testpath = os.path.join(srcroot, "components", "cam")
-        if os.path.exists(testpath):
-            srcroot = testpath
-
-        cmd = os.path.join(os.path.join(srcroot,
+        cmd = os.path.join(os.path.join(srcroot, "components", "cam",
                                         "cime_config", "buildcpp"))
         logger.info("     ...calling cam buildcpp to set build time options")
         try:

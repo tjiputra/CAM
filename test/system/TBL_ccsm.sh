@@ -63,37 +63,15 @@ if [ -n "${BL_ROOT}" ]; then
 
     echo "TBL_ccsm.sh: calling ****baseline**** TSM_ccsm.sh for smoke test"
     if [ "${CAM_BASEBACK}" = "YES" ]; then
-        if [ -d "${BL_ROOT}/components/cam" ]; then
-
-            env CAM_TESTDIR=${BL_TESTDIR} \
+        env CAM_TESTDIR=${BL_TESTDIR} \
 	    CAM_SCRIPTDIR=${BL_ROOT}/components/cam/test/system \
 	    CAM_ROOT=${BL_ROOT} \
 	    ${BL_ROOT}/components/cam/test/system/TSM_ccsm.sh $1 $2 $3
-
-        else
-
-            env CAM_TESTDIR=${BL_TESTDIR} \
-            CAM_SCRIPTDIR=${BL_ROOT}/test/system \
-            CAM_ROOT=${BL_ROOT} \
-            ${BL_ROOT}/test/system/TSM_ccsm.sh $1 $2 $3
-
-        fi
     else
-        if [ -d "${BL_ROOT}/components/cam" ]; then
-
-            env CAM_TESTDIR=${BL_TESTDIR} \
+        env CAM_TESTDIR=${BL_TESTDIR} \
 	    CAM_SCRIPTDIR=${BL_ROOT}/components/cam/test/system \
 	    CAM_ROOT=${BL_ROOT} \
 	    ${BL_ROOT}/components/cam/test/system/TSM_ccsm.sh $1 $2 $3 $4
-
-        else
-
-            env CAM_TESTDIR=${BL_TESTDIR} \
-            CAM_SCRIPTDIR=${BL_ROOT}/test/system \
-            CAM_ROOT=${BL_ROOT} \
-            ${BL_ROOT}/test/system/TSM_ccsm.sh $1 $2 $3 $4
-
-        fi
     fi
     rc=$?
     if [ $rc -ne 0 ]; then
