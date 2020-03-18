@@ -62,19 +62,9 @@ if [ -n "${BL_ROOT}" ]; then
     echo "TPF.sh: generating baseline data from root $BL_ROOT - results in $BL_TESTDIR"
 
     echo "TPF.sh: calling ****baseline**** TSM.sh for smoke test"
-    if [ -d "${BL_ROOT}/components/cam" ]; then
-
-        env CAM_TESTDIR=${BL_TESTDIR} \
+    env CAM_TESTDIR=${BL_TESTDIR} \
 	CAM_SCRIPTDIR=${BL_ROOT}/components/cam/test/system \
 	${BL_ROOT}/components/cam/test/system/TSM.sh $1 $2 $3 $4
-
-    else
-
-        env CAM_TESTDIR=${BL_TESTDIR} \
-        CAM_SCRIPTDIR=${BL_ROOT}/test/system \
-        ${BL_ROOT}/test/system/TSM.sh $1 $2 $3 $4
-
-    fi
     rc=$?
     if [ $rc -ne 0 ]; then
 	echo "TPF.sh: error from *baseline* TSM.sh= $rc" 

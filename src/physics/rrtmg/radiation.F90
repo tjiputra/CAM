@@ -826,6 +826,8 @@ subroutine radiation_tend( &
    real(r8) :: flntclr(pcols)          ! Clearsky only columns (zero if cloudy)
 
    character(*), parameter :: name = 'radiation_tend'
+
+   logical, parameter :: cosz_rad_call=.true. !+tht
    !--------------------------------------------------------------------------------------
 
    lchnk = state%lchnk
@@ -850,7 +852,7 @@ subroutine radiation_tend( &
    call shr_orb_decl(calday, eccen, mvelpp, lambm0, obliqr, &
                      delta, eccf)
    do i = 1, ncol
-      coszrs(i) = shr_orb_cosz(calday, clat(i), clon(i), delta, dt_avg)
+      coszrs(i) = shr_orb_cosz(calday, clat(i), clon(i), delta, dt_avg, cosz_rad_call) !+tht
    end do
 
    ! Gather night/day column indices.

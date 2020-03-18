@@ -124,7 +124,7 @@ OPTIONS
                         [ trop_mam3 | trop_mam4 | trop_mam7 | trop_mozart | trop_strat_mam4_vbs | trop_strat_mam4_vbsext | 
                           waccm_ma | waccm_mad | waccm_mad_mam4 | waccm_ma_mam4 | 
                           waccm_ma_sulfur | waccm_sc | waccm_sc_mam4 | waccm_tsmlt_mam4 | 
-                          terminator | none ].
+                          terminator | trop_mam_oslo | none ].
                         Default: trop_mam4 for cam6 and trop_mam3 for cam5.
      -[no]clubb_sgs     Switch on [off] CLUBB_SGS.  Default: on for cam6, otherwise off.
      -clubb_opts <list> Comma separated list of CLUBB options to turn on/off.  By default they are all off.
@@ -450,30 +450,17 @@ if (($ccsm_seq)) {
 
 #-----------------------------------------------------------------------------------------------
 # CAM root directory.
-# Check for standalone or CESM checkout
-my $cam_root = absolute_path("$cfgdir/..");
-my $cam_dir = $cam_root;
-if (! -d "$cam_root/cime") {
-  $cam_root = absolute_path("$cfgdir/../../..");
-}
+my $cam_root = absolute_path("$cfgdir/../../..");
+
 if (-d "$cam_root/components/cam/src") {
     $cfg_ref->set('cam_root', $cam_root);
-    $cam_dir = "$cam_root/components/cam";
-    $cfg_ref->set('cam_dir', $cam_dir);
-}
-elsif (-d "$cam_root/src") {
-    $cfg_ref->set('cam_root', $cam_root);
-    $cfg_ref->set('cam_dir', $cam_dir);
 } else {
     die <<"EOF";
 ** Invalid CAM root directory: $cam_root
 **
-** The CAM root directory must contain the subdirectory components/cam/src/
-** (CESM checkout) or the subdirectory src (standalone checkout).
-** For CESM checkouts, it is derived from "config_dir/../../..".
-** For CAM standalone checkouts, it is derived from"config_dir/..",
-** where config_dir is the directory in the CAM distribution that
-** contains the configuration scripts.
+** The CAM root directory must contain the subdirectory components/cam/src/.
+** It is derived from "config_dir/../../.." where config_dir is the
+** directory in the CAM distribution that contains the configuration
 ** scripts.
 EOF
 }
@@ -1386,7 +1373,7 @@ my $chem_cppdefs = '';
 my $chem_src_dir = '';
 
 if (!$prog_species) {
-  $chem_src_dir = "$cam_dir/src/chemistry/pp_$chem_pkg";
+  $chem_src_dir = "$cam_root/components/cam/src/chemistry/pp_$chem_pkg";
   $cfg_ref->set('chem_src_dir', $chem_src_dir);
 }
 
@@ -1426,6 +1413,10 @@ if ($chem_pkg =~ '_mam3') {
     $chem_cppdefs = ' -DMODAL_AERO -DMODAL_AERO_4MODE ';
 } elsif ($chem_pkg =~ '_mam7') {
     $chem_cppdefs = ' -DMODAL_AERO -DMODAL_AERO_7MODE ';
+}
+
+if ($chem_pkg =~ '_oslo') {
+ $chem_cppdefs = ' -DOSLO_AERO -DDIRIND'
 }
 
 # CARMA sectional microphysics
@@ -2742,7 +2733,7 @@ sub write_filepath
     my $inic_val      = $cfg_ref->get('analytic_ic');
 
     # Root directory
-    my $camsrcdir = $cfg_ref->get('cam_dir');
+    my $camsrcdir = "$cam_root/components";
 
     # Start writing paths to the file.  *** Order is important ***  The
     # sequence of paths will be used to set the GNU Makefile's VPATH macro
@@ -2762,21 +2753,31 @@ sub write_filepath
         print $fh "$CASEROOT/SourceMods/src.cam\n";
     }
 
-    # offline unit driver (defaults to stub)
-    print $fh "$camsrcdir/src/unit_drivers\n";
-    print $fh "$camsrcdir/src/unit_drivers/${offline_drv}\n";
+   #NorESM-specific: 
+   #Any files in "NorESM"-folder go before the original CAM-files
+   #These files MUST give back standard CAM5.3 if a standard CAM5.3 compset is chosen
+   #Un-commenting this line will give back standard CAM 5.3 (unmodified).
+   #This is used for testing.
+   #++djlo (should be switched off when pure NCAR version is desired)
+   print $fh "$camsrcdir/cam/src/NorESM\n";
+   print $fh "$camsrcdir/cam/src/NorESM/$dyn\n";
+   #--djlo
+
+   # offline unit driver (defaults to stub)
+    print $fh "$camsrcdir/cam/src/unit_drivers\n";
+    print $fh "$camsrcdir/cam/src/unit_drivers/${offline_drv}\n";
 
     if ($simple_phys) {
-      print $fh "$camsrcdir/src/physics/simple\n";
+      print $fh "$camsrcdir/cam/src/physics/simple\n";
     }
 
     if ($carma ne 'none') {
         # This directory needs to precede physics/cam/ to replace
         # the CARMA stub package with CARMA. Putting it first allows
         # any CAM file to be overridden by a particular CARMA model.
-        print $fh "$camsrcdir/src/physics/carma/models/$carma\n";
-        print $fh "$camsrcdir/src/physics/carma/cam\n";
-        print $fh "$camsrcdir/src/physics/carma/base\n";
+        print $fh "$camsrcdir/cam/src/physics/carma/models/$carma\n";
+        print $fh "$camsrcdir/cam/src/physics/carma/cam\n";
+        print $fh "$camsrcdir/cam/src/physics/carma/base\n";
     }
 
     # CAM chemistry, dynamics, physics, control and shared utilities.
@@ -2786,59 +2787,65 @@ sub write_filepath
     if ($chem_src_dir) {
         print $fh "$chem_src_dir\n";
     }
-    if ($chem =~ /_mam/) {
-        print $fh "$camsrcdir/src/chemistry/modal_aero\n";
-    } else {
-        print $fh "$camsrcdir/src/chemistry/bulk_aero\n";
+    if ($chem =~/_oslo/) {
+         print $fh "$camsrcdir/cam/src/chemistry/oslo_aero\n";
+         print $fh "$camsrcdir/cam/src/physics/cam_oslo\n";
     }
-    print $fh "$camsrcdir/src/chemistry/aerosol\n";
+    else{
+	 if ($chem =~ /_mam/) {
+	    print $fh "$camsrcdir/cam/src/chemistry/modal_aero\n";
+	 } else {
+	   print $fh "$camsrcdir/cam/src/chemistry/bulk_aero\n";
+	}
+    }
+    print $fh "$camsrcdir/cam/src/chemistry/aerosol\n";
 
     if ($waccmx) {
-        print $fh "$camsrcdir/src/physics/waccmx\n";
+        print $fh "$camsrcdir/cam/src/physics/waccmx\n";
         if ($ionos =~ /wxi/) {
-            print $fh "$camsrcdir/src/ionosphere/waccmx\n";
+            print $fh "$camsrcdir/cam/src/ionosphere/waccmx\n";
         }
     }
     if ($waccm_phys) {
-        print $fh "$camsrcdir/src/physics/waccm\n";
+        print $fh "$camsrcdir/cam/src/physics/waccm\n";
     }
-    print $fh "$camsrcdir/src/ionosphere\n";
+    print $fh "$camsrcdir/cam/src/ionosphere\n";
 
-    print $fh "$camsrcdir/src/chemistry/mozart\n";
-    print $fh "$camsrcdir/src/chemistry/utils\n";
+    print $fh "$camsrcdir/cam/src/chemistry/mozart\n";
+    print $fh "$camsrcdir/cam/src/chemistry/utils\n";
 
     if ($rad eq 'rrtmg') {
-        print $fh "$camsrcdir/src/physics/rrtmg\n";
-        print $fh "$camsrcdir/src/physics/rrtmg/aer_src\n";
+        print $fh "$camsrcdir/cam/src/physics/rrtmg\n";
+        print $fh "$camsrcdir/cam/src/physics/rrtmg/aer_src\n";
     }
     elsif ($rad eq 'camrt') {
-        print $fh "$camsrcdir/src/physics/camrt\n";
+        print $fh "$camsrcdir/cam/src/physics/camrt\n";
     }
 
     if ($clubb_sgs eq '1') {
-       print $fh "$camsrcdir/src/physics/clubb\n";
+       print $fh "$camsrcdir/cam/src/physics/clubb\n";
     }
 
     # Superparameterization
     if ($phys_pkg eq 'spcam_m2005' or $phys_pkg eq 'spcam_sam1mom') {
-        print $fh "$camsrcdir/src/physics/spcam\n";
-        print $fh "$camsrcdir/src/physics/spcam/crm\n";
+        print $fh "$camsrcdir/cam/src/physics/spcam\n";
+        print $fh "$camsrcdir/cam/src/physics/spcam/crm\n";
 
         # add additional directories for sam6.10.4
-        print $fh "$camsrcdir/src/physics/spcam/crm/ADV_MPDATA\n";
+        print $fh "$camsrcdir/cam/src/physics/spcam/crm/ADV_MPDATA\n";
         if ($phys_pkg eq 'spcam_sam1mom') {
-           print $fh "$camsrcdir/src/physics/spcam/crm/MICRO_SAM1MOM\n";
+           print $fh "$camsrcdir/cam/src/physics/spcam/crm/MICRO_SAM1MOM\n";
         }
         if ($phys_pkg eq 'spcam_m2005') {
-              print $fh "$camsrcdir/src/physics/spcam/crm/MICRO_M2005\n";
-              print $fh "$camsrcdir/src/physics/spcam/ecpp\n";
+              print $fh "$camsrcdir/cam/src/physics/spcam/crm/MICRO_M2005\n";
+              print $fh "$camsrcdir/cam/src/physics/spcam/ecpp\n";
         }
         if ( $spcam_clubb_sgs == 1 ) {
-           print $fh "$camsrcdir/src/physics/spcam/crm/CLUBB\n";
-           print $fh "$camsrcdir/src/physics/spcam/crm/SGS_CLUBBkvhkvm\n"
+           print $fh "$camsrcdir/cam/src/physics/spcam/crm/CLUBB\n";
+           print $fh "$camsrcdir/cam/src/physics/spcam/crm/SGS_CLUBBkvhkvm\n"
         }
         else {
-           print $fh "$camsrcdir/src/physics/spcam/crm/SGS_TKE\n";
+           print $fh "$camsrcdir/cam/src/physics/spcam/crm/SGS_TKE\n";
         }
     }
 
@@ -2846,31 +2853,31 @@ sub write_filepath
     # as well as the cam specific interface modules that may need to
     # be overridden by modules from directories that occur earlier
     # in the list of filepaths.
-    print $fh "$camsrcdir/src/physics/cam\n";
+    print $fh "$camsrcdir/cam/src/physics/cam\n";
 
     # Dynamics package and test utilities
-    print $fh "$camsrcdir/src/dynamics/$dyn\n";
+    print $fh "$camsrcdir/cam/src/dynamics/$dyn\n";
     if($dyn eq 'se') {
-       print $fh "$camsrcdir/src/dynamics/se/dycore\n";
+       print $fh "$camsrcdir/cam/src/dynamics/se/dycore\n";
     }
-    print $fh "$camsrcdir/src/dynamics/tests\n";
+    print $fh "$camsrcdir/cam/src/dynamics/tests\n";
     if($inic_val) {
-       print $fh "$camsrcdir/src/dynamics/tests/initial_conditions\n";
+       print $fh "$camsrcdir/cam/src/dynamics/tests/initial_conditions\n";
     }
 
     # Parallelization utilies
     if ($dyn eq 'fv' or $cppdefs =~ /MODCM_DP_TRANSPOSE/) {
-        print $fh "$camsrcdir/src/utils/pilgrim\n";
+        print $fh "$camsrcdir/cam/src/utils/pilgrim\n";
     }
 
     # Advective transport
     if ($dyn eq 'eul') {
-        print $fh "$camsrcdir/src/advection/slt\n";
+        print $fh "$camsrcdir/cam/src/advection/slt\n";
     }
 
-    print $fh "$camsrcdir/src/cpl\n";
-    print $fh "$camsrcdir/src/control\n";
-    print $fh "$camsrcdir/src/utils\n";
+    print $fh "$camsrcdir/cam/src/cpl\n";
+    print $fh "$camsrcdir/cam/src/control\n";
+    print $fh "$camsrcdir/cam/src/utils\n";
 
     if ($cam_build) {
 
@@ -2890,15 +2897,15 @@ sub write_filepath
 
 	# Ocean package.
 	if ($ocn eq 'dom') {
-	    print $fh "$camsrcdir/src/utils/cam_dom\n";
+	    print $fh "$camsrcdir/cam/src/utils/cam_dom\n";
 	}
 	elsif ($ocn eq 'docn' or $ocn eq 'som') {
 	    print $fh "$cam_root/cime/src/components/data_comps/docn\n";
 	    print $fh "$cam_root/cime/src/components/data_comps/docn/mct\n";
 	}
 	elsif ($ocn eq 'aquaplanet') {
-	    print $fh "$camsrcdir/src/utils/cam_aqua\n";
-	    print $fh "$camsrcdir/src/utils/cam_aqua/cpl\n";
+	    print $fh "$camsrcdir/cam/src/utils/cam_aqua\n";
+	    print $fh "$camsrcdir/cam/src/utils/cam_aqua/cpl\n";
 	}
 	elsif ($ocn eq 'socn') {
 	    print $fh "$cam_root/cime/src/components/stub_comps/socn/cpl\n";
@@ -3074,14 +3081,14 @@ sub write_cosp_makefile
     print $fh_out  <<"EOF";
 
 CAM_BLD      := $cam_bld
-COSP_PATH    := $cam_dir/src/physics/cosp2
-ISCCP_PATH   := $cam_dir/src/physics/cosp2/src/simulator/icarus
-RS_PATH      := $cam_dir/src/physics/cosp2/src/simulator/quickbeam
-RT_PATH      := $cam_dir/src/physics/cosp2/src/simulator/rttov
-CS_PATH      := $cam_dir/src/physics/cosp2/src/simulator/actsim
-MISR_PATH    := $cam_dir/src/physics/cosp2/src/simulator/MISR_simulator
-MODIS_PATH   := $cam_dir/src/physics/cosp2/src/simulator/MODIS_simulator
-PARASOL_PATH := $cam_dir/src/physics/cosp2/src/simulator/parasol
+COSP_PATH    := $cam_root/components/cam/src/physics/cosp2
+ISCCP_PATH   := $cam_root/components/cam/src/physics/cosp2/src/simulator/icarus
+RS_PATH      := $cam_root/components/cam/src/physics/cosp2/src/simulator/quickbeam
+RT_PATH      := $cam_root/components/cam/src/physics/cosp2/src/simulator/rttov
+CS_PATH      := $cam_root/components/cam/src/physics/cosp2/src/simulator/actsim
+MISR_PATH    := $cam_root/components/cam/src/physics/cosp2/src/simulator/MISR_simulator
+MODIS_PATH   := $cam_root/components/cam/src/physics/cosp2/src/simulator/MODIS_simulator
+PARASOL_PATH := $cam_root/components/cam/src/physics/cosp2/src/simulator/parasol
 
 EOF
 

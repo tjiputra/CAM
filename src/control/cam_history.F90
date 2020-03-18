@@ -2215,6 +2215,8 @@ CONTAINS
     !    on that grid.
     integer, allocatable        :: gridsontape(:,:)
 
+    logical, parameter          :: i_am_a_nazi_arse=.false. !+tht if T exit on error
+
     !
     ! First ensure contents of fincl, fexcl, and fwrtpr are all valid names
     !
@@ -2232,9 +2234,12 @@ CONTAINS
              write(iulog,*) trim(errormsg)
              call shr_sys_flush(iulog)
           end if
+          fincl(f:pflds-1,t)=fincl(f+1:pflds,t)
+          fincl(pflds,t)=' '
           errors_found = errors_found + 1
+        else
+          f = f + 1
         end if
-        f = f + 1
       end do
 
       f = 1
@@ -2242,16 +2247,18 @@ CONTAINS
         mastername=''
         listentry => get_entry_by_name(masterlinkedlist, fexcl(f,t))
         if(associated(listentry)) mastername = listentry%field%name
-
         if (fexcl(f,t) /= mastername) then
           write(errormsg,'(3a,2(i0,a))')'FLDLST: ', trim(fexcl(f,t)), ' in fexcl(', f,', ',t, ') not found'
           if (masterproc) then
              write(iulog,*) trim(errormsg)
              call shr_sys_flush(iulog)
           end if
+          fexcl(f:pflds-1,t)=fexcl(f+1:pflds,t)
+          fexcl(pflds,t)=' '
           errors_found = errors_found + 1
+        else
+          f = f + 1
         end if
-        f = f + 1
       end do
 
       f = 1
@@ -2286,7 +2293,7 @@ CONTAINS
        ! Give masterproc a chance to write all the log messages
        call mpi_barrier(mpicom, t)
        write(errormsg, '(a,i0,a)') 'FLDLST: ',errors_found,' errors found, see log'
-       call endrun(trim(errormsg))
+       if (i_am_a_nazi_arse) call endrun(trim(errormsg))
     end if
 
     nflds(:) = 0

@@ -8,7 +8,7 @@
       CAM
     ===============
    -->
-    <desc atm="CAM60[%1PCT][%4xCO2][%CCTS][%CFIRE][%CVBSX][%PORT][%RCO2][%SCAM][%SDYN][%WCCM][%WCMD][%WCSC][%WCTS]">CAM cam6 physics:</desc>
+    <desc atm="CAM60[%1PCT][%4xCO2][%2xCO2][%CCTS][%CFIRE][%CVBSX][%PORT][%RCO2][%SCAM][%SDYN][%WCCM][%WCMD][%WCSC][%WCTS][%NORESM][%FRC2][%GHGONLY][%NATONLY][%AEROXIDONLY][%OZONEONLY][%PINTCF][%PIAER][%PIAEROXID][%NORBC][%GHG2014][%GHGNOH2O2014][%N2O2014][%CH42014][%CH4NOH2O2014][%BC2014][%OC2014][%SO22014][%AER2014][%AEROXID2014][%SO2OXID2014][%NTCF2014][%ANTHRO2014][%GHGOZONELU2014][%OZONE2014][%H2O2014][%OXID2014][%FSST][%NORPDDMSBC][%NORPIBC][%SSP245]">CAM cam6 physics:</desc>
     <desc atm="CAM50[%CCTS][%CLB][%PORT][%RCO2][%SCAM][%SDYN][%WCSC][%WCTS]"              >CAM cam5 physics:</desc>
     <desc atm="CAM40[%PORT][%RCO2][%SCAM][%SDYN][%TMOZ][%WXIE][%WXIED][%WCMD]"                   >CAM cam4 physics:</desc>
     <desc atm="CAM[%ADIAB][%DABIP04][%TJ16][%HS94][%KESSLER][%RCO2][%SPCAMS][%SPCAMCLBS][%SPCAMM][%SPCAMCLBM]">CAM simplified and non-versioned physics :</desc>
@@ -19,7 +19,16 @@
     ===============
    -->
     <desc option="4xCO2"        >abrupt quadrupling of CO2 with other forcings maintained at 1850 piControl levels (CMIP6 DECK abrupt4xCO2 experiment) :</desc>
+    <desc option="2xCO2"        >abrupt doubling of CO2 with other forcings maintained at 1850 piControl levels :</desc>
     <desc option="1PCT"         >ramped CO2 increasing by 1% per year with other forcings maintained at 1850 piControl levels (CMIP6 DECK 1pctCO2 experiment) :</desc>
+
+    <desc atm="CAM5%PTAERO"         >cam 5 physics and Production tagged aerosols (OSLO_AERO)</desc>
+    <desc atm="CAM60%PTAERO"        >cam 6 and Production tagged aerosols (OSLO_AERO)</desc>
+    <desc atm="CAM60%NORESM"        >cam 6 and general NorESM  changes + Production tagged aerosols (OSLO_AERO)</desc>
+    <desc atm="CAM54%PTAERO"        >cam 5.4+Production tagged aerosols (OSLO_AERO)+clm5 </desc>
+    <desc atm="CAM5%NUDGEPTAEROUPD1">cam 5 physics and Production tagged aerosols (OSLO_AERO)</desc>
+    <desc atm="CAM54%NUDGEPTAERO"   >cam 6 (no clubb) physics and Production tagged aerosols (OSLO_AERO)</desc>
+    <desc atm="CAM60%NUDGEPTAERO"   >cam 6 physics and Production tagged aerosols (OSLO_AERO)</desc>
 
   <!--
     ===============
@@ -162,6 +171,19 @@
 
       <!-- PORT -->
       <value compset="%PORT">-offline_drv rad</value>
+
+      <value compset="_CAM5%PTAERO"   >-phys cam5 -chem trop_mam_oslo</value>             
+      <value compset="_CAM60%PTAERO" >-chem trop_mam_oslo</value>               
+      <value compset="_CAM60%NORESM" >-chem trop_mam_oslo</value>               
+      <value compset="_CAM60%NORESM%NORBC"      >-chem trop_mam_oslo -cosp</value>               
+      <value compset="_CAM60%NORESM%FSST"       >-chem trop_mam_oslo -cosp</value>               
+      <value compset="_CAM60%NORESM%NORPDDMSBC" >-chem trop_mam_oslo -cosp</value>               
+      <value compset="_CAM60%NORESM%NORPIBC"    >-chem trop_mam_oslo -cosp</value>               
+      <value compset="_CAM54%PTAERO" >-chem trop_mam_oslo</value>               
+  
+      <value compset="_CAM50%NUDGEPTAERO"   >-phys cam5 -chem trop_mam_oslo -offline_dyn</value>             
+      <value compset="_CAM54%NUDGEPTAERO"   >-chem trop_mam_oslo -offline_dyn</value>             
+      <value compset="_CAM60%NUDGEPTAERO"   >-chem trop_mam_oslo -offline_dyn</value>             
     </values>
     <group>build_component_cam</group>
     <file>env_build.xml</file>
@@ -228,6 +250,15 @@
 
       <value compset="PIPD_CAM50"        >1850-PD_cam5</value>
 
+      <value compset="SSP126_CAM60"      >ssp126_cam6</value>
+      <value compset="SSP245_CAM60"      >ssp245_cam6</value>
+      <value compset="SSP370_CAM60"      >ssp370_cam6</value>
+      <value compset="SSP585_CAM60"      >ssp585_cam6</value>
+      <value compset="SSP126_CAM60%WCTS" >waccm_tsmlt_ssp126_cam6</value>
+      <value compset="SSP245_CAM60%WCTS" >waccm_tsmlt_ssp245_cam6</value>
+      <value compset="SSP370_CAM60%WCTS" >waccm_tsmlt_ssp370_cam6</value>
+      <value compset="SSP534_CAM60%WCTS" >waccm_tsmlt_ssp534_cam6</value>
+      <value compset="SSP585_CAM60%WCTS" >waccm_tsmlt_ssp585_cam6</value>
       <value compset="RCP2_CAM40"        >2005-2100_cam4_rcp26</value>
       <value compset="RCP4_CAM40"        >2005-2100_cam4_rcp45</value>
       <value compset="RCP4_CAM40.*_BGC%B">2005-2100_cam4_rcp45_bgc</value>
@@ -256,6 +287,72 @@
 
       <!-- SCAM defaults to ARM97, all other IOPs are in usermods_dirs -->
       <value compset="CAM[456]0%SCAM"    >scam_arm97</value>
+      <value compset="2000_CAM54"       >2000_cam6_noclb</value>
+      <value compset="1850_CAM54%PTAERO"  >1850_cam54_ptaero</value>
+      <value compset="2000_CAM54%PTAERO"  >2000_cam6_noclb_oslo</value>
+      <value compset="2000_CAM60%PTAERO"  >2000_cam6_oslo</value>
+      <value compset="1850_CAM60%PTAERO"  >1850_cam6_oslo</value>
+      <value compset="1850_CAM60%NORESM"    >1850_cam6_noresm</value>
+      <value compset="1850_CAM60%NORESM%FRC2"    >1850_cam6_noresm_frc2</value>
+      <!-- DAMIP transient coupled -->
+      <value compset="1850_CAM60%NORESM%GHGONLY"     >1850_cam6_noresm_ghgonly</value>
+      <value compset="1850_CAM60%NORESM%NATONLY"     >1850_cam6_noresm_natonly</value>
+      <value compset="1850_CAM60%NORESM%AEROXIDONLY" >1850_cam6_noresm_aeroxidonly</value>
+
+      <value compset="1850_CAM60%NORESM%GHGONLY%SSP245%FRC2"     >ssp245_cam6_noresm_ghgonly_frc2</value>
+      <value compset="1850_CAM60%NORESM%NATONLY%SSP245%FRC2"     >ssp245_cam6_noresm_natonly_frc2</value>
+      <value compset="1850_CAM60%NORESM%AEROXIDONLY%SSP245%FRC2" >ssp245_cam6_noresm_aeroxidonly_frc2</value>
+
+      <!-- RFMIP transient, but fixed pre-industrial NorESM-derived fSST -->
+      <value compset="1850_CAM60%NORESM%NORPIBC%GHGONLY"     >1850_cam6_noresm_ghgonly</value>
+      <value compset="1850_CAM60%NORESM%NORPIBC%NATONLY"     >1850_cam6_noresm_natonly</value>
+      <value compset="1850_CAM60%NORESM%NORPIBC%AEROXIDONLY" >1850_cam6_noresm_aeroxidonly</value>
+      <value compset="1850_CAM60%NORESM%NORPIBC%OZONEONLY"   >1850_cam6_noresm_ozoneonly</value>
+      <!-- RFMIP/AerChemMIP constant preindustrial fSST -->
+      <value compset="1850_CAM60%NORESM%NORBC%GHG2014" >1850_cam6_noresm_ghg2014</value>
+      <value compset="1850_CAM60%NORESM%NORBC%GHGNOH2O2014" >1850_cam6_noresm_ghgnoh2o2014</value>
+      <value compset="1850_CAM60%NORESM%NORBC%N2O2014" >1850_cam6_noresm_n2o2014</value>
+      <value compset="1850_CAM60%NORESM%NORBC%CH42014" >1850_cam6_noresm_ch42014</value>
+      <value compset="1850_CAM60%NORESM%NORBC%CH4NOH2O2014" >1850_cam6_noresm_ch4noh2o2014</value>
+      <value compset="1850_CAM60%NORESM%NORBC%BC2014"  >1850_cam6_noresm_bc2014</value>
+      <value compset="1850_CAM60%NORESM%NORBC%OC2014"  >1850_cam6_noresm_oc2014</value>
+      <value compset="1850_CAM60%NORESM%NORBC%SO22014" >1850_cam6_noresm_so22014</value>
+      <value compset="1850_CAM60%NORESM%NORBC%AER2014" >1850_cam6_noresm_aer2014</value>
+      <value compset="1850_CAM60%NORESM%NORBC%AEROXID2014" >1850_cam6_noresm_aeroxid2014</value>
+      <value compset="1850_CAM60%NORESM%NORBC%SO2OXID2014" >1850_cam6_noresm_so2oxid2014</value>
+      <value compset="1850_CAM60%NORESM%NORBC%NTCF2014" >1850_cam6_noresm_ntcf2014</value>
+      <value compset="1850_CAM60%NORESM%NORBC%ANTHRO2014" >1850_cam6_noresm_anthro2014</value>
+      <value compset="1850_CAM60%NORESM%NORBC%GHGOZONELU2014" >1850_cam6_noresm_ghgozone2014</value>
+      <value compset="1850_CAM60%NORESM%NORBC%OZONE2014" >1850_cam6_noresm_ozone2014</value>
+      <value compset="1850_CAM60%NORESM%NORBC%H2O2014" >1850_cam6_noresm_h2o2014</value>
+      <value compset="1850_CAM60%NORESM%NORBC%OXID2014" >1850_cam6_noresm_oxid2014</value>
+     
+      <value compset="HIST_CAM60%PTAERO"  >hist_cam6_oslo</value>
+      <value compset="HIST_CAM60%NORESM"  >hist_cam6_noresm</value>
+      <value compset="HIST_CAM60%NORESM%FRC2"            >hist_cam6_noresm_frc2</value>
+      <value compset="HIST_CAM60%NORESM%FSST%FRC2"       >hist_cam6_noresm_frc2</value>
+      <value compset="HIST_CAM60%NORESM%NORPDDMSBC%FRC2" >hist_cam6_noresm_frc2</value>
+      <!-- nudging -->
+      <value compset="HIST_CAM60%NORESM%NORPDDMSBC%SDYN" >sd_hist_cam6_noresm</value>
+      <!-- AerChemMIP transient coupled -->
+      <value compset="HIST_CAM60%NORESM%PINTCF"    >hist_cam6_noresm_pintcf</value>
+      <value compset="HIST_CAM60%NORESM%PIAER"     >hist_cam6_noresm_piaer</value>
+      <value compset="HIST_CAM60%NORESM%PIAEROXID" >hist_cam6_noresm_piaeroxid</value>
+      <!-- AerChemMIP transient, with varying NorESM derived fSST -->
+      <value compset="HIST_CAM60%NORESM%NORBC%PINTCF"  >hist_cam6_noresm_pintcf</value>
+      <value compset="HIST_CAM60%NORESM%NORBC%PIAER"   >hist_cam6_noresm_piaer</value>
+
+      <value compset="SSP126_CAM60%NORESM%FRC2"  >ssp126_cam6_noresm_frc2</value>
+      <value compset="SSP245_CAM60%NORESM%FRC2"  >ssp245_cam6_noresm_frc2</value>
+      <value compset="SSP370_CAM60%NORESM%FRC2"  >ssp370_cam6_noresm_frc2</value>
+      <value compset="SSP585_CAM60%NORESM%FRC2"  >ssp585_cam6_noresm_frc2</value>
+
+      <value compset="_CAM50%NUDGEPTAERO" >2000_cam5_oslonudge</value>
+      <value compset="_CAM50%NUDGEPTAEROUPD1">cam5_nudge_ptaero_up1</value>
+      <value compset="_CAM54%NUDGEPTAERO" >2000_cam6_noclb_oslonudge</value>
+      <value compset="_CAM60%NUDGEPTAERO" >2000_cam6_oslonudge</value>
+      <value compset="_CAM5%NUDGEMAM3" >2000_cam5_oslonudge</value>
+      <value compset="_CAM5%PTAEROUPD1"  >cam5_ptaero_up1</value>
     </values>
     <group>run_component_cam</group>
     <file>env_run.xml</file>
@@ -265,7 +362,7 @@
       leverages groups of namelist options (use cases) that are often
       paired with the CAM configure options.  These use cases are xml
       files located in
-      $CIMEROOT/../components/cam/bld/namelist_files/use_cases.
+      $CIMEROOT/../components/atm/cam/bld/namelist_files/use_cases.
       In general, this variable should not be modified for supported
       component sets (compsets).  Recommendation: If you want to
       modify this value for your experiment, use your own user-defined
@@ -279,6 +376,7 @@
     <values match="last" modifier="additive">
       <value compset="_CAM.*%RCO2"> scenario_ghg=&apos;RAMP_CO2_ONLY&apos;ramp_co2_annual_rate=1 </value>
       <value compset="_CAM60%4xCO2"> co2vmr=1138.8e-6  </value>
+      <value compset="_CAM60%2xCO2"> co2vmr=568.64e-6  </value>
       <value compset="_CAM60%WCTS%4xCO2"> flbc_cycle_yr=1  </value>
       <value compset="_CAM60%WCTS%4xCO2"> flbc_file='$DIN_LOC_ROOT/atm/waccm/lb/LBC_CMIP6abrupt4xCO2_cyclicalYear1_0p5degLat_c180929.nc'  </value>
       <value compset="_CAM60%WCTS%4xCO2"> ncdata='$DIN_LOC_ROOT/atm/waccm/ic/b.e21.BW1850.f09_g17.CMIP6-piControl.001.cam.i.0070-01-01.abrupt4xCO2_c181003.nc'  </value>
@@ -291,6 +389,45 @@
       <value compset="_CAM60%WCTS%1PCT"> flbc_file='$DIN_LOC_ROOT/atm/waccm/lb/LBC_CMIP6_1pctCO2ramp_y1-165_0p5degLat_c180930.nc'</value>
       <value compset="_CAM60%WCTS%1PCT"> nlte_limit_co2=.true.</value>
       <value compset="_BGC%BDRD"> co2_cycle_rad_passive=.true. </value>
+      <value compset="_BGC%BPRPDMS"> dms_source='ocean_flux' </value>
+      <value compset="_BGC%BDRDDMS"> co2_cycle_rad_passive=.true.,dms_source='ocean_flux' </value>
+      <value compset="_BGC%DMS"> dms_source='ocean_flux' </value>
+      <value compset="_CAM60%NORESM%4xCO2"> co2vmr=1138.8e-6  </value>  
+      <value compset="_CAM60%NORESM%FRC2%4xCO2"> co2vmr=1138.8e-6  </value>  
+      <value compset="_CAM60%NORESM%2xCO2"> co2vmr=568.64e-6  </value>
+      <value compset="_CAM60%NORESM%1PCT"> flbc_type='SERIAL'</value>
+      <value compset="_CAM60%NORESM%1PCT"> flbc_file='$DIN_LOC_ROOT/atm/waccm/lb/LBC_CMIP6_1pctCO2_y1-165_GlobAnnAvg_0p5degLat_c180929.nc'</value>
+      <value compset="_CAM60%NORESM%1PCT"> flbc_list='CO2','CH4','N2O','CFC11eq','CFC12' </value>
+      <value compset="_CAM60%NORESM%FRC2%1PCT"> flbc_type='SERIAL'</value>
+      <value compset="_CAM60%NORESM%FRC2%1PCT"> flbc_file='$DIN_LOC_ROOT/atm/waccm/lb/LBC_CMIP6_1pctCO2_y1-165_GlobAnnAvg_0p5degLat_c180929.nc'</value>
+      <value compset="_CAM60%NORESM%FRC2%1PCT"> flbc_list='CO2','CH4','N2O','CFC11eq','CFC12' </value>
+      <!-- fSST NorESM-derived pre-industrial -->
+      <value compset="1850_CAM60%NORESM%NORBC"> ocean_filename='dms-hamocc-dow-taylor_chlor_a-lanaclim_N1850_f19_tn14_20190621_1751-1780_cycle_version20190726.nc' </value>
+      <value compset="1850_CAM60%NORESM%NORBC"> dms_cycle_year=1850 </value>
+      <value compset="1850_CAM60%NORESM%NORBC"> opom_cycle_year=1850 </value>
+      <value compset="1850_CAM60%NORESM%NORBC"> dms_source_type='CYCLICAL' </value>
+      <value compset="1850_CAM60%NORESM%NORBC"> opom_source_type='CYCLICAL' </value>
+      <!-- NorESM derived preindustrial -->
+      <value compset="CAM60%NORESM%NORPIBC"> ocean_filename='dms-hamocc-dow-taylor_chlor_a-lanaclim_N1850_f19_tn14_20190621_1751-1780_cycle_version20190726.nc' </value>
+      <value compset="CAM60%NORESM%NORPIBC"> dms_cycle_year=1850 </value>
+      <value compset="CAM60%NORESM%NORPIBC"> opom_cycle_year=1850 </value>
+      <value compset="CAM60%NORESM%NORPIBC"> dms_source_type='CYCLICAL' </value>
+      <value compset="CAM60%NORESM%NORPIBC"> opom_source_type='CYCLICAL' </value>
+
+      <!-- NorESM derived evolving -->
+      <value compset="HIST_CAM60%NORESM%NORBC"> ocean_filename='dms-hamocc-dow-taylor_chlor_a-lanaclim_NHIST_f19_tn14_20190625_1849-2015_series_version20190726.nc' </value>
+      <value compset="HIST_CAM60%NORESM%NORBC"> dms_source_type='INTERP_MISSING_MONTHS' </value>
+      <value compset="HIST_CAM60%NORESM%NORBC"> opom_source_type='INTERP_MISSING_MONTHS' </value>
+      <!-- fSST AMIP type 1979-2014-->
+      <value compset="HIST_CAM60%NORESM%NORPDDMSBC"> ocean_filename='dms-hamocc-dow-taylor_chlor_a-lanaclim_NHIST_f19_tn14_20190625_1985-2014_cycle_version20190726.nc' </value>
+      <value compset="HIST_CAM60%NORESM%NORPDDMSBC"> dms_cycle_year=2000 </value>
+      <value compset="HIST_CAM60%NORESM%NORPDDMSBC"> opom_cycle_year=2000 </value>
+      <value compset="HIST_CAM60%NORESM%NORPDDMSBC"> dms_source_type='CYCLICAL' </value>
+      <value compset="HIST_CAM60%NORESM%NORPDDMSBC"> opom_source_type='CYCLICAL' </value>
+      <!-- fSST 4xCO2-->
+      <value compset="1850_CAM60%NORESM%NORBC%4xCO2"> co2vmr=1138.8e-6 </value>
+      <!-- fSST 2xCO2-->
+      <value compset="1850_CAM60%NORESM%NORBC%2xCO2"> co2vmr=568.64e-6  </value>
     </values>
     <group>run_component_cam</group>
     <file>env_run.xml</file>
@@ -306,10 +443,10 @@
     <valid_values></valid_values>
     <default_value></default_value>
     <values match="last">
-    <value compset="DOCN%AQP">$COMP_ROOT_DIR_ATM/cime_config/usermods_dirs/aquap</value>
-    <value compset="DOCN%SOMAQP">$COMP_ROOT_DIR_ATM/cime_config/usermods_dirs/aquap</value>
-    <value compset="_CAM40%WX.*_CLM40" grid="a%1.9x2.5_l%1.9x2.5">$COMP_ROOT_DIR_ATM/cime_config/usermods_dirs/waccmx</value>
-    <value compset="CAM[456]0%SCAM" >$COMP_ROOT_DIR_ATM/cime_config/usermods_dirs/scam_mandatory</value>
+    <value compset="DOCN%AQP">$SRCROOT/components/cam/cime_config/usermods_dirs/aquap</value>
+    <value compset="DOCN%SOMAQP">$SRCROOT/components/cam/cime_config/usermods_dirs/aquap</value>
+    <value compset="_CAM40%WX.*_CLM40" grid="a%1.9x2.5_l%1.9x2.5">$SRCROOT/components/cam/cime_config/usermods_dirs/waccmx</value>
+    <value compset="CAM[456]0%SCAM" >$SRCROOT/components/cam/cime_config/usermods_dirs/scam_mandatory</value>
     </values>
     <group>run_component_cam</group>
     <file>env_case.xml</file>
