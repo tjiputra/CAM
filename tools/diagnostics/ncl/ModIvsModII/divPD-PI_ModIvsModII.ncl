@@ -32,6 +32,11 @@ begin
                                      ; 7 => Sea-salt column burden, PD - PI
                                      ; 8 => BC MEC based on PD - PI AOD and Burdens
                                      ; 9 => BC MABS based on PD - PI ABS and Burdens
+                                     ;10 => SO4 AOD at 550 nm, PD - PI
+                                     ;11 => POM AOD at 550 nm, PD - PI
+                                     ;12 => BC AOD at 550 nm, PD - PI
+                                     ;13 => DU AOD at 550 nm, PD - PI
+                                     ;14 => SS AOD at 550 nm, PD - PI
   end if
  if (.not. isvar("format")) then        ; is format on command line?
   format = "ps"
@@ -166,6 +171,39 @@ begin
  end if
  forc_II=(((/f1PD_II[:]->A550_BC/)-(/f1PI_II[:]->A550_BC/))/((/(f1PD_II[:]->cb_BC)/)-(/(f1PI_II[:]->cb_BC)/)))*1.e-3
  load_II=(((/(f1PD_II[:]->cb_BC)/)-(/(f1PI_II[:]->cb_BC)/)))*1.e3                     
+
+ else if (plot_type.eq.10) then
+ var="dD550so4"                                             
+ varname="Anthropogenic SO4 AOD at 550nm"                       
+ forc_I=(/(f1PD_I[:]->D550_SO4)/)-(/(f1PI_I[:]->D550_SO4)/)     
+ forc_II=(/(f1PD_II[:]->D550_SO4)/)-(/(f1PI_II[:]->D550_SO4)/)
+ else if (plot_type.eq.11) then
+ var="dD550pom"                                             
+ varname="Anthropogenic POM AOD at 550nm"                       
+ forc_I=(/(f1PD_I[:]->D550_POM)/)-(/(f1PI_I[:]->D550_POM)/)     
+ forc_II=(/(f1PD_II[:]->D550_POM)/)-(/(f1PI_II[:]->D550_POM)/)
+ else if (plot_type.eq.12) then
+ var="dD550bc"                                             
+ varname="Anthropogenic BC AOD at 550nm"                       
+ forc_I=(/(f1PD_I[:]->D550_BC)/)-(/(f1PI_I[:]->D550_BC)/)     
+ forc_II=(/(f1PD_II[:]->D550_BC)/)-(/(f1PI_II[:]->D550_BC)/)
+ else if (plot_type.eq.13) then
+ var="dD550du"                                             
+ varname="Anthropogenic DU AOD at 550nm"                       
+ forc_I=(/(f1PD_I[:]->D550_DU)/)-(/(f1PI_I[:]->D550_DU)/)     
+ forc_II=(/(f1PD_II[:]->D550_DU)/)-(/(f1PI_II[:]->D550_DU)/)
+ else if (plot_type.eq.14) then
+ var="dD550ss"                                             
+ varname="Anthropogenic SS AOD at 550nm"                       
+ forc_I=(/(f1PD_I[:]->D550_SS)/)-(/(f1PI_I[:]->D550_SS)/)     
+ forc_II=(/(f1PD_II[:]->D550_SS)/)-(/(f1PI_II[:]->D550_SS)/)
+ end if
+ end if
+ end if
+ end if
+ end if
+
+
  end if
  end if
  end if
@@ -197,7 +235,7 @@ end if
  end do
  forcave_I=sum(dim_avg_n(forc_Ia,0))/area1
 
-if (plot_type.ge.8) then
+if (plot_type.eq.8 .or. plot_type.eq.9) then
  do i=0,dimsizes(gw0_I)-1
  aod_Ia(:,i,:)=aod_I(:,i,:)*coffa*dlon_I*gw0_I(i)
  load_Ia(:,i,:)=load_I(:,i,:)*coffa*dlon_I*gw0_I(i)
@@ -215,7 +253,7 @@ end if
  end do
  forcave_II=sum(dim_avg_n(forc_IIa,0))/area1
 
-if (plot_type.ge.8) then
+if (plot_type.eq.8 .or. plot_type.eq.9) then
  do i=0,dimsizes(gw0_II)-1
  aod_IIa(:,i,:)=aod_II(:,i,:)*coffa*dlon_II*gw0_II(i)
  load_IIa(:,i,:)=load_II(:,i,:)*coffa*dlon_II*gw0_II(i)
@@ -225,7 +263,7 @@ if (plot_type.ge.8) then
 end if
 
 ; Defining color scales for each forcing variable
-if (var .eq. "dDOD550") then
+if (var.eq."dDOD550".or.var.eq."dD550so4".or.var.eq."dD550pom".or.var.eq."dD550bc".or.var.eq."dD550du".or.var.eq."dD550ss") then
  digg=(/-0.2,-.05,0,0.01,0.02,0.03,0.05,0.1,0.2,0.3/)
  else if (var .eq. "dABS550") then
   digg=(/-.01,0,0.001,0.002,0.003,0.005,0.01,0.02,0.03/)
@@ -295,7 +333,7 @@ end if
   res@cnLevels       =   sprintf("%5.3f",digg)             ; min level
 
 ;  res@tiMainString   = "CAM4-Oslo"
-if (var.eq."dDOD550".or.var.eq."dABS550") then
+if (var.eq."dDOD550".or.var.eq."dABS550".or.var.eq."dD550so4".or.var.eq."dD550pom".or.var.eq."dD550bc".or.var.eq."dD550du".or.var.eq."dD550ss") then
   res@gsnRightString   = "avg = "+sprintf("%6.4f",(sum(dim_avg_n(forc_Ia,0))/area1))
 else if (var.eq."dCDNUMC2") then
  if(ModI.eq."CAM4-Oslo") then
@@ -320,7 +358,7 @@ end if
   plot(0) = gsn_csm_contour_map_ce(wks,dim_avg_n_Wrap(forc_I,0),res)    ; create the plot
 
 ;  res@tiMainString   = "CAM5-Oslo"
-if (var.eq."dDOD550".or.var.eq."dABS550") then
+if (var.eq."dDOD550".or.var.eq."dABS550".or.var.eq."dD550so4".or.var.eq."dD550pom".or.var.eq."dD550bc".or.var.eq."dD550du".or.var.eq."dD550ss") then
   res@gsnRightString  = "avg = "+sprintf("%6.4f",(sum(dim_avg_n(forc_IIa,0))/area1))
 else if (var.eq."dCDNUMC2") then
   res@gsnRightString  = "(CDNUMC) avg = "+sprintf("%5.3f",(sum(dim_avg_n(forc_IIa,0))/area1))+" (10~S~6~N~ cm~S~-2~N~)"
