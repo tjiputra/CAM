@@ -8,7 +8,7 @@
       CAM
     ===============
    -->
-    <desc atm="CAM60[%1PCT][%4xCO2][%2xCO2][%CCTS][%CFIRE][%CVBSX][%PORT][%RCO2][%SCAM][%SDYN][%WCCM][%WCMD][%WCSC][%WCTS][%NORESM][%FRC2][%GHGONLY][%NATONLY][%AEROXIDONLY][%OZONEONLY][%PINTCF][%PIAER][%PIAEROXID][%NORBC][%GHG2014][%GHGNOH2O2014][%N2O2014][%CH42014][%CH4NOH2O2014][%BC2014][%OC2014][%SO22014][%AER2014][%AEROXID2014][%SO2OXID2014][%NTCF2014][%ANTHRO2014][%GHGOZONELU2014][%OZONE2014][%H2O2014][%OXID2014][%FSST][%NORPDDMSBC][%NORPIBC][%SSP245]">CAM cam6 physics:</desc>
+    <desc atm="CAM60[%1PCT][%4xCO2][%2xCO2][%CCTS][%CFIRE][%CVBSX][%PORT][%RCO2][%SCAM][%SDYN][%WCCM][%WCMD][%WCSC][%WCTS][%NORESM][%FRC2][%GHGONLY][%NATONLY][%AEROXIDONLY][%OZONEONLY][%PINTCF][%PIAER][%PIAEROXID][%NORBC][%GHG2014][%GHGNOH2O2014][%N2O2014][%CH42014][%CH4NOH2O2014][%BC2014][%OC2014][%SO22014][%AER2014][%AEROXID2014][%SO2OXID2014][%NTCF2014][%ANTHRO2014][%GHGOZONELU2014][%OZONE2014][%H2O2014][%OXID2014][%FSST][%NORPDDMSBC][%NORPIBC][%SSP245][%FRC2EXT]">CAM cam6 physics:</desc>
     <desc atm="CAM50[%CCTS][%CLB][%PORT][%RCO2][%SCAM][%SDYN][%WCSC][%WCTS]"              >CAM cam5 physics:</desc>
     <desc atm="CAM40[%PORT][%RCO2][%SCAM][%SDYN][%TMOZ][%WXIE][%WXIED][%WCMD]"                   >CAM cam4 physics:</desc>
     <desc atm="CAM[%ADIAB][%DABIP04][%TJ16][%HS94][%KESSLER][%RCO2][%SPCAMS][%SPCAMCLBS][%SPCAMM][%SPCAMCLBM]">CAM simplified and non-versioned physics :</desc>
@@ -332,6 +332,13 @@
       <value compset="HIST_CAM60%NORESM%FRC2"            >hist_cam6_noresm_frc2</value>
       <value compset="HIST_CAM60%NORESM%FSST%FRC2"       >hist_cam6_noresm_frc2</value>
       <value compset="HIST_CAM60%NORESM%NORPDDMSBC%FRC2" >hist_cam6_noresm_frc2</value>
+
+      <!-- NorESM emissions driven compsets -->
+      <value compset="1850_CAM60%NORESM.*_BGC%BPRPDMS"     >1850esm_cam6_noresm</value>
+      <value compset="1850_CAM60%NORESM%FRC2.*_BGC%BPRPDMS">1850esm_cam6_noresm_frc2</value>
+      <value compset="HIST_CAM60%NORESM.*_BGC%BPRPDMS"     >histesm_cam6_noresm</value>
+      <value compset="HIST_CAM60%NORESM%FRC2.*_BGC%BPRPDMS">histesm_cam6_noresm_frc2</value>
+ 
       <!-- nudging -->
       <value compset="HIST_CAM60%NORESM%NORPDDMSBC%SDYN" >sd_hist_cam6_noresm</value>
       <!-- AerChemMIP transient coupled -->
@@ -342,10 +349,12 @@
       <value compset="HIST_CAM60%NORESM%NORBC%PINTCF"  >hist_cam6_noresm_pintcf</value>
       <value compset="HIST_CAM60%NORESM%NORBC%PIAER"   >hist_cam6_noresm_piaer</value>
 
-      <value compset="SSP126_CAM60%NORESM%FRC2"  >ssp126_cam6_noresm_frc2</value>
-      <value compset="SSP245_CAM60%NORESM%FRC2"  >ssp245_cam6_noresm_frc2</value>
-      <value compset="SSP370_CAM60%NORESM%FRC2"  >ssp370_cam6_noresm_frc2</value>
-      <value compset="SSP585_CAM60%NORESM%FRC2"  >ssp585_cam6_noresm_frc2</value>
+      <value compset="SSP126_CAM60%NORESM%FRC2"   >ssp126_cam6_noresm_frc2</value>
+      <value compset="SSP126_CAM60%NORESM%FRC2EXT">ssp126_cam6_noresm_frc2ext</value>
+      <value compset="SSP245_CAM60%NORESM%FRC2"   >ssp245_cam6_noresm_frc2</value>
+      <value compset="SSP370_CAM60%NORESM%FRC2"   >ssp370_cam6_noresm_frc2</value>
+      <value compset="SSP585_CAM60%NORESM%FRC2"   >ssp585_cam6_noresm_frc2</value>
+      <value compset="SSP585_CAM60%NORESM%FRC2EXT">ssp585_cam6_noresm_frc2ext</value>
 
       <value compset="_CAM50%NUDGEPTAERO" >2000_cam5_oslonudge</value>
       <value compset="_CAM50%NUDGEPTAEROUPD1">cam5_nudge_ptaero_up1</value>
