@@ -60,6 +60,50 @@
 
 
   <!-- NorESM compset -->
+
+  <!-- comment on the naming of NorESM compsets
+
+	(1) CAM60%NORESM versus CAM60%PTAERO :
+		CAM60%NORESM : the compsets used and created for CMIP6 use "NORESM" to activate typically NorESM2 settings
+		CAM60%PTAERO : older compsets use "PTAERO" to activate typically NorESM2 settings
+
+	(2) presence of frc2 (FRC2) in the compset name : 
+		WITHOUT "frc2" in name : uses multiple emission files per species (leads on fram HPC to irreprudicibility for fully-coupled compsets)
+		WITH "frc2" in name : uses sligthly differently organized emission files 
+			- these emissions are very similar to "WITHOUT frc2"
+			- they avoid the non-reproducibility issue on the fram HPC for fully-coupled simulations
+
+		In the fully-coupled simulations most CMIP6 experiments have been run in the following way (as a general rule) :
+		        (i) f09 resolution : all simulations have been done WITH frc2.
+		        (ii) f19 resolution : 
+		                piControl + historical + perturbed historical (hist-aer, hist-GHG, hist-nat) have been done WITHOUT frc2
+                		scenarios + perturbed scenarios : have been done WITH frc2
+
+		Therefore, to have the best correspondence between atmosphere-only and fully-coupled simulations :
+			some atmosphere-only compsets use FRC2, whereas others do not.
+
+
+	(3) norbc, norpibc, norpddmsbc : refers to the type of boundary condtions used for SST, sea-ice cover, and upper-ocean DMS concentration
+		norbc [ nor (NorESM) derived bc (boundary conditions) ] :
+			boundary conditions are derived from a fully-coupled NorESM2 simulation (e.g., N1850 or NHIST)
+			boundary conditions follow the "corresponding" fully coupled equivalent 
+				(e.g., NFHISTnorbc will use bc from NHIST, NF1850norbc will use bc from N1850)
+		norpibc [ nor (NorESM) derived pi (pre-industrial) bc (boundary condtions) ] : 
+			boundary conditions are derived from a fully-coupled pre-industrial NorESM2 simulation (N1850).  
+			you impose explicitly that the "pre-industrial" boundary conditions are used : e.g., NFHISTnorpibc uses bc from N1850
+		norpddmsbc [ nor (NorESM) derived pd (present-day) dms (DMS) bc (boundary conditions) ] :
+			only DMS boundary conditions come from a fully-coupled NorESM2 simulation
+			SST and sea-ice boundary conditions com from standard observation-based data set
+
+	(4) grids
+		f09_f09 and f19_f19 : 
+			When using NorESM-derived boundary conditions, we have opted to use the same land-sea mask 
+			in the atmosphere-only as in the fully-coupled simulations.
+
+		f19_19_mg17 
+			stanard CAM land-sea mask will be used when using this grid
+    -->
+
     <compset>
     <alias>NF1850</alias>
     <lname>1850_CAM60%PTAERO_CLM50%SP_CICE%PRES_DOCN%DOM_MOSART_SGLC_SWAV</lname>
@@ -88,6 +132,7 @@
     <alias>NFHISTnorpddmsbc</alias>
     <lname>HIST_CAM60%NORESM%NORPDDMSBC_CLM50%BGC-CROP_CICE%PRES_DOCN%DOM_MOSART_SGLC_SWAV</lname>
     <science_support grid="f09_f09_mg17"/>
+    <science_support grid="f19_f19_mg17"/>
   </compset>
 
   <!-- fSST : evolving from observations ; upper-ocean DMS : present-day constant NorESM derived ; nudged meteorology -->
@@ -101,56 +146,57 @@
     <alias>NFHISTfrc2norpddmsbc</alias>
     <lname>HIST_CAM60%NORESM%NORPDDMSBC%FRC2_CLM50%BGC-CROP_CICE%PRES_DOCN%DOM_MOSART_SGLC_SWAV</lname>
     <science_support grid="f09_f09_mg17"/>
+    <science_support grid="f19_f19_mg17"/>
   </compset>
 
   <!-- fSST : evolving NorESM derived ; DMS: evolving NorESM derived -->
   <compset>
     <alias>NFHISTnorbc</alias>
     <lname>HIST_CAM60%NORESM%NORBC_CLM50%BGC-CROP_CICE%PRES_DOCN%DOM_MOSART_SGLC_SWAV</lname>
-    <science_support grid="f09_f09_mg17"/>
+    <science_support grid="f19_f19"/>
   </compset>
 
   <compset>
     <alias>NFHISTnorbc_pintcf</alias>
     <lname>HIST_CAM60%NORESM%NORBC%PINTCF_CLM50%BGC-CROP_CICE%PRES_DOCN%DOM_MOSART_SGLC_SWAV</lname>
-    <science_support grid="f09_f09_mg17"/>
+    <science_support grid="f19_f19"/>
   </compset>
 
   <compset>
     <alias>NFHISTnorbc_piaer</alias>
     <lname>HIST_CAM60%NORESM%NORBC%PIAER_CLM50%BGC-CROP_CICE%PRES_DOCN%DOM_MOSART_SGLC_SWAV</lname>
-    <science_support grid="f09_f09_mg17"/>
+    <science_support grid="f19_f19"/>
   </compset>
 
   <!-- constant pre-industrial NorESM derived ; DMS : constant pre-industrial NorESM derived -->
   <compset>
     <alias>NFHISTnorpibc</alias>
     <lname>HIST_CAM60%NORESM%NORPIBC_CLM50%BGC-CROP_CICE%PRES_DOCN%DOM_MOSART_SGLC_SWAV</lname>
-    <science_support grid="f09_f09_mg17"/>
+    <science_support grid="f19_f19"/>
   </compset>
 
   <compset>
     <alias>NFHISTnorpibc_ghgonly</alias>
     <lname>1850_CAM60%NORESM%NORPIBC%GHGONLY_CLM50%BGC-CROP_CICE%PRES_DOCN%DOM_MOSART_SGLC_SWAV</lname>
-    <science_support grid="f09_f09_mg17"/>
+    <science_support grid="f19_f19"/>
   </compset>
 
   <compset>
     <alias>NFHISTnorpibc_natonly</alias>
     <lname>1850_CAM60%NORESM%NORPIBC%NATONLY_CLM50%BGC-CROP_CICE%PRES_DOCN%DOM_MOSART_SGLC_SWAV</lname>
-    <science_support grid="f09_f09_mg17"/>
+    <science_support grid="f19_f19"/>
   </compset>
 
   <compset>
     <alias>NFHISTnorpibc_aeroxidonly</alias>
     <lname>1850_CAM60%NORESM%NORPIBC%AEROXIDONLY_CLM50%BGC-CROP_CICE%PRES_DOCN%DOM_MOSART_SGLC_SWAV</lname>
-    <science_support grid="f09_f09_mg17"/>
+    <science_support grid="f19_f19"/>
   </compset>
 
   <compset>
     <alias>NFHISTnorpibc_ozoneonly</alias>
     <lname>1850_CAM60%NORESM%NORPIBC%OZONEONLY_CLM50%BGC-CROP_CICE%PRES_DOCN%DOM_MOSART_SGLC_SWAV</lname>
-    <science_support grid="f09_f09_mg17"/>
+    <science_support grid="f19_f19"/>
   </compset>
 
   <compset>
@@ -163,101 +209,126 @@
   <compset>
     <alias>NF1850norbc</alias>
     <lname>1850_CAM60%NORESM%NORBC_CLM50%BGC-CROP_CICE%PRES_DOCN%DOM_MOSART_SGLC_SWAV</lname>
+    <science_support grid="f09_f09"/>
+    <science_support grid="f19_f19"/>
   </compset>
 
   <compset>
     <alias>NF1850norbc_4xco2</alias>
     <lname>1850_CAM60%NORESM%NORBC%4xCO2_CLM50%BGC-CROP_CICE%PRES_DOCN%DOM_MOSART_SGLC_SWAV</lname>
+    <science_support grid="f09_f09"/>
+    <science_support grid="f19_f19"/>
   </compset>
 
   <compset>
     <alias>NF1850norbc_2xco2</alias>
     <lname>1850_CAM60%NORESM%NORBC%2xCO2_CLM50%BGC-CROP_CICE%PRES_DOCN%DOM_MOSART_SGLC_SWAV</lname>
+    <science_support grid="f19_f19"/>
   </compset>
 
   <compset>
     <alias>NF1850norbc_ghg2014</alias>
     <lname>1850_CAM60%NORESM%NORBC%GHG2014_CLM50%BGC-CROP_CICE%PRES_DOCN%DOM_MOSART_SGLC_SWAV</lname>
+    <science_support grid="f19_f19"/>
   </compset>
 
   <compset>
     <alias>NF1850norbc_ghgnoh2o2014</alias>
     <lname>1850_CAM60%NORESM%NORBC%GHGNOH2O2014_CLM50%BGC-CROP_CICE%PRES_DOCN%DOM_MOSART_SGLC_SWAV</lname>
+    <science_support grid="f19_f19"/>
   </compset>
 
   <compset>
     <alias>NF1850norbc_n2o2014</alias>
     <lname>1850_CAM60%NORESM%NORBC%N2O2014_CLM50%BGC-CROP_CICE%PRES_DOCN%DOM_MOSART_SGLC_SWAV</lname>
+    <science_support grid="f19_f19"/>
   </compset>
 
   <compset>
     <alias>NF1850norbc_ch42014</alias>
     <lname>1850_CAM60%NORESM%NORBC%CH42014_CLM50%BGC-CROP_CICE%PRES_DOCN%DOM_MOSART_SGLC_SWAV</lname>
+    <science_support grid="f19_f19"/>
   </compset>
 
   <compset>
     <alias>NF1850norbc_ch4noh2o2014</alias>
     <lname>1850_CAM60%NORESM%NORBC%CH4NOH2O2014_CLM50%BGC-CROP_CICE%PRES_DOCN%DOM_MOSART_SGLC_SWAV</lname>
+    <science_support grid="f19_f19"/>
   </compset>
 
   <compset>
     <alias>NF1850norbc_bc2014</alias>
     <lname>1850_CAM60%NORESM%NORBC%BC2014_CLM50%BGC-CROP_CICE%PRES_DOCN%DOM_MOSART_SGLC_SWAV</lname>
+    <science_support grid="f19_f19"/>
   </compset>
 
   <compset>
     <alias>NF1850norbc_oc2014</alias>
     <lname>1850_CAM60%NORESM%NORBC%OC2014_CLM50%BGC-CROP_CICE%PRES_DOCN%DOM_MOSART_SGLC_SWAV</lname>
+    <science_support grid="f19_f19"/>
   </compset>
 
   <compset>
     <alias>NF1850norbc_so22014</alias>
     <lname>1850_CAM60%NORESM%NORBC%SO22014_CLM50%BGC-CROP_CICE%PRES_DOCN%DOM_MOSART_SGLC_SWAV</lname>
+    <science_support grid="f19_f19"/>
   </compset>
 
   <compset>
     <alias>NF1850norbc_aer2014</alias>
     <lname>1850_CAM60%NORESM%NORBC%AER2014_CLM50%BGC-CROP_CICE%PRES_DOCN%DOM_MOSART_SGLC_SWAV</lname>
+    <science_support grid="f09_f09"/>
+    <science_support grid="f19_f19"/>
   </compset>
 
   <compset>
     <alias>NF1850norbc_aeroxid2014</alias>
     <lname>1850_CAM60%NORESM%NORBC%AEROXID2014_CLM50%BGC-CROP_CICE%PRES_DOCN%DOM_MOSART_SGLC_SWAV</lname>
+    <science_support grid="f09_f09"/>
+    <science_support grid="f19_f19"/>
   </compset>
 
   <compset>
     <alias>NF1850norbc_ntcf2014</alias>
     <lname>1850_CAM60%NORESM%NORBC%NTCF2014_CLM50%BGC-CROP_CICE%PRES_DOCN%DOM_MOSART_SGLC_SWAV</lname>
+    <science_support grid="f19_f19"/>
   </compset>
 
   <compset>
     <alias>NF1850norbc_anthro2014</alias>
     <lname>1850_CAM60%NORESM%NORBC%ANTHRO2014_CLM50%BGC-CROP_CICE%PRES_DOCN%DOM_MOSART_SGLC_SWAV</lname>
+    <science_support grid="f19_f19"/>
   </compset>
 
   <compset>
     <alias>NF1850norbc_ghgozonelu2014</alias>
     <lname>1850_CAM60%NORESM%NORBC%GHGOZONELU2014_CLM50%BGC-CROP_CICE%PRES_DOCN%DOM_MOSART_SGLC_SWAV</lname>
+    <science_support grid="f19_f19"/>
   </compset>
 
   <compset>
     <alias>NF1850norbc_so2oxid2014</alias>
     <lname>1850_CAM60%NORESM%NORBC%SO2OXID2014_CLM50%BGC-CROP_CICE%PRES_DOCN%DOM_MOSART_SGLC_SWAV</lname>
+    <science_support grid="f19_f19"/>
   </compset>
 
   <compset>
     <alias>NF1850norbc_ozone2014</alias>
     <lname>1850_CAM60%NORESM%NORBC%OZONE2014_CLM50%BGC-CROP_CICE%PRES_DOCN%DOM_MOSART_SGLC_SWAV</lname>
+    <science_support grid="f19_f19"/>
   </compset>
 
   <compset>
     <alias>NF1850norbc_h2o2014</alias>
     <lname>1850_CAM60%NORESM%NORBC%H2O2014_CLM50%BGC-CROP_CICE%PRES_DOCN%DOM_MOSART_SGLC_SWAV</lname>
+    <science_support grid="f19_f19"/>
   </compset>
 
   <compset>
     <alias>NF1850norbc_oxid2014</alias>
     <lname>1850_CAM60%NORESM%NORBC%OXID2014_CLM50%BGC-CROP_CICE%PRES_DOCN%DOM_MOSART_SGLC_SWAV</lname>
+    <science_support grid="f09_f09"/>
+    <science_support grid="f19_f19"/>
   </compset>
 
   <!-- CAM simpler model compsets -->
