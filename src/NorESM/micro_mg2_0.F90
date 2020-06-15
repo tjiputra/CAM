@@ -99,12 +99,18 @@ module micro_mg2_0
 ! .........................................................................
 ! NOTE: List of all inputs/outputs passed through the call/subroutine statement
 !       for micro_mg_tend is given below at the start of subroutine micro_mg_tend.
-!---------------------------------------------------------------------------------
+!-----------------------------------------------------------------------------------
+! Sept. 2019   A. Kirkevåg    Added MACv2 SP-aerosol code wrt. Twomey effect (SPAERO) 
+!-----------------------------------------------------------------------------------
 
 ! Procedures required:
 ! 1) An implementation of the gamma function (if not intrinsic).
 ! 2) saturation vapor pressure and specific humidity over water
 ! 3) svp over ice
+
+!ak+
+#include <preprocessorDefinitions.h>
+!ak-
 
 #ifndef HAVE_GAMMA_INTRINSICS
 use shr_spfn_mod, only: gamma => shr_spfn_gamma
@@ -377,6 +383,10 @@ subroutine micro_mg_tend ( &
      prain,                        prodsnow,                     &
      cmeout,                       deffi,                        &
      pgamrad,                      lamcrad,                      &
+#ifdef SPAERO
+     sp_xcdnc,                                                   &
+     sp_pgamrad,                   sp_lamcrad,                   &
+#endif
      qsout,                        dsout,                        &
      lflx,               iflx,                                   &
      rflx,               sflx,               qrout,              &
@@ -525,6 +535,10 @@ subroutine micro_mg_tend ( &
   real(r8), intent(out) :: deffi(mgncol,nlev)        ! ice effective diameter for optics (radiation) (micron)
   real(r8), intent(out) :: pgamrad(mgncol,nlev)      ! ice gamma parameter for optics (radiation) (no units)
   real(r8), intent(out) :: lamcrad(mgncol,nlev)      ! slope of droplet distribution for optics (radiation) (1/m)
+#ifdef SPAERO
+  real(r8), intent(out) :: sp_pgamrad(mgncol,nlev)   ! ice gamma parameter for SP optics (radiation) (no units)
+  real(r8), intent(out) :: sp_lamcrad(mgncol,nlev)   ! slope of droplet distribution for SP optics (radiation) (1/m)
+#endif
   real(r8), intent(out) :: qsout(mgncol,nlev)        ! snow mixing ratio (kg/kg)
   real(r8), intent(out) :: dsout(mgncol,nlev)        ! snow diameter (m)
   real(r8), intent(out) :: lflx(mgncol,nlev+1)       ! grid-box average liquid condensate flux (kg m^-2 s^-1)
@@ -852,6 +866,10 @@ subroutine micro_mg_tend ( &
   ! dummies for in-cloud variables
   real(r8) :: dumc(mgncol,nlev)   ! qc
   real(r8) :: dumnc(mgncol,nlev)  ! nc
+#ifdef SPAERO
+  real(r8) :: sp_dumnc(mgncol,nlev)
+  real(r8), intent(in) :: sp_xcdnc(mgncol)
+#endif
   real(r8) :: dumi(mgncol,nlev)   ! qi
   real(r8) :: dumni(mgncol,nlev)  ! ni
   real(r8) :: dumr(mgncol,nlev)   ! rain mixing ratio
@@ -1130,6 +1148,10 @@ subroutine micro_mg_tend ( &
   effc = 10._r8
   lamcrad = 0._r8
   pgamrad = 0._r8
+#ifdef SPAERO
+  sp_lamcrad = 0._r8
+  sp_pgamrad = 0._r8
+#endif
   effc_fn = 10._r8
   effi = 25._r8
   sadice = 0._r8
@@ -2188,7 +2210,7 @@ subroutine micro_mg_tend ( &
         ! switch for specification of droplet and crystal number
         if (nccons) then
            dumnc(i,k)=ncnst/rho(i,k)
-        end if
+       end if
 
         ! switch for specification of cloud ice number
         if (nicons) then
@@ -2881,6 +2903,9 @@ subroutine micro_mg_tend ( &
         dumc(i,k) = max(qc(i,k)+qctend(i,k)*deltat,0._r8)/lcldm(i,k)
         dumi(i,k) = max(qi(i,k)+qitend(i,k)*deltat,0._r8)/icldm(i,k)
         dumnc(i,k) = max(nc(i,k)+nctend(i,k)*deltat,0._r8)/lcldm(i,k)
+#ifdef SPAERO 
+        sp_dumnc(i,k) = dumnc(i,k) * sp_xcdnc(i)
+#endif
         dumni(i,k) = max(ni(i,k)+nitend(i,k)*deltat,0._r8)/icldm(i,k)
 
         dumr(i,k) = max(qr(i,k)+qrtend(i,k)*deltat,0._r8)/precip_frac(i,k)
@@ -2973,6 +2998,13 @@ subroutine micro_mg_tend ( &
 
            dum = dumnc(i,k)
 
+#ifdef SPAERO 
+!          Extra call with SP aerosol to obtain new droplet size distrobution for
+!          radiative transfer (only). Does not change the results when xcdnc=1.0_r8. 
+!          NB: dumnc er en in-out parameter i kallet under, mens dumc ikke er det !
+           call size_dist_param_liq(mg_liq_props, dumc(i,k), sp_dumnc(i,k), rho(i,k), &
+            sp_pgamrad(i,k), sp_lamcrad(i,k))
+#endif
            call size_dist_param_liq(mg_liq_props, dumc(i,k), dumnc(i,k), rho(i,k), &
                 pgam(i,k), lamc(i,k))
 
@@ -2986,11 +3018,14 @@ subroutine micro_mg_tend ( &
               nctend(i,k)=(dumnc(i,k)*lcldm(i,k)-nc(i,k))/deltat
            end if
 
-           effc(i,k) = (pgam(i,k)+3._r8)/lamc(i,k)/2._r8*1.e6_r8
+#ifdef SPAERO
+          effc(i,k) = (sp_pgamrad(i,k)+3._r8)/sp_lamcrad(i,k)/2._r8*1.e6_r8
+#else
+          effc(i,k) = (pgam(i,k)+3._r8)/lamc(i,k)/2._r8*1.e6_r8
+#endif
            !assign output fields for shape here
            lamcrad(i,k)=lamc(i,k)
            pgamrad(i,k)=pgam(i,k)
-
 
            ! recalculate effective radius for constant number, in order to separate
            ! first and second indirect effects

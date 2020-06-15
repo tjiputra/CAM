@@ -276,11 +276,6 @@ subroutine rad_rrtmg_sw(lchnk,ncol       ,rrtmg_levs   ,r_state      , &
    real(r8) :: fdsc(pcols,pverp)  ! Downward clear-sky flux (added for CRM)
 
 #ifdef AEROFFL
-!   real(r8), intent(out) :: fds(pcols,pverp)   ! Downward flux (added for CRM)
-!   real(r8), intent(out) :: fdsc(pcols,pverp)  ! Downward clear-sky flux (added for CRM)
-!#else
-!   real(r8) :: fds(pcols,pverp)   ! Downward flux (added for CRM)
-!   real(r8) :: fdsc(pcols,pverp)  ! Downward clear-sky flux (added for CRM)
    logical, intent(in) :: idrf
 #endif
 
@@ -337,10 +332,10 @@ subroutine rad_rrtmg_sw(lchnk,ncol       ,rrtmg_levs   ,r_state      , &
 
    if (associated(su)) su(1:ncol,:,:) = 0.0_r8
    if (associated(sd)) sd(1:ncol,:,:) = 0.0_r8
-!#ifdef RFMIPIRF
-!   su(1:ncol,:,:) = 0.0_r8
-!   sd(1:ncol,:,:) = 0.0_r8
-!#endif
+#ifdef RFMIPIRF
+   su(1:ncol,:,:) = 0.0_r8
+   sd(1:ncol,:,:) = 0.0_r8
+#endif
 
    ! If night everywhere, return:
    if ( Nday == 0 ) then
@@ -603,23 +598,23 @@ subroutine rad_rrtmg_sw(lchnk,ncol       ,rrtmg_levs   ,r_state      , &
 
    ! Set spectral fluxes, reverse layering
    ! order=(/3,1,2/) maps the first index of swuflxs to the third index of su.
-!#ifndef RFMIPIRF
+#ifndef RFMIPIRF
    if (associated(su)) then
-!#endif
+#endif
       su(1:Nday,pverp-rrtmg_levs+1:pverp,:) = reshape(swuflxs(:,1:Nday,rrtmg_levs:1:-1), &
            (/Nday,rrtmg_levs,nbndsw/), order=(/3,1,2/))
-!#ifndef RFMIPIRF
+#ifndef RFMIPIRF
    end if
-!#endif
+#endif
 
-!#ifndef RFMIPIRF
+#ifndef RFMIPIRF
    if (associated(sd)) then
-!#endif
+#endif
       sd(1:Nday,pverp-rrtmg_levs+1:pverp,:) = reshape(swdflxs(:,1:Nday,rrtmg_levs:1:-1), &
            (/Nday,rrtmg_levs,nbndsw/), order=(/3,1,2/))
-!#ifndef RFMIPIRF
+#ifndef RFMIPIRF
    end if
-!#endif
+#endif
 
    call t_stopf('rrtmg_sw')
 
@@ -649,21 +644,21 @@ subroutine rad_rrtmg_sw(lchnk,ncol       ,rrtmg_levs   ,r_state      , &
    call ExpDayNite(fsnrtoac,	Nday, IdxDay, Nnite, IdxNite, 1, pcols)
    call ExpDayNite(fsnrtoaq,	Nday, IdxDay, Nnite, IdxNite, 1, pcols)
 
-!#ifndef RFMIPIRF
+#ifndef RFMIPIRF
    if (associated(su)) then
-!#endif
+#endif
       call ExpDayNite(su,	Nday, IdxDay, Nnite, IdxNite, 1, pcols, 1, pverp, 1, nbndsw)
-!#ifndef RFMIPIRF
+#ifndef RFMIPIRF
    end if
-!#endif
+#endif
 
-!#ifndef RFMIPIRF
+#ifndef RFMIPIRF
    if (associated(sd)) then
-!#endif
+#endif
       call ExpDayNite(sd,	Nday, IdxDay, Nnite, IdxNite, 1, pcols, 1, pverp, 1, nbndsw)
-!#ifndef RFMIPIRF
+#ifndef RFMIPIRF
    end if
-!#endif
+#endif
 
    !  these outfld calls don't work for spmd only outfield in scm mode (nonspmd)
 #ifndef OSLO_AERO
@@ -684,8 +679,6 @@ subroutine rad_rrtmg_sw(lchnk,ncol       ,rrtmg_levs   ,r_state      , &
 
 #ifdef AEROFFL
    if(idrf) then
-!      call ExpDayNite(fusc,Nday, IdxDay, Nnite, IdxNite, 1, pcols, 1, pverp)
-!      call ExpDayNite(fdsc,Nday, IdxDay, Nnite, IdxNite, 1, pcols, 1, pverp)
       call outfld('FUSCDRF ', fusc, pcols, lchnk)
       call outfld('FDSCDRF ', fdsc, pcols, lchnk)
    endif

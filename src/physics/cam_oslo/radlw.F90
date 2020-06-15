@@ -193,10 +193,10 @@ subroutine rad_rrtmg_lw(lchnk   ,ncol      ,rrtmg_levs,r_state,       &
 
    if (associated(lu)) lu(1:ncol,:,:) = 0.0_r8
    if (associated(ld)) ld(1:ncol,:,:) = 0.0_r8
-!#ifdef RFMIPIRF
-!   lu(1:ncol,:,:) = 0.0_r8
-!   ld(1:ncol,:,:) = 0.0_r8
-!#endif
+#ifdef RFMIPIRF
+   lu(1:ncol,:,:) = 0.0_r8
+   ld(1:ncol,:,:) = 0.0_r8
+#endif
 
    call rrtmg_lw(lchnk  ,ncol ,rrtmg_levs    ,icld    ,                 &
         r_state%pmidmb  ,r_state%pintmb  ,r_state%tlay    ,r_state%tlev    ,tsfc    ,r_state%h2ovmr, &
@@ -266,23 +266,23 @@ subroutine rad_rrtmg_lw(lchnk   ,ncol      ,rrtmg_levs,r_state,       &
 
    ! Pass spectral fluxes, reverse layering
    ! order=(/3,1,2/) maps the first index of lwuflxs to the third index of lu.
-!#ifndef RFMIPIRF
+#ifndef RFMIPIRF
    if (associated(lu)) then
-!#endif
+#endif
       lu(:ncol,pverp-rrtmg_levs+1:pverp,:) = reshape(lwuflxs(:,:ncol,rrtmg_levs:1:-1), &
            (/ncol,rrtmg_levs,nbndlw/), order=(/3,1,2/))
-!#ifndef RFMIPIRF
+#ifndef RFMIPIRF
    end if
-!#endif
+#endif
    
-!#ifndef RFMIPIRF
+#ifndef RFMIPIRF
    if (associated(ld)) then
-!#endif
+#endif
       ld(:ncol,pverp-rrtmg_levs+1:pverp,:) = reshape(lwdflxs(:,:ncol,rrtmg_levs:1:-1), &
            (/ncol,rrtmg_levs,nbndlw/), order=(/3,1,2/))
-!#ifndef RFMIPIRF
+#ifndef RFMIPIRF
    end if
-!#endif
+#endif
    
    call t_stopf('rrtmg_lw')
 

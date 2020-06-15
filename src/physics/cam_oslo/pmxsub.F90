@@ -53,7 +53,7 @@ subroutine pmxsub(lchnk, ncol, pint, pmid, coszrs, state, t, cld, qm1, Nnatk, &
    integer, intent(in) :: lchnk                   ! chunk identifier
    integer, intent(in) :: ncol                    ! number of atmospheric columns
    real(r8), intent(in) :: coszrs(pcols)          ! Cosine solar zenith angle
-   real(r8), intent(in) :: pint(pcols,pverp)      ! Model interface pressures (10*Pa)
+   real(r8), intent(in) :: pint(pcols,pverp)      ! Model interface pressures (10*Pa) !!!!!!!!   
    real(r8), intent(in) :: pmid(pcols,pver)       ! Model level pressures (Pa)
    real(r8), intent(in) :: t(pcols,pver)          ! Model level temperatures (K)
    real(r8), intent(in) :: cld(pcols,pver)        ! cloud fraction
@@ -85,7 +85,7 @@ subroutine pmxsub(lchnk, ncol, pint, pmid, coszrs, state, t, cld, qm1, Nnatk, &
 !---------------------------Local variables-----------------------------
 !
    integer  i, k, ib, icol, mplus10
-   integer iloop
+   integer iloop                   ! Loop index for testing of CPU time of parts of the code
    logical  daylight(pcols)        ! SW calculations also at (polar) night in interpol* if daylight=.true. 
 
    real(r8) aodvisvolc(pcols)      ! AOD vis for CMIP6 volcanic aerosol
@@ -97,7 +97,6 @@ subroutine pmxsub(lchnk, ncol, pint, pmid, coszrs, state, t, cld, qm1, Nnatk, &
 !tst
 !   real(r8) aodvis3d(pcols,pver)  ! 3D AOD in VIS
 !tst
-
    real(r8) deltah_km(pcols,pver)  ! Layer thickness, unit km
 
 !akc6   real(r8) deltah, airmass(pcols,pver) 
@@ -971,13 +970,11 @@ enddo ! iloop
             per_tau_w(i,k,ib)=per_tau(i,k,ib)*max(min(ssatot(i,k,14-ib),0.999999_r8),1.e-6_r8)
             per_tau_w_g(i,k,ib)=per_tau_w(i,k,ib)*asymtot(i,k,14-ib)
             per_tau_w_f(i,k,ib)=per_tau_w_g(i,k,ib)*asymtot(i,k,14-ib)
-!tst
 !       if(ib.eq.4.and.k.eq.pver.and.i.eq.1) then
 !         write(*,*) 'per_tau =', per_tau(i,k,ib)
 !         write(*,*) 'per_tau_w =', per_tau_w(i,k,ib)
 !         write(*,*) 'per_tau_w_g =', per_tau_w_g(i,k,ib)
 !       endif
-!tst
           end do
         end do
           ib=14
@@ -1009,7 +1006,7 @@ enddo ! iloop
        enddo
       enddo
 
-!     Adding also the volcanic contribution (CMIP6), which is also using
+!     Adding the volcanic contribution (CMIP6), which is also using
 !     AeroTab band numbering, so that a remapping is required here 
       do ib=1,nlwbands
         volc_balw(1:ncol,1:pver,ib) = volc_ext_earth(:ncol,1:pver,ib) &
@@ -1179,9 +1176,10 @@ enddo ! iloop
          do k=1,pver
 !         Layer thickness, unit km, and layer airmass, unit kg/m2
           deltah=deltah_km(icol,k)
-!akc6          airmass(icol,k)=1.e3_r8*deltah*rhoda(icol,k)
+!akc6+          airmass(icol,k)=1.e3_r8*deltah*rhoda(icol,k)
           airmassl(icol,k)=1.e3_r8*deltah*rhoda(icol,k)
-          airmass(icol)=airmass(icol)+airmassl(icol,k)  !akc6
+          airmass(icol)=airmass(icol)+airmassl(icol,k)  
+!akc6-
 !          Optical depths at ca. 550 nm (0.442-0.625um) all aerosols
 !tst
 !          aodvis3d(icol,k)=betotvis(icol,k)*deltah
@@ -1976,6 +1974,7 @@ enddo ! iloop
 !tst
 !        call outfld('DOD5503D',dod5503d,pcols,lchnk)
 !tst
+!-        call outfld('DOD5503D',dod5503d,pcols,lchnk)
 !-        call outfld('ABS5503D',abs5503d,pcols,lchnk)
 !-        call outfld('D443_SS ',dod4403d_ss  ,pcols,lchnk)
 !-        call outfld('D443_DU ',dod4403d_dust,pcols,lchnk)
@@ -2392,7 +2391,6 @@ enddo ! iloop
         call outfld('PM2P5   ',c_pm25  ,pcols,lchnk)
         call outfld('MMRPM2P5',mmr_pm25,pcols,lchnk)
         call outfld('MMRPM1  ',mmr_pm1 ,pcols,lchnk)
-        call outfld('MMRPM2P5_SRF',mmr_pm25(:pcols,pver),pcols,lchnk) 
 !akc6-
 !       total (all r) dry concentrations (ug/m3) and loadings (mg/m2)
         call outfld('DLOAD_MI',dload_mi,pcols,lchnk)
@@ -2433,7 +2431,6 @@ enddo ! iloop
 !akc6        call outfld('AIRMASSL',airmassl,pcols,lchnk)
         call outfld('AIRMASSL',airmassl,pcols,lchnk)
         call outfld('AIRMASS ',airmass,pcols,lchnk)  !akc6
-
 !c_er3d 
 !       effective dry radii (um) in each layer
 !        call outfld('ERLT053D',erlt053d,pcols,lchnk)
@@ -2448,7 +2445,7 @@ enddo ! iloop
 
 !000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 
-!     Extra AeroCom diagnostics requiring table look-ups with RH = constant 
+!     Extra AeroCom diagnostics requiring table look-ups with RH = constant. 
 
 #ifdef AEROCOM_INSITU
       irfmax=6

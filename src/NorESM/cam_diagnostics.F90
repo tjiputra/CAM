@@ -186,9 +186,9 @@ contains
 !+
 #ifdef AEROCOM
     use commondefinitions,  only: nbmodes 
-!#ifdef RFMIPIRF
-!    use radconstants,       only: nswbands, nlwbands
-!#endif  
+#ifdef RFMIPIRF
+    use radconstants,       only: nswbands, nlwbands
+#endif  
 #endif  
 !-
 
@@ -206,10 +206,10 @@ contains
     character(len=10) :: modeString
     character(len=20) :: varname
     integer :: i, irh
-!#ifdef RFMIPIRF
-!    character(len=2) :: c2
-!    integer :: ib
-!#endif
+#ifdef RFMIPIRF
+    character(len=2) :: c2
+    integer :: ib
+#endif
 #endif  
 !-
 
@@ -221,7 +221,6 @@ contains
     call addfld ('PS',         horiz_only,  'A', 'Pa',       'Surface pressure')
     call addfld ('T',          (/ 'lev' /), 'A', 'K',        'Temperature')
     call addfld ('U',          (/ 'lev' /), 'A', 'm/s',      'Zonal wind')
-    call addfld ('UA010',      horiz_only,  'A', 'm/s',      'Zonal wind U at 10 mbar pressure surface')
     call addfld ('V',          (/ 'lev' /), 'A', 'm/s',      'Meridional wind')
 
     call register_vector_field('U','V')
@@ -259,12 +258,10 @@ contains
     call addfld ('Z200',       horiz_only,  'A', 'm',         'Geopotential Z at 200 mbar pressure surface')
     call addfld ('Z100',       horiz_only,  'A', 'm',         'Geopotential Z at 100 mbar pressure surface')
     call addfld ('Z050',       horiz_only,  'A', 'm',         'Geopotential Z at 50 mbar pressure surface')
-    call addfld ('Z010',       horiz_only,  'A', 'm',         'Geopotential Z at 10 mbar pressure surface')
 
     call addfld ('ZZ',         (/ 'lev' /), 'A', 'm2',        'Eddy height variance' )
     call addfld ('VZ',         (/ 'lev' /), 'A', 'm2/s',      'Meridional transport of geopotential height')
     call addfld ('VT',         (/ 'lev' /), 'A', 'K m/s   ',  'Meridional heat transport')
-    call addfld ('VT100',      horiz_only,  'A', 'K m/s   ',  'Meridional heat transport at 100 mbar pressure level')
     call addfld ('VU',         (/ 'lev' /), 'A', 'm2/s2',     'Meridional flux of zonal momentum' )
     call addfld ('VV',         (/ 'lev' /), 'A', 'm2/s2',     'Meridional velocity squared' )
     call addfld ('OMEGAV',     (/ 'lev' /), 'A', 'm Pa/s2 ',  'Vertical flux of meridional momentum' )
@@ -327,7 +324,7 @@ contains
 
     call addfld ('ATMEINT',    horiz_only,  'A', 'J/m2','Vertically integrated total atmospheric energy ')
 
-!akc6+  CNVCLD is zero... 
+!akc6+  CNVCLD is actually zero... 
 !    call addfld ('CNVCLD',     horiz_only,  'A', 'fraction', 'Vertically integrated convective cloud cover')
 !akc6-
 
@@ -352,13 +349,13 @@ contains
 !akc6+
    call addfld ('BVISVOLC ',(/'lev'/),   'A','1/km    ','CMIP6 volcanic aerosol extinction at 0.442-0.625um')
 !akc6-
-!#ifdef SPAERO
-!   call addfld ('AODVISSP',horiz_only, 'A','unitless' ,'Simple plumes aerosol optical depth at 0.35-0.64um')  
-!   call addfld ('ABSVISSP',horiz_only, 'A','unitless' ,'Simple plumes aerosol absorptive optical depth at 0.35-0.64um')
-!   call addfld ('XCDNC_SP',horiz_only, 'A','unitless' ,'CDNC modification factor for simple plume aerosols')
-!   call addfld ('AODV3DSP',(/'lev'/),  'A','unitless','Simple plumes 3D aerosol optical depth at 0.35-0.64um')    
-!   call addfld ('ABSV3DSP',(/'lev'/),  'A','unitless','Simple plumes 3D absorption AOD at 0.35-0.64um')    
-!#endif
+#ifdef SPAERO
+   call addfld ('AODVISSP',horiz_only, 'A','unitless' ,'Simple plumes aerosol optical depth at 0.35-0.64um')  
+   call addfld ('ABSVISSP',horiz_only, 'A','unitless' ,'Simple plumes aerosol absorptive optical depth at 0.35-0.64um')
+   call addfld ('XCDNC_SP',horiz_only, 'A','unitless' ,'CDNC modification factor for simple plume aerosols')
+   call addfld ('AODV3DSP',(/'lev'/),  'A','unitless','Simple plumes 3D aerosol optical depth at 0.35-0.64um')    
+   call addfld ('ABSV3DSP',(/'lev'/),  'A','unitless','Simple plumes 3D absorption AOD at 0.35-0.64um')    
+#endif
 #ifdef COLTST4INTCONS 
 ! optical depth for each mode/mixture:
     call addfld ('TAUKC0 ',horiz_only, 'A','unitless','Aerosol optical depth at 0.442-0.625um for kcomp 0')
@@ -426,7 +423,6 @@ contains
       call addfld ('PM2P5   ',(/'lev'/), 'A','ug/m3   ','3D aerosol PM2.5')
       call addfld ('MMRPM2P5',(/'lev'/), 'A','kg/kg   ','3D aerosol PM2.5 mass mixing ratio')
       call addfld ('MMRPM1  ',(/'lev'/), 'A','kg/kg   ','3D aerosol PM1.0 mass mixing ratio')
-      call addfld ('MMRPM2P5_SRF',horiz_only, 'A','kg/kg   ','Aerosol PM2.5 mass mixing ratio in bottom layer')   
 !akc6-
       call addfld ('GRIDAREA',horiz_only, 'A','m2      ','Grid area for 1.9x2.5 horizontal resolution')
       call addfld ('DAERH2O ',horiz_only, 'A', 'mg/m2   ','Aerosol water load')
@@ -588,22 +584,22 @@ contains
          if(i.ne.3) call addfld(varName, horiz_only, 'A', 'unitless', 'relative exessive added mass column for mode'//modeString)
       enddo  
 
-!#ifdef RFMIPIRF
-!      do ib=1,nswbands
-!        write(c2,'(I2)') ib
-!        call addfld('AERTAUBND'//trim(adjustl(c2)), (/'lev'/),'A', 'unitless', 'aerosol extinction optical depth for wavelength band '//trim(adjustl(c2)))
-!        call addfld('AERSSABND'//trim(adjustl(c2)), (/'lev'/),'A', 'unitless', 'aerosol single scattering albedo for wavelength band '//c2)
-!        call addfld('AERASYBND'//trim(adjustl(c2)), (/'lev'/),'A', 'unitless', 'aerosol asymmetry parameter for wavelength band '//c2)
-!
-!        call addfld('SDBND'//trim(adjustl(c2)), (/'ilev'/),'A', 'W/m^2', 'shortwave spectral flux down for wavelength band '//c2)
-!        call addfld('SUBND'//trim(adjustl(c2)), (/'ilev'/),'A', 'W/m^2', 'shortwave spectral flux up for wavelength band '//c2)
-!      enddo
-!      do ib=1,nlwbands
-!        write(c2,'(I2)') ib
-!        call addfld('LDBND'//trim(adjustl(c2)), (/'ilev'/),'A', 'W/m^2', 'longwave spectral flux down for wavelength band '//c2)
-!        call addfld('LUBND'//trim(adjustl(c2)), (/'ilev'/),'A', 'W/m^2', 'longwave spectral flux up for wavelength band '//c2)
-!      enddo
-!#endif
+#ifdef RFMIPIRF
+      do ib=1,nswbands
+        write(c2,'(I2)') ib
+        call addfld('AERTAUBND'//trim(adjustl(c2)), (/'lev'/),'A', 'unitless', 'aerosol extinction optical depth for wavelength band '//trim(adjustl(c2)))
+        call addfld('AERSSABND'//trim(adjustl(c2)), (/'lev'/),'A', 'unitless', 'aerosol single scattering albedo for wavelength band '//c2)
+        call addfld('AERASYBND'//trim(adjustl(c2)), (/'lev'/),'A', 'unitless', 'aerosol asymmetry parameter for wavelength band '//c2)
+
+        call addfld('SDBND'//trim(adjustl(c2)), (/'ilev'/),'A', 'W/m^2', 'shortwave spectral flux down for wavelength band '//c2)
+        call addfld('SUBND'//trim(adjustl(c2)), (/'ilev'/),'A', 'W/m^2', 'shortwave spectral flux up for wavelength band '//c2)
+      enddo
+      do ib=1,nlwbands
+        write(c2,'(I2)') ib
+        call addfld('LDBND'//trim(adjustl(c2)), (/'ilev'/),'A', 'W/m^2', 'longwave spectral flux down for wavelength band '//c2)
+        call addfld('LUBND'//trim(adjustl(c2)), (/'ilev'/),'A', 'W/m^2', 'longwave spectral flux up for wavelength band '//c2)
+      enddo
+#endif
 
 #ifdef AEROCOM_INSITU        ! Note that this code has not yet been updated to CESM2 standard 
 
@@ -832,13 +828,13 @@ contains
 !akc6+
    call add_default ('BVISVOLC', 1, ' ')
 !akc6-
-!#ifdef SPAERO
-!   call add_default ('AODVISSP', 1, ' ')
-!   call add_default ('ABSVISSP', 1, ' ')
-!   call add_default ('XCDNC_SP', 1, ' ')
-!   call add_default ('AODV3DSP', 1, ' ')
-!   call add_default ('ABSV3DSP', 1, ' ')
-!#endif
+#ifdef SPAERO
+   call add_default ('AODVISSP', 1, ' ')
+   call add_default ('ABSVISSP', 1, ' ')
+   call add_default ('XCDNC_SP', 1, ' ')
+   call add_default ('AODV3DSP', 1, ' ')
+   call add_default ('ABSV3DSP', 1, ' ')
+#endif
 #ifdef AEROFFL
      call add_default ('FSNT_DRF', 1, ' ')
      call add_default ('FSNTCDRF', 1, ' ')
@@ -1020,23 +1016,22 @@ contains
       enddo  
 !++
 
-!#ifdef RFMIPIRF
-!      do i=1,nbands
-!      do ib=1,nswbands
-!        write(c2,'(I2)') ib
-!        call add_default('AERTAUBND'//trim(adjustl(c2)), 1, ' ') 
-!        call add_default('AERSSABND'//trim(adjustl(c2)), 1, ' ') 
-!        call add_default('AERASYBND'//trim(adjustl(c2)), 1, ' ') 
-!
-!        call add_default('SDBND'//trim(adjustl(c2)), 1, ' ') 
-!        call add_default('SUBND'//trim(adjustl(c2)), 1, ' ') 
-!      enddo
-!      do ib=1,nlwbands
-!        write(c2,'(I2)') ib
-!        call add_default('LDBND'//trim(adjustl(c2)), 1, ' ') 
-!        call add_default('LUBND'//trim(adjustl(c2)), 1, ' ') 
-!      enddo
-!#endif
+#ifdef RFMIPIRF
+      do ib=1,nswbands
+        write(c2,'(I2)') ib
+        call add_default('AERTAUBND'//trim(adjustl(c2)), 1, ' ') 
+        call add_default('AERSSABND'//trim(adjustl(c2)), 1, ' ') 
+        call add_default('AERASYBND'//trim(adjustl(c2)), 1, ' ') 
+
+        call add_default('SDBND'//trim(adjustl(c2)), 1, ' ') 
+        call add_default('SUBND'//trim(adjustl(c2)), 1, ' ') 
+      enddo
+      do ib=1,nlwbands
+        write(c2,'(I2)') ib
+        call add_default('LDBND'//trim(adjustl(c2)), 1, ' ') 
+        call add_default('LUBND'//trim(adjustl(c2)), 1, ' ') 
+      enddo
+#endif
 
 
 #ifdef AEROCOM_INSITU
@@ -1071,32 +1066,32 @@ contains
 #endif  ! aerocom
 #endif  ! dirind
 
-!#ifdef SPAERO
-!      call addfld ('FSNT_SP ', horiz_only, 'A','W/m^2','Total column absorbed solar flux (without SP aerosols)')
-!      call addfld ('FSNTC_SP', horiz_only, 'A','W/m^2','Clear sky total column absorbed solar flux (without SP aerosols)')
-!      call addfld ('FSNS_SP ', horiz_only, 'A','W/m^2','Surface absorbed solar flux (without SP aerosols)')
-!      call addfld ('FSNSC_SP', horiz_only, 'A','W/m^2','Clear sky surface absorbed solar flux (without SP aerosols)')
-!      call addfld ('FSNT_SP2', horiz_only, 'A','W/m^2','Total column absorbed solar flux (SP aerosols for DRF only)')
-!      call addfld ('FSNTCSP2', horiz_only, 'A','W/m^2','Clear sky total column absorbed solar flux (SP aerosols for DRF only)')
-!      call addfld ('FSNS_SP2', horiz_only, 'A','W/m^2','Surface absorbed solar flux (SP aerosols for DRF only)')
-!      call addfld ('FSNSCSP2', horiz_only, 'A','W/m^2','Clear sky surface absorbed solar flux (SP aerosols for DRF only)')
-!      call addfld ('FSNT_SP3', horiz_only, 'A','W/m^2','Total column absorbed solar flux (SP aerosols)')
-!      call addfld ('FSNTCSP3', horiz_only, 'A','W/m^2','Clear sky total column absorbed solar flux (SP aerosols)')
-!      call addfld ('FSNS_SP3', horiz_only, 'A','W/m^2','Surface absorbed solar flux (SP aerosols)')
-!      call addfld ('FSNSCSP3', horiz_only, 'A','W/m^2','Clear sky surface absorbed solar flux (SP aerosols)')
-!      call add_default ('FSNT_SP' , 1, ' ')
-!      call add_default ('FSNTC_SP', 1, ' ')
-!      call add_default ('FSNS_SP' , 1, ' ')
-!      call add_default ('FSNSC_SP', 1, ' ')
-!      call add_default ('FSNT_SP2', 1, ' ')
-!      call add_default ('FSNTCSP2', 1, ' ')
-!      call add_default ('FSNS_SP2', 1, ' ')
-!      call add_default ('FSNSCSP2', 1, ' ')
-!      call add_default ('FSNT_SP3', 1, ' ')
-!      call add_default ('FSNTCSP3', 1, ' ')
-!      call add_default ('FSNS_SP3', 1, ' ')
-!      call add_default ('FSNSCSP3', 1, ' ')
-!#endif
+#ifdef SPAERO
+      call addfld ('FSNT_SP ', horiz_only, 'A','W/m^2','Total column absorbed solar flux (without SP aerosols)')
+      call addfld ('FSNTC_SP', horiz_only, 'A','W/m^2','Clear sky total column absorbed solar flux (without SP aerosols)')
+      call addfld ('FSNS_SP ', horiz_only, 'A','W/m^2','Surface absorbed solar flux (without SP aerosols)')
+      call addfld ('FSNSC_SP', horiz_only, 'A','W/m^2','Clear sky surface absorbed solar flux (without SP aerosols)')
+      call addfld ('FSNT_SP2', horiz_only, 'A','W/m^2','Total column absorbed solar flux (SP aerosols for DRF only)')
+      call addfld ('FSNTCSP2', horiz_only, 'A','W/m^2','Clear sky total column absorbed solar flux (SP aerosols for DRF only)')
+      call addfld ('FSNS_SP2', horiz_only, 'A','W/m^2','Surface absorbed solar flux (SP aerosols for DRF only)')
+      call addfld ('FSNSCSP2', horiz_only, 'A','W/m^2','Clear sky surface absorbed solar flux (SP aerosols for DRF only)')
+      call addfld ('FSNT_SP3', horiz_only, 'A','W/m^2','Total column absorbed solar flux (SP aerosols)')
+      call addfld ('FSNTCSP3', horiz_only, 'A','W/m^2','Clear sky total column absorbed solar flux (SP aerosols)')
+      call addfld ('FSNS_SP3', horiz_only, 'A','W/m^2','Surface absorbed solar flux (SP aerosols)')
+      call addfld ('FSNSCSP3', horiz_only, 'A','W/m^2','Clear sky surface absorbed solar flux (SP aerosols)')
+      call add_default ('FSNT_SP' , 1, ' ')
+      call add_default ('FSNTC_SP', 1, ' ')
+      call add_default ('FSNS_SP' , 1, ' ')
+      call add_default ('FSNSC_SP', 1, ' ')
+      call add_default ('FSNT_SP2', 1, ' ')
+      call add_default ('FSNTCSP2', 1, ' ')
+      call add_default ('FSNS_SP2', 1, ' ')
+      call add_default ('FSNSCSP2', 1, ' ')
+      call add_default ('FSNT_SP3', 1, ' ')
+      call add_default ('FSNTCSP3', 1, ' ')
+      call add_default ('FSNS_SP3', 1, ' ')
+      call add_default ('FSNSCSP3', 1, ' ')
+#endif
 
   end subroutine diag_init_dry
 
@@ -1714,14 +1709,6 @@ contains
       call vertinterp(ncol, pcols, pver, state%pmid,  5000._r8, z3, p_surf, ln_interp=.true.)
       call outfld('Z050    ', p_surf, pcols, lchnk)
     end if
-    if (hist_fld_active('Z010')) then
-      call vertinterp(ncol, pcols, pver, state%pmid,  1000._r8, z3, p_surf, ln_interp=.true.)
-      call outfld('Z010    ', p_surf, pcols, lchnk)
-    end if
-    if (hist_fld_active('UA010')) then
-      call vertinterp(ncol, pcols, pver, state%pmid,  1000._r8, state%u, p_surf, ln_interp=.true.)
-      call outfld('UA010   ', p_surf, pcols, lchnk)
-    end if
     !
     ! Quadratic height fiels Z3*Z3
     !
@@ -1735,11 +1722,6 @@ contains
     !
     ftem(:ncol,:) = state%v(:ncol,:)*state%t(:ncol,:)
     call outfld ('VT      ',ftem    ,pcols   ,lchnk     )
-
-    if (hist_fld_active('VT100')) then
-      call vertinterp(ncol, pcols, pver, state%pmid, 10000._r8, ftem, p_surf, ln_interp=.true.)
-      call outfld('VT100  ', p_surf, pcols, lchnk)
-    end if
 
     ftem(:ncol,:) = state%v(:ncol,:)**2
     call outfld ('VV      ',ftem    ,pcols   ,lchnk     )
