@@ -61,7 +61,13 @@ module micro_mg_cam
 ! "post_proc%process_and_unpack", which sets every single field that was
 ! added with post_proc%add_field.
 !
-!---------------------------------------------------------------------------------
+!-----------------------------------------------------------------------------------
+! Sept. 2019  A. Kirkevåg    Added MACv2 SP-aerosol code wrt. Twomey effect (SPAERO) 
+!-----------------------------------------------------------------------------------
+
+!ak+
+#include <preprocessorDefinitions.h>
+!ak-
 
 use shr_kind_mod,   only: r8=>shr_kind_r8
 use spmd_utils,     only: masterproc
@@ -162,8 +168,13 @@ integer :: &
    rel_idx,            &
    dei_idx,            &
    mu_idx,             &
-   prer_evap_idx,            &
+   prer_evap_idx,      &
    lambdac_idx,        &
+#ifdef SPAERO
+   sp_mu_idx,          &
+   sp_lambdac_idx,     &
+   sp_rel_idx,         &
+#endif
    iciwpst_idx,        &
    iclwpst_idx,        &
    des_idx,            &
@@ -214,6 +225,9 @@ integer :: &
    cld_idx = -1,            &
    concld_idx = -1,         &
    qsatfac_idx = -1
+#ifdef SPAERO
+ integer :: sp_xcdnc_idx =-1
+#endif
 
 ! Pbuf fields needed for subcol_SILHS
 integer :: &
@@ -452,6 +466,9 @@ subroutine micro_mg_cam_register
    call pbuf_add_field('SADICE',     'physpkg',dtype_r8,(/pcols,pver/), sadice_idx)
    call pbuf_add_field('SADSNOW',    'physpkg',dtype_r8,(/pcols,pver/), sadsnow_idx)
    call pbuf_add_field('REL',        'physpkg',dtype_r8,(/pcols,pver/), rel_idx)
+#ifdef SPAERO
+   call pbuf_add_field('SPREL',      'physpkg',dtype_r8,(/pcols,pver/), sp_rel_idx)
+#endif
 
    ! Mitchell ice effective diameter for radiation
    call pbuf_add_field('DEI',        'physpkg',dtype_r8,(/pcols,pver/), dei_idx)
@@ -459,7 +476,12 @@ subroutine micro_mg_cam_register
    call pbuf_add_field('MU',         'physpkg',dtype_r8,(/pcols,pver/), mu_idx)
    ! Size distribution shape parameter for radiation
    call pbuf_add_field('LAMBDAC',    'physpkg',dtype_r8,(/pcols,pver/), lambdac_idx)
-
+#ifdef SPAERO
+   ! Size distribution shape parameter for radiation
+   call pbuf_add_field('SP_MU',      'physpkg',dtype_r8,(/pcols,pver/), sp_mu_idx)
+   ! Size distribution shape parameter for radiation
+   call pbuf_add_field('SP_LAMBDAC', 'physpkg',dtype_r8,(/pcols,pver/), sp_lambdac_idx)
+#endif
    ! Stratiform only in cloud ice water path for radiation
    call pbuf_add_field('ICIWPST',    'physpkg',dtype_r8,(/pcols,pver/), iciwpst_idx)
    ! Stratiform in cloud liquid water path for radiation
@@ -530,6 +552,9 @@ subroutine micro_mg_cam_register
       call pbuf_register_subcol('SADICE',      'micro_mg_cam_register', sadice_idx)
       call pbuf_register_subcol('SADSNOW',     'micro_mg_cam_register', sadsnow_idx)
       call pbuf_register_subcol('REL',         'micro_mg_cam_register', rel_idx)
+#ifdef SPAERO
+      call pbuf_register_subcol('SPREL',       'micro_mg_cam_register', sp_rel_idx)
+#endif
 
       ! Mitchell ice effective diameter for radiation
       call pbuf_register_subcol('DEI',         'micro_mg_cam_register', dei_idx)
@@ -537,7 +562,12 @@ subroutine micro_mg_cam_register
       call pbuf_register_subcol('MU',          'micro_mg_cam_register', mu_idx)
       ! Size distribution shape parameter for radiation
       call pbuf_register_subcol('LAMBDAC',     'micro_mg_cam_register', lambdac_idx)
-
+#ifdef SPAERO
+      ! Size distribution shape parameter for radiation
+      call pbuf_register_subcol('SP_MU',        'micro_mg_cam_register', sp_mu_idx)
+      ! Size distribution shape parameter for radiation
+      call pbuf_register_subcol('SP_LAMBDAC',   'micro_mg_cam_register', sp_lambdac_idx)
+#endif
       ! Stratiform only in cloud ice water path for radiation
       call pbuf_register_subcol('ICIWPST',     'micro_mg_cam_register', iciwpst_idx)
       ! Stratiform in cloud liquid water path for radiation
@@ -873,6 +903,9 @@ subroutine micro_mg_cam_init(pbuf2d)
    call addfld ('AWNC',        (/ 'lev' /),  'A', 'm-3',      'Average cloud water number conc'                                   )
    call addfld ('AWNI',        (/ 'lev' /),  'A', 'm-3',      'Average cloud ice number conc'                                     )
    call addfld ('AREL',        (/ 'lev' /),  'A', 'Micron',   'Average droplet effective radius'                                  )
+#ifdef SPAERO
+   call addfld ('SPAREL',      (/ 'lev' /),  'A', 'Micron',   'Average droplet effective radius SP'                               )
+#endif
    call addfld ('AREI',        (/ 'lev' /),  'A', 'Micron',   'Average ice effective radius'                                      )
    ! Frequency arrays for above
    call addfld ('FREQL',       (/ 'lev' /),  'A', 'fraction', 'Fractional occurrence of liquid'                                   )
@@ -888,8 +921,7 @@ subroutine micro_mg_cam_init(pbuf2d)
    call addfld ('FCTI',        horiz_only,   'A', 'fraction', 'Fractional occurrence of cloud top ice'                            )
    !++IH
    !For comparing to Bernartz CDNC concentrations
-!akc6   call addfld ('ACTNL_B    ', horiz_only, 'A', 'Micron  ', 'Average Cloud Top droplet number (Bennartz)'                         )
-   call addfld ('ACTNL_B    ', horiz_only, 'A', 'm-3',  'Average Cloud Top   droplet number (Bennartz)'                       )
+   call addfld ('ACTNL_B    ', horiz_only, 'A', 'm-3',  'Average Cloud Top droplet number (Bennartz)'                       )
    call addfld ('FCTL_B     ', horiz_only, 'A', 'fraction',  'Fractional occurrence of cloud top liquid (Bennartz)'           )
 !ak6+
    call addfld ('CCN_B      ', horiz_only, 'A', 'm-3',  'Average Cloud Top liquid CCN (Bennartz)'                             )
@@ -984,6 +1016,9 @@ subroutine micro_mg_cam_init(pbuf2d)
       call add_default ('ADSNOW   ', 1, ' ')
       call add_default ('AREI     ', 1, ' ')
       call add_default ('AREL     ', 1, ' ')
+#ifdef SPAERO
+      call add_default ('SPAREL   ', 1, ' ')
+#endif
       call add_default ('AWNC     ', 1, ' ')
       call add_default ('AWNI     ', 1, ' ')
       call add_default ('CDNUMC   ', 1, ' ')
@@ -1142,6 +1177,10 @@ subroutine micro_mg_cam_init(pbuf2d)
    nrain_idx    = pbuf_get_index('NRAIN', ierr)
    nsnow_idx    = pbuf_get_index('NSNOW', ierr)
 
+#ifdef SPAERO
+   sp_xcdnc_idx = pbuf_get_index('SP_XCDNC', ierr)
+#endif
+
   ! fields for heterogeneous freezing
   frzimm_idx = pbuf_get_index('FRZIMM', ierr)
   frzcnt_idx = pbuf_get_index('FRZCNT', ierr)
@@ -1281,6 +1320,11 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
    real(r8), pointer :: dei(:,:)          ! Ice effective diameter (meters) (AG: microns?)
    real(r8), pointer :: mu(:,:)           ! Size distribution shape parameter for radiation
    real(r8), pointer :: lambdac(:,:)      ! Size distribution slope parameter for radiation
+#ifdef SPAERO
+   real(r8), pointer :: sp_mu(:,:)        ! Size distribution shape parameter for radiation
+   real(r8), pointer :: sp_lambdac(:,:)   ! Size distribution slope parameter for radiation
+   real(r8), pointer :: sp_xcdnc(:)       ! CDNC modification factor from MACv2SP
+#endif
    real(r8), pointer :: des(:,:)          ! Snow effective diameter (m)
 
    real(r8) :: rho(state%psetcols,pver)
@@ -1526,11 +1570,19 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
    real(r8), target :: packed_qcrat(mgncol,nlev)
 
    real(r8), target :: packed_rel(mgncol,nlev)
+#ifdef SPAERO
+   real(r8), target :: packed_sp_rel(mgncol,nlev)
+#endif
    real(r8), target :: packed_rei(mgncol,nlev)
    real(r8), target :: packed_sadice(mgncol,nlev)
    real(r8), target :: packed_sadsnow(mgncol,nlev)
    real(r8), target :: packed_lambdac(mgncol,nlev)
    real(r8), target :: packed_mu(mgncol,nlev)
+#ifdef SPAERO
+   real(r8), target :: packed_sp_lambdac(mgncol,nlev)
+   real(r8), target :: packed_sp_mu(mgncol,nlev)
+   real(r8), target :: packed_sp_xcdnc(mgncol)
+#endif
    real(r8), target :: packed_des(mgncol,nlev)
    real(r8), target :: packed_dei(mgncol,nlev)
 
@@ -1625,6 +1677,9 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
    real(r8) :: liqcldf(state%psetcols,pver) ! Liquid cloud fraction (combined into cloud)
 
    real(r8), pointer :: rel(:,:)          ! Liquid effective drop radius (microns)
+#ifdef SPAERO
+   real(r8), pointer :: sp_rel(:,:)       ! Liquid effective drop radius (microns)
+#endif
    real(r8), pointer :: rei(:,:)          ! Ice effective drop size (microns)
    real(r8), pointer :: sadice(:,:)       ! Ice surface area density (cm2/cm3)
    real(r8), pointer :: sadsnow(:,:)      ! Snow surface area density (cm2/cm3)
@@ -1650,6 +1705,9 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
    ! Averaging arrays for effective radius and number....
    real(r8) :: efiout_grid(pcols,pver)
    real(r8) :: efcout_grid(pcols,pver)
+#ifdef SPAERO
+   real(r8) :: spefcout_grid(pcols,pver)
+#endif
    real(r8) :: ncout_grid(pcols,pver)
    real(r8) :: niout_grid(pcols,pver)
    real(r8) :: freqi_grid(pcols,pver)
@@ -1715,6 +1773,11 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
 
    real(r8), pointer :: lambdac_grid(:,:)
    real(r8), pointer :: mu_grid(:,:)
+#ifdef SPAERO
+   real(r8), pointer :: sp_lambdac_grid(:,:)
+   real(r8), pointer :: sp_mu_grid(:,:)
+   real(r8), pointer :: sp_rel_grid(:,:)
+#endif
    real(r8), pointer :: rel_grid(:,:)
    real(r8), pointer :: rei_grid(:,:)
    real(r8), pointer :: sadice_grid(:,:)
@@ -1727,6 +1790,9 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
    real(r8) :: liqcldf_grid(pcols,pver)
    real(r8) :: qsout_grid(pcols,pver)
    real(r8) :: ncic_grid(pcols,pver)
+#ifdef SPAERO
+   real(r8) :: sp_ncic_grid(pcols,pver)
+#endif  
    real(r8) :: niic_grid(pcols,pver)
    real(r8) :: rel_fn_grid(pcols,pver)    ! Ice effective drop size at fixed number (indirect effect) (microns) - on grid
    real(r8) :: qrout_grid(pcols,pver)
@@ -1872,6 +1938,10 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
 
    if (qsatfac_idx > 0) call pbuf_get_field(pbuf, qsatfac_idx, qsatfac, col_type=col_type, copy_if_needed=use_subcol_microp)
 
+#ifdef SPAERO
+   call pbuf_get_field(pbuf, sp_xcdnc_idx, sp_xcdnc, col_type=col_type)
+#endif
+
    !-----------------------
    ! These physics buffer fields are calculated and set in this parameterization
    ! If subcolumns is turned on, then these fields will be calculated on a subcolumn grid, otherwise they will be a normal grid
@@ -1888,6 +1958,10 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
    call pbuf_get_field(pbuf, dei_idx,         dei,         col_type=col_type)
    call pbuf_get_field(pbuf, mu_idx,          mu,          col_type=col_type)
    call pbuf_get_field(pbuf, lambdac_idx,     lambdac,     col_type=col_type)
+#ifdef SPAERO
+   call pbuf_get_field(pbuf, sp_mu_idx,       sp_mu,       col_type=col_type)
+   call pbuf_get_field(pbuf, sp_lambdac_idx,  sp_lambdac,  col_type=col_type)
+#endif
    call pbuf_get_field(pbuf, des_idx,         des,         col_type=col_type)
    call pbuf_get_field(pbuf, ls_flxprc_idx,   mgflxprc,    col_type=col_type)
    call pbuf_get_field(pbuf, ls_flxsnw_idx,   mgflxsnw,    col_type=col_type)
@@ -1899,6 +1973,9 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
    call pbuf_get_field(pbuf, iclwpst_idx,     iclwpst,     col_type=col_type)
    call pbuf_get_field(pbuf, icswp_idx,       icswp,       col_type=col_type)
    call pbuf_get_field(pbuf, rel_idx,         rel,         col_type=col_type)
+#ifdef SPAERO
+   call pbuf_get_field(pbuf, sp_rel_idx,      sp_rel,      col_type=col_type)
+#endif
    call pbuf_get_field(pbuf, rei_idx,         rei,         col_type=col_type)
    call pbuf_get_field(pbuf, sadice_idx,      sadice,      col_type=col_type)
    call pbuf_get_field(pbuf, sadsnow_idx,     sadsnow,     col_type=col_type)
@@ -1940,6 +2017,10 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
       call pbuf_get_field(pbuf, dei_idx,         dei_grid)
       call pbuf_get_field(pbuf, mu_idx,          mu_grid)
       call pbuf_get_field(pbuf, lambdac_idx,     lambdac_grid)
+#ifdef SPAERO
+      call pbuf_get_field(pbuf, sp_mu_idx,       sp_mu_grid)
+      call pbuf_get_field(pbuf, sp_lambdac_idx,  sp_lambdac_grid)
+#endif
       call pbuf_get_field(pbuf, des_idx,         des_grid)
       call pbuf_get_field(pbuf, ls_flxprc_idx,   mgflxprc_grid)
       call pbuf_get_field(pbuf, ls_flxsnw_idx,   mgflxsnw_grid)
@@ -1951,6 +2032,9 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
       call pbuf_get_field(pbuf, iclwpst_idx,     iclwpst_grid)
       call pbuf_get_field(pbuf, icswp_idx,       icswp_grid)
       call pbuf_get_field(pbuf, rel_idx,         rel_grid)
+#ifdef SPAERO
+      call pbuf_get_field(pbuf, sp_rel_idx,      sp_rel_grid)
+#endif
       call pbuf_get_field(pbuf, rei_idx,         rei_grid)
       call pbuf_get_field(pbuf, sadice_idx,      sadice_grid)
       call pbuf_get_field(pbuf, sadsnow_idx,     sadsnow_grid)
@@ -2200,6 +2284,10 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
    ! the value from the last substep, which is what "accum_null" does.
    call post_proc%add_field(p(rel), p(packed_rel), &
         fillvalue=10._r8, accum_method=accum_null)
+#ifdef SPAERO
+   call post_proc%add_field(p(sp_rel), p(packed_sp_rel), &
+        fillvalue=10._r8, accum_method=accum_null)
+#endif
    call post_proc%add_field(p(rei), p(packed_rei), &
         fillvalue=25._r8, accum_method=accum_null)
    call post_proc%add_field(p(sadice), p(packed_sadice), &
@@ -2210,6 +2298,12 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
         accum_method=accum_null)
    call post_proc%add_field(p(mu), p(packed_mu), &
         accum_method=accum_null)
+#ifdef SPAERO
+   call post_proc%add_field(p(sp_lambdac), p(packed_sp_lambdac), &
+        accum_method=accum_null)
+   call post_proc%add_field(p(sp_mu), p(packed_sp_mu), &
+        accum_method=accum_null)
+#endif
    call post_proc%add_field(p(des), p(packed_des), &
         accum_method=accum_null)
    call post_proc%add_field(p(dei), p(packed_dei), &
@@ -2235,6 +2329,10 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
    endif
    packed_naai = packer%pack(naai)
    packed_npccn = packer%pack(npccn)
+
+#ifdef SPAERO
+   packed_sp_xcdnc = packer%pack(sp_xcdnc)
+#endif
 
    allocate(packed_rndst(mgncol,nlev,size(rndst, 3)))
    packed_rndst = packer%pack(rndst)
@@ -2341,6 +2439,10 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
                  packed_prain,           packed_prodsnow,        &
                  packed_cmeout,          packed_dei,             &
                  packed_mu,              packed_lambdac,         &
+#ifdef SPAERO
+                 packed_sp_xcdnc,                                &
+                 packed_sp_mu,           packed_sp_lambdac,      &
+#endif
                  packed_qsout,           packed_des,             &
                  packed_cflx,    packed_iflx,                    &
                  packed_rflx,    packed_sflx,    packed_qrout,   &
@@ -2648,6 +2750,11 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
       ! as they are reset before being used, so it would be a needless calculation
       lambdac_grid    => lambdac
       mu_grid         => mu
+#ifdef SPAERO
+      sp_lambdac_grid => sp_lambdac
+      sp_mu_grid      => sp_mu
+      sp_rel_grid     => sp_rel
+#endif
       rel_grid        => rel
       rei_grid        => rei
       sadice_grid     => sadice
@@ -2758,10 +2865,10 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
    end if
 
    ! Effective radius for cloud liquid, fixed number.
+
    mu_grid = 0._r8
    lambdac_grid = 0._r8
    rel_fn_grid = 10._r8
-
    ncic_grid = 1.e8_r8
 
    call size_dist_param_liq(mg_liq_props, icwmrst_grid(:ngrdcol,top_lev:), &
@@ -2773,6 +2880,55 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
            (mu_grid(:ngrdcol,top_lev:) + 3._r8)/ &
            lambdac_grid(:ngrdcol,top_lev:)/2._r8 * 1.e6_r8
    end where
+
+!-------------------------------------------------------------------------
+#ifdef SPAERO
+   ! Calculating cloud droplet size distribution and effective radii for
+   ! the MACv2SP aerosols
+
+   ! Effective radius for cloud liquid, and size parameters
+   ! sp_mu_grid and sp_lambdac_grid.
+   sp_mu_grid = 0._r8
+   sp_lambdac_grid = 0._r8
+   sp_rel_grid = 10._r8
+
+   ! Calculate sp_ncic on the grid
+   sp_ncic_grid = 1.e8_r8
+   ncic_grid(:ngrdcol,top_lev:) = nc_grid(:ngrdcol,top_lev:) / &
+        max(mincld,liqcldf_grid(:ngrdcol,top_lev:))
+
+   do k = top_lev, pver
+     sp_ncic_grid(:,k) = sp_xcdnc(:) * ncic_grid(:,k)
+   end do
+
+   call size_dist_param_liq(mg_liq_props, icwmrst_grid(:ngrdcol,top_lev:), &
+        sp_ncic_grid(:ngrdcol,top_lev:), rho_grid(:ngrdcol,top_lev:), &
+        sp_mu_grid(:ngrdcol,top_lev:), sp_lambdac_grid(:ngrdcol,top_lev:))
+
+   where (icwmrst_grid(:ngrdcol,top_lev:) >= qsmall)
+      sp_rel_grid(:ngrdcol,top_lev:) = &
+           (sp_mu_grid(:ngrdcol,top_lev:) + 3._r8) / &
+           sp_lambdac_grid(:ngrdcol,top_lev:)/2._r8 * 1.e6_r8
+   elsewhere
+      ! Deal with the fact that size_dist_param_liq sets mu_grid to -100
+      ! wherever there is no cloud.
+      sp_mu_grid(:ngrdcol,top_lev:) = 0._r8
+   end where
+
+   ! Limiters for low cloud fraction.
+   do k = top_lev, pver
+      do i = 1, ngrdcol
+         ! Convert snow effective diameter to microns
+         if ( ast_grid(i,k) < 1.e-4_r8 ) then
+            sp_mu_grid(i,k) = mucon
+            sp_lambdac_grid(i,k) = (mucon + 1._r8)/dcon
+         end if
+      end do
+   end do
+
+#endif
+!-------------------------------------------------------------------------
+
 
    ! Effective radius for cloud liquid, and size parameters
    ! mu_grid and lambdac_grid.
@@ -3005,6 +3161,9 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
 
    ! Averaging for new output fields
    efcout_grid      = 0._r8
+#ifdef SPAERO
+   spefcout_grid    = 0._r8
+#endif
    efiout_grid      = 0._r8
    ncout_grid       = 0._r8
    niout_grid       = 0._r8
@@ -3020,6 +3179,9 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
       do i = 1, ngrdcol
          if ( liqcldf_grid(i,k) > 0.01_r8 .and. icwmrst_grid(i,k) > 5.e-5_r8 ) then
             efcout_grid(i,k) = rel_grid(i,k) * liqcldf_grid(i,k)
+#ifdef SPAERO
+            spefcout_grid(i,k) = sp_rel_grid(i,k) * liqcldf_grid(i,k)
+#endif
             ncout_grid(i,k)  = icwnc_grid(i,k) * liqcldf_grid(i,k)
             freql_grid(i,k)  = liqcldf_grid(i,k)
             icwmrst_grid_out(i,k) = icwmrst_grid(i,k)
@@ -3298,6 +3460,9 @@ subroutine micro_mg_cam_tend_pack(state, ptend, dtime, pbuf, mgncol, mgcols, nle
    call outfld('VPRCO',       vprco_grid,       pcols, lchnk)
    call outfld('RACAU',       racau_grid,       pcols, lchnk)
    call outfld('AREL',        efcout_grid,      pcols, lchnk)
+#ifdef SPAERO
+   call outfld('SPAREL',      spefcout_grid,    pcols, lchnk)
+#endif
    call outfld('AREI',        efiout_grid,      pcols, lchnk)
    call outfld('AWNC' ,       ncout_grid,       pcols, lchnk)
    call outfld('AWNI' ,       niout_grid,       pcols, lchnk)

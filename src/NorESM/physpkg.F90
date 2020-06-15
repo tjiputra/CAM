@@ -9,6 +9,8 @@ module physpkg
   ! 2005-10-17  B. Eaton       Add contents of inti.F90 to phys_init().  Add
   !                            initialization of grid info in phys_state.
   ! Nov 2010    A. Gettelman   Put micro/macro physics into separate routines
+  ! Sept 2019   A. Kirkevåg    Added MACv2 SP-aerosol code wrt. Twomey effect 
+  !                            (SPAERO)
   !-----------------------------------------------------------------------
 
 #ifdef OSLO_AERO
@@ -88,6 +90,10 @@ module physpkg
   integer ::  prec_sh_idx        = 0
   integer ::  snow_sh_idx        = 0
   integer ::  dlfzm_idx          = 0     ! detrained convective cloud water mixing ratio.
+
+#ifdef SPAERO
+  integer ::  sp_xcdnc_idx       = 0 
+#endif
 
 !=======================================================================
 contains
@@ -199,6 +205,11 @@ contains
     call pbuf_add_field('CLDNCINI', 'physpkg', dtype_r8, (/pcols,pver/), cldncini_idx)
     call pbuf_add_field('CLDNIINI', 'physpkg', dtype_r8, (/pcols,pver/), cldniini_idx)
 !AL
+
+#ifdef SPAERO
+    call pbuf_add_field('SP_XCDNC', 'physpkg',  dtype_r8, (/pcols/), sp_xcdnc_idx)
+#endif
+
     ! check energy package
     call check_energy_register
 
@@ -1785,6 +1796,7 @@ contains
     integer kcomp                              ! mode number (1-14)
 #endif                                    
 
+
     ! physics buffer fields to compute tendencies for stratiform package
     integer itim_old, ifld
     real(r8), pointer, dimension(:,:) :: cld        ! cloud fraction
@@ -1800,6 +1812,11 @@ contains
     real(r8), pointer, dimension(:,:) :: cldncini
     real(r8), pointer, dimension(:,:) :: cldniini
 !AL
+
+#ifdef SPAERO
+    real(r8), pointer, dimension(:)   :: sp_xcdnc  ! CDNC modification factor from MACv2SP
+#endif
+
     real(r8), pointer, dimension(:,:,:) :: fracis  ! fraction of transported species that are insoluble
 
     real(r8), pointer :: dlfzm(:,:)                ! ZM detrained convective cloud water mixing ratio.
@@ -1918,6 +1935,11 @@ contains
     call pbuf_get_field(pbuf, cldncini_idx, cldncini)
     call pbuf_get_field(pbuf, cldniini_idx, cldniini)
 !AL
+
+#ifdef SPAERO
+    ifld    = pbuf_get_index('SP_XCDNC')
+    call pbuf_get_field(pbuf, ifld, sp_xcdnc, start=(/1/), kount=(/pcols/)  )
+#endif
 
     ifld   =  pbuf_get_index('DTCORE')
     call pbuf_get_field(pbuf, ifld, dtcore, start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
@@ -2403,9 +2425,9 @@ contains
 !   call outfld('RNEWD8  ',rnewdry8,pcols,lchnk)
 !   call outfld('RNEWD9  ',rnewdry9,pcols,lchnk)
 !   call outfld('RNEWD10 ',rnewdry10,pcols,lchnk)
-!!   call outfld('RNEWD11 ',rnewdry11,pcols,lchnk)  ! always = 0.0118
-!!   call outfld('RNEWD13 ',rnewdry13,pcols,lchnk)  ! always = 0.04
-!!   call outfld('RNEWD14 ',rnewdry14,pcols,lchnk)  ! always = 0.04
+!!   call outfld('RNEWD11 ',rnewdry11,pcols,lchnk)  ! constant
+!!   call outfld('RNEWD13 ',rnewdry13,pcols,lchnk)  ! constant
+!!   call outfld('RNEWD14 ',rnewdry14,pcols,lchnk)  ! constant
 !   call outfld('RNEW1   ',rnew1,pcols,lchnk)
 !   call outfld('RNEW2   ',rnew2,pcols,lchnk)
 !   call outfld('RNEW4   ',rnew4,pcols,lchnk)
@@ -2427,9 +2449,9 @@ contains
 !   call outfld('LOGSIG8 ',logsig8,pcols,lchnk)
 !   call outfld('LOGSIG9 ',logsig9,pcols,lchnk)
 !   call outfld('LOGSIG10',logsig10,pcols,lchnk)
-!!   call outfld('LOGSIG11',logsig11,pcols,lchnk)  ! always = 0.2553
-!!   call outfld('LOGSIG13',logsig13,pcols,lchnk)  ! always = 0.2553
-!!   call outfld('LOGSIG14',logsig14,pcols,lchnk)  ! always = 0.2553
+!!   call outfld('LOGSIG11',logsig11,pcols,lchnk)  ! constant
+!!   call outfld('LOGSIG13',logsig13,pcols,lchnk)  ! constant
+!!   call outfld('LOGSIG14',logsig14,pcols,lchnk)  ! constant
 #endif ! aerocom
 #endif ! dirind
 
@@ -2485,7 +2507,12 @@ contains
 
 
     call radiation_tend( &
+
+#ifdef SPAERO
+       state, ptend, pbuf, cam_out, cam_in, net_flx, sp_xcdnc)
+#else
        state, ptend, pbuf, cam_out, cam_in, net_flx)
+#endif
 
     ! Set net flux used by spectral dycores
     do i=1,ncol
