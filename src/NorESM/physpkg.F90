@@ -2087,14 +2087,14 @@ contains
 !      if(precc(i).lt.0.) precc(i)=0.
 !   end do
 #ifdef AEROCOM
-   do kcomp=1,14
-   do k=1,pver
-      do i=1,ncol
-        rnew3d(i,k,kcomp)  =0.0_r8
-        logsig3d(i,k,kcomp)=0.0_r8
-      enddo
-   enddo
-   enddo
+!   do kcomp=1,14
+!   do k=1,pver
+!      do i=1,ncol
+        rnew3d(:,:,:)  =0.0_r8
+        logsig3d(:,:,:)=0.0_r8
+!      enddo
+!   enddo
+!   enddo
 #endif ! aerocom
 #endif ! dirind
 
