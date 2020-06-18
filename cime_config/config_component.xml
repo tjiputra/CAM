@@ -457,6 +457,66 @@
       <value compset="1850_CAM60%NORESM%NORBC%FRC2%4xCO2"> co2vmr=1138.8e-6 </value>
       <!-- fSST 2xCO2-->
       <value compset="1850_CAM60%NORESM%NORBC%2xCO2"> co2vmr=568.64e-6  </value>
+
+      <value compset="_CAM60%NORESM"> aerocomk0_file='$DIN_LOC_ROOT/noresm-only/atm/cam/camoslo/AeroTab_8jun17/aerocomk0.out' </value>
+      <value compset="_CAM60%NORESM"> aerocomk1_file='$DIN_LOC_ROOT/noresm-only/atm/cam/camoslo/AeroTab_8jun17/aerocomk1.out' </value>
+      <value compset="_CAM60%NORESM"> aerocomk2_file='$DIN_LOC_ROOT/noresm-only/atm/cam/camoslo/AeroTab_8jun17/aerocomk2.out' </value>
+      <value compset="_CAM60%NORESM"> aerocomk3_file='$DIN_LOC_ROOT/noresm-only/atm/cam/camoslo/AeroTab_8jun17/aerocomk3.out' </value>
+      <value compset="_CAM60%NORESM"> aerocomk4_file='$DIN_LOC_ROOT/noresm-only/atm/cam/camoslo/AeroTab_8jun17/aerocomk4.out' </value>
+      <value compset="_CAM60%NORESM"> aerocomk5_file='$DIN_LOC_ROOT/noresm-only/atm/cam/camoslo/AeroTab_8jun17/aerocomk5.out' </value>
+      <value compset="_CAM60%NORESM"> aerocomk6_file='$DIN_LOC_ROOT/noresm-only/atm/cam/camoslo/AeroTab_8jun17/aerocomk6.out' </value>
+      <value compset="_CAM60%NORESM"> aerocomk7_file='$DIN_LOC_ROOT/noresm-only/atm/cam/camoslo/AeroTab_8jun17/aerocomk7.out' </value>
+      <value compset="_CAM60%NORESM"> aerocomk8_file='$DIN_LOC_ROOT/noresm-only/atm/cam/camoslo/AeroTab_8jun17/aerocomk8.out' </value>
+      <value compset="_CAM60%NORESM"> aerocomk9_file='$DIN_LOC_ROOT/noresm-only/atm/cam/camoslo/AeroTab_8jun17/aerocomk9.out' </value>
+      <value compset="_CAM60%NORESM"> aerocomk10_file='$DIN_LOC_ROOT/noresm-only/atm/cam/camoslo/AeroTab_8jun17/aerocomk10.out' </value>
+
+      <value compset="_CAM60%NORESM"> aerodryk0_file='$DIN_LOC_ROOT/noresm-only/atm/cam/camoslo/AeroTab_8jun17/aerodryk0.out' </value>
+      <value compset="_CAM60%NORESM"> aerodryk1_file='$DIN_LOC_ROOT/noresm-only/atm/cam/camoslo/AeroTab_8jun17/aerodryk1.out' </value>
+      <value compset="_CAM60%NORESM"> aerodryk2_file='$DIN_LOC_ROOT/noresm-only/atm/cam/camoslo/AeroTab_8jun17/aerodryk2.out' </value>
+      <value compset="_CAM60%NORESM"> aerodryk3_file='$DIN_LOC_ROOT/noresm-only/atm/cam/camoslo/AeroTab_8jun17/aerodryk3.out' </value>
+      <value compset="_CAM60%NORESM"> aerodryk4_file='$DIN_LOC_ROOT/noresm-only/atm/cam/camoslo/AeroTab_8jun17/aerodryk4.out' </value>
+      <value compset="_CAM60%NORESM"> aerodryk5_file='$DIN_LOC_ROOT/noresm-only/atm/cam/camoslo/AeroTab_8jun17/aerodryk5.out' </value>
+      <value compset="_CAM60%NORESM"> aerodryk6_file='$DIN_LOC_ROOT/noresm-only/atm/cam/camoslo/AeroTab_8jun17/aerodryk6.out' </value>
+      <value compset="_CAM60%NORESM"> aerodryk7_file='$DIN_LOC_ROOT/noresm-only/atm/cam/camoslo/AeroTab_8jun17/aerodryk7.out' </value>
+      <value compset="_CAM60%NORESM"> aerodryk8_file='$DIN_LOC_ROOT/noresm-only/atm/cam/camoslo/AeroTab_8jun17/aerodryk8.out' </value>
+      <value compset="_CAM60%NORESM"> aerodryk9_file='$DIN_LOC_ROOT/noresm-only/atm/cam/camoslo/AeroTab_8jun17/aerodryk9.out' </value>
+      <value compset="_CAM60%NORESM"> aerodryk10_file='$DIN_LOC_ROOT/noresm-only/atm/cam/camoslo/AeroTab_8jun17/aerodryk10.out' </value>
+
+      <value compset="_CAM60%NORESM"> kcomp0_file='$DIN_LOC_ROOT/noresm-only/atm/cam/camoslo/AeroTab_8jun17/kcomp0.out' </value>
+      <value compset="_CAM60%NORESM"> kcomp1_file='$DIN_LOC_ROOT/noresm-only/atm/cam/camoslo/AeroTab_8jun17/kcomp1.out' </value>
+      <value compset="_CAM60%NORESM"> kcomp2_file='$DIN_LOC_ROOT/noresm-only/atm/cam/camoslo/AeroTab_8jun17/kcomp2.out' </value>
+      <value compset="_CAM60%NORESM"> kcomp3_file='$DIN_LOC_ROOT/noresm-only/atm/cam/camoslo/AeroTab_8jun17/kcomp3.out' </value>
+      <value compset="_CAM60%NORESM"> kcomp4_file='$DIN_LOC_ROOT/noresm-only/atm/cam/camoslo/AeroTab_8jun17/kcomp4.out' </value>
+      <value compset="_CAM60%NORESM"> kcomp5_file='$DIN_LOC_ROOT/noresm-only/atm/cam/camoslo/AeroTab_8jun17/kcomp5.out' </value>
+      <value compset="_CAM60%NORESM"> kcomp6_file='$DIN_LOC_ROOT/noresm-only/atm/cam/camoslo/AeroTab_8jun17/kcomp6.out' </value>
+      <value compset="_CAM60%NORESM"> kcomp7_file='$DIN_LOC_ROOT/noresm-only/atm/cam/camoslo/AeroTab_8jun17/kcomp7.out' </value>
+      <value compset="_CAM60%NORESM"> kcomp8_file='$DIN_LOC_ROOT/noresm-only/atm/cam/camoslo/AeroTab_8jun17/kcomp8.out' </value>
+      <value compset="_CAM60%NORESM"> kcomp9_file='$DIN_LOC_ROOT/noresm-only/atm/cam/camoslo/AeroTab_8jun17/kcomp9.out' </value>
+      <value compset="_CAM60%NORESM"> kcomp10_file='$DIN_LOC_ROOT/noresm-only/atm/cam/camoslo/AeroTab_8jun17/kcomp10.out' </value>
+
+      <value compset="_CAM60%NORESM"> logntilp1_file='$DIN_LOC_ROOT/noresm-only/atm/cam/camoslo/AeroTab_8jun17/logntilp1.out' </value>
+      <value compset="_CAM60%NORESM"> logntilp2_file='$DIN_LOC_ROOT/noresm-only/atm/cam/camoslo/AeroTab_8jun17/logntilp2.out' </value>
+      <value compset="_CAM60%NORESM"> logntilp3_file='$DIN_LOC_ROOT/noresm-only/atm/cam/camoslo/AeroTab_8jun17/logntilp3.out' </value>
+      <value compset="_CAM60%NORESM"> logntilp4_file='$DIN_LOC_ROOT/noresm-only/atm/cam/camoslo/AeroTab_8jun17/logntilp4.out' </value>
+      <value compset="_CAM60%NORESM"> logntilp5_file='$DIN_LOC_ROOT/noresm-only/atm/cam/camoslo/AeroTab_8jun17/logntilp5.out' </value>
+      <value compset="_CAM60%NORESM"> logntilp6_file='$DIN_LOC_ROOT/noresm-only/atm/cam/camoslo/AeroTab_8jun17/logntilp6.out' </value>
+      <value compset="_CAM60%NORESM"> logntilp7_file='$DIN_LOC_ROOT/noresm-only/atm/cam/camoslo/AeroTab_8jun17/logntilp7.out' </value>
+      <value compset="_CAM60%NORESM"> logntilp8_file='$DIN_LOC_ROOT/noresm-only/atm/cam/camoslo/AeroTab_8jun17/logntilp8.out' </value>
+      <value compset="_CAM60%NORESM"> logntilp9_file='$DIN_LOC_ROOT/noresm-only/atm/cam/camoslo/AeroTab_8jun17/logntilp9.out' </value>
+      <value compset="_CAM60%NORESM"> logntilp10_file='$DIN_LOC_ROOT/noresm-only/atm/cam/camoslo/AeroTab_8jun17/logntilp10.out' </value>
+
+      <value compset="_CAM60%NORESM"> lwkcomp0_file='$DIN_LOC_ROOT/noresm-only/atm/cam/camoslo/AeroTab_8jun17/lwkcomp0.out' </value>
+      <value compset="_CAM60%NORESM"> lwkcomp1_file='$DIN_LOC_ROOT/noresm-only/atm/cam/camoslo/AeroTab_8jun17/lwkcomp1.out' </value>
+      <value compset="_CAM60%NORESM"> lwkcomp2_file='$DIN_LOC_ROOT/noresm-only/atm/cam/camoslo/AeroTab_8jun17/lwkcomp2.out' </value>
+      <value compset="_CAM60%NORESM"> lwkcomp3_file='$DIN_LOC_ROOT/noresm-only/atm/cam/camoslo/AeroTab_8jun17/lwkcomp3.out' </value>
+      <value compset="_CAM60%NORESM"> lwkcomp4_file='$DIN_LOC_ROOT/noresm-only/atm/cam/camoslo/AeroTab_8jun17/lwkcomp4.out' </value>
+      <value compset="_CAM60%NORESM"> lwkcomp5_file='$DIN_LOC_ROOT/noresm-only/atm/cam/camoslo/AeroTab_8jun17/lwkcomp5.out' </value>
+      <value compset="_CAM60%NORESM"> lwkcomp6_file='$DIN_LOC_ROOT/noresm-only/atm/cam/camoslo/AeroTab_8jun17/lwkcomp6.out' </value>
+      <value compset="_CAM60%NORESM"> lwkcomp7_file='$DIN_LOC_ROOT/noresm-only/atm/cam/camoslo/AeroTab_8jun17/lwkcomp7.out' </value>
+      <value compset="_CAM60%NORESM"> lwkcomp8_file='$DIN_LOC_ROOT/noresm-only/atm/cam/camoslo/AeroTab_8jun17/lwkcomp8.out' </value>
+      <value compset="_CAM60%NORESM"> lwkcomp9_file='$DIN_LOC_ROOT/noresm-only/atm/cam/camoslo/AeroTab_8jun17/lwkcomp9.out' </value>
+      <value compset="_CAM60%NORESM"> lwkcomp10_file='$DIN_LOC_ROOT/noresm-only/atm/cam/camoslo/AeroTab_8jun17/lwkcomp10.out' </value>
+
     </values>
     <group>run_component_cam</group>
     <file>env_run.xml</file>
