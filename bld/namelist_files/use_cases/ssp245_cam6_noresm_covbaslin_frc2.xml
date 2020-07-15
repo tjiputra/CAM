@@ -14,13 +14,13 @@
 
 <!-- ozone data -->
 <prescribed_ozone_datapath>   'atm/cam/ozone_strataero'                                                    </prescribed_ozone_datapath>
-<prescribed_ozone_file    >   'ozone_strataero_WACCM_L70_zm5day_18500101-21010201_CMIP6histEnsAvg_SSP370_c190403.nc' </prescribed_ozone_file>
+<prescribed_ozone_file    >   'ozone_strataero_WACCM_L70_zm5day_18500101-21010201_CMIP6histEnsAvg_SSP245_c190403.nc' </prescribed_ozone_file>
 <prescribed_ozone_name    >   'O3'                                                                         </prescribed_ozone_name>
 <prescribed_ozone_type    >   'SERIAL'                                                                     </prescribed_ozone_type>
 
 <!-- Prescribed oxidants for aerosol chemistry -->
 <tracer_cnst_datapath     >   'atm/cam/tracer_cnst'                                        </tracer_cnst_datapath>
-<tracer_cnst_file         >   'tracer_cnst_halons_3D_L70_1849-2101_CMIP6ensAvg_SSP3-7.0_c190403.nc' </tracer_cnst_file>
+<tracer_cnst_file         >   'tracer_cnst_halons_3D_L70_1849-2101_CMIP6ensAvg_SSP2-4.5_c190403.nc' </tracer_cnst_file>
 <tracer_cnst_specifier    >   'O3','OH','NO3','HO2'                                        </tracer_cnst_specifier>
 <tracer_cnst_type         >   'INTERP_MISSING_MONTHS'                                      </tracer_cnst_type>
 <tracer_cnst_filelist     >   ''                                                           </tracer_cnst_filelist>
@@ -49,7 +49,7 @@
 
 <!-- 3D emissions -->
 <ext_frc_specifier hgrid="0.9x1.25">
-  'H2O ->  $INPUTDATA_ROOT/atm/cam/chem/emis/elev/H2OemissionCH4oxidationx2_3D_L70_1849-2101_CMIP6ensAvg_SSP3-7.0_c190403.nc',
+  'H2O ->  $INPUTDATA_ROOT/atm/cam/chem/emis/elev/H2OemissionCH4oxidationx2_3D_L70_1849-2101_CMIP6ensAvg_SSP2-4.5_c190403.nc',
   'BC_AX  ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20200628/emissions_cmip6_noresm2_ScenarioMIP_IAMC-MESSAGE-GLOBIOM-ssp245-1-1-covid-version3.0-baseline_BC_AX_all_vertical_2014-2051_0.9x1.25_version20200628.nc',
   'BC_N   ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20200628/emissions_cmip6_noresm2_ScenarioMIP_IAMC-MESSAGE-GLOBIOM-ssp245-1-1-covid-version3.0-baseline_BC_N_all_vertical_2014-2051_0.9x1.25_version20200628.nc',
   'BC_NI  ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20200628/emissions_cmip6_noresm2_ScenarioMIP_IAMC-MESSAGE-GLOBIOM-ssp245-1-1-covid-version3.0-baseline_BC_NI_all_vertical_2014-2051_0.9x1.25_version20200628.nc',
@@ -58,7 +58,7 @@
   'SO4_PR ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20200628/emissions_cmip6_noresm2_ScenarioMIP_IAMC-MESSAGE-GLOBIOM-ssp245-1-1-covid-version3.0-baseline_SO4_PR_all_vertical_2014-2051_0.9x1.25_version20200628.nc'
 </ext_frc_specifier>
 <ext_frc_specifier hgrid="1.9x2.5">
-  'H2O ->  $INPUTDATA_ROOT/atm/cam/chem/emis/elev/H2OemissionCH4oxidationx2_3D_L70_1849-2101_CMIP6ensAvg_SSP3-7.0_c190403.nc',
+  'H2O ->  $INPUTDATA_ROOT/atm/cam/chem/emis/elev/H2OemissionCH4oxidationx2_3D_L70_1849-2101_CMIP6ensAvg_SSP2-4.5_c190403.nc',
   'BC_AX  ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20200628/emissions_cmip6_noresm2_ScenarioMIP_IAMC-MESSAGE-GLOBIOM-ssp245-1-1-covid-version3.0-baseline_BC_AX_all_vertical_2014-2051_1.9x2.5_version20200628.nc',
   'BC_N   ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20200628/emissions_cmip6_noresm2_ScenarioMIP_IAMC-MESSAGE-GLOBIOM-ssp245-1-1-covid-version3.0-baseline_BC_N_all_vertical_2014-2051_1.9x2.5_version20200628.nc',
   'BC_NI  ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20200628/emissions_cmip6_noresm2_ScenarioMIP_IAMC-MESSAGE-GLOBIOM-ssp245-1-1-covid-version3.0-baseline_BC_NI_all_vertical_2014-2051_1.9x2.5_version20200628.nc',
