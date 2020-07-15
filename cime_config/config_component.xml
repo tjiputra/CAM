@@ -369,11 +369,11 @@
       <value compset="SSP370_CAM60%NORESM%NORBC%FRC2"  >ssp370_cam6_noresm_frc2</value>
       <value compset="SSP370_CAM60%NORESM%NORBC%AERLOW%FRC2"  >ssp370_cam6_noresm_aerlow_frc2</value>
 
-      <value compset="SSP370_CAM60%NORESM%COVBASLIN%FRC2"  >ssp370_cam6_noresm_covbaslin_frc2</value>
-      <value compset="SSP370_CAM60%NORESM%COVFOSFUE%FRC2"  >ssp370_cam6_noresm_covfosfue_frc2</value>
-      <value compset="SSP370_CAM60%NORESM%COVMODGRE%FRC2"  >ssp370_cam6_noresm_covmodgre_frc2</value>
-      <value compset="SSP370_CAM60%NORESM%COVSTRGRE%FRC2"  >ssp370_cam6_noresm_covstrgre_frc2</value>
-      <value compset="SSP370_CAM60%NORESM%COVTWOBLI%FRC2"  >ssp370_cam6_noresm_covtwobli_frc2</value>
+      <value compset="SSP245_CAM60%NORESM%COVBASLIN%FRC2"  >ssp245_cam6_noresm_covbaslin_frc2</value>
+      <value compset="SSP245_CAM60%NORESM%COVFOSFUE%FRC2"  >ssp245_cam6_noresm_covfosfue_frc2</value>
+      <value compset="SSP245_CAM60%NORESM%COVMODGRE%FRC2"  >ssp245_cam6_noresm_covmodgre_frc2</value>
+      <value compset="SSP245_CAM60%NORESM%COVSTRGRE%FRC2"  >ssp245_cam6_noresm_covstrgre_frc2</value>
+      <value compset="SSP245_CAM60%NORESM%COVTWOBLI%FRC2"  >ssp245_cam6_noresm_covtwobli_frc2</value>
 
       <value compset="SSP245_CAM60%NORESM%NORPIBC%FRC2"  >ssp245_cam6_noresm_frc2</value>
       <value compset="SSP245_CAM60%NORESM%NORPIBC%GHGONLY%FRC2"  >ssp245_cam6_noresm_ghgonly_frc2</value>
