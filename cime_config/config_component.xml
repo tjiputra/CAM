@@ -8,7 +8,7 @@
       CAM
     ===============
    -->
-    <desc atm="CAM60[%1PCT][%4xCO2][%2xCO2][%CCTS][%CFIRE][%CVBSX][%PORT][%RCO2][%SCAM][%SDYN][%WCCM][%WCMD][%WCSC][%WCTS][%NORESM][%FRC2][%GHGONLY][%NATONLY][%AEROXIDONLY][%AERONLY][%OXIDONLY][%OZONEONLY][%LUONLY][%PINTCF][%PIAER][%PIAEROXID][%NORBC][%GHG2014][%GHGNOH2O2014][%CO22014][%N2O2014][%CH42014][%CH4NOH2O2014][%BC2014][%OC2014][%SO22014][%AER2014][%AEROXID2014][%SO2OXID2014][%NTCF2014][%ANTHRO2014][%GHGOZONELU2014][%OZONE2014][%H2O2014][%OXID2014][%FSST][%NORPDDMSBC][%NORPIBC][%SSP245][%AERLOW][%FRC2EXT]">CAM cam6 physics:</desc>
+    <desc atm="CAM60[%1PCT][%4xCO2][%2xCO2][%CCTS][%CFIRE][%CVBSX][%PORT][%RCO2][%SCAM][%SDYN][%WCCM][%WCMD][%WCSC][%WCTS][%NORESM][%FRC2][%GHGONLY][%NATONLY][%AEROXIDONLY][%AERONLY][%OXIDONLY][%OZONEONLY][%LUONLY][%PINTCF][%PIAER][%PIAEROXID][%NORBC][%GHG2014][%GHGNOH2O2014][%CO22014][%N2O2014][%CH42014][%CH4NOH2O2014][%BC2014][%OC2014][%SO22014][%AER2014][%AEROXID2014][%SO2OXID2014][%NTCF2014][%ANTHRO2014][%GHGOZONELU2014][%OZONE2014][%H2O2014][%OXID2014][%FSST][%NORPDDMSBC][%NORPIBC][%SSP245][%AERLOW][%FRC2EXT][%COVBASLIN][%COVFOSFUE][%COVMODGRE][%COVSTRGRE][%COVTWOBLI]">CAM cam6 physics:</desc>
     <desc atm="CAM50[%CCTS][%CLB][%PORT][%RCO2][%SCAM][%SDYN][%WCSC][%WCTS]"              >CAM cam5 physics:</desc>
     <desc atm="CAM40[%PORT][%RCO2][%SCAM][%SDYN][%TMOZ][%WXIE][%WXIED][%WCMD]"                   >CAM cam4 physics:</desc>
     <desc atm="CAM[%ADIAB][%DABIP04][%TJ16][%HS94][%KESSLER][%RCO2][%SPCAMS][%SPCAMCLBS][%SPCAMM][%SPCAMCLBM]">CAM simplified and non-versioned physics :</desc>
@@ -368,6 +368,12 @@
 
       <value compset="SSP370_CAM60%NORESM%NORBC%FRC2"  >ssp370_cam6_noresm_frc2</value>
       <value compset="SSP370_CAM60%NORESM%NORBC%AERLOW%FRC2"  >ssp370_cam6_noresm_aerlow_frc2</value>
+
+      <value compset="SSP245_CAM60%NORESM%COVBASLIN%FRC2"  >ssp245_cam6_noresm_covbaslin_frc2</value>
+      <value compset="SSP245_CAM60%NORESM%COVFOSFUE%FRC2"  >ssp245_cam6_noresm_covfosfue_frc2</value>
+      <value compset="SSP245_CAM60%NORESM%COVMODGRE%FRC2"  >ssp245_cam6_noresm_covmodgre_frc2</value>
+      <value compset="SSP245_CAM60%NORESM%COVSTRGRE%FRC2"  >ssp245_cam6_noresm_covstrgre_frc2</value>
+      <value compset="SSP245_CAM60%NORESM%COVTWOBLI%FRC2"  >ssp245_cam6_noresm_covtwobli_frc2</value>
 
       <value compset="SSP245_CAM60%NORESM%NORPIBC%FRC2"  >ssp245_cam6_noresm_frc2</value>
       <value compset="SSP245_CAM60%NORESM%NORPIBC%GHGONLY%FRC2"  >ssp245_cam6_noresm_ghgonly_frc2</value>
