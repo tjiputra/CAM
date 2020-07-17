@@ -8,7 +8,7 @@
 <!-- GHG values -->
 <scenario_ghg            >    'CHEM_LBC_FILE'   </scenario_ghg>
 <!-- use waccm LBC file -->  
-<flbc_file>noresm-only/atm/cam/lb/cmip6_ghg_version20200701/ghg_cmip6_hist_ScenarioMIP_UoM-MESSAGE-GLOBIOM-ssp245-1-2-1-covid-version3.0-ModerateGreen_2014-2051_annual_0p5degLat_version20200701.nc</flbc_file>
+<flbc_file>noresm-only/atm/cam/lb/cmip6_ghg_version20200717/ghg_cmip6_hist_ScenarioMIP_UoM-MESSAGE-GLOBIOM-ssp245-1-2-1-covid-version4.0-ModerateGreen_2014-2051_annual_0p5degLat_version20200717.nc</flbc_file>
 <flbc_type>'SERIAL'</flbc_type>
 <flbc_list>'CO2','CH4','N2O','CFC11eq','CFC12'</flbc_list>
 
@@ -33,38 +33,38 @@
 
 <!-- surface emissions -->
 <srf_emis_specifier hgrid="0.9x1.25">
-  'BC_AX  ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20200628/emissions_cmip6_noresm2_ScenarioMIP_IAMC-MESSAGE-GLOBIOM-ssp245-1-1-covid-version3.0-ModerateGreen_BC_AX_all_surface_2014-2051_0.9x1.25_version20200628.nc',
-  'BC_N   ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20200628/emissions_cmip6_noresm2_ScenarioMIP_IAMC-MESSAGE-GLOBIOM-ssp245-1-1-covid-version3.0-ModerateGreen_BC_N_all_surface_2014-2051_0.9x1.25_version20200628.nc',
-  'OM_NI  ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20200628/emissions_cmip6_noresm2_ScenarioMIP_IAMC-MESSAGE-GLOBIOM-ssp245-1-1-covid-version3.0-ModerateGreen_OM_NI_all_surface_2014-2051_0.9x1.25_version20200628.nc',
-  'SO2    ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20200628/emissions_cmip6_noresm2_ScenarioMIP_IAMC-MESSAGE-GLOBIOM-ssp245-1-1-covid-version3.0-ModerateGreen_SO2_all_surface_2014-2051_0.9x1.25_version20200628.nc',
-  'SO4_PR ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20200628/emissions_cmip6_noresm2_ScenarioMIP_IAMC-MESSAGE-GLOBIOM-ssp245-1-1-covid-version3.0-ModerateGreen_SO4_PR_all_surface_2014-2051_0.9x1.25_version20200628.nc'
+  'BC_AX  ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20200716/emissions_cmip6_noresm2_ScenarioMIP_IAMC-MESSAGE-GLOBIOM-ssp245-1-1-covid-version4.0-ModerateGreen_BC_AX_all_surface_2014-2051_0.9x1.25_version20200716.nc',
+  'BC_N   ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20200716/emissions_cmip6_noresm2_ScenarioMIP_IAMC-MESSAGE-GLOBIOM-ssp245-1-1-covid-version4.0-ModerateGreen_BC_N_all_surface_2014-2051_0.9x1.25_version20200716.nc',
+  'OM_NI  ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20200716/emissions_cmip6_noresm2_ScenarioMIP_IAMC-MESSAGE-GLOBIOM-ssp245-1-1-covid-version4.0-ModerateGreen_OM_NI_all_surface_2014-2051_0.9x1.25_version20200716.nc',
+  'SO2    ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20200716/emissions_cmip6_noresm2_ScenarioMIP_IAMC-MESSAGE-GLOBIOM-ssp245-1-1-covid-version4.0-ModerateGreen_SO2_all_surface_2014-2051_0.9x1.25_version20200716.nc',
+  'SO4_PR ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20200716/emissions_cmip6_noresm2_ScenarioMIP_IAMC-MESSAGE-GLOBIOM-ssp245-1-1-covid-version4.0-ModerateGreen_SO4_PR_all_surface_2014-2051_0.9x1.25_version20200716.nc'
 </srf_emis_specifier>
 <srf_emis_specifier hgrid="1.9x2.5">
-  'BC_AX  ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20200628/emissions_cmip6_noresm2_ScenarioMIP_IAMC-MESSAGE-GLOBIOM-ssp245-1-1-covid-version3.0-ModerateGreen_BC_AX_all_surface_2014-2051_1.9x2.5_version20200628.nc',
-  'BC_N   ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20200628/emissions_cmip6_noresm2_ScenarioMIP_IAMC-MESSAGE-GLOBIOM-ssp245-1-1-covid-version3.0-ModerateGreen_BC_N_all_surface_2014-2051_1.9x2.5_version20200628.nc',
-  'OM_NI  ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20200628/emissions_cmip6_noresm2_ScenarioMIP_IAMC-MESSAGE-GLOBIOM-ssp245-1-1-covid-version3.0-ModerateGreen_OM_NI_all_surface_2014-2051_1.9x2.5_version20200628.nc',
-  'SO2    ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20200628/emissions_cmip6_noresm2_ScenarioMIP_IAMC-MESSAGE-GLOBIOM-ssp245-1-1-covid-version3.0-ModerateGreen_SO2_all_surface_2014-2051_1.9x2.5_version20200628.nc',
-  'SO4_PR ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20200628/emissions_cmip6_noresm2_ScenarioMIP_IAMC-MESSAGE-GLOBIOM-ssp245-1-1-covid-version3.0-ModerateGreen_SO4_PR_all_surface_2014-2051_1.9x2.5_version20200628.nc'
+  'BC_AX  ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20200716/emissions_cmip6_noresm2_ScenarioMIP_IAMC-MESSAGE-GLOBIOM-ssp245-1-1-covid-version4.0-ModerateGreen_BC_AX_all_surface_2014-2051_1.9x2.5_version20200716.nc',
+  'BC_N   ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20200716/emissions_cmip6_noresm2_ScenarioMIP_IAMC-MESSAGE-GLOBIOM-ssp245-1-1-covid-version4.0-ModerateGreen_BC_N_all_surface_2014-2051_1.9x2.5_version20200716.nc',
+  'OM_NI  ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20200716/emissions_cmip6_noresm2_ScenarioMIP_IAMC-MESSAGE-GLOBIOM-ssp245-1-1-covid-version4.0-ModerateGreen_OM_NI_all_surface_2014-2051_1.9x2.5_version20200716.nc',
+  'SO2    ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20200716/emissions_cmip6_noresm2_ScenarioMIP_IAMC-MESSAGE-GLOBIOM-ssp245-1-1-covid-version4.0-ModerateGreen_SO2_all_surface_2014-2051_1.9x2.5_version20200716.nc',
+  'SO4_PR ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20200716/emissions_cmip6_noresm2_ScenarioMIP_IAMC-MESSAGE-GLOBIOM-ssp245-1-1-covid-version4.0-ModerateGreen_SO4_PR_all_surface_2014-2051_1.9x2.5_version20200716.nc'
 </srf_emis_specifier>
 
 <!-- 3D emissions -->
 <ext_frc_specifier hgrid="0.9x1.25">
   'H2O ->  $INPUTDATA_ROOT/atm/cam/chem/emis/elev/H2OemissionCH4oxidationx2_3D_L70_1849-2101_CMIP6ensAvg_SSP2-4.5_c190403.nc',
-  'BC_AX  ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20200628/emissions_cmip6_noresm2_ScenarioMIP_IAMC-MESSAGE-GLOBIOM-ssp245-1-1-covid-version3.0-ModerateGreen_BC_AX_all_vertical_2014-2051_0.9x1.25_version20200628.nc',
-  'BC_N   ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20200628/emissions_cmip6_noresm2_ScenarioMIP_IAMC-MESSAGE-GLOBIOM-ssp245-1-1-covid-version3.0-ModerateGreen_BC_N_all_vertical_2014-2051_0.9x1.25_version20200628.nc',
-  'BC_NI  ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20200628/emissions_cmip6_noresm2_ScenarioMIP_IAMC-MESSAGE-GLOBIOM-ssp245-1-1-covid-version3.0-ModerateGreen_BC_NI_all_vertical_2014-2051_0.9x1.25_version20200628.nc',
-  'OM_NI  ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20200628/emissions_cmip6_noresm2_ScenarioMIP_IAMC-MESSAGE-GLOBIOM-ssp245-1-1-covid-version3.0-ModerateGreen_OM_NI_all_vertical_2014-2051_0.9x1.25_version20200628.nc',
-  'SO2    ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20200628/emissions_cmip6_noresm2_ScenarioMIP_IAMC-MESSAGE-GLOBIOM-ssp245-1-1-covid-version3.0-ModerateGreen_SO2_all_vertical_2014-2051_0.9x1.25_version20200628.nc',
-  'SO4_PR ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20200628/emissions_cmip6_noresm2_ScenarioMIP_IAMC-MESSAGE-GLOBIOM-ssp245-1-1-covid-version3.0-ModerateGreen_SO4_PR_all_vertical_2014-2051_0.9x1.25_version20200628.nc'
+  'BC_AX  ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20200716/emissions_cmip6_noresm2_ScenarioMIP_IAMC-MESSAGE-GLOBIOM-ssp245-1-1-covid-version4.0-ModerateGreen_BC_AX_all_vertical_2014-2051_0.9x1.25_version20200716.nc',
+  'BC_N   ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20200716/emissions_cmip6_noresm2_ScenarioMIP_IAMC-MESSAGE-GLOBIOM-ssp245-1-1-covid-version4.0-ModerateGreen_BC_N_all_vertical_2014-2051_0.9x1.25_version20200716.nc',
+  'BC_NI  ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20200716/emissions_cmip6_noresm2_ScenarioMIP_IAMC-MESSAGE-GLOBIOM-ssp245-1-1-covid-version4.0-ModerateGreen_BC_NI_all_vertical_2014-2051_0.9x1.25_version20200716.nc',
+  'OM_NI  ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20200716/emissions_cmip6_noresm2_ScenarioMIP_IAMC-MESSAGE-GLOBIOM-ssp245-1-1-covid-version4.0-ModerateGreen_OM_NI_all_vertical_2014-2051_0.9x1.25_version20200716.nc',
+  'SO2    ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20200716/emissions_cmip6_noresm2_ScenarioMIP_IAMC-MESSAGE-GLOBIOM-ssp245-1-1-covid-version4.0-ModerateGreen_SO2_all_vertical_2014-2051_0.9x1.25_version20200716.nc',
+  'SO4_PR ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20200716/emissions_cmip6_noresm2_ScenarioMIP_IAMC-MESSAGE-GLOBIOM-ssp245-1-1-covid-version4.0-ModerateGreen_SO4_PR_all_vertical_2014-2051_0.9x1.25_version20200716.nc'
 </ext_frc_specifier>
 <ext_frc_specifier hgrid="1.9x2.5">
   'H2O ->  $INPUTDATA_ROOT/atm/cam/chem/emis/elev/H2OemissionCH4oxidationx2_3D_L70_1849-2101_CMIP6ensAvg_SSP2-4.5_c190403.nc',
-  'BC_AX  ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20200628/emissions_cmip6_noresm2_ScenarioMIP_IAMC-MESSAGE-GLOBIOM-ssp245-1-1-covid-version3.0-ModerateGreen_BC_AX_all_vertical_2014-2051_1.9x2.5_version20200628.nc',
-  'BC_N   ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20200628/emissions_cmip6_noresm2_ScenarioMIP_IAMC-MESSAGE-GLOBIOM-ssp245-1-1-covid-version3.0-ModerateGreen_BC_N_all_vertical_2014-2051_1.9x2.5_version20200628.nc',
-  'BC_NI  ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20200628/emissions_cmip6_noresm2_ScenarioMIP_IAMC-MESSAGE-GLOBIOM-ssp245-1-1-covid-version3.0-ModerateGreen_BC_NI_all_vertical_2014-2051_1.9x2.5_version20200628.nc',
-  'OM_NI  ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20200628/emissions_cmip6_noresm2_ScenarioMIP_IAMC-MESSAGE-GLOBIOM-ssp245-1-1-covid-version3.0-ModerateGreen_OM_NI_all_vertical_2014-2051_1.9x2.5_version20200628.nc',
-  'SO2    ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20200628/emissions_cmip6_noresm2_ScenarioMIP_IAMC-MESSAGE-GLOBIOM-ssp245-1-1-covid-version3.0-ModerateGreen_SO2_all_vertical_2014-2051_1.9x2.5_version20200628.nc',
-  'SO4_PR ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20200628/emissions_cmip6_noresm2_ScenarioMIP_IAMC-MESSAGE-GLOBIOM-ssp245-1-1-covid-version3.0-ModerateGreen_SO4_PR_all_vertical_2014-2051_1.9x2.5_version20200628.nc'
+  'BC_AX  ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20200716/emissions_cmip6_noresm2_ScenarioMIP_IAMC-MESSAGE-GLOBIOM-ssp245-1-1-covid-version4.0-ModerateGreen_BC_AX_all_vertical_2014-2051_1.9x2.5_version20200716.nc',
+  'BC_N   ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20200716/emissions_cmip6_noresm2_ScenarioMIP_IAMC-MESSAGE-GLOBIOM-ssp245-1-1-covid-version4.0-ModerateGreen_BC_N_all_vertical_2014-2051_1.9x2.5_version20200716.nc',
+  'BC_NI  ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20200716/emissions_cmip6_noresm2_ScenarioMIP_IAMC-MESSAGE-GLOBIOM-ssp245-1-1-covid-version4.0-ModerateGreen_BC_NI_all_vertical_2014-2051_1.9x2.5_version20200716.nc',
+  'OM_NI  ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20200716/emissions_cmip6_noresm2_ScenarioMIP_IAMC-MESSAGE-GLOBIOM-ssp245-1-1-covid-version4.0-ModerateGreen_OM_NI_all_vertical_2014-2051_1.9x2.5_version20200716.nc',
+  'SO2    ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20200716/emissions_cmip6_noresm2_ScenarioMIP_IAMC-MESSAGE-GLOBIOM-ssp245-1-1-covid-version4.0-ModerateGreen_SO2_all_vertical_2014-2051_1.9x2.5_version20200716.nc',
+  'SO4_PR ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20200716/emissions_cmip6_noresm2_ScenarioMIP_IAMC-MESSAGE-GLOBIOM-ssp245-1-1-covid-version4.0-ModerateGreen_SO4_PR_all_vertical_2014-2051_1.9x2.5_version20200716.nc'
 </ext_frc_specifier>
 
 
