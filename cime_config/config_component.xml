@@ -291,6 +291,8 @@
       <value compset="1850_CAM54%PTAERO"  >1850_cam54_ptaero</value>
       <value compset="2000_CAM54%PTAERO"  >2000_cam6_noclb_oslo</value>
       <value compset="2000_CAM60%PTAERO"  >2000_cam6_oslo</value>
+      <value compset="2000_CAM60%NORESM"  >2000_cam6_noresm</value>
+      <value compset="2000_CAM60%NORESM%FRC2"  >2000_cam6_noresm_frc2</value>
       <value compset="1850_CAM60%PTAERO"  >1850_cam6_oslo</value>
       <value compset="1850_CAM60%NORESM"    >1850_cam6_noresm</value>
       <value compset="1850_CAM60%NORESM%FRC2"       >1850_cam6_noresm_frc2</value>
