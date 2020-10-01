@@ -352,6 +352,7 @@
       <value compset="HIST_CAM60%NORESM%PINTCF"    >hist_cam6_noresm_pintcf</value>
       <value compset="HIST_CAM60%NORESM%PIAER"     >hist_cam6_noresm_piaer</value>
       <value compset="HIST_CAM60%NORESM%PIAEROXID" >hist_cam6_noresm_piaeroxid</value>
+      <value compset="HIST_CAM60%NORESM%PIAEROXID%FRC2" >hist_cam6_noresm_piaeroxid_frc2</value>
       <!-- AerChemMIP transient, with varying NorESM derived fSST -->
       <value compset="HIST_CAM60%NORESM%NORBC%PINTCF"  >hist_cam6_noresm_pintcf</value>
       <value compset="HIST_CAM60%NORESM%NORBC%PIAER"   >hist_cam6_noresm_piaer</value>
@@ -380,6 +381,8 @@
       <value compset="SSP245_CAM60%NORESM%NORPIBC%NATONLY%FRC2"  >ssp245_cam6_noresm_natonly_frc2</value>
       <value compset="SSP245_CAM60%NORESM%NORPIBC%AERONLY%FRC2"  >ssp245_cam6_noresm_aeronly_frc2</value>
       <value compset="SSP245_CAM60%NORESM%NORPIBC%AEROXIDONLY%FRC2"  >ssp245_cam6_noresm_aeroxidonly_frc2</value>
+
+      <value compset="SSP585_CAM60%NORESM%PIAEROXID%FRC2"  >ssp585_cam6_noresm_piaeroxid_frc2</value>
 
       <value compset="_CAM50%NUDGEPTAERO" >2000_cam5_oslonudge</value>
       <value compset="_CAM50%NUDGEPTAEROUPD1">cam5_nudge_ptaero_up1</value>
