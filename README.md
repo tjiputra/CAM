@@ -21,6 +21,10 @@ This repository has the following CAM-Nor branches:
 
 * cam_cesm2_1_rel_05-Nor-SpAer - based on cam_cesm2_1_rel_05-Nor, about to contain simple plume aerosol model code
 
+* cam_cesm2_1_rel_05-Nor_v1.0.2_keyClim-withoutanthraer - based on cam_cesm2_1_rel_05-Nor (branched off at tag cam_cesm2_1_rel_05-Nor_v1.0.2) : related to version used in project KeyClim for simulation without anthropogenic aerosol (only natural aerosol)
+
+* cam-Nor-dev - based on cam_cesm2_1_rel_05-Nor (branched off at tag cam_cesm2_1_rel_05-Nor_v1.0.2) : post-CMIP6 development version of CAM6-Nor (including bugfixes, new developments, answer-changes modifications, ...)
+
 ### CAM-Nor and NorESM documentation https://noresm-docs.readthedocs.io/en/noresm2/
 
 ## How to checkout and use CAM:
