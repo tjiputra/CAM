@@ -35,18 +35,18 @@
 
 <!-- surface emissions -->
 <srf_emis_specifier hgrid="0.9x1.25">
-  'BC_AX  ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20190808/perturbations/emissions_cmip6_noresm2_BC_AX_all_surface_1850_date_0000_5000_0.9x1.25_version20190808.nc',
-  'BC_N   ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20190808/perturbations/emissions_cmip6_noresm2_BC_N_all_surface_1850_date_0000_5000_0.9x1.25_version20190808.nc',
-  'OM_NI  ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20190808/perturbations/emissions_cmip6_noresm2_OM_NI_all_surface_1850_date_0000_5000_0.9x1.25_version20190808.nc',
-  'SO2    ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20190808/perturbations/emissions_cmip6_noresm2_SO2_all_surface_1850_date_0000_5000_0.9x1.25_version20190808.nc',
-  'SO4_PR ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20190808/perturbations/emissions_cmip6_noresm2_SO4_PR_all_surface_1850_date_0000_5000_0.9x1.25_version20190808.nc'
+  'BC_AX  ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20190808/emissions_cmip6_noresm2_BC_AX_all_surface_1850_0.9x1.25_version20190808.nc',
+  'BC_N   ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20190808/emissions_cmip6_noresm2_BC_N_all_surface_1850_0.9x1.25_version20190808.nc',
+  'OM_NI  ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20190808/emissions_cmip6_noresm2_OM_NI_all_surface_1850_0.9x1.25_version20190808.nc',
+  'SO2    ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20190808/emissions_cmip6_noresm2_SO2_all_surface_1850_0.9x1.25_version20190808.nc',
+  'SO4_PR ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20190808/emissions_cmip6_noresm2_SO4_PR_all_surface_1850_0.9x1.25_version20190808.nc'
 </srf_emis_specifier>
 <srf_emis_specifier hgrid="1.9x2.5">
-  'BC_AX  ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20190808/perturbations/emissions_cmip6_noresm2_BC_AX_all_surface_1850_date_0000_5000_1.9x2.5_version20190808.nc',
-  'BC_N   ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20190808/perturbations/emissions_cmip6_noresm2_BC_N_all_surface_1850_date_0000_5000_1.9x2.5_version20190808.nc',
-  'OM_NI  ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20190808/perturbations/emissions_cmip6_noresm2_OM_NI_all_surface_1850_date_0000_5000_1.9x2.5_version20190808.nc',
-  'SO2    ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20190808/perturbations/emissions_cmip6_noresm2_SO2_all_surface_1850_date_0000_5000_1.9x2.5_version20190808.nc',
-  'SO4_PR ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20190808/perturbations/emissions_cmip6_noresm2_SO4_PR_all_surface_1850_date_0000_5000_1.9x2.5_version20190808.nc'
+  'BC_AX  ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20190808/emissions_cmip6_noresm2_BC_AX_all_surface_1850_1.9x2.5_version20190808.nc',
+  'BC_N   ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20190808/emissions_cmip6_noresm2_BC_N_all_surface_1850_1.9x2.5_version20190808.nc',
+  'OM_NI  ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20190808/emissions_cmip6_noresm2_OM_NI_all_surface_1850_1.9x2.5_version20190808.nc',
+  'SO2    ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20190808/emissions_cmip6_noresm2_SO2_all_surface_1850_1.9x2.5_version20190808.nc',
+  'SO4_PR ->  $INPUTDATA_ROOT/atm/cam/chem/emis/cmip6_emissions_version20190808/emissions_cmip6_noresm2_SO4_PR_all_surface_1850_1.9x2.5_version20190808.nc'
 </srf_emis_specifier>
 
 <!-- 3D emissions -->
