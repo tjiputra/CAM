@@ -50,7 +50,8 @@
          prod(:,:,27) = 0._r8
          prod(:,:,28) = 0._r8
          prod(:,:,29) = 0._r8
-         prod(:,:,30) = + extfrc(:,:,7)
+         prod(:,:,30) = 0._r8
+         prod(:,:,31) = + extfrc(:,:,7)
       end if
       end subroutine indprd
       end module mo_indprd

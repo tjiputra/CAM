@@ -69,6 +69,7 @@
          mat( 36) = lmat( 36)
          mat( 37) = lmat( 37)
          mat( 38) = lmat( 38)
+         mat( 39) = lmat( 39)
          mat( 1) = mat( 1) - dti
          mat( 5) = mat( 5) - dti
          mat( 7) = mat( 7) - dti
@@ -99,5 +100,6 @@
          mat( 35) = mat( 35) - dti
          mat( 37) = mat( 37) - dti
          mat( 38) = mat( 38) - dti
+         mat( 39) = mat( 39) - dti
       end subroutine nlnmat_finit
       end module mo_nln_matrix

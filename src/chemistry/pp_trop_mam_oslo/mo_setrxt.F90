@@ -35,6 +35,7 @@
       real(r8)  :: ko(ncol,pver)
       real(r8)  :: kinf(ncol,pver)
 
+      rate(:,:,14) = 3.86e-7_r8
       itemp(:ncol,:) = 1._r8 / temp(:ncol,:)
       n = ncol*pver
       rate(:,:,3) = 2.9e-12_r8 * exp( -160._r8 * itemp(:,:) )
