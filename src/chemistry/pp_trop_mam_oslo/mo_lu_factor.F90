@@ -44,6 +44,7 @@
          lu(35) = 1._r8 / lu(35)
          lu(37) = 1._r8 / lu(37)
          lu(38) = 1._r8 / lu(38)
+         lu(39) = 1._r8 / lu(39)
       end subroutine lu_fac01
       subroutine lu_fac( lu )
       use shr_kind_mod, only : r8 => shr_kind_r8

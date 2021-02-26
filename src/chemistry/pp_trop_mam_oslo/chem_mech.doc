@@ -1,16 +1,5 @@
   
   
-           |--------------------------------------------------------------------------------------------------|
-           |                                                                                                  |
-           |                                                                                                  |
-           |                              This is a mam-oslo simulation with :                                |
-           |                              (1)  comments to add                                                |
-           |                              (2)  comments to add                                                |
-           |                                                                                                  |
-           |                                                                                                  |
-           |--------------------------------------------------------------------------------------------------|
-  
-  
      Solution species
       (  1)  SO2             
       (  2)  H2SO4           
@@ -41,7 +30,8 @@
       ( 27)  SOA_SV             (C10H16O2)
       ( 28)  monoterp           (C10H16)
       ( 29)  isoprene           (C5H8)
-      ( 30)  H2O             
+      ( 30)  CHBR3              (CHBr3)
+      ( 31)  H2O             
   
   
      Invariant species
@@ -92,7 +82,8 @@ Class List
       ( 27)  SOA_SV          
       ( 28)  monoterp        
       ( 29)  isoprene        
-      ( 30)  H2O             
+      ( 30)  CHBR3           
+      ( 31)  H2O             
   
      Photolysis
   jh2o2            (  1)   H2O2 + hv -> (No products)                                           rate = ** User defined **         (  1)
@@ -112,6 +103,7 @@ Class List
                    ( 10)   isoprene + O3 ->  .05*SOA_SV                                         rate = 1.03E-14*exp(  -1995./t)   ( 11)
                    ( 11)   isoprene + OH ->  .05*SOA_SV                                         rate = 2.70E-11*exp(    390./t)   ( 12)
                    ( 12)   isoprene + NO3 ->  .05*SOA_SV                                        rate = 3.15E-12*exp(   -450./t)   ( 13)
+                   ( 13)   CHBR3 -> (No products)                                               rate = 3.86E-07                   ( 14)
   
 Heterogeneous loss species
   
@@ -159,4 +151,5 @@ Extraneous prod/loss species
                     + .05*r11*OH*isoprene  + .05*r12*NO3*isoprene                                                       
     d(monoterp)/dt =  - r7*O3*monoterp  - r8*OH*monoterp  - r9*NO3*monoterp                                             
     d(isoprene)/dt =  - r10*O3*isoprene  - r11*OH*isoprene  - r12*NO3*isoprene                                          
+    d(CHBR3)/dt =  - r13*CHBR3                                                                                          
     d(H2O)/dt = r2*OH*H2O2                                                                                              

@@ -21,5 +21,6 @@ contains
       rxt_rates(:ncol,:,    11) = rxt_rates(:ncol,:,    11)*sol(:ncol,:,    29)                                                ! rate_const*O3*isoprene
       rxt_rates(:ncol,:,    12) = rxt_rates(:ncol,:,    12)*sol(:ncol,:,    29)                                                ! rate_const*OH*isoprene
       rxt_rates(:ncol,:,    13) = rxt_rates(:ncol,:,    13)*sol(:ncol,:,    29)                                                ! rate_const*NO3*isoprene
+      rxt_rates(:ncol,:,    14) = rxt_rates(:ncol,:,    14)*sol(:ncol,:,    30)                                                ! rate_const*CHBR3
   end subroutine set_rates
 end module mo_rxt_rates_conv

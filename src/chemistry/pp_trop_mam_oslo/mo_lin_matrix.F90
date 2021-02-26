@@ -52,7 +52,8 @@
          mat(36) = .050_r8*rxt(11) + .050_r8*rxt(12) + .050_r8*rxt(13)
          mat(35) = -( rxt(8) + rxt(9) + rxt(10) + het_rates(28) )
          mat(37) = -( rxt(11) + rxt(12) + rxt(13) + het_rates(29) )
-         mat(38) = -( het_rates(30) )
+         mat(38) = -( rxt(14) + het_rates(30) )
+         mat(39) = -( het_rates(31) )
          mat(8) = rxt(3)
       end subroutine linmat01
       subroutine linmat( mat, y, rxt, het_rates )

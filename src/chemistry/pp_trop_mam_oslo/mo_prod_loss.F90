@@ -91,7 +91,9 @@
          prod(28) = 0._r8
          loss(29) = ( + rxt(11) + rxt(12) + rxt(13) + het_rates(29))* y(29)
          prod(29) = 0._r8
-         loss(30) = ( + het_rates(30))* y(30)
-         prod(30) =rxt(3)*y(4)
+         loss(30) = ( + rxt(14) + het_rates(30))* y(30)
+         prod(30) = 0._r8
+         loss(31) = ( + het_rates(31))* y(31)
+         prod(31) =rxt(3)*y(4)
       end subroutine imp_prod_loss
       end module mo_prod_loss

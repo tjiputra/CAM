@@ -29,5 +29,6 @@
       integer, parameter :: id_SOA_SV = 27
       integer, parameter :: id_monoterp = 28
       integer, parameter :: id_isoprene = 29
-      integer, parameter :: id_H2O = 30
+      integer, parameter :: id_CHBR3 = 30
+      integer, parameter :: id_H2O = 31
       end module m_spc_id

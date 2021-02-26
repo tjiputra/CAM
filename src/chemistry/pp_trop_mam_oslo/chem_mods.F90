@@ -6,19 +6,19 @@
       implicit none
       save
       integer, parameter :: phtcnt = 1, & ! number of photolysis reactions
-                            rxntot = 13, & ! number of total reactions
-                            gascnt = 12, & ! number of gas phase reactions
+                            rxntot = 14, & ! number of total reactions
+                            gascnt = 13, & ! number of gas phase reactions
                             nabscol = 2, & ! number of absorbing column densities
-                            gas_pcnst = 30, & ! number of "gas phase" species
+                            gas_pcnst = 31, & ! number of "gas phase" species
                             nfs = 7, & ! number of "fixed" species
                             relcnt = 0, & ! number of relationship species
                             grpcnt = 0, & ! number of group members
-                            nzcnt = 38, & ! number of non-zero matrix entries
+                            nzcnt = 39, & ! number of non-zero matrix entries
                             extcnt = 7, & ! number of species with external forcing
                             clscnt1 = 0, & ! number of species in explicit class
                             clscnt2 = 0, & ! number of species in hov class
                             clscnt3 = 0, & ! number of species in ebi class
-                            clscnt4 = 30, & ! number of species in implicit class
+                            clscnt4 = 31, & ! number of species in implicit class
                             clscnt5 = 0, & ! number of species in rodas class
                             indexm = 1, & ! index of total atm density in invariant array
                             indexh2o = 0, & ! index of water vapor density

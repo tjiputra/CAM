@@ -15,6 +15,7 @@ BEGSIM
  SOA_NA->C10H16O2, SOA_A1->C10H16O2
  SOA_LV ->C10H16O2, SOA_SV->C10H16O2
  monoterp -> C10H16, isoprene -> C5H8
+ CHBR3 -> CHBr3
  H2O
    End Solution
 
@@ -42,6 +43,7 @@ BEGSIM
         SS_A1, SS_A2, SS_A3 , H2SO4
         SOA_NA, SOA_A1
 	SOA_LV,SOA_SV, monoterp, isoprene
+        CHBR3
         H2O
       End Implicit
    End Solution Classes
@@ -75,6 +77,8 @@ BEGSIM
 	       isoprene + O3 -> .05*SOA_SV			; 1.03e-14, -1995.
 	       isoprene + OH -> .05*SOA_SV 			; 2.7e-11, 390.
 	       isoprene + NO3 -> .05*SOA_SV 			; 3.15e-12, -450.
+*     Bromoform
+               CHBR3          ->                                ; 3.86e-7 
       End Reactions
 
       Heterogeneous
