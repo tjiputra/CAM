@@ -482,6 +482,8 @@ add_default($nl, 'flds_co2a',      'val'=>'.true.');
 add_default($nl, 'flds_co2b',      'val'=>'.false.');
 add_default($nl, 'flds_co2c',      'val'=>'.false.');
 add_default($nl, 'cplflds_custom', 'val'=>'');
+add_default($nl, 'flds_vslsa',     'val'=>'.false.');
+add_default($nl, 'flds_vslsc',     'val'=>'.false.');
 
 ############################
 # namelist group: cime_pes #
@@ -2903,6 +2905,7 @@ unless (defined $nl->get_value('dms_source_type')) {
 #add_default($nl, 'opom_source_type');
 
 #add_default($nl, 'opom_cycle_year');
+add_default($nl, 'vsls_source');
 #--djlo--
 
 if ($chem =~ /_mam_oslo/) {$nl->set_variable_value('phys_ctl_nl','use_hetfrz_classnuc','.true.');}

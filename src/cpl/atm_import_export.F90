@@ -119,6 +119,10 @@ contains
           if (index_x2a_Faoo_fdms_ocn /= 0) then
              cam_in(c)%fdms(i)     = -x2a(index_x2a_Faoo_fdms_ocn,ig)
           end if
+          ! Get bromoform fluxes from ocn in kg CHBr3 /m^2/s units
+          if (index_x2a_Faoo_fvsls_ocn /= 0) then
+             cam_in(c)%fvsls(i)     = -x2a(index_x2a_Faoo_fvsls_ocn,ig)
+          end if
 
           ig=ig+1
 
@@ -274,6 +278,9 @@ contains
           if (index_a2x_Faxa_noy > 0 ) then
              a2x(index_a2x_Faxa_noy,ig) = cam_out(c)%noy_nitrogen_flx(i)
           endif
+          if (index_a2x_Sa_vslsprog /= 0) then
+             a2x(index_a2x_Sa_vslsprog,ig) = cam_out(c)%vslsprog(i) ! atm prognostic bromoform
+          end if
 
           ig=ig+1
        end do

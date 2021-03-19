@@ -48,6 +48,7 @@ module oslo_ocean_intr
    public :: oslo_dms_inq        ! logical function which tells mo_srf_emis what to do
    public :: oslo_opom_emis_intr ! calculate opom surface emissions
    public :: oslo_opom_inq       ! logical function which tells oslo_salt what to do
+   public :: oslo_vsls_emis_intr ! calculate vsls surface emissions
 
 
 
@@ -82,6 +83,9 @@ module oslo_ocean_intr
    integer            :: n_ocean_species                 !Number of variables read from ocean file
    integer            :: pndx_fdms                       !DMS surface flux physics index
 
+   character(len=20)  :: vsls_source                     ! will be collected from NAMELIST   
+   integer            :: pndx_vsls                      !CHBR3 surface flux physcis index 
+
 contains
 !---------------------------------------------------------------------
 !---------------------------------------------------------------------
@@ -101,7 +105,7 @@ subroutine oslo_ocean_getnl()
    character(len=20)  ::  in_opom_data_source
    character(len=32)  ::  in_opom_data_type
    integer            ::  in_opom_cycle_yr
-
+   character(len=20)  ::  in_vsls_data_source
 
    ! Initialize namelist variables from local module variables.
    in_filename         = filename
@@ -112,6 +116,7 @@ subroutine oslo_ocean_getnl()
    in_opom_data_type   = opom_data_type
    in_opom_cycle_yr    = opom_cycle_yr
    in_opom_data_source = opom_source
+   in_vsls_data_source = vsls_source
 
    ! Read namelist.
    call oslo_getopts(dms_source_out      = in_dms_data_source,  &
@@ -120,6 +125,7 @@ subroutine oslo_ocean_getnl()
                      opom_source_out     = in_opom_data_source, &
                      opom_source_type_out= in_opom_data_type,   &
                      opom_cycle_year_out = in_opom_cycle_yr,    &
+                     vsls_source_out     = in_vsls_data_source, & 
                      ocean_filename_out  = in_filename,         &
                      ocean_filepath_out  = in_datapath)
 
@@ -133,6 +139,7 @@ subroutine oslo_ocean_getnl()
    opom_data_type= in_opom_data_type
    opom_cycle_yr = in_opom_cycle_yr
    opom_source   = in_opom_data_source
+   vsls_source   = in_vsls_data_source
 
    ! Write new value set from namelist to log
 !   write(iulog,*)"test pom namelist 2: " // trim(opom_source)
@@ -162,6 +169,9 @@ subroutine oslo_ocean_init()
    call cnst_get_ind('DMS', pndx_fdms, abort=.true.)
 
 !   write(iulog,*)"test dms p index: " ,pndx_fdms
+
+   !get physics index for chbr3 surface flux.  Index for cflx
+   call cnst_get_ind('CHBR3', pndx_vsls, abort=.true.)
 
    if (dms_source=='lana')then
       emis_species(1) = dmsl_fld_name
@@ -323,6 +333,26 @@ subroutine oslo_dms_emis_intr(state, cam_in)
    ! return?
 
 endsubroutine oslo_dms_emis_intr
+!------------------------------------------------------------------------------------------
+!------------------------------------------------------------------------------------------
+
+subroutine oslo_vsls_emis_intr(state, cam_in)
+
+   use physics_types, only: physics_state
+
+   type(physics_state),    intent(in)    :: state   ! Physics state variables
+   type(cam_in_t), target, intent(inout) :: cam_in  ! import state
+
+   integer                               :: ncol       ![nbr] number of columns in use
+
+   ncol  = state%ncol
+
+   ! IF OCEAN FLUX
+   if(vsls_source=='ocean_flux') then 
+      cam_in%cflx(:ncol, pndx_vsls)  =  cam_in%fvsls(:ncol)
+   endif
+
+endsubroutine oslo_vsls_emis_intr
 !------------------------------------------------------------------------------------------
 !------------------------------------------------------------------------------------------
 

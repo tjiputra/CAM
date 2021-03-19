@@ -7080,6 +7080,14 @@ Default: FALSE
        group="seq_cplflds_userspec" valid_values="" >
 Default:
 </entry>
+<entry id="flds_vslsa" type="logical"  category="driver"
+       group="seq_cplflds_inparm" valid_values="" >
+Default: FALSE
+</entry>
+<entry id="flds_vslsc" type="logical"  category="driver"
+       group="seq_cplflds_inparm" valid_values="" >
+Default: FALSE
+</entry>
 
 <!-- Task/Thread layouts -->
 
@@ -7808,6 +7816,12 @@ Default: CYCLICAL
        group="oslo_ctl_nl" valid_values="" >
 DMS cycle year
 Default: 2000
+</entry>
+
+<entry id="vsls_source" type="char*20" category="cam_oslo"
+       group="oslo_ctl_nl" valid_values="" >
+Type of DMS data source
+Default: none
 </entry>
 
 <entry id="opom_source" type="char*20" category="cam_oslo"
