@@ -10,6 +10,7 @@ use cam_logfile,   only: iulog
 use cam_abortutils, only: endrun
 use shr_kind_mod,  only: r8 => shr_kind_r8
 use cam_cpl_indices, only:index_x2a_Faoo_fdms_ocn
+!use cam_cpl_indices, only:index_x2a_Faoo_fvsls_ocn
 
 implicit none
 private
@@ -33,6 +34,7 @@ character(len=20), private                    :: dms_source       = unset_str
 character(len=32), private                    :: dms_source_type  = unset_str
 character(len=20), private                    :: opom_source      = unset_str
 character(len=32), private                    :: opom_source_type = unset_str
+character(len=20), private                    :: vsls_source      = unset_str 
 character(len=dir_string_length), private     :: ocean_filename   = unset_str
 character(len=dir_string_length), private     :: ocean_filepath   = unset_str
 integer, private                              :: dms_cycle_year   = 0 ! =unset_int?
@@ -59,7 +61,8 @@ subroutine oslo_ctl_readnl(nlfile)
 
    namelist /oslo_ctl_nl/ volc_fraction_coarse, aerotab_table_dir, dms_source, &
                           dms_source_type, opom_source, opom_source_type, &
-                          ocean_filename, ocean_filepath, dms_cycle_year, opom_cycle_year     
+                          ocean_filename, ocean_filepath, dms_cycle_year, opom_cycle_year, &
+                          vsls_source     
    !-----------------------------------------------------------------------------
 
    if (masterproc) then
@@ -89,6 +92,8 @@ subroutine oslo_ctl_readnl(nlfile)
    call mpibcast(ocean_filepath,         len(ocean_filepath)    , mpichar,  0, mpicom)
    call mpibcast(dms_cycle_year,                              1 , mpiint,   0, mpicom)
    call mpibcast(opom_cycle_year,                             1 , mpiint,   0, mpicom)
+!new vsls variables
+   call mpibcast(vsls_source,            len(vsls_source)       , mpichar,  0, mpicom)
 
 #endif
 
@@ -145,7 +150,15 @@ subroutine oslo_ctl_readnl(nlfile)
       call endrun("oslo_control: no valid opom source from namelist: " //trim(opom_source))
    endif
 
-
+!   ! Error check for vsls_source from namelist
+!   if (vsls_source=='ocean_flux')then
+!      if (index_x2a_Faoo_fvsls_ocn == 0)then
+!         call endrun("cam_oslo: VSLS (CHBr3) source set to "//trim(vsls_source)//" but bgc is off")
+!      else
+!         write(iulog,*)"VSLS (CHBr3) emission source is : "// trim(vsls_source)
+!      endif      
+!
+!   endif
 
 ! more security checks needed?
 
@@ -163,7 +176,8 @@ subroutine oslo_getopts(volc_fraction_coarse_out, &
                         ocean_filename_out,       &
                         ocean_filepath_out,       &
                         opom_cycle_year_out,      &
-                        dms_cycle_year_out  )
+                        dms_cycle_year_out,       &
+                        vsls_source_out)
 !-----------------------------------------------------------------------
 ! Purpose: Return runtime settings
 !-----------------------------------------------------------------------
@@ -179,6 +193,7 @@ subroutine oslo_getopts(volc_fraction_coarse_out, &
    character(len=20),                intent(out), optional :: opom_source_out
    character(len=32),                intent(out), optional :: opom_source_type_out
    integer          ,                intent(out), optional :: opom_cycle_year_out
+   character(len=20),                intent(out), optional :: vsls_source_out
 
    if ( present(volc_fraction_coarse_out) ) volc_fraction_coarse_out = volc_fraction_coarse
    if ( present(aerotab_table_dir_out) ) aerotab_table_dir_out = aerotab_table_dir
@@ -191,6 +206,7 @@ subroutine oslo_getopts(volc_fraction_coarse_out, &
    if ( present(opom_source_out) )    opom_source_out     = opom_source
    if ( present(opom_source_type_out))opom_source_type_out= opom_source_type
    if ( present(opom_cycle_year_out) )opom_cycle_year_out = opom_cycle_year
+   if ( present(vsls_source_out) )    vsls_source_out     = vsls_source
 end subroutine oslo_getopts
 
 !===============================================================================

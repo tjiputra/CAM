@@ -49,6 +49,7 @@ module cam_cpl_indices
   integer :: index_a2x_Sa_co2diag      ! bottom atm level diagnostic co2
   integer :: index_a2x_Faxa_nhx        ! flux: Nitrogen deposition
   integer :: index_a2x_Faxa_noy        ! flux: Nitrogen deposition
+  integer :: index_a2x_Sa_vslsprog     ! bottom atm level prognostic bromoform
 
   integer :: index_x2a_Sx_t            ! surface temperature             
   integer :: index_x2a_So_t            ! sea surface temperature         
@@ -87,6 +88,7 @@ module cam_cpl_indices
   integer :: index_x2a_So_ssq          ! surface saturation specific humidity in ocean 
   integer :: index_x2a_Sl_ddvel        ! dry deposition velocities from land
   integer :: index_x2a_Sx_u10          ! 10m wind
+  integer :: index_x2a_Faoo_fvsls_ocn  ! bromoform flux from ocean
 
 contains
 
@@ -141,6 +143,7 @@ contains
     index_x2a_Fall_fco2_lnd = mct_avect_indexra(x2a,'Fall_fco2_lnd',perrWith='quiet')
     index_x2a_Faoo_fco2_ocn = mct_avect_indexra(x2a,'Faoo_fco2_ocn',perrWith='quiet')
     index_x2a_Faoo_fdms_ocn = mct_avect_indexra(x2a,'Faoo_fdms_ocn',perrWith='quiet')
+    index_x2a_Faoo_fvsls_ocn= mct_avect_indexra(x2a,'Faoo_fvsls_ocn',perrWith='quiet')
 
     if (shr_megan_mechcomps_n>0) then
        index_x2a_Fall_flxvoc = mct_avect_indexra(x2a,trim(shr_megan_fields_token))
@@ -200,6 +203,7 @@ contains
     index_a2x_Sa_co2diag    = mct_avect_indexra(a2x,'Sa_co2diag',perrWith='quiet')
     index_a2x_Faxa_nhx      = mct_avect_indexra(a2x,'Faxa_nhx',perrWith='quiet')
     index_a2x_Faxa_noy      = mct_avect_indexra(a2x,'Faxa_noy',perrWith='quiet')
+    index_a2x_Sa_vslsprog   = mct_avect_indexra(a2x,'Sa_vslsprog',perrWith='quiet')
 
     call mct_aVect_clean(x2a)
     call mct_aVect_clean(a2x)

@@ -81,6 +81,7 @@ module camsrfexch
      real(r8) :: dstdry4(pcols)      ! dry deposition of dust (bin4)
      real(r8), pointer, dimension(:) :: nhx_nitrogen_flx ! nitrogen deposition fluxes (kgN/m2/s)
      real(r8), pointer, dimension(:) :: noy_nitrogen_flx ! nitrogen deposition fluxes (kgN/m2/s)
+     real(r8) :: vslsprog(pcols)     ! volume mixing ratio of CHBr3 (pptv)
   end type cam_out_t 
 
 !---------------------------------------------------------------------------
@@ -109,6 +110,7 @@ module camsrfexch
      real(r8) :: fco2_lnd(pcols)         ! co2 flux from lnd
      real(r8) :: fco2_ocn(pcols)         ! co2 flux from ocn
      real(r8) :: fdms(pcols)             ! dms flux
+     real(r8) :: fvsls(pcols)            ! chbr3 flux
      real(r8) :: landfrac(pcols)         ! land area fraction
      real(r8) :: icefrac(pcols)          ! sea-ice areal fraction
      real(r8) :: ocnfrac(pcols)          ! ocean areal fraction
@@ -244,6 +246,7 @@ CONTAINS
        cam_in(c)%fco2_lnd (:) = 0._r8
        cam_in(c)%fco2_ocn (:) = 0._r8
        cam_in(c)%fdms     (:) = 0._r8
+       cam_in(c)%fvsls    (:) = 0._r8
        cam_in(c)%landfrac (:) = posinf
        cam_in(c)%icefrac  (:) = posinf
        cam_in(c)%ocnfrac  (:) = posinf
@@ -355,6 +358,7 @@ CONTAINS
        cam_out(c)%dstwet3(:)  = 0._r8
        cam_out(c)%dstdry4(:)  = 0._r8
        cam_out(c)%dstwet4(:)  = 0._r8
+       cam_out(c)%vslsprog(:) = 0._r8
 
        nullify(cam_out(c)%nhx_nitrogen_flx)
        nullify(cam_out(c)%noy_nitrogen_flx)
@@ -441,6 +445,11 @@ subroutine cam_export(state,cam_out,pbuf)
    use physconst,        only: rair, mwdry, mwco2, gravit
    use constituents,     only: pcnst
    use physics_buffer,   only: pbuf_get_index, pbuf_get_field, physics_buffer_desc
+
+   use chem_mods,        only: adv_mass
+   use constituents,     only: cnst_get_ind
+   use mo_chem_utls,     only: get_spc_ndx
+
    implicit none
 
    !------------------------------Arguments--------------------------------
@@ -461,6 +470,9 @@ subroutine cam_export(state,cam_out,pbuf)
    integer :: psl_idx
    integer :: prec_dp_idx, snow_dp_idx, prec_sh_idx, snow_sh_idx
    integer :: prec_sed_idx,snow_sed_idx,prec_pcw_idx,snow_pcw_idx
+
+   integer :: ind_phys_chbr3
+   integer :: ind_chem_chbr3
 
    real(r8), pointer :: psl(:)
 
@@ -529,6 +541,14 @@ subroutine cam_export(state,cam_out,pbuf)
      do i = 1, ncol
         cam_out%qbot(i,m) = state%q(i,pver,m) 
      end do
+   end do
+
+   ! obtain the tracer index of CHBR3 for phyics-array and chemistry array
+   call cnst_get_ind('CHBR3', ind_phys_chbr3) 
+   ind_chem_chbr3 =get_spc_ndx('CHBR3')
+
+   do i = 1, ncol     
+      cam_out%vslsprog(i) = state%q(i,pver,ind_phys_chbr3) * 1.0e+12_r8 * mwdry/adv_mass(ind_chem_chbr3)
    end do
 
    cam_out%co2diag(:ncol) = chem_surfvals_get('CO2VMR') * 1.0e+6_r8 
