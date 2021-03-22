@@ -349,7 +349,7 @@ subroutine oslo_vsls_emis_intr(state, cam_in)
 
    ! IF OCEAN FLUX
    if(vsls_source=='ocean_flux') then 
-      cam_in%cflx(:ncol, pndx_chbr3)  =  cam_in%fvsls(:ncol)
+      cam_in%cflx(:ncol, pndx_chbr3)  =  cam_in%fchbr3(:ncol)
    endif
 
 endsubroutine oslo_vsls_emis_intr
