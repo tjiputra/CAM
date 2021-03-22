@@ -81,7 +81,7 @@ module camsrfexch
      real(r8) :: dstdry4(pcols)      ! dry deposition of dust (bin4)
      real(r8), pointer, dimension(:) :: nhx_nitrogen_flx ! nitrogen deposition fluxes (kgN/m2/s)
      real(r8), pointer, dimension(:) :: noy_nitrogen_flx ! nitrogen deposition fluxes (kgN/m2/s)
-     real(r8) :: vslsprog(pcols)     ! volume mixing ratio of CHBr3 (pptv)
+     real(r8) :: chbr3prog(pcols)    ! volume mixing ratio of CHBr3 (pptv)
   end type cam_out_t 
 
 !---------------------------------------------------------------------------
@@ -110,7 +110,7 @@ module camsrfexch
      real(r8) :: fco2_lnd(pcols)         ! co2 flux from lnd
      real(r8) :: fco2_ocn(pcols)         ! co2 flux from ocn
      real(r8) :: fdms(pcols)             ! dms flux
-     real(r8) :: fvsls(pcols)            ! chbr3 flux
+     real(r8) :: fchbr3(pcols)           ! chbr3 flux
      real(r8) :: landfrac(pcols)         ! land area fraction
      real(r8) :: icefrac(pcols)          ! sea-ice areal fraction
      real(r8) :: ocnfrac(pcols)          ! ocean areal fraction
@@ -246,7 +246,7 @@ CONTAINS
        cam_in(c)%fco2_lnd (:) = 0._r8
        cam_in(c)%fco2_ocn (:) = 0._r8
        cam_in(c)%fdms     (:) = 0._r8
-       cam_in(c)%fvsls    (:) = 0._r8
+       cam_in(c)%fchbr3   (:) = 0._r8
        cam_in(c)%landfrac (:) = posinf
        cam_in(c)%icefrac  (:) = posinf
        cam_in(c)%ocnfrac  (:) = posinf
@@ -358,7 +358,7 @@ CONTAINS
        cam_out(c)%dstwet3(:)  = 0._r8
        cam_out(c)%dstdry4(:)  = 0._r8
        cam_out(c)%dstwet4(:)  = 0._r8
-       cam_out(c)%vslsprog(:) = 0._r8
+       cam_out(c)%chbr3prog(:)= 0._r8
 
        nullify(cam_out(c)%nhx_nitrogen_flx)
        nullify(cam_out(c)%noy_nitrogen_flx)
@@ -548,7 +548,7 @@ subroutine cam_export(state,cam_out,pbuf)
    ind_chem_chbr3 =get_spc_ndx('CHBR3')
 
    do i = 1, ncol     
-      cam_out%vslsprog(i) = state%q(i,pver,ind_phys_chbr3) * 1.0e+12_r8 * mwdry/adv_mass(ind_chem_chbr3)
+      cam_out%chbr3prog(i) = state%q(i,pver,ind_phys_chbr3) * 1.0e+12_r8 * mwdry/adv_mass(ind_chem_chbr3)
    end do
 
    cam_out%co2diag(:ncol) = chem_surfvals_get('CO2VMR') * 1.0e+6_r8 

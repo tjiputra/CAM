@@ -10,7 +10,7 @@ use cam_logfile,   only: iulog
 use cam_abortutils, only: endrun
 use shr_kind_mod,  only: r8 => shr_kind_r8
 use cam_cpl_indices, only:index_x2a_Faoo_fdms_ocn
-!use cam_cpl_indices, only:index_x2a_Faoo_fvsls_ocn
+!use cam_cpl_indices, only:index_x2a_Faoo_fbrf_ocn
 
 implicit none
 private
@@ -152,7 +152,7 @@ subroutine oslo_ctl_readnl(nlfile)
 
 !   ! Error check for vsls_source from namelist
 !   if (vsls_source=='ocean_flux')then
-!      if (index_x2a_Faoo_fvsls_ocn == 0)then
+!      if (index_x2a_Faoo_fbrf_ocn == 0)then
 !         call endrun("cam_oslo: VSLS (CHBr3) source set to "//trim(vsls_source)//" but bgc is off")
 !      else
 !         write(iulog,*)"VSLS (CHBr3) emission source is : "// trim(vsls_source)

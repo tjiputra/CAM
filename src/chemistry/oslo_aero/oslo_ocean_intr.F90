@@ -84,7 +84,7 @@ module oslo_ocean_intr
    integer            :: pndx_fdms                       !DMS surface flux physics index
 
    character(len=20)  :: vsls_source                     ! will be collected from NAMELIST   
-   integer            :: pndx_vsls                      !CHBR3 surface flux physcis index 
+   integer            :: pndx_chbr3                      !CHBR3 surface flux physcis index 
 
 contains
 !---------------------------------------------------------------------
@@ -171,7 +171,7 @@ subroutine oslo_ocean_init()
 !   write(iulog,*)"test dms p index: " ,pndx_fdms
 
    !get physics index for chbr3 surface flux.  Index for cflx
-   call cnst_get_ind('CHBR3', pndx_vsls, abort=.true.)
+   call cnst_get_ind('CHBR3', pndx_chbr3, abort=.true.)
 
    if (dms_source=='lana')then
       emis_species(1) = dmsl_fld_name
@@ -349,7 +349,7 @@ subroutine oslo_vsls_emis_intr(state, cam_in)
 
    ! IF OCEAN FLUX
    if(vsls_source=='ocean_flux') then 
-      cam_in%cflx(:ncol, pndx_vsls)  =  cam_in%fvsls(:ncol)
+      cam_in%cflx(:ncol, pndx_chbr3)  =  cam_in%fvsls(:ncol)
    endif
 
 endsubroutine oslo_vsls_emis_intr
