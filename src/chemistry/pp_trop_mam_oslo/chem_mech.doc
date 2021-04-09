@@ -87,23 +87,24 @@ Class List
   
      Photolysis
   jh2o2            (  1)   H2O2 + hv -> (No products)                                           rate = ** User defined **         (  1)
+  jchbr3           (  2)   CHBR3 + hv -> (No products)                                          rate = ** User defined **         (  2)
   
      Reactions
-  usr_HO2_HO2      (  1)   HO2 + HO2 ->  H2O2                                                   rate = ** User defined **         (  2)
-                   (  2)   H2O2 + OH ->  H2O + HO2                                              rate = 2.90E-12*exp(   -160./t)   (  3)
-                   (  3)   DMS + OH ->  SO2                                                     rate = 9.60E-12*exp(   -234./t)   (  4)
-                   (  4)   DMS + NO3 ->  SO2 + {HNO3}                                           rate = 1.90E-13*exp(    520./t)   (  5)
-                   (  5)   SO2 + OH + M ->  H2SO4 + M                                           troe : ko=3.00E-31*(300/t)**3.30  (  6)
+  usr_HO2_HO2      (  1)   HO2 + HO2 ->  H2O2                                                   rate = ** User defined **         (  3)
+                   (  2)   H2O2 + OH ->  H2O + HO2                                              rate = 2.90E-12*exp(   -160./t)   (  4)
+                   (  3)   DMS + OH ->  SO2                                                     rate = 9.60E-12*exp(   -234./t)   (  5)
+                   (  4)   DMS + NO3 ->  SO2 + {HNO3}                                           rate = 1.90E-13*exp(    520./t)   (  6)
+                   (  5)   SO2 + OH + M ->  H2SO4 + M                                           troe : ko=3.00E-31*(300/t)**3.30  (  7)
                                                                                                        ki=1.50E-12                
                                                                                                         f=0.60                    
-  usr_DMS_OH       (  6)   DMS + OH ->  .75*SO2 + .5*HO2 + 0.029*SOA_LV + 0.114*SOA_SV          rate = ** User defined **         (  7)
-                   (  7)   monoterp + O3 ->  .15*SOA_LV                                         rate = 8.05E-16*exp(   -640./t)   (  8)
-                   (  8)   monoterp + OH ->  .15*SOA_SV                                         rate = 1.20E-11*exp(    440./t)   (  9)
-                   (  9)   monoterp + NO3 ->  .15*SOA_SV                                        rate = 1.20E-12*exp(    490./t)   ( 10)
-                   ( 10)   isoprene + O3 ->  .05*SOA_SV                                         rate = 1.03E-14*exp(  -1995./t)   ( 11)
-                   ( 11)   isoprene + OH ->  .05*SOA_SV                                         rate = 2.70E-11*exp(    390./t)   ( 12)
-                   ( 12)   isoprene + NO3 ->  .05*SOA_SV                                        rate = 3.15E-12*exp(   -450./t)   ( 13)
-                   ( 13)   CHBR3 -> (No products)                                               rate = 3.86E-07                   ( 14)
+  CHBR3_OH         (  6)   CHBR3 + OH -> (No products)                                          rate = 9.00E-13*exp(   -360./t)   (  8)
+  usr_DMS_OH       (  7)   DMS + OH ->  .75*SO2 + .5*HO2 + 0.029*SOA_LV + 0.114*SOA_SV          rate = ** User defined **         (  9)
+                   (  8)   monoterp + O3 ->  .15*SOA_LV                                         rate = 8.05E-16*exp(   -640./t)   ( 10)
+                   (  9)   monoterp + OH ->  .15*SOA_SV                                         rate = 1.20E-11*exp(    440./t)   ( 11)
+                   ( 10)   monoterp + NO3 ->  .15*SOA_SV                                        rate = 1.20E-12*exp(    490./t)   ( 12)
+                   ( 11)   isoprene + O3 ->  .05*SOA_SV                                         rate = 1.03E-14*exp(  -1995./t)   ( 13)
+                   ( 12)   isoprene + OH ->  .05*SOA_SV                                         rate = 2.70E-11*exp(    390./t)   ( 14)
+                   ( 13)   isoprene + NO3 ->  .05*SOA_SV                                        rate = 3.15E-12*exp(   -450./t)   ( 15)
   
 Heterogeneous loss species
   
@@ -119,10 +120,10 @@ Extraneous prod/loss species
   
  Equation Report
   
-    d(SO2)/dt = r3*OH*DMS  + r4*NO3*DMS  + .75*r6*OH*DMS                                                                
+    d(SO2)/dt = r3*OH*DMS  + r4*NO3*DMS  + .75*r7*OH*DMS                                                                
                  - r5*OH*M*SO2                                                                                          
     d(H2SO4)/dt = r5*OH*M*SO2                                                                                           
-    d(DMS)/dt =  - r3*OH*DMS  - r4*NO3*DMS  - r6*OH*DMS                                                                 
+    d(DMS)/dt =  - r3*OH*DMS  - r4*NO3*DMS  - r7*OH*DMS                                                                 
     d(H2O2)/dt = r1                                                                                                     
                   - j1*H2O2  - r2*OH*H2O2                                                                               
     d(SO4_NA)/dt = 0                                                                                                    
@@ -146,10 +147,10 @@ Extraneous prod/loss species
     d(SS_A3)/dt = 0                                                                                                     
     d(SOA_NA)/dt = 0                                                                                                    
     d(SOA_A1)/dt = 0                                                                                                    
-    d(SOA_LV)/dt = .029*r6*OH*DMS  + .15*r7*O3*monoterp                                                                 
-    d(SOA_SV)/dt = .114*r6*OH*DMS  + .15*r8*OH*monoterp  + .15*r9*NO3*monoterp  + .05*r10*O3*isoprene                   
-                    + .05*r11*OH*isoprene  + .05*r12*NO3*isoprene                                                       
-    d(monoterp)/dt =  - r7*O3*monoterp  - r8*OH*monoterp  - r9*NO3*monoterp                                             
-    d(isoprene)/dt =  - r10*O3*isoprene  - r11*OH*isoprene  - r12*NO3*isoprene                                          
-    d(CHBR3)/dt =  - r13*CHBR3                                                                                          
+    d(SOA_LV)/dt = .029*r7*OH*DMS  + .15*r8*O3*monoterp                                                                 
+    d(SOA_SV)/dt = .114*r7*OH*DMS  + .15*r9*OH*monoterp  + .15*r10*NO3*monoterp  + .05*r11*O3*isoprene                  
+                    + .05*r12*OH*isoprene  + .05*r13*NO3*isoprene                                                       
+    d(monoterp)/dt =  - r8*O3*monoterp  - r9*OH*monoterp  - r10*NO3*monoterp                                            
+    d(isoprene)/dt =  - r11*O3*isoprene  - r12*OH*isoprene  - r13*NO3*isoprene                                          
+    d(CHBR3)/dt =  - j2*CHBR3  - r6*OH*CHBR3                                                                            
     d(H2O)/dt = r2*OH*H2O2                                                                                              

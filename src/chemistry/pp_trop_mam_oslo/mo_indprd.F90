@@ -23,7 +23,7 @@
       if( class == 4 ) then
          prod(:,:,1) = 0._r8
          prod(:,:,2) = + extfrc(:,:,1)
-         prod(:,:,3) =rxt(:,:,2)
+         prod(:,:,3) =rxt(:,:,3)
          prod(:,:,4) = 0._r8
          prod(:,:,5) = 0._r8
          prod(:,:,6) = 0._r8

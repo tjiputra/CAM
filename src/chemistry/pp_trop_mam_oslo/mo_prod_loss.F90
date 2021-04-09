@@ -32,11 +32,11 @@
 !--------------------------------------------------------------------
 ! ... loss and production for Implicit method
 !--------------------------------------------------------------------
-         loss(1) = ( + rxt(4) + rxt(5) + rxt(7) + het_rates(3))* y(3)
+         loss(1) = ( + rxt(5) + rxt(6) + rxt(9) + het_rates(3))* y(3)
          prod(1) = 0._r8
-         loss(2) = ( + rxt(6) + het_rates(1))* y(1)
-         prod(2) = (rxt(4) +rxt(5) +.750_r8*rxt(7))*y(3)
-         loss(3) = ( + rxt(1) + rxt(3) + het_rates(4))* y(4)
+         loss(2) = ( + rxt(7) + het_rates(1))* y(1)
+         prod(2) = (rxt(5) +rxt(6) +.750_r8*rxt(9))*y(3)
+         loss(3) = ( + rxt(1) + rxt(4) + het_rates(4))* y(4)
          prod(3) = 0._r8
          loss(4) = ( + het_rates(5))* y(5)
          prod(4) = 0._r8
@@ -77,23 +77,23 @@
          loss(22) = ( + het_rates(23))* y(23)
          prod(22) = 0._r8
          loss(23) = ( + het_rates(2))* y(2)
-         prod(23) =rxt(6)*y(1)
+         prod(23) =rxt(7)*y(1)
          loss(24) = ( + het_rates(24))* y(24)
          prod(24) = 0._r8
          loss(25) = ( + het_rates(25))* y(25)
          prod(25) = 0._r8
          loss(26) = ( + het_rates(26))* y(26)
-         prod(26) =.029_r8*rxt(7)*y(3) +.150_r8*rxt(8)*y(28)
+         prod(26) =.029_r8*rxt(9)*y(3) +.150_r8*rxt(10)*y(28)
          loss(27) = ( + het_rates(27))* y(27)
-         prod(27) = (.050_r8*rxt(11) +.050_r8*rxt(12) +.050_r8*rxt(13))*y(29) &
-                  + (.150_r8*rxt(9) +.150_r8*rxt(10))*y(28) +.114_r8*rxt(7)*y(3)
-         loss(28) = ( + rxt(8) + rxt(9) + rxt(10) + het_rates(28))* y(28)
+         prod(27) = (.050_r8*rxt(13) +.050_r8*rxt(14) +.050_r8*rxt(15))*y(29) &
+                  + (.150_r8*rxt(11) +.150_r8*rxt(12))*y(28) +.114_r8*rxt(9)*y(3)
+         loss(28) = ( + rxt(10) + rxt(11) + rxt(12) + het_rates(28))* y(28)
          prod(28) = 0._r8
-         loss(29) = ( + rxt(11) + rxt(12) + rxt(13) + het_rates(29))* y(29)
+         loss(29) = ( + rxt(13) + rxt(14) + rxt(15) + het_rates(29))* y(29)
          prod(29) = 0._r8
-         loss(30) = ( + rxt(14) + het_rates(30))* y(30)
+         loss(30) = ( + rxt(2) + rxt(8) + het_rates(30))* y(30)
          prod(30) = 0._r8
          loss(31) = ( + het_rates(31))* y(31)
-         prod(31) =rxt(3)*y(4)
+         prod(31) =rxt(4)*y(4)
       end subroutine imp_prod_loss
       end module mo_prod_loss

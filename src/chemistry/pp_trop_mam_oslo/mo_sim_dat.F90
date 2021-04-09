@@ -33,7 +33,7 @@
 
       clscnt(:) = (/      0,     0,     0,    31,     0 /)
 
-      cls_rxt_cnt(:,4) = (/      1,    13,     0,    31 /)
+      cls_rxt_cnt(:,4) = (/      1,    14,     0,    31 /)
 
       solsym(: 31) = (/ 'SO2             ','H2SO4           ','DMS             ','H2O2            ','SO4_NA          ', &
                         'SO4_A1          ','SO4_A2          ','SO4_AC          ','SO4_PR          ','BC_N            ', &
@@ -102,9 +102,10 @@
          write(iulog,*) 'set_sim_dat: failed to allocate rxt_tag_map; error = ',ios
          call endrun
       end if
-      rxt_tag_lst(     1:     3) = (/ 'jh2o2                           ', 'usr_HO2_HO2                     ', &
+      rxt_tag_lst(     1:     5) = (/ 'jh2o2                           ', 'jchbr3                          ', &
+                                      'usr_HO2_HO2                     ', 'CHBR3_OH                        ', &
                                       'usr_DMS_OH                      ' /)
-      rxt_tag_map(:rxt_tag_cnt) = (/    1,   2,   7 /)
+      rxt_tag_map(:rxt_tag_cnt) = (/    1,   2,   3,   8,   9 /)
       if( allocated( pht_alias_lst ) ) then
          deallocate( pht_alias_lst )
       end if
@@ -121,17 +122,17 @@
          write(iulog,*) 'set_sim_dat: failed to allocate pht_alias_mult; error = ',ios
          call endrun
       end if
-      pht_alias_lst(:,1) = (/ '                ' /)
-      pht_alias_lst(:,2) = (/ '                ' /)
-      pht_alias_mult(:,1) = (/ 1._r8 /)
-      pht_alias_mult(:,2) = (/ 1._r8 /)
+      pht_alias_lst(:,1) = (/ '                ', '                ' /)
+      pht_alias_lst(:,2) = (/ '                ', '                ' /)
+      pht_alias_mult(:,1) = (/ 1._r8, 1._r8 /)
+      pht_alias_mult(:,2) = (/ 1._r8, 1._r8 /)
       allocate( num_rnts(rxntot-phtcnt),stat=ios )
       if( ios /= 0 ) then
          write(iulog,*) 'set_sim_dat: failed to allocate num_rnts; error = ',ios
          call endrun
       end if
       num_rnts(:) = (/      2,     2,     2,     2,     3,     2,     2,     2,     2,     2, &
-                            2,     2,     1 /)
+                            2,     2,     2 /)
 
       end subroutine set_sim_dat
 
