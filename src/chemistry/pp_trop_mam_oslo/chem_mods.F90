@@ -5,8 +5,8 @@
       use shr_kind_mod, only : r8 => shr_kind_r8
       implicit none
       save
-      integer, parameter :: phtcnt = 1, & ! number of photolysis reactions
-                            rxntot = 14, & ! number of total reactions
+      integer, parameter :: phtcnt = 2, & ! number of photolysis reactions
+                            rxntot = 15, & ! number of total reactions
                             gascnt = 13, & ! number of gas phase reactions
                             nabscol = 2, & ! number of absorbing column densities
                             gas_pcnst = 31, & ! number of "gas phase" species
@@ -23,7 +23,7 @@
                             indexm = 1, & ! index of total atm density in invariant array
                             indexh2o = 0, & ! index of water vapor density
                             clsze = 1, & ! loop length for implicit chemistry
-                            rxt_tag_cnt = 3, &
+                            rxt_tag_cnt = 5, &
                             enthalpy_cnt = 0, &
                             nslvd = 0
       integer :: clscnt(5) = 0
