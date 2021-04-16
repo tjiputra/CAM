@@ -51,6 +51,7 @@ BEGSIM
  CHEMISTRY
       Photolysis
  [jh2o2]    H2O2 + hv ->
+ [jchbr3]   CHBR3 + hv -> 
       End Photolysis
 
       Reactions
@@ -59,6 +60,7 @@ BEGSIM
                DMS + OH -> SO2                                                  ; 9.6e-12, -234.
                DMS + NO3 -> SO2 + HNO3                                          ; 1.9e-13,  520.
                SO2 + OH + M -> H2SO4 + M                                      ; 3.0e-31, 3.3, 1.5e-12, 0.0, 0.6
+ [CHBR3_OH]    CHBR3 + OH  ->                                                   ; 9e-13, -360
 * SOA has MW=168, and MSA=96, so to get correct MSA mass ==> factor of 96/168 = 0.57
 * Then account for 0.25 which is 0.25 MSA molec per DMS molec (the other 0.75 goes to SO2)
 * Then 0.2 assumed yield for SOA_LV and 0.8 assumed  yield for SOA_SV gives the coefficients below
@@ -77,8 +79,6 @@ BEGSIM
 	       isoprene + O3 -> .05*SOA_SV			; 1.03e-14, -1995.
 	       isoprene + OH -> .05*SOA_SV 			; 2.7e-11, 390.
 	       isoprene + NO3 -> .05*SOA_SV 			; 3.15e-12, -450.
-*     Bromoform
-               CHBR3          ->                                ; 3.86e-7 
       End Reactions
 
       Heterogeneous
@@ -110,4 +110,5 @@ BEGSIM
      End Version Options
 
    END SIMULATION PARAMETERS
+
 ENDSIM
